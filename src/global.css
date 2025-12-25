@@ -1,0 +1,45 @@
+/* Global styles to override Enact defaults */
+
+/* Remove Enact Panels default horizontal padding - using multiple selectors for maximum specificity */
+div[class*="Panels_Panel"] section[class*="Panel_body"] {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+
+/* Make Panel headers transparent to show backdrop images */
+header[class*="Panels_Header"],
+[class*="sandstone_Header"],
+[class*="sandstone-panels-Header"],
+[class*="Header_Header"],
+[class*="PanelHeader"] {
+	background: rgba(0, 0, 0, 0.35) !important;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+	z-index: 20 !important;
+	backdrop-filter: blur(0.1rem) !important;
+	-webkit-backdrop-filter: blur(0.1rem) !important;
+	box-shadow: none !important;
+	border: none !important;
+	padding: 2rem 0.5rem 0.5rem 0.5rem !important;
+}
+
+header[class*="Panels_Header"] * {
+	background: transparent !important;
+}
+
+/* Strip Sandstone default hover/pressed shadows on buttons app-wide */
+[class*="Button_Button_bg"],
+[class*="Button_Button"],
+[class*="Button_Button"]:hover,
+[class*="Button_Button"]:focus,
+[class*="Button_Button"]:active,
+button,
+button:hover,
+button:focus,
+button:active,
+button::before,
+button::after {
+	box-shadow: none !important;
+	background: transparent !important;
+	filter: none !important;
+	max-width: none !important;
+}

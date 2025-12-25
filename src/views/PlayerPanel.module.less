@@ -1,0 +1,150 @@
+.playerContainer {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	background: #000;
+}
+
+.video {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	background: #000;
+}
+
+.loading {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 100;
+}
+
+.error {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 100;
+	background: rgba(0, 0, 0, 0.9);
+	padding: 48px;
+	border-radius: 12px;
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.alwaysVisibleBack {
+	position: absolute;
+	top: 24px;
+	left: 24px;
+	z-index: 50;
+}
+
+.controls {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	background: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.7) 0%,
+		rgba(0, 0, 0, 0) 20%,
+		rgba(0, 0, 0, 0) 80%,
+		rgba(0, 0, 0, 0.7) 100%
+	);
+	pointer-events: none;
+	
+	> * {
+		pointer-events: auto;
+	}
+}
+
+.topBar {
+	display: flex;
+	align-items: center;
+	padding: 64px;
+	gap: 24px;
+}
+
+.title {
+	font-size: 1.8em;
+	font-weight: 600;
+	line-height: 1.2;
+	margin: 0;
+	padding: 0;
+}
+
+.bottomBar {
+	padding: 32px 64px 64px;
+}
+
+.progressContainer {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	margin-bottom: 24px;
+}
+
+.time {
+	font-size: 1.2em;
+	min-width: 80px;
+	text-align: center;
+}
+
+.progressSlider {
+	flex: 1;
+}
+
+.controlButtons {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 36px;
+	flex-wrap: nowrap;
+}
+
+.volumeControl {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-left: 48px;
+	min-width: 240px;
+}
+
+.volumeSlider {
+	width: 180px;
+	min-width: 180px;
+	flex-shrink: 0;
+}
+
+.trackButtons {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-left: 48px;
+}
+
+.trackPopup {
+	padding: 24px;
+	min-width: 1200px;
+	max-width: 80vw;
+	max-height: 70vh;
+}
+
+.popupTitle {
+	font-size: 1.5em;
+	font-weight: 600;
+	margin-bottom: 16px;
+	text-align: center;
+}
+
+.trackList {
+	max-height: 55vh;
+	width: 100%;
+}

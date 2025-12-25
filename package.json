@@ -1,0 +1,51 @@
+{
+	"name": "breezyfin",
+	"version": "1.0.0",
+	"description": "A general template for an Enact Sandstone application.",
+	"author": "",
+	"main": "src/index.js",
+	"scripts": {
+		"serve": "enact serve",
+		"pack": "enact pack",
+		"pack-p": "enact pack -p",
+		"watch": "enact pack --watch",
+		"clean": "enact clean",
+		"lint": "enact lint .",
+		"license": "enact license",
+		"test": "enact test",
+		"test-watch": "enact test --watch"
+	},
+	"license": "UNLICENSED",
+	"private": true,
+	"repository": "",
+	"enact": {
+		"theme": "sandstone"
+	},
+	"eslintConfig": {
+		"extends": "enact-proxy"
+	},
+	"eslintIgnore": [
+		"node_modules/*",
+		"build/*",
+		"dist/*"
+	],
+	"dependencies": {
+		"@enact/core": "^4.8.0",
+		"@enact/i18n": "^4.8.0",
+		"@enact/sandstone": "^2.8.0",
+		"@enact/spotlight": "^4.8.0",
+		"@enact/ui": "^4.8.0",
+		"@enact/webos": "^5.3.2",
+		"@jellyfin/sdk": "^0.13.0",
+		"axios": "^1.13.2",
+		"hls.js": "^1.6.15",
+		"ilib": "^14.19.0",
+		"prop-types": "^15.8.1",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0",
+		"web-vitals": "^3.5.1"
+	},
+	"devDependencies": {
+		"eslint-config-enact-proxy": "^1.0.7"
+	}
+}

@@ -1,0 +1,42 @@
+# See http://help.github.com/ignore-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+
+# testing
+coverage
+test/
+tests/
+*.spec.js
+*.test.js
+
+# production
+build
+dist
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# misc
+.DS_Store
+npm-debug.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*
+breezyfin-webos.code-workspace
+.webosstudio.config

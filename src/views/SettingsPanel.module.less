@@ -1,0 +1,142 @@
+.settingsContainer {
+	background: #121212;
+	min-height: 100vh;
+	padding-top: 0;
+}
+
+.content {
+	padding: 5rem 4rem 13rem;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(20rem, 1fr));
+	gap: 1.5rem;
+	max-width: 100%;
+	margin: 0 auto;
+}
+
+.section {
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 12px;
+	padding: 1.5rem;
+	min-width: 0;
+}
+
+.sectionTitle {
+	font-size: 1.1em;
+	font-weight: 600;
+	margin-bottom: 1rem;
+	padding-bottom: 0.5rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	color: #8ab4f8;
+}
+
+.infoItem {
+	background: transparent !important;
+	padding: 0.75rem 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	
+	&:last-of-type {
+		border-bottom: none;
+	}
+}
+
+.settingItem {
+	background: transparent !important;
+	padding: 0.75rem 0;
+	cursor: pointer;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	
+	&:global(.spottable):focus {
+		background: rgba(138, 180, 248, 0.2) !important;
+		border-radius: 8px;
+	}
+	
+	&:last-of-type {
+		border-bottom: none;
+	}
+}
+
+.switchItem {
+	background: transparent !important;
+	padding: 0.75rem 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	
+	&:last-of-type {
+		border-bottom: none;
+	}
+	
+	&:global(.spottable):focus {
+		background: rgba(138, 180, 248, 0.2) !important;
+		border-radius: 8px;
+	}
+}
+
+.loadingItem {
+	display: flex;
+	justify-content: center;
+	padding: 2rem;
+}
+
+.logoutButton {
+	margin-top: 1rem;
+	width: 100%;
+	background: rgba(244, 67, 54, 0.2);
+	
+	&:hover,
+	&:focus {
+		background: rgba(244, 67, 54, 0.4);
+	}
+}
+
+.popup {
+	z-index: 1000;
+}
+
+.popupContent {
+	padding: 1.5rem;
+	min-width: 300px;
+}
+
+.popupTitle {
+    font-size: 1.2em;
+	font-weight: 600;
+	margin-bottom: 1rem;
+}
+
+.popupMessage {
+	text-align: center;
+	margin-bottom: 1.5rem;
+	opacity: 0.8;
+}
+
+.popupOptions {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 0.5rem;
+}
+
+.popupOption {
+	justify-content: center;
+	padding: 0.5rem 0.75rem;
+	min-height: auto;
+	font-size: 0.9em;
+}
+
+.popupActions {
+	display: flex;
+	gap: 1rem;
+	justify-content: center;
+	margin-top: 1rem;
+	
+	button {
+		flex: 1;
+	}
+}
+
+.dangerButton {
+	background: rgba(244, 67, 54, 0.6);
+	
+	&:hover,
+	&:focus {
+		background: rgba(244, 67, 54, 0.8);
+	}
+}

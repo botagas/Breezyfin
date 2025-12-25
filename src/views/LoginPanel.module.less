@@ -1,0 +1,133 @@
+.page {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	padding: 48px;
+	background-color: #11121a;
+	background-image:
+		repeating-linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.05),
+			rgba(255, 255, 255, 0.05) 2px,
+			transparent 2px,
+			transparent 88px
+		),
+		repeating-linear-gradient(
+			135deg,
+			rgba(0, 164, 220, 0.06),
+			rgba(0, 164, 220, 0.06) 2px,
+			transparent 2px,
+			transparent 108px
+		);
+	background-size: 240px 240px, 360px 360px;
+}
+
+.loginBox {
+	max-width: 100%;
+	width: min(92vw, 50%);
+	background: rgba(0, 0, 0, 0.35);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	padding: 64px 72px 72px;
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	align-items: stretch;
+	box-sizing: border-box;
+
+	> * {
+		width: 100%;
+		margin: 0;
+	}
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	margin-bottom: 8px;
+	width: 100%;
+	text-align: center;
+	background: transparent !important;
+}
+
+.inlineSpinner {
+	margin-left: auto;
+}
+
+.lead {
+	margin-bottom: 24px;
+	opacity: 0.85;
+	width: 100%;
+	text-align: center;
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	width: 100%;
+}
+
+/* Force form direct children (including Sandstone Button wrappers) to full width */
+.form > * {
+	width: 100%;
+	max-width: none !important;
+	margin: 0 !important;
+}
+
+.form :global(.Button_Button),
+.form :global(.Button_Button:hover),
+.form :global(.Button_Button:focus),
+.form :global(.Button_Button:active) {
+	background: rgba(255, 255, 255, 0.14) !important;
+	border: 1px solid rgba(255, 255, 255, 0.2) !important;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35) !important;
+	color: #ffffff !important;
+}
+
+.inputField {
+	background: rgba(255, 255, 255, 0.12) !important;
+	border: 1px solid rgba(255, 255, 255, 0.2) !important;
+	border-radius: 12px !important;
+	padding: 6px 0 !important;
+
+	:global(input) {
+		background: transparent !important;
+		color: #ffffff !important;
+	}
+}
+
+.serverInfo {
+	opacity: 0.75;
+	font-size: 0.95em;
+	text-align: center;
+}
+
+.buttonRow {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	width: 100%;
+}
+
+.status {
+	margin-top: 16px;
+	opacity: 0.8;
+	text-align: center;
+}
+
+.errorBanner {
+	margin-top: 12px;
+	padding: 14px 18px;
+	border-radius: 10px;
+	background: rgba(255, 87, 87, 0.12);
+	border: 1px solid rgba(255, 87, 87, 0.4);
+	color: #ffdede;
+	line-height: 1.5;
+}

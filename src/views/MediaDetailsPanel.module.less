@@ -1,0 +1,441 @@
+.scroller {
+	min-height: calc(100vh + 0.75rem);
+	overflow-y: auto;
+	background: transparent;
+	margin-top: -9rem;
+}
+
+.detailsContainer {
+	min-height: 100vh;
+	background: rgba(18, 18, 18, 0.45);
+	position: relative;
+}
+
+.loading {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 80vh;
+}
+
+.backdrop {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	overflow: hidden;
+	z-index: 0;
+	pointer-events: none;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0.6;
+		filter: blur(18px);
+		transform: scale(1.05);
+	}
+}
+
+.gradient {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.55) 0%,
+		rgba(0, 0, 0, 0.35) 35%,
+		rgba(18, 18, 18, 0.85) 75%,
+		#121212 100%
+	);
+	z-index: 1;
+}
+
+.content {
+	padding: 10rem 48px 120px 48px;
+	position: relative;
+	z-index: 2;
+}
+
+.header {
+	margin-bottom: 32px;
+}
+
+.title {
+	margin-bottom: 12px;
+	color: #ffffff;
+	font-size: 2.5em;
+	font-weight: 700;
+	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.episodeInfo {
+	font-size: 1.3em;
+	margin-bottom: 16px;
+	color: rgba(255, 255, 255, 0.85);
+	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.metadata {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.metadataItem {
+	padding: 8px 16px;
+	background: rgba(255, 255, 255, 0.15);
+	border-radius: 6px;
+	font-size: 1em;
+	font-weight: 500;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	backdrop-filter: blur(10px);
+}
+
+.overview {
+	margin-top: 32px;
+	margin-bottom: 24px;
+	line-height: 1.7;
+	max-width: 100%;
+	color: rgba(255, 255, 255, 0.9);
+	font-size: 1.1em;
+}
+
+.genres {
+	margin-bottom: 24px;
+	color: rgba(255, 255, 255, 0.7);
+	font-size: 1em;
+}
+
+.seriesContent {
+	margin-bottom: 32px;
+}
+
+.sectionHeading {
+	margin-bottom: 20px;
+	color: rgba(255, 255, 255, 0.95);
+	font-weight: 600;
+}
+
+.seasonsSection {
+	margin-bottom: 48px;
+}
+
+.seasonCards {
+	display: flex;
+	gap: 1rem;
+	overflow-x: auto;
+	padding-bottom: 16px;
+	scroll-behavior: smooth;
+	
+	// Hide scrollbar but keep functionality
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+.seasonCard {
+	flex-shrink: 0;
+	width: 15rem;
+	cursor: pointer;
+	transition: transform 0.2s, box-shadow 0.2s;
+	border-radius: 8px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.05);
+	border: 3px solid transparent;
+	position: relative;
+
+	&:hover {
+		transform: scale(1.05);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+	}
+
+	&.selected {
+		border-color: rgba(0, 164, 220, 0.95);
+		box-shadow: 0 4px 16px rgba(0, 164, 220, 0.4);
+	}
+}
+
+.seasonWatchedButton {
+	position: absolute;
+	top: 50px;
+	right: 50px;
+	z-index: 2;
+	width: 56px;
+	height: 56px;
+	background: rgba(0, 0, 0, 0.2);
+	backdrop-filter: blur(10px);
+	border-radius: 50%;
+	border: 2px solid rgba(255, 255, 255, 0.3);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.2s;
+	padding: 15px;
+
+	&:hover {
+		background: rgba(0, 0, 0, 0.1);
+		border-color: rgba(255, 255, 255, 0.5);
+	}
+
+	button {
+		min-width: unset !important;
+		padding: 0 !important;
+		background: transparent !important;
+		border: none !important;
+		font-size: 24px !important;
+
+		&[data-webos-voice-focused="true"],
+		&:focus {
+			color: rgba(0, 164, 220, 1) !important;
+		}
+
+		&:not([data-webos-voice-focused="true"]):not(:focus) {
+			color: rgba(255, 255, 255, 0.7) !important;
+		}
+	}
+}
+
+.seasonPoster {
+	width: 100%;
+	aspect-ratio: 2/3;
+	object-fit: cover;
+	display: block;
+}
+
+.seasonName {
+	padding: 10px;
+	font-weight: 600;
+	font-size: 0.95em;
+	color: rgba(255, 255, 255, 0.95);
+	word-wrap: break-word;
+	line-height: 1.3;
+	text-align: center;
+}
+
+.episodeCount {
+	padding: 0 10px 10px 10px;
+	font-size: 0.85em;
+	color: rgba(255, 255, 255, 0.6);
+	text-align: center;
+}
+
+.episodesSection {
+	margin-bottom: 32px;
+}
+
+.episodeCards {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.episodeCard {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+	padding: 16px;
+	background: transparent;
+	border-radius: 60px;
+	transition: background 0.2s, transform 0.2s;
+	height: 15rem;
+
+	&:hover,
+	&:focus {
+		background: rgba(255, 255, 255, 0.05);
+		transform: translateX(8px);
+		
+		.episodeImageContainer {
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+		}
+	}
+
+	&.selected {
+		background: rgba(0, 164, 220, 0.15);
+	}
+}
+
+.episodeImageContainer {
+	position: relative;
+	cursor: pointer;
+	transition: box-shadow 0.2s;
+	border-radius: 60px;
+	overflow: hidden;
+	height: calc(100% - 32px);
+}
+
+.episodeImage {
+	height: 100%;
+	width: auto;
+	aspect-ratio: 21/9;
+	object-fit: cover;
+	flex-shrink: 0;
+	display: block;
+}
+
+.episodeWatchedButton {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 10;
+	
+	:global(.button) {
+		min-width: auto !important;
+		padding: 0 !important;
+		
+		&:global(.selected) {
+			color: rgba(0, 164, 220, 0.95);
+		}
+		
+		&:not(:global(.selected)) {
+			color: rgba(255, 255, 255, 0.4);
+			
+			&:hover,
+			&:focus {
+				color: rgba(255, 255, 255, 0.7);
+			}
+		}
+	}
+}
+
+.episodeInfo {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.episodeNumber {
+	font-size: 0.9em;
+	color: rgba(255, 255, 255, 0.6);
+	font-weight: 600;
+}
+
+.episodeName {
+	font-size: 1.2em;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.95);
+}
+
+.episodeOverview {
+	font-size: 0.95em;
+	line-height: 1.5;
+	color: rgba(255, 255, 255, 0.75);
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.runtime {
+	font-size: 0.85em;
+	color: rgba(255, 255, 255, 0.5);
+	margin-top: auto;
+}
+
+.trackSelectors {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	margin-bottom: 32px;
+}
+
+.trackSection {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	flex: 1 1 0;
+	min-width: 240px;
+}
+
+.stickyControls {
+	position: sticky;
+	top: 10rem;
+	background: rgba(18, 18, 18, 0.95);
+	padding: 16px 24px;
+	border-radius: 12px;
+	backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	margin-bottom: 32px;
+	z-index: 10;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	display: flex;
+	flex-direction: row;
+	gap: 24px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.controlsTitle {
+	font-weight: 600;
+	font-size: 1em;
+	color: rgba(255, 255, 255, 0.95);
+	flex-shrink: 0;
+	min-width: 220px;
+	margin-bottom: 0 !important;
+}
+
+.stickyControls .trackSelectors {
+	display: flex;
+	flex-direction: row;
+	gap: 16px;
+	flex-wrap: nowrap;
+	align-items: flex-start;
+	margin-top: 1rem;
+	flex: 1;
+	min-width: 0;
+}
+
+.trackLabel {
+	font-weight: 600;
+	font-size: 1em;
+	color: rgba(255, 255, 255, 0.95);
+}
+
+.buttons {
+	display: flex;
+	gap: 16px;
+	margin-top: 40px;
+}
+
+/* Popup track picker */
+.popupHeading {
+	margin: 0 0 12px 0;
+}
+
+.popupScroller {
+	max-height: 60vh;
+	width: 100%;
+}
+
+.popupList {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.popupButton {
+	width: 100%;
+	text-align: left;
+}
+
+.dropdown {
+	text-align: left !important;
+	margin: 0 !important;
+	font-size: 1em !important;
+}
+
+/* Normalize text margins for headings/body text */
+:global(.heading),
+:global(.BodyText) {
+	margin: 0;
+}

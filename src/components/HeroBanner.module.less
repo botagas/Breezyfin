@@ -1,0 +1,170 @@
+.heroBanner {
+	position: relative;
+	width: 100%;
+	height: calc(1000px + 10rem);
+	overflow: hidden;
+	margin-bottom: 64px;
+}
+
+.backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		animation: kenBurns 20s ease-in-out infinite alternate;
+	}
+}
+
+.gradient {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.3) 0%,
+		rgba(0, 0, 0, 0.6) 40%,
+		rgba(18, 18, 18, 0.85) 70%,
+		rgba(18, 18, 18, 0.95) 85%,
+		#121212 100%
+	);
+}
+
+.gradientExtension {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	height: 260px;
+	background: linear-gradient(
+		to bottom,
+		#121212 0%,
+		#121212 100%
+	);
+	z-index: 1;
+}
+
+.content {
+	position: relative;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	padding: calc(80px + 4rem) 60px 60px 60px;
+	z-index: 10;
+}
+
+.info {
+	max-width: 100vw;
+}
+
+.logoWrapper {
+	width: 20rem;
+	height: 10rem;
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	margin: 0 0 24px 0;
+	padding: 12px 0;
+}
+
+.logo {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.7));
+}
+
+.title {
+	font-size: 2.5em;
+	font-weight: 700;
+	margin-bottom: 12px;
+	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.overview {
+	font-size: 1em;
+	line-height: 1.5;
+	margin: 0 0 12px 0;
+	opacity: 0.95;
+	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+	flex: 0 0 4.5rem;
+	min-height: 4.5rem;
+	max-height: 4.5rem;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.metadata {
+	display: flex;
+	gap: 18px;
+	font-size: 0.95em;
+	opacity: 0.9;
+	margin: 0 0.75rem 1.25rem 0.75rem
+}
+
+.metadataItem {
+	font-weight: 500;
+	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.buttons {
+	display: flex;
+	gap: 18px;
+}
+
+.heroBannerButton {
+	background: transparent !important;
+	
+	& * {
+		background: transparent !important;
+	}
+}
+
+.controls {
+	position: relative;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 12px;
+	width: 100%;
+}
+
+.navButton {
+	min-width: auto;
+}
+
+.indicators {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.indicator {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.4);
+	cursor: pointer;
+	transition: all 0.3s ease;
+	
+	&:hover {
+		background: rgba(255, 255, 255, 0.7);
+		transform: scale(1.2);
+	}
+	
+	&.active {
+		background: rgba(255, 255, 255, 1);
+		width: 24px;
+		border-radius: 4px;
+	}
+}
