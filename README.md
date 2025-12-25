@@ -71,10 +71,6 @@ The app requests the following webOS permissions (see `appinfo.json`):
 
 Pull requests and issues are welcome! Please follow the code style and add tests for new features. See the [components/README.md](src/components/README.md) for reusable UI guidelines.
 
-## License
-
-This project is currently **UNLICENSED**. Please update the license in `package.json` if you intend to distribute or modify.
-
 ## Credits
 
 - Built with [Enact Sandstone](https://github.com/enactjs/sandstone)
