@@ -12,7 +12,7 @@ import jellyfinService from '../services/jellyfinService';
 
 import css from './PlayerPanel.module.less';
 
-const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
+const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, ...rest }) => {
 	const videoRef = useRef(null);
 	const hlsRef = useRef(null);
 	const progressIntervalRef = useRef(null);
@@ -37,6 +37,105 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 	const [showSubtitlePopup, setShowSubtitlePopup] = useState(false);
 	const [mediaSourceData, setMediaSourceData] = useState(null);
 	const [playSessionId, setPlaySessionId] = useState(null);
+	const [hasNextEpisode, setHasNextEpisode] = useState(false);
+	const [hasPreviousEpisode, setHasPreviousEpisode] = useState(false);
+
+	// Build playback options to carry current selections to the next item
+	const buildPlaybackOptions = useCallback(() => {
+		const opts = { ...playbackSettingsRef.current };
+		if (Number.isInteger(currentAudioTrack)) {
+			opts.audioStreamIndex = currentAudioTrack;
+		}
+		if (currentSubtitleTrack === -1 || Number.isInteger(currentSubtitleTrack)) {
+			opts.subtitleStreamIndex = currentSubtitleTrack;
+		}
+		return opts;
+	}, [currentAudioTrack, currentSubtitleTrack]);
+
+	// Find the next episode relative to the current one
+	const getNextEpisode = useCallback(async (currentItem) => {
+		if (!currentItem || currentItem.Type !== 'Episode' || !currentItem.SeriesId) return null;
+
+		const seasonId = currentItem.SeasonId || currentItem.ParentId;
+		if (!seasonId) return null;
+
+		// Try to find next episode in the same season
+		const seasonEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, seasonId);
+		const currentIndex = seasonEpisodes.findIndex(ep => ep.Id === currentItem.Id);
+		if (currentIndex >= 0 && currentIndex < seasonEpisodes.length - 1) {
+			return seasonEpisodes[currentIndex + 1];
+		}
+
+		// Otherwise, move to the next season and pick its first episode
+		const seasons = await jellyfinService.getSeasons(currentItem.SeriesId);
+		if (!seasons || seasons.length === 0) return null;
+
+		// Sort seasons by index for predictable order
+		seasons.sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+		const currentSeasonIndex = seasons.findIndex(s => s.Id === seasonId);
+		if (currentSeasonIndex >= 0 && currentSeasonIndex < seasons.length - 1) {
+			const nextSeason = seasons[currentSeasonIndex + 1];
+			const nextEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, nextSeason.Id);
+			return nextEpisodes?.[0] || null;
+		}
+
+		return null;
+	}, []);
+
+	const getPreviousEpisode = useCallback(async (currentItem) => {
+		if (!currentItem || currentItem.Type !== 'Episode' || !currentItem.SeriesId) return null;
+
+		const seasonId = currentItem.SeasonId || currentItem.ParentId;
+		if (!seasonId) return null;
+
+		const seasonEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, seasonId);
+		const currentIndex = seasonEpisodes.findIndex(ep => ep.Id === currentItem.Id);
+		if (currentIndex > 0) {
+			return seasonEpisodes[currentIndex - 1];
+		}
+
+		const seasons = await jellyfinService.getSeasons(currentItem.SeriesId);
+		if (!seasons || seasons.length === 0) return null;
+		seasons.sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+		const currentSeasonIndex = seasons.findIndex(s => s.Id === seasonId);
+		if (currentSeasonIndex > 0) {
+			const previousSeason = seasons[currentSeasonIndex - 1];
+			const previousEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, previousSeason.Id);
+			return previousEpisodes?.[previousEpisodes.length - 1] || null;
+		}
+
+		return null;
+	}, []);
+
+	// Pre-compute whether a next episode exists to control button visibility/behavior
+	useEffect(() => {
+		let cancelled = false;
+		const checkNext = async () => {
+			if (!item || item.Type !== 'Episode') {
+				if (!cancelled) {
+					setHasNextEpisode(false);
+					setHasPreviousEpisode(false);
+				}
+				return;
+			}
+			try {
+				const nextEp = await getNextEpisode(item);
+				const prevEp = await getPreviousEpisode(item);
+				if (!cancelled) {
+					setHasNextEpisode(!!nextEp);
+					setHasPreviousEpisode(!!prevEp);
+				}
+			} catch (err) {
+				console.error('Failed to check next episode:', err);
+				if (!cancelled) {
+					setHasNextEpisode(false);
+					setHasPreviousEpisode(false);
+				}
+			}
+		};
+		checkNext();
+		return () => { cancelled = true; };
+	}, [getNextEpisode, getPreviousEpisode, item]);
 
 	// Start progress reporting to Jellyfin server
 	const startProgressReporting = useCallback(() => {
@@ -101,6 +200,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 			let forceTranscoding = settings.forceTranscoding || false;
 			const enableTranscoding = settings.enableTranscoding !== false;
 			const maxBitrate = settings.maxBitrate;
+			const autoPlayNext = settings.autoPlayNext !== false;
 			
 			// Check if we should force transcoding for subtitles
 			const hasSubtitles = playbackOptions?.subtitleStreamIndex !== undefined && playbackOptions?.subtitleStreamIndex >= 0;
@@ -110,7 +210,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 			}
 			
 			console.log('Force Transcoding:', forceTranscoding);
-			playbackSettingsRef.current = { forceTranscoding, enableTranscoding, maxBitrate };
+			playbackSettingsRef.current = { forceTranscoding, enableTranscoding, maxBitrate, autoPlayNext };
 
 			// Get playback info from Jellyfin
 			let playbackInfo = null;
@@ -449,8 +549,23 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 	const handleEnded = useCallback(async () => {
 		console.log('Video ended');
 		await handleStop();
+		
+		// Auto-play next episode if enabled
+		if (playbackSettingsRef.current.autoPlayNext && item?.Type === 'Episode' && onPlay) {
+			try {
+				const nextEpisode = hasNextEpisode ? await getNextEpisode(item) : null;
+				if (nextEpisode) {
+					console.log('Auto-playing next episode:', nextEpisode.Name);
+					onPlay(nextEpisode, buildPlaybackOptions());
+					return;
+				}
+			} catch (err) {
+				console.error('Failed to auto-play next episode:', err);
+			}
+		}
+
 		onBack();
-	}, [handleStop, onBack]);
+	}, [getNextEpisode, handleStop, hasNextEpisode, item, onBack, onPlay]);
 
 	// Playback controls
 	const handlePlay = async () => {
@@ -648,52 +763,32 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 		return parts.join(' - ') || `Track ${track.Index}`;
 	};
 
-	const skipTime = async (seconds) => {
-		if (!videoRef.current) return;
-		
-		const currentActualTime = videoRef.current.currentTime + seekOffsetRef.current;
-		const newTime = Math.max(0, Math.min(duration, currentActualTime + seconds));
-		const seekTicks = Math.floor(newTime * 10000000);
-		
-		// For transcoded streams, we need to reload
-		if (mediaSourceData?.TranscodingUrl) {
-			try {
-				console.log('Skipping transcoded stream to:', newTime, 'seconds (', seekTicks, 'ticks)');
-				setLoading(true);
-				setCurrentTime(newTime);
-				
-				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
-					...playbackOptions,
-					...playbackSettingsRef.current,
-					audioStreamIndex: currentAudioTrack,
-					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
-					startTimeTicks: seekTicks
-				});
-				
-				const newMediaSource = newPlaybackInfo?.MediaSources?.[0];
-				if (newMediaSource?.TranscodingUrl) {
-					seekOffsetRef.current = newTime;
-					
-					// Build URL and ensure StartTimeTicks is included
-					let videoUrl = `${jellyfinService.serverUrl}${newMediaSource.TranscodingUrl}`;
-					if (!videoUrl.includes('StartTimeTicks')) {
-						videoUrl += `&StartTimeTicks=${seekTicks}`;
-					}
-					console.log('Skip URL:', videoUrl);
-					
-					videoRef.current.src = videoUrl;
-					videoRef.current.load();
-				}
-			} catch (err) {
-				console.error('Failed to skip:', err);
-				setLoading(false);
+	// Manually trigger next episode from the player controls
+	const handlePlayNextEpisode = useCallback(async () => {
+		if (!item || item.Type !== 'Episode' || !onPlay || !hasNextEpisode) return;
+		try {
+			const nextEpisode = await getNextEpisode(item);
+			if (nextEpisode) {
+				await handleStop();
+				onPlay(nextEpisode, buildPlaybackOptions());
 			}
-		} else {
-			// For direct play/stream, we can seek directly
-			videoRef.current.currentTime = newTime;
-			setCurrentTime(newTime);
+		} catch (err) {
+			console.error('Failed to play next episode:', err);
 		}
-	};
+	}, [buildPlaybackOptions, getNextEpisode, handleStop, hasNextEpisode, item, onPlay]);
+
+	const handlePlayPreviousEpisode = useCallback(async () => {
+		if (!item || item.Type !== 'Episode' || !onPlay || !hasPreviousEpisode) return;
+		try {
+			const prevEpisode = await getPreviousEpisode(item);
+			if (prevEpisode) {
+				await handleStop();
+				onPlay(prevEpisode, buildPlaybackOptions());
+			}
+		} catch (err) {
+			console.error('Failed to play previous episode:', err);
+		}
+	}, [buildPlaybackOptions, getPreviousEpisode, handleStop, hasPreviousEpisode, item, onPlay]);
 
 	const handleBackButton = async () => {
 		await handleStop();
@@ -811,7 +906,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 									className={css.progressSlider}
 									min={0}
 									max={Math.floor(duration) || 1}
-									step={1}
+									step={5}
 									value={Math.floor(currentTime)}
 									onChange={handleSeek}
 								/>
@@ -821,15 +916,29 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 							</div>
 
 							<div className={css.controlButtons}>
-								<Button onClick={() => skipTime(-10)} size="large" icon="jumpbackward" />
-								
+								{item?.Type === 'Episode' && (
+									<Button 
+										onClick={handlePlayPreviousEpisode} 
+										size="large" 
+										icon="jumpbackward" 
+										disabled={!hasPreviousEpisode}
+									/>
+								)}
+
 								{playing ? (
 									<Button onClick={handlePause} size="large" icon="pause" />
 								) : (
 									<Button onClick={handlePlay} size="large" icon="play" />
 								)}
-								
-								<Button onClick={() => skipTime(10)} size="large" icon="jumpforward" />
+
+								{item?.Type === 'Episode' && (
+									<Button 
+										onClick={handlePlayNextEpisode} 
+										size="large" 
+										icon="jumpforward" 
+										disabled={!hasNextEpisode}
+									/>
+								)}
 
 								<div className={css.trackButtons}>
 									{audioTracks.length > 1 && (

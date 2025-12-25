@@ -217,6 +217,7 @@ const App = (props) => {
 					item={selectedItem}
 					playbackOptions={playbackOptions}
 					onBack={handleBackToDetails}
+					onPlay={handlePlay}
 				/>
 			</Panels>
 		</div>
