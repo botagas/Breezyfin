@@ -1,3 +1,6 @@
+<p align="center">
+<img src="./images/Breezyfin-main.png">
+</p>
 
 # Breezyfin for webOS
 
