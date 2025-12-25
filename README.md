@@ -1,5 +1,5 @@
 <p align="center">
-<img src="./images/Breezyfin-main.png">
+<img src="./images/Breezyfin_main.png">
 </p>
 
 # Breezyfin for webOS
