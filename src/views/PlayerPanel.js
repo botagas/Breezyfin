@@ -17,6 +17,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 	const hlsRef = useRef(null);
 	const progressIntervalRef = useRef(null);
 	const seekOffsetRef = useRef(0); // Track offset for transcoded stream seeking
+	const playbackSettingsRef = useRef({}); // Persist user playback settings between re-requests
 	
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
@@ -98,6 +99,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 			const settingsJson = localStorage.getItem('breezyfinSettings');
 			const settings = settingsJson ? JSON.parse(settingsJson) : {};
 			let forceTranscoding = settings.forceTranscoding || false;
+			const enableTranscoding = settings.enableTranscoding !== false;
+			const maxBitrate = settings.maxBitrate;
 			
 			// Check if we should force transcoding for subtitles
 			const hasSubtitles = playbackOptions?.subtitleStreamIndex !== undefined && playbackOptions?.subtitleStreamIndex >= 0;
@@ -107,13 +110,14 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 			}
 			
 			console.log('Force Transcoding:', forceTranscoding);
+			playbackSettingsRef.current = { forceTranscoding, enableTranscoding, maxBitrate };
 
 			// Get playback info from Jellyfin
 			let playbackInfo = null;
 			try {
 				const options = { 
 					...(playbackOptions || {}), 
-					forceTranscoding 
+					...playbackSettingsRef.current
 				};
 				playbackInfo = await jellyfinService.getPlaybackInfo(item.Id, options);
 				console.log('Playback info received:', playbackInfo);
@@ -579,6 +583,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 			try {
 				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
 					...playbackOptions,
+					...playbackSettingsRef.current,
 					audioStreamIndex: trackIndex,
 					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
 					startTimeTicks: Math.floor(currentPosition * 10000000)
@@ -616,6 +621,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 			try {
 				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
 					...playbackOptions,
+					...playbackSettingsRef.current,
 					audioStreamIndex: currentAudioTrack,
 					subtitleStreamIndex: trackIndex >= 0 ? trackIndex : undefined,
 					startTimeTicks: Math.floor(currentPosition * 10000000)
@@ -658,6 +664,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, ...rest }) => {
 				
 				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
 					...playbackOptions,
+					...playbackSettingsRef.current,
 					audioStreamIndex: currentAudioTrack,
 					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
 					startTimeTicks: seekTicks

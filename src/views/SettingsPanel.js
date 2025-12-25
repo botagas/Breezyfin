@@ -223,7 +223,7 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, ...rest }) => {
 							onToggle={() => handleSettingChange('forceTranscoding', !settings.forceTranscoding)}
 							selected={settings.forceTranscoding}
 						>
-							Force Transcoding (may fix black video)
+							Force Transcoding (always)
 						</SwitchItem>
 						
 						<SwitchItem

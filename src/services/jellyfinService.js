@@ -366,20 +366,25 @@ class JellyfinService {
 				payload.StartTimeTicks = options.startTimeTicks;
 			}
 
-			// Check if user wants to force transcoding (useful for debugging black video issues)
-			const forceTranscoding = options.forceTranscoding || false;
+			// Settings-driven knobs
+			const forceTranscoding = options.forceTranscoding === true;
+			const enableTranscoding = options.enableTranscoding !== false; // default on
+			const maxBitrateSetting = options.maxBitrate ? parseInt(options.maxBitrate, 10) : null;
 			console.log('Force Transcoding Enabled:', forceTranscoding);
 
 			// webOS-optimized device profile
 			payload.EnableDirectPlay = !forceTranscoding;
 			payload.EnableDirectStream = !forceTranscoding;
-			payload.EnableTranscoding = true;
-			payload.AllowVideoStreamCopy = true;
-			payload.AllowAudioStreamCopy = true;
+			payload.EnableTranscoding = enableTranscoding;
+			payload.AllowVideoStreamCopy = enableTranscoding && !forceTranscoding;
+			payload.AllowAudioStreamCopy = enableTranscoding && !forceTranscoding;
 			payload.AutoOpenLiveStream = true;
+			if (maxBitrateSetting) {
+				payload.MaxStreamingBitrate = maxBitrateSetting * 1000000; // convert Mbps to bps
+			}
 			payload.DeviceProfile = {
 				Name: 'Breezyfin webOS TV',
-				MaxStreamingBitrate: 120000000, // webOS can handle high bitrates
+				MaxStreamingBitrate: maxBitrateSetting ? maxBitrateSetting * 1000000 : 120000000,
 				MaxStaticBitrate: 100000000,
 				MusicStreamingTranscodingBitrate: 384000,
 				DirectPlayProfiles: forceTranscoding ? [] : [
@@ -388,7 +393,8 @@ class JellyfinService {
 					// MP4 container - webOS TVs have excellent MP4 support
 					{ Container: 'mp4,m4v', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2' },
 					// MKV support varies by webOS version, but newer versions support it
-					{ Container: 'mkv', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2,dts' },
+					// Drop DTS from the direct-play list so Jellyfin will transcode DTS/DTS-HD
+					{ Container: 'mkv', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2' },
 					// Audio direct play
 					{ Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
 					{ Container: 'aac', Type: 'Audio', AudioCodec: 'aac' },
