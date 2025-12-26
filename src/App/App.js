@@ -11,6 +11,7 @@ import SettingsPanel from '../views/SettingsPanel';
 import PlayerPanel from '../views/PlayerPanel';
 import MediaDetailsPanel from '../views/MediaDetailsPanel';
 import jellyfinService from '../services/jellyfinService';
+import {KeyCodes, isBackKey} from '../utils/keyCodes';
 
 import css from './App.module.less';
 
@@ -62,6 +63,39 @@ const App = (props) => {
 				return false; // Allow default behavior (exit prompt)
 		}
 	}, [currentView, previousItem]);
+
+	// Global back-key listener to keep navigation consistent outside the player
+	useEffect(() => {
+		const handleGlobalKeyDown = (e) => {
+			const code = e.keyCode || e.which;
+			if (isBackKey(code)) {
+				const handled = handleBack();
+				if (handled) {
+					e.preventDefault();
+					e.stopPropagation();
+					e.stopImmediatePropagation?.();
+				}
+			}
+		};
+		document.addEventListener('keydown', handleGlobalKeyDown, true);
+		return () => document.removeEventListener('keydown', handleGlobalKeyDown, true);
+	}, [handleBack]);
+
+	// Intercept browser history back (webOS back triggers popstate)
+	useEffect(() => {
+		const handlePopState = (e) => {
+			const handled = handleBack();
+			if (handled) {
+				e.preventDefault?.();
+				// Re-push a dummy state so the next back event stays in-app
+				window.history.pushState(null, document.title);
+			}
+		};
+		// Push an initial state to keep back within the app
+		window.history.pushState(null, document.title);
+		window.addEventListener('popstate', handlePopState);
+		return () => window.removeEventListener('popstate', handlePopState);
+	}, [handleBack]);
 
 	// Back button handling removed - using Panels onBack instead
 
@@ -201,12 +235,14 @@ const App = (props) => {
 					noCloseButton
 				/>
 				<SettingsPanel
+					isActive={currentView === 'settings'}
 					onNavigate={handleNavigate}
 					onLogout={handleLogout}
 					onExit={handleExit}
 					noCloseButton
 				/>
 				<MediaDetailsPanel
+					isActive={currentView === 'details'}
 					item={selectedItem}
 					onBack={handleBackToHome}
 					onPlay={handlePlay}
@@ -214,6 +250,7 @@ const App = (props) => {
 					noCloseButton
 				/>
 				<PlayerPanel
+					isActive={currentView === 'player'}
 					item={selectedItem}
 					playbackOptions={playbackOptions}
 					onBack={handleBackToDetails}

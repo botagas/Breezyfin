@@ -1,5 +1,6 @@
 import { Jellyfin } from '@jellyfin/sdk';
 import { getPlaystateApi } from '@jellyfin/sdk/lib/utils/api/playstate-api';
+import serverManager from './serverManager';
 
 class JellyfinService {
 	constructor() {
@@ -17,6 +18,8 @@ class JellyfinService {
 		this.userId = null;
 		this.serverUrl = null;
 		this.accessToken = null;
+		this.serverName = null;
+		this.username = null;
 	}
 
 	// Initialize connection to Jellyfin server
@@ -29,7 +32,9 @@ class JellyfinService {
 			const response = await fetch(`${serverUrl}/System/Info/Public`);
 			if (!response.ok) throw new Error('Server not reachable');
 			
-			return await response.json();
+			const info = await response.json();
+			this.serverName = info?.ServerName || info?.Name || serverUrl;
+			return info;
 		} catch (error) {
 			console.error('Failed to connect to server:', error);
 			throw error;
@@ -59,6 +64,8 @@ class JellyfinService {
 			if (data.AccessToken) {
 				this.accessToken = data.AccessToken;
 				this.userId = data.User.Id;
+				this.username = data.User?.Name || username;
+				this.serverName = data?.ServerName || this.serverName || this.serverUrl;
 
 				// Update API with auth token
 				this.api.accessToken = this.accessToken;
@@ -70,6 +77,18 @@ class JellyfinService {
 					userId: this.userId
 				}));
 
+				// Persist to multi-server store
+				const saved = serverManager.addServer({
+					serverUrl: this.serverUrl,
+					serverName: this.serverName,
+					userId: this.userId,
+					username: this.username,
+					accessToken: this.accessToken
+				});
+				if (saved) {
+					serverManager.setActiveServer(saved.serverId, saved.userId);
+				}
+
 				return data.User;
 			}
 		} catch (error) {
@@ -78,15 +97,51 @@ class JellyfinService {
 		}
 	}
 
+	_applySessionFromStore(entry) {
+		if (!entry) return false;
+		this.serverUrl = entry.url;
+		this.accessToken = entry.accessToken;
+		this.userId = entry.userId;
+		this.serverName = entry.serverName;
+		this.username = entry.username;
+		this.api = this.jellyfin.createApi(entry.url, entry.accessToken);
+		return true;
+	}
+
 	// Restore session from storage
-	restoreSession() {
+	restoreSession(serverId = null, userId = null) {
+		// Prefer multi-server store
+		const active = serverManager.getActiveServer(serverId, userId);
+		if (active && active.activeUser) {
+			return this._applySessionFromStore({
+				url: active.url,
+				accessToken: active.activeUser.accessToken,
+				userId: active.activeUser.userId,
+				serverName: active.name,
+				username: active.activeUser.username
+			});
+		}
+
+		// Fallback to legacy storage and promote it into the multi-server store
 		const stored = localStorage.getItem('jellyfinAuth');
 		if (stored) {
-			const { serverUrl, accessToken, userId } = JSON.parse(stored);
+			const { serverUrl, accessToken, userId: storedUserId } = JSON.parse(stored);
 			this.serverUrl = serverUrl;
 			this.accessToken = accessToken;
-			this.userId = userId;
+			this.userId = storedUserId;
 			this.api = this.jellyfin.createApi(serverUrl, accessToken);
+
+			// Promote to server manager for future use
+			const saved = serverManager.addServer({
+				serverUrl,
+				serverName: serverUrl,
+				userId: storedUserId,
+				username: 'User',
+				accessToken: accessToken
+			});
+			if (saved) {
+				serverManager.setActiveServer(saved.serverId, saved.userId);
+			}
 			return true;
 		}
 		return false;
@@ -95,10 +150,52 @@ class JellyfinService {
 	// Logout
 	logout() {
 		localStorage.removeItem('jellyfinAuth');
+		const active = serverManager.getActiveServer();
+		if (active?.id && active?.activeUser?.userId) {
+			serverManager.removeUser(active.id, active.activeUser.userId);
+		}
+		serverManager.clearActive();
 		this.api = null;
 		this.userId = null;
 		this.serverUrl = null;
 		this.accessToken = null;
+		this.serverName = null;
+		this.username = null;
+	}
+
+	// Switch to a saved server/user combination
+	setActiveServer(serverId, userId) {
+		const active = serverManager.setActiveServer(serverId, userId);
+		if (!active || !active.activeUser) {
+			throw new Error('Server selection failed: not found');
+		}
+		return this._applySessionFromStore({
+			url: active.url,
+			accessToken: active.activeUser.accessToken,
+			userId: active.activeUser.userId,
+			serverName: active.name,
+			username: active.activeUser.username
+		});
+	}
+
+	// Expose saved servers for UI listing
+	getSavedServers() {
+		return serverManager.listServers();
+	}
+
+	// Remove a saved server/user without affecting others
+	forgetServer(serverId, userId) {
+		serverManager.removeUser(serverId, userId);
+		// If we just removed the active session, clear local state
+		const active = serverManager.getActiveServer();
+		if (!active || !active.activeUser) {
+			this.api = null;
+			this.userId = null;
+			this.serverUrl = null;
+			this.accessToken = null;
+			this.serverName = null;
+			this.username = null;
+		}
 	}
 
 	// Get image URL for item
@@ -751,6 +848,27 @@ class JellyfinService {
 		} catch (error) {
 			console.error('getPublicServerInfo error:', error);
 			return null;
+		}
+	}
+
+	// Fetch intro/recap/credits segments for a media item
+	async getMediaSegments(itemId) {
+		if (!this.serverUrl || !this.accessToken || !itemId) return [];
+		try {
+			const response = await fetch(`${this.serverUrl}/MediaSegments/${itemId}`, {
+				headers: {
+					'X-Emby-Token': this.accessToken
+				}
+			});
+			if (!response.ok) {
+				console.warn('getMediaSegments non-200:', response.status);
+				return [];
+			}
+			const data = await response.json();
+			return Array.isArray(data?.Items) ? data.Items : [];
+		} catch (error) {
+			console.error('getMediaSegments error:', error);
+			return [];
 		}
 	}
 }

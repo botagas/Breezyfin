@@ -148,3 +148,57 @@
 	max-height: 55vh;
 	width: 100%;
 }
+
+.skipOverlay {
+	position: absolute;
+	top: 32px;
+	right: 32px;
+	z-index: 120;
+	pointer-events: none;
+}
+
+.skipPill {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	background: rgba(0, 0, 0, 0.72);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	border-radius: 12px;
+	padding: 12px 14px;
+	box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+	pointer-events: auto;
+}
+
+.skipText {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.skipTitle {
+	font-weight: 700;
+}
+
+.skipCountdown {
+	opacity: 0.8;
+	font-size: 0.95em;
+}
+
+.skipButton {
+	min-width: 120px;
+}
+
+.playerToast {
+	position: absolute;
+	top: 10rem;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(0, 0, 0, 0.8);
+	color: #fff;
+	padding: 10px 14px;
+	border-radius: 8px;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+	z-index: 200;
+	pointer-events: none;
+	font-weight: 600;
+}

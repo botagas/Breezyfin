@@ -140,3 +140,54 @@
 		background: rgba(244, 67, 54, 0.8);
 	}
 }
+
+.serverList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.serverCard {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 0.75rem;
+	align-items: center;
+	padding: 0.9rem 1rem;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	background: rgba(0, 0, 0, 0.25);
+}
+
+.activeCard {
+	border-color: rgba(138, 180, 248, 0.5);
+	background: rgba(138, 180, 248, 0.08);
+}
+
+.serverCardMain {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	overflow: hidden;
+}
+
+.serverTitle {
+	font-weight: 700;
+}
+
+.serverMeta {
+	opacity: 0.75;
+	font-size: 0.95em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.serverCardActions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.mutedText {
+	opacity: 0.7;
+}

@@ -63,6 +63,16 @@ const MediaCard = ({ item, imageUrl, onClick, ...rest }) => {
 		<SpottableDiv
 			className={css.card}
 			onClick={() => onClick(item)}
+			onKeyDown={(e) => {
+				// Ensure left/right navigation moves focus predictably across cards
+				if (e.keyCode === 37 && e.target.previousElementSibling) { // left
+					e.preventDefault();
+					e.target.previousElementSibling.focus();
+				} else if (e.keyCode === 39 && e.target.nextElementSibling) { // right
+					e.preventDefault();
+					e.target.nextElementSibling.focus();
+				}
+			}}
 			{...rest}
 		>
 			<div className={css.cardImage}>

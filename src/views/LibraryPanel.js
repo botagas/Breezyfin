@@ -85,6 +85,25 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 							className={css.gridCard}
 							onClick={() => handleItemClick(item)}
 							tabIndex={0}
+							onKeyDown={(e) => {
+								const card = e.currentTarget;
+								const cards = Array.from(card.parentElement.querySelectorAll(`.${css.gridCard}`));
+								const idx = cards.indexOf(card);
+								const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
+								if (e.keyCode === 37 && idx > 0) { // left
+									e.preventDefault();
+									cards[idx - 1].focus();
+								} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
+									e.preventDefault();
+									cards[idx + 1].focus();
+								} else if (e.keyCode === 38 && idx - columns >= 0) { // up
+									e.preventDefault();
+									cards[idx - columns].focus();
+								} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
+									e.preventDefault();
+									cards[idx + columns].focus();
+								}
+							}}
 						>
 							<div className={css.cardImage}>
 								<img 

@@ -131,3 +131,72 @@
 	color: #ffdede;
 	line-height: 1.5;
 }
+
+.savedServers {
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	border-radius: 12px;
+	padding: 16px 18px;
+	margin-bottom: 12px;
+}
+
+.savedHeader {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.savedHint {
+	opacity: 0.72;
+	font-size: 0.95em;
+}
+
+.savedList {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.savedItem {
+	display: grid !important;
+	grid-template-columns: 1fr auto;
+	align-items: center;
+	background: rgba(0, 0, 0, 0.25) !important;
+	border-radius: 10px;
+	padding: 10px 12px !important;
+	border: 1px solid transparent;
+}
+
+.savedItem:global(.spottable):focus {
+	border-color: rgba(255, 255, 255, 0.22);
+}
+
+.activeSaved {
+	border-color: rgba(0, 200, 255, 0.4);
+}
+
+.savedMain {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	overflow: hidden;
+}
+
+.savedTitle {
+	font-weight: 700;
+}
+
+.savedMeta {
+	opacity: 0.75;
+	font-size: 0.95em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.savedActions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}

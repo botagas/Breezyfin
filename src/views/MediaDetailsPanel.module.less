@@ -83,18 +83,55 @@
 	display: flex;
 	gap: 12px;
 	flex-wrap: wrap;
+	align-items: center;
 }
 
 .metadataItem {
 	padding: 8px 16px;
-	background: rgba(255, 255, 255, 0.15);
+	background: transparent;
 	border-radius: 6px;
 	font-size: 1em;
 	font-weight: 500;
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	backdrop-filter: blur(10px);
+}
+
+.actionButton {
+	background: transparent;
+
+	&:hover,
+	&:focus {
+		background: rgba(255, 255, 255, 0.25) !important;
+		color: white !important;
+	}
+}
+
+.activeAction {
+	background: rgba(0, 200, 255, 0.3) !important;
+	border: 1px solid rgba(0, 200, 255, 0.6) !important;
+}
+
+.actionsRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-left: 12px;
+}
+
+.toast {
+	position: fixed;
+	top: 10rem;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(0, 0, 0, 0.8);
+	color: #fff;
+	padding: 12px 18px;
+	border-radius: 8px;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+	z-index: 20;
+	pointer-events: none;
+	font-weight: 600;
 }
 
 .overview {
@@ -110,6 +147,101 @@
 	margin-bottom: 24px;
 	color: rgba(255, 255, 255, 0.7);
 	font-size: 1em;
+}
+
+.richMeta {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 12px;
+	margin-bottom: 24px;
+}
+
+.metaGroup {
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 8px;
+	padding: 10px 12px;
+}
+
+.metaLabel {
+	font-weight: 700;
+	font-size: 0.95em;
+	margin-bottom: 4px;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.metaValue {
+	font-size: 0.95em;
+	color: rgba(255, 255, 255, 0.78);
+}
+
+.castSection {
+	margin-top: 8px;}
+
+.castScroller {
+	overflow-x: auto;
+	padding-bottom: 8px;
+	scroll-behavior: smooth;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+.castRow {
+	display: flex;
+	gap: 12px;
+}
+
+.castCard {
+	background: transparent;
+	border-radius: 10px;
+	padding: 12px;
+	text-align: center;
+	min-width: 15rem;
+	outline: none;
+	transition: transform 0.15s ease;
+
+	&:focus {
+		transform: translateY(-4px);
+	}
+}
+
+.castAvatar {
+	width: 10rem;
+	height: 10rem;
+	border-radius: 50%;
+	overflow: hidden;
+	margin: 0 auto 8px;
+	background: rgba(255, 255, 255, 0.08);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.castAvatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.castInitial {
+	font-size: 1.6em;
+	font-weight: 700;
+	color: #fff;
+}
+
+.castName {
+	font-weight: 700;
+	color: #fff;
+	text-align: center;
+	margin: 1rem;
+}
+
+.castRole {
+	font-size: 0.9em;
+	color: rgba(255, 255, 255, 0.75);
+	text-align: center;
 }
 
 .seriesContent {
@@ -130,7 +262,8 @@
 	display: flex;
 	gap: 1rem;
 	overflow-x: auto;
-	padding-bottom: 16px;
+	overflow-y: visible;
+	padding: 1rem;
 	scroll-behavior: smooth;
 	
 	// Hide scrollbar but keep functionality

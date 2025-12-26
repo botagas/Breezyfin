@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Panel } from '@enact/sandstone/Panels';
 import Button from '@enact/sandstone/Button';
 import Heading from '@enact/sandstone/Heading';
@@ -6,6 +6,7 @@ import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import Input from '@enact/sandstone/Input';
+import Item from '@enact/sandstone/Item';
 import jellyfinService from '../services/jellyfinService';
 
 import css from './LoginPanel.module.less';
@@ -18,13 +19,24 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 	const [error, setError] = useState(null);
 	const [status, setStatus] = useState('');
 	const [step, setStep] = useState('server'); // 'server' or 'login'
+	const [savedServers, setSavedServers] = useState([]);
+	const [resumingKey, setResumingKey] = useState(null);
+
+	const refreshSavedServers = useCallback(() => {
+		try {
+			setSavedServers(jellyfinService.getSavedServers() || []);
+		} catch (err) {
+			console.error('Failed to load saved servers:', err);
+		}
+	}, []);
 
 	useEffect(() => {
 		const lastServer = localStorage.getItem('lastJellyfinServer');
 		if (lastServer) {
 			setServerUrl(lastServer);
 		}
-	}, []);
+		refreshSavedServers();
+	}, [refreshSavedServers]);
 
 	const normalizedServerUrl = useMemo(
 		() => serverUrl.trim().replace(/\/+$/, ''),
@@ -78,12 +90,40 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 			setStatus('');
 		} finally {
 			setLoading(false);
+			refreshSavedServers();
 		}
 	};
 
 	const handleBack = () => {
 		setStep('server');
 		resetMessages();
+	};
+
+	const handleResume = async (entry) => {
+		if (!entry) return;
+		const key = `${entry.serverId}:${entry.userId}`;
+		setResumingKey(key);
+		setLoading(true);
+		setError(null);
+		setStatus('Restoring saved session...');
+		try {
+			jellyfinService.setActiveServer(entry.serverId, entry.userId);
+			// Validate quickly by fetching user info; failures will return null/throw
+			const user = await jellyfinService.getCurrentUser();
+			if (!user) {
+				throw new Error('Session is no longer valid');
+			}
+			onLogin();
+		} catch (err) {
+			console.error('Failed to resume session:', err);
+			setError('Could not resume saved session. Please sign in again.');
+			setStep('server');
+		} finally {
+			setLoading(false);
+			setResumingKey(null);
+			setStatus('');
+			refreshSavedServers();
+		}
 	};
 
 	return (
@@ -97,6 +137,42 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 							</Heading>
 							{loading && <Spinner className={css.inlineSpinner} />}
 						</div>
+
+						{savedServers.length > 0 && (
+							<div className={css.savedServers}>
+								<div className={css.savedHeader}>
+									<Heading size="small" spacing="none">Saved servers</Heading>
+									<BodyText className={css.savedHint}>Jump back into a remembered server without re-entering credentials.</BodyText>
+								</div>
+								<div className={css.savedList}>
+									{savedServers.map((entry) => {
+										const key = `${entry.serverId}:${entry.userId}`;
+										return (
+											<Item
+												key={key}
+												className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
+												onClick={() => handleResume(entry)}
+											>
+												<div className={css.savedMain}>
+													<div className={css.savedTitle}>{entry.serverName || 'Jellyfin Server'}</div>
+													<div className={css.savedMeta}>{entry.username} • {entry.url}</div>
+												</div>
+												<div className={css.savedActions}>
+													<Button
+														size="small"
+														minWidth={false}
+														disabled={loading}
+														selected={resumingKey === key}
+													>
+														{resumingKey === key ? 'Resuming...' : 'Resume'}
+													</Button>
+												</div>
+											</Item>
+										);
+									})}
+								</div>
+							</div>
+						)}
 
 						<BodyText className={css.lead}>
 							{step === 'server'

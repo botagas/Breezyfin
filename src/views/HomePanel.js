@@ -18,8 +18,32 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const [nextUp, setNextUp] = useState([]);
 	const [latestMovies, setLatestMovies] = useState([]);
 	const [latestShows, setLatestShows] = useState([]);
+	const [homeRowSettings, setHomeRowSettings] = useState({
+		recentlyAdded: true,
+		continueWatching: true,
+		nextUp: true,
+		latestMovies: true,
+		latestShows: true
+	});
 
 	useEffect(() => {
+		try {
+			const stored = localStorage.getItem('breezyfinSettings');
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				if (parsed.homeRows) {
+					setHomeRowSettings({
+						recentlyAdded: parsed.homeRows.recentlyAdded !== false,
+						continueWatching: parsed.homeRows.continueWatching !== false,
+						nextUp: parsed.homeRows.nextUp !== false,
+						latestMovies: parsed.homeRows.latestMovies !== false,
+						latestShows: parsed.homeRows.latestShows !== false
+					});
+				}
+			}
+		} catch (err) {
+			console.warn('Failed to load home row settings:', err);
+		}
 		loadContent();
 	}, []);
 
@@ -115,15 +139,15 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const getCardImageUrl = (item) => {
 		// Prefer episode-specific art when the item is an episode (e.g., Continue Watching / Next Up)
 		if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 800);
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 640);
 		}
 
 		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 800);
+			return jellyfinService.getBackdropUrl(item.Id, 0, 640);
 		}
 
 		if (item?.SeriesId) {
-			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 800);
+			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 640);
 		}
 
 		return '';
@@ -135,6 +159,13 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 			onNavigate(section, data);
 		}
 	};
+
+	const hasContent =
+		(homeRowSettings.recentlyAdded && recentlyAdded.length > 0) ||
+		(homeRowSettings.continueWatching && continueWatching.length > 0) ||
+		(homeRowSettings.nextUp && nextUp.length > 0) ||
+		(homeRowSettings.latestMovies && latestMovies.length > 0) ||
+		(homeRowSettings.latestShows && latestShows.length > 0);
 
 	if (loading) {
 		return (
@@ -151,8 +182,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 			</Panel>
 		);
 	}
-
-	const hasContent = recentlyAdded.length > 0 || continueWatching.length > 0 || nextUp.length > 0 || latestMovies.length > 0 || latestShows.length > 0;
 
 	return (
 		<Panel {...rest}>
@@ -177,7 +206,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						</div>
 					)}
 
-					{recentlyAdded.length > 0 && (
+					{homeRowSettings.recentlyAdded && recentlyAdded.length > 0 && (
 						<MediaRow
 							title="Recently Added"
 							items={recentlyAdded}
@@ -186,7 +215,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						/>
 					)}
 
-					{continueWatching.length > 0 && (
+					{homeRowSettings.continueWatching && continueWatching.length > 0 && (
 						<MediaRow
 							title="Continue Watching"
 							items={continueWatching}
@@ -195,7 +224,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						/>
 					)}
 
-					{nextUp.length > 0 && (
+					{homeRowSettings.nextUp && nextUp.length > 0 && (
 						<MediaRow
 							title="Next Up"
 							items={nextUp}
@@ -204,7 +233,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						/>
 					)}
 
-					{latestMovies.length > 0 && (
+					{homeRowSettings.latestMovies && latestMovies.length > 0 && (
 						<MediaRow
 							title="Latest Movies"
 							items={latestMovies}
@@ -213,7 +242,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						/>
 					)}
 
-					{latestShows.length > 0 && (
+					{homeRowSettings.latestShows && latestShows.length > 0 && (
 						<MediaRow
 							title="Latest TV Shows"
 							items={latestShows}

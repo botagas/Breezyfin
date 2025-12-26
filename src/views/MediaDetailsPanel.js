@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Panel, Header } from '@enact/sandstone/Panels';
 import Button from '@enact/sandstone/Button';
-import BodyText from '@enact/sandstone/BodyText';
 import Heading from '@enact/sandstone/Heading';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import Icon from '@enact/sandstone/Icon';
 import Popup from '@enact/sandstone/Popup';
+import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
+import {KeyCodes} from '../utils/keyCodes';
 
 import css from './MediaDetailsPanel.module.less';
 
-const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
+const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [playbackInfo, setPlaybackInfo] = useState(null);
 	const [selectedAudioTrack, setSelectedAudioTrack] = useState(null);
@@ -22,8 +23,12 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 	const [selectedEpisode, setSelectedEpisode] = useState(null);
 	const [showAudioPicker, setShowAudioPicker] = useState(false);
 	const [showSubtitlePicker, setShowSubtitlePicker] = useState(false);
+	const [showEpisodePicker, setShowEpisodePicker] = useState(false);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
+	const [toastMessage, setToastMessage] = useState('');
+	const castRowRef = useRef(null);
+	const castScrollerRef = useRef(null);
 
 	useEffect(() => {
 		loadPlaybackInfo();
@@ -162,11 +167,19 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 	};
 
 	const handleToggleFavorite = async () => {
+		if (!item) return;
 		try {
 			const newStatus = await jellyfinService.toggleFavorite(item.Id, isFavorite);
 			setIsFavorite(newStatus);
+			// Refresh user data so UI stays in sync
+			const updated = await jellyfinService.getItem(item.Id);
+			if (updated?.UserData) {
+				setIsWatched(updated.UserData.Played || false);
+			}
+			setToastMessage(newStatus ? 'Added to favorites' : 'Removed from favorites');
 		} catch (error) {
 			console.error('Failed to toggle favorite:', error);
+			setToastMessage('Failed to update favorite');
 		}
 	};
 
@@ -188,11 +201,65 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 			if (itemId && item?.Type === 'Series' && selectedSeason) {
 				const updatedEpisodes = await jellyfinService.getSeasonEpisodes(item.Id, selectedSeason.Id);
 				setEpisodes(updatedEpisodes);
+			} else {
+				// Refresh main item user data
+				const refreshed = await jellyfinService.getItem(targetId);
+				if (refreshed?.UserData && (!itemId || itemId === item?.Id)) {
+					setIsWatched(refreshed.UserData.Played || false);
+				}
 			}
+			setToastMessage(!targetWatchedState ? 'Marked as watched' : 'Marked as unwatched');
 		} catch (error) {
 			console.error('Error toggling watched status:', error);
+			setToastMessage('Failed to update watched status');
 		}
 	};
+
+	// Map remote back/play keys when this panel is active
+	useEffect(() => {
+		if (!isActive) return undefined;
+
+		const handleKeyDown = (e) => {
+			const code = e.keyCode || e.which;
+			const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
+			const PLAY_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE, KeyCodes.PLAY, 179];
+
+			if (BACK_KEYS.includes(code)) {
+				e.preventDefault();
+				onBack();
+				return;
+			}
+
+			if (PLAY_KEYS.includes(code)) {
+				// Avoid triggering play when user is interacting with another control
+				const target = e.target;
+				const tag = target?.tagName?.toLowerCase();
+				const role = target?.getAttribute?.('role');
+				const isInteractive =
+					tag === 'button' ||
+					tag === 'input' ||
+					tag === 'select' ||
+					tag === 'textarea' ||
+					role === 'button' ||
+					role === 'textbox';
+				if (isInteractive) {
+					return;
+				}
+				e.preventDefault();
+				handlePlay();
+			}
+		};
+
+		document.addEventListener('keydown', handleKeyDown);
+		return () => document.removeEventListener('keydown', handleKeyDown);
+	}, [handlePlay, isActive, onBack]);
+
+	// Auto-hide toast after a short delay
+	useEffect(() => {
+		if (!toastMessage) return undefined;
+		const t = setTimeout(() => setToastMessage(''), 2000);
+		return () => clearTimeout(t);
+	}, [toastMessage]);
 
 	if (!item) return null;
 
@@ -217,6 +284,24 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 			})) || [])
 	];
 
+	const cast = item?.People?.filter(p => p.Type === 'Actor') || [];
+	const directors = (item?.People || []).filter(p => p.Type === 'Director');
+	const writers = (item?.People || []).filter(p => p.Type === 'Writer');
+
+	const scrollCastIntoView = (element) => {
+		if (!element || !castScrollerRef.current) return;
+		const scroller = castScrollerRef.current;
+		const scrollerRect = scroller.getBoundingClientRect();
+		const elementRect = element.getBoundingClientRect();
+		const buffer = 60;
+
+		if (elementRect.left < scrollerRect.left + buffer) {
+			scroller.scrollLeft -= (scrollerRect.left + buffer) - elementRect.left;
+		} else if (elementRect.right > scrollerRect.right - buffer) {
+			scroller.scrollLeft += elementRect.right - (scrollerRect.right - buffer);
+		}
+	};
+
 	const getAudioLabel = () => {
 		const track = audioTracks.find(t => t.key === selectedAudioTrack);
 		return track?.children || 'Default';
@@ -226,6 +311,15 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 		if (selectedSubtitleTrack === -1) return 'None';
 		const track = subtitleTracks.find(t => t.key === selectedSubtitleTrack);
 		return track?.children || 'Default';
+	};
+
+	const renderToast = () => {
+		if (!toastMessage) return null;
+		return (
+			<div className={css.toast} role="status">
+				{toastMessage}
+			</div>
+		);
 	};
 
 	const getSeasonImageUrl = (season) => {
@@ -281,9 +375,39 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 		);
 	};
 
+	const renderEpisodePopup = () => {
+		if (item.Type !== 'Series' || !episodes?.length) return null;
+		return (
+			<Popup open={showEpisodePicker} onClose={() => setShowEpisodePicker(false)} noAutoDismiss>
+				<Heading size="medium" spacing="none" className={css.popupHeading}>
+					Select Episode
+				</Heading>
+				<Scroller className={css.popupScroller}>
+					<div className={css.popupList}>
+						{episodes.map(ep => (
+							<Button
+								key={ep.Id}
+								size="large"
+								selected={selectedEpisode?.Id === ep.Id}
+								onClick={() => {
+									handleEpisodeClick(ep);
+									setShowEpisodePicker(false);
+								}}
+								className={css.popupButton}
+							>
+								Episode {ep.IndexNumber}: {ep.Name}
+							</Button>
+						))}
+					</div>
+				</Scroller>
+			</Popup>
+		);
+	};
+
 	return (
 		<Panel {...rest}>
 			<Header title={item?.Name || 'Details'} />
+			{renderToast()}
 			{!loading && (
 				<div className={css.backdrop}>
 					<img src={backdropUrl} alt={item.Name} />
@@ -326,38 +450,101 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 											<div className={css.metadataItem}>
 												{Math.floor(item.RunTimeTicks / 600000000)} min
 											</div>
-									)}
-									<Button
-										size="small"
-										icon={isFavorite ? 'heart' : 'hearthollow'}
-										onClick={handleToggleFavorite}
-									/>
-									<Button
-										size="small"
-										icon="check"
-										selected={isWatched}
-										onClick={handleToggleWatched}
-									/>
+										)}
+										<div className={css.actionsRow}>
+											<Button
+												size="small"
+												icon={isFavorite ? 'heart' : 'hearthollow'}
+												onClick={handleToggleFavorite}
+												className={`${css.actionButton} ${isFavorite ? css.activeAction : ''}`}
+											/>
+											<Button
+												size="small"
+												icon="check"
+												selected={isWatched}
+												onClick={() => handleToggleWatched()}
+												className={`${css.actionButton} ${isWatched ? css.activeAction : ''}`}
+											/>
+										</div>
 									</div>
+									{item.Genres && item.Genres.length > 0 && (
+										<div className={css.metadataItem}>
+											{item.Genres.join(', ')}
+										</div>
+									)}
+									{item.Overview && (
+										<BodyText className={css.overview}>
+											{item.Overview}
+										</BodyText>
+									)}
 								</div>
 
-								{item.Overview && (
-									<BodyText className={css.overview}>
-										{item.Overview}
-									</BodyText>
+								{(directors.length > 0 || writers.length > 0 || cast.length > 0) && (
+									<div className={css.richMeta}>
+										{directors.length > 0 && (
+											<div className={css.metaGroup}>
+												<BodyText className={css.metaLabel}>Director</BodyText>
+												<BodyText className={css.metaValue}>{directors.map(d => d.Name).join(', ')}</BodyText>
+											</div>
+										)}
+										{writers.length > 0 && (
+											<div className={css.metaGroup}>
+												<BodyText className={css.metaLabel}>Writer</BodyText>
+												<BodyText className={css.metaValue}>{writers.map(w => w.Name).join(', ')}</BodyText>
+											</div>
+										)}
+									</div>
 								)}
 
-								{item.Genres && item.Genres.length > 0 && (
-									<BodyText className={css.genres}>
-										{item.Genres.join(' · ')}
-									</BodyText>
+								{cast.length > 0 && (
+									<div className={css.castSection}>
+										<Heading size="medium" className={css.sectionHeading}>Cast</Heading>
+										<div className={css.castScroller} ref={castScrollerRef}>
+											<div className={css.castRow} ref={castRowRef}>
+												{cast.map(person => (
+													<div
+														key={person.Id}
+														className={css.castCard}
+														tabIndex={0}
+														onFocus={(e) => scrollCastIntoView(e.currentTarget)}
+														onKeyDown={(e) => {
+															const cards = Array.from(castRowRef.current?.querySelectorAll(`.${css.castCard}`) || []);
+															const idx = cards.indexOf(e.currentTarget);
+															if (e.keyCode === 37 && idx > 0) {
+																e.preventDefault();
+																cards[idx - 1].focus();
+															} else if (e.keyCode === 39 && idx < cards.length - 1) {
+																e.preventDefault();
+																cards[idx + 1].focus();
+															}
+														}}
+													>
+														<div className={css.castAvatar}>
+															{person.PrimaryImageTag ? (
+																<img
+																	src={jellyfinService.getImageUrl(person.Id, 'Primary', 240)}
+																	alt={person.Name}
+																	onError={(e) => { e.target.style.display = 'none'; }}
+																/>
+															) : (
+																<div className={css.castInitial}>{person.Name?.charAt(0) || '?'}</div>
+															)}
+														</div>
+														<BodyText className={css.castName}>{person.Name}</BodyText>
+														{person.Role && (
+															<BodyText className={css.castRole}>{person.Role}</BodyText>
+														)}
+													</div>
+												))}
+											</div>
+										</div>
+									</div>
 								)}
-
 										{item.Type === 'Series' && seasons.length > 0 && (
 											<div className={css.seriesContent}>
-												<div className={css.seasonsSection}>
-													<Heading size="medium" className={css.sectionHeading}>Seasons</Heading>
-													<div className={css.seasonCards}>
+											<div className={css.seasonsSection}>
+												<Heading size="medium" className={css.sectionHeading}>Seasons</Heading>
+												<div className={css.seasonCards}>
 												{seasons.map(season => (
 													<div
 														key={season.Id}
@@ -392,9 +579,15 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 
 										{episodes.length > 0 && selectedEpisode && (
 											<div className={css.stickyControls}>
-												<BodyText className={css.controlsTitle}>
-													Episode {selectedEpisode.IndexNumber}: {selectedEpisode.Name}
-												</BodyText>
+												<div className={css.controlsTitle}>
+													<Button
+														size="large"
+														onClick={() => setShowEpisodePicker(true)}
+														className={css.dropdown}
+													>
+														Episode {selectedEpisode.IndexNumber}: {selectedEpisode.Name}
+													</Button>
+												</div>
 
 												<div className={css.trackSelectors}>
 													{audioTracks.length > 0 && (
@@ -464,17 +657,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 																		{Math.floor(episode.RunTimeTicks / 600000000)} min
 																	</BodyText>
 																)}
-																<div className={css.episodeWatchedButton}>
-																	<Button
-																		icon="check"
-																		selected={episode.UserData?.Played}
-																		backgroundOpacity="transparent"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			handleToggleWatched(episode.Id, episode.UserData?.Played);
-																		}}
-																	/>
-																</div>
 															</div>
 														</div>
 													))}
@@ -549,6 +731,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, ...rest }) => {
 			</Scroller>
 			{renderTrackPopup('audio')}
 			{renderTrackPopup('subtitle')}
+			{renderEpisodePopup()}
 		</Panel>
 	);
 };
