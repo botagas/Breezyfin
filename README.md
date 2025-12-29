@@ -17,11 +17,14 @@ Breezyfin is a Jellyfin client for LG webOS TVs, built with Enact Sandstone. It 
 
 ## Getting Started
 
-### Prerequisites
-- Node.js (v18+ recommended)
-- npm
+### Testing
 
-### Installation
+Watch out for any new releases in this repository. 
+Releases typically contain a ready-to-use IPK file.
+- Download the IPK file from releases.
+- Use WebOS Dev Manager (or a different tool of your choice) to install the app on the TV
+
+### Development
 
 Clone the repository and install dependencies:
 
@@ -30,8 +33,6 @@ git clone https://github.com/your-org/breezyfin-webos.git
 cd breezyfin-webos/Breezyfin
 npm install
 ```
-
-### Development
 
 Start the development server:
 
@@ -47,29 +48,6 @@ npm run pack-p
 ```
 Output will be in the `dist/` folder.
 
-### Packaging for webOS
-
-Use the webOS SDK or CLI tools to package the app for deployment to your TV. See [webOS documentation](https://webostv.developer.lge.com/) for details.
-
-## Scripts
-
-- `npm run serve` — Start development server
-- `npm run pack` — Build in development mode
-- `npm run pack-p` — Build in production mode
-- `npm run watch` — Watch files and rebuild on changes
-- `npm run clean` — Remove build artifacts
-- `npm run lint` — Run ESLint
-- `npm run test` — Run tests
-
-## Permissions
-
-The app requests the following webOS permissions (see `appinfo.json`):
-
-- `time.query`
-- `activity.operation`
-- `network.operation`
-- `media.operation`
-
 ## Contributing
 
 Pull requests and issues are welcome! Please follow the code style and add tests for new features. See the [components/README.md](src/components/README.md) for reusable UI guidelines.
@@ -78,4 +56,4 @@ Pull requests and issues are welcome! Please follow the code style and add tests
 
 - Built with [Enact Sandstone](https://github.com/enactjs/sandstone)
 - Uses [Jellyfin SDK](https://github.com/jellyfin/sdk)
-- BEWARE: AI was used when developing this app. This means that it may have vulnerabilities, dead-code, and functional issues that could be addressed in the future.
+- **BEWARE**: AI was used when developing this app. This means that it may have vulnerabilities, dead-code, and functional issues that could be addressed in the future. It is currently in the **BAREBONES** stage.
