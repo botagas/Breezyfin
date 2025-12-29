@@ -43,3 +43,21 @@ button::after {
 	filter: none !important;
 	max-width: none !important;
 }
+
+/* Shared toast styling across panels */
+.toast,
+.playerToast,
+.error {
+	position: fixed;
+	top: 10rem;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(0, 0, 0, 0.8);
+	color: #fff;
+	padding: 12px 18px;
+	border-radius: 8px;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+	z-index: 200;
+	pointer-events: none;
+	font-weight: 600;
+}

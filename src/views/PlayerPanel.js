@@ -21,12 +21,17 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const playbackSettingsRef = useRef({}); // Persist user playback settings between re-requests
 	const startupFallbackTimerRef = useRef(null);
 	const transcodeFallbackAttemptedRef = useRef(false);
+	const reloadAttemptedRef = useRef(false);
 	const trackPreferenceRef = useRef(null);
 	const lastProgressRef = useRef({ time: 0, timestamp: 0 });
 	const loadVideoRef = useRef(null);
 	const playbackOverrideRef = useRef(null);
 	const skipButtonRef = useRef(null);
 	const playPauseButtonRef = useRef(null);
+	const lastInteractionRef = useRef(Date.now());
+	const startWatchTimerRef = useRef(null);
+	const failStartTimerRef = useRef(null);
+	const pendingOverrideClearRef = useRef(false);
 	const [toastMessage, setToastMessage] = useState('');
 	
 	const [loading, setLoading] = useState(true);
@@ -170,6 +175,17 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}, 10000);
 	}, [item]);
 
+	const clearStartWatch = useCallback(() => {
+		if (startWatchTimerRef.current) {
+			clearTimeout(startWatchTimerRef.current);
+			startWatchTimerRef.current = null;
+		}
+		if (failStartTimerRef.current) {
+			clearTimeout(failStartTimerRef.current);
+			failStartTimerRef.current = null;
+		}
+	}, []);
+
 	// Stop playback and clean up
 	const handleStop = useCallback(async () => {
 		if (progressIntervalRef.current) {
@@ -180,6 +196,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			clearTimeout(startupFallbackTimerRef.current);
 			startupFallbackTimerRef.current = null;
 		}
+		clearStartWatch();
 
 		if (hlsRef.current) {
 			try {
@@ -197,7 +214,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			videoRef.current.removeAttribute('src');
 			videoRef.current.load();
 		}
-	}, [item]);
+	}, [clearStartWatch, item]);
 
 	// Attempt to fall back to transcoding if direct playback looks unhealthy
 	const attemptTranscodeFallback = useCallback(async (reason) => {
@@ -314,6 +331,9 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}
 		
 		setLoading(true);
+		reloadAttemptedRef.current = false;
+		// Reset last progress marker so stall detection can work even before timeupdate
+		lastProgressRef.current = { time: 0, timestamp: Date.now() };
 		setError(null);
 		seekOffsetRef.current = 0; // Reset seek offset for new video
 		trackPreferenceRef.current = loadTrackPreferences();
@@ -355,53 +375,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 					...((playbackOverrideRef.current ?? playbackOptions) || {}), 
 					...playbackSettingsRef.current
 				};
-				const requestedAudio = Number.isInteger(options.audioStreamIndex) ? options.audioStreamIndex : null;
-				const requestedSubtitle = (options.subtitleStreamIndex === -1 || Number.isInteger(options.subtitleStreamIndex))
-					? options.subtitleStreamIndex
-					: null;
 				playbackInfo = await jellyfinService.getPlaybackInfo(item.Id, options);
 				console.log('Playback info received:', playbackInfo);
-				// If we end up selecting different tracks than the request, reload with the chosen ones
-				const mediaSource = playbackInfo?.MediaSources?.[0];
-				const audioStreams = mediaSource?.MediaStreams?.filter(s => s.Type === 'Audio') || [];
-				const subtitleStreams = mediaSource?.MediaStreams?.filter(s => s.Type === 'Subtitle') || [];
-
-				// Determine intended defaults before proceeding
-				const defaultAudio = audioStreams.find(s => s.IsDefault) || audioStreams[0];
-				const defaultSubtitle = subtitleStreams.find(s => s.IsDefault);
-				const providedAudio = Number.isInteger(requestedAudio)
-					? requestedAudio
-					: Number.isInteger(playbackOptions?.audioStreamIndex)
-						? playbackOptions.audioStreamIndex
-						: null;
-				const providedSubtitle = (requestedSubtitle === -1 || Number.isInteger(requestedSubtitle))
-					? requestedSubtitle
-					: Number.isInteger(playbackOptions?.subtitleStreamIndex)
-						? playbackOptions.subtitleStreamIndex
-						: null;
-				const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
-				const initialSubtitle = pickPreferredSubtitle(subtitleStreams, providedSubtitle, defaultSubtitle);
-
-				if (!playbackOverrideRef.current && ((requestedAudio ?? null) !== (initialAudio ?? null) || (requestedSubtitle ?? null) !== (initialSubtitle ?? null))) {
-					console.log('[Player] Track mismatch detected, reloading with selected tracks', {
-						requestedAudio,
-						requestedSubtitle,
-						initialAudio,
-						initialSubtitle
-					});
-					const targetAudio = requestedAudio ?? initialAudio;
-					const targetSubtitle = requestedSubtitle ?? initialSubtitle;
-					playbackOverrideRef.current = {
-						...(playbackOptions || {}),
-						audioStreamIndex: Number.isInteger(targetAudio) ? targetAudio : undefined,
-						subtitleStreamIndex: (targetSubtitle === -1 || Number.isInteger(targetSubtitle)) ? targetSubtitle : undefined,
-						startTimeTicks: 0
-					};
-					setLoading(true);
-					await handleStop();
-					loadVideo();
-					return;
-				}
 			} catch (infoError) {
 				console.error('Failed to get playback info:', infoError);
 			}
@@ -529,8 +504,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 						url.searchParams.delete('SubtitleMethod');
 					}
 				}
-				// Always force a fresh PlaySession when we are overriding tracks to avoid reused transcodes
-				if (playbackOverrideRef.current || Number.isInteger(selectedAudio) || (selectedSubtitle === -1 || Number.isInteger(selectedSubtitle))) {
+				// Only force a fresh PlaySession when we explicitly asked to (track change/override)
+				if (playbackOverrideRef.current?.forceNewSession) {
 					const newSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 					url.searchParams.set('PlaySessionId', newSessionId);
 					console.log('[Player] Forcing new PlaySessionId for track override:', newSessionId);
@@ -538,8 +513,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 				videoUrl = url.toString();
 			}
 			
-			// Clear one-time overrides after we've applied them
-			playbackOverrideRef.current = null;
+			// Mark overrides to clear once playback has actually started
+			pendingOverrideClearRef.current = !!playbackOverrideRef.current;
 
 			console.log('Video URL:', videoUrl);
 			console.log('Is HLS:', isHls);
@@ -642,27 +617,27 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 					video.addEventListener('error', errorHandler, { once: true });
 					
 					// Clear timer if video starts loading successfully
-					video.addEventListener('loadstart', () => {
-						console.log('Native HLS loadstart event fired');
-						clearTimeout(fallbackTimer);
-						video.removeEventListener('error', errorHandler);
-					}, { once: true });
-					
-					video.src = videoUrl;
-				} else if (Hls.isSupported()) {
-					console.log('Using HLS.js library');
-					const hls = new Hls({
-						enableWorker: true,
-						lowLatencyMode: false,
-						backBufferLength: 90,
-						maxBufferLength: 30,
-						maxMaxBufferLength: 600,
-						fragLoadingTimeOut: 20000,
-						levelLoadingTimeOut: 20000,
-						fragLoadingMaxRetry: 4,
-						levelLoadingMaxRetry: 4,
-						startLevel: -1
-					});
+				video.addEventListener('loadstart', () => {
+					console.log('Native HLS loadstart event fired');
+					clearTimeout(fallbackTimer);
+					video.removeEventListener('error', errorHandler);
+				}, { once: true });
+
+				video.src = videoUrl;
+			} else if (Hls.isSupported()) {
+				console.log('Using HLS.js library');
+				const hls = new Hls({
+					enableWorker: true,
+					lowLatencyMode: false,
+					backBufferLength: 90,
+					maxBufferLength: 30,
+					maxMaxBufferLength: 600,
+					fragLoadingTimeOut: 20000,
+					levelLoadingTimeOut: 20000,
+					fragLoadingMaxRetry: 4,
+					levelLoadingMaxRetry: 4,
+					startLevel: -1
+				});
 					hlsRef.current = hls;
 
 					hls.loadSource(videoUrl);
@@ -700,6 +675,56 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			video.load();
 			console.log('video.load() called');
 
+			// Startup watchdog: if playback hasn't begun shortly after load, try to kick it
+			if (startWatchTimerRef.current) {
+				clearTimeout(startWatchTimerRef.current);
+			}
+			console.log('[Player] Scheduling startup stall watchdog');
+			startWatchTimerRef.current = setTimeout(() => {
+				if (!videoRef.current) return;
+				// Consider it stalled if not playing OR if currentTime hasn't advanced recently
+				const last = lastProgressRef.current || { time: 0, timestamp: 0 };
+				const now = Date.now();
+				const stagnant = (now - last.timestamp > 5000) && Math.abs((videoRef.current.currentTime || 0) - last.time) < 0.25;
+				if (playing && !stagnant) return;
+				// One-shot recovery: rebuild session with a fresh PlaySessionId
+				if (reloadAttemptedRef.current) {
+					console.warn('[Player] Playback stall after load() and recovery already attempted');
+					return;
+				}
+				console.warn('[Player] Playback stalled after load(), rebuilding session with fresh PlaySessionId');
+				console.warn('[Player] Video readyState:', videoRef.current?.readyState, 'networkState:', videoRef.current?.networkState, 'currentTime:', videoRef.current?.currentTime, 'lastProgress:', last);
+				reloadAttemptedRef.current = true;
+				clearStartWatch();
+				if (startupFallbackTimerRef.current) {
+					clearTimeout(startupFallbackTimerRef.current);
+					startupFallbackTimerRef.current = null;
+				}
+				// Tear down current HLS/video source
+				if (hlsRef.current) {
+					try { hlsRef.current.destroy(); } catch (_) {}
+					hlsRef.current = null;
+				}
+				if (videoRef.current) {
+					videoRef.current.removeAttribute('src');
+					videoRef.current.load();
+				}
+				// Force a new session on reload
+				playbackOverrideRef.current = { ...(playbackOptions || {}), forceNewSession: true };
+				loadVideo();
+			}, 7000);
+
+			// Final fallback: if still loading after 12s, surface an error with retry
+			if (failStartTimerRef.current) {
+				clearTimeout(failStartTimerRef.current);
+			}
+			failStartTimerRef.current = setTimeout(() => {
+				if (!loading) return;
+				console.warn('[Player] Playback failed to start within timeout, showing retry');
+				setError('Playback failed to start. Please try again.');
+				setToastMessage('Playback failed to start. Press Retry or Back.');
+			}, 12000);
+
 			// Note: Position will be set in handleLoadedMetadata after metadata loads
 
 		} catch (err) {
@@ -707,7 +732,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			setError('Failed to load video: ' + err.message);
 			setLoading(false);
 		}
-	}, [attemptTranscodeFallback, item, playbackOptions]);
+	}, [attemptTranscodeFallback, item, playbackOptions, playing]);
 
 	// Video event handlers
 	const handleLoadedMetadata = useCallback(() => {
@@ -718,7 +743,12 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			console.log('Video element duration:', videoRef.current.duration, 'seconds (may be inaccurate for transcoding)');
 			
 			// Set start position after metadata is loaded
-			if (item.UserData?.PlaybackPositionTicks) {
+			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
+			if (typeof overrideSeek === 'number') {
+				console.log('Setting override resume position:', overrideSeek, 'seconds');
+				videoRef.current.currentTime = overrideSeek;
+				setCurrentTime(overrideSeek);
+			} else if (item.UserData?.PlaybackPositionTicks) {
 				const startPosition = item.UserData.PlaybackPositionTicks / 10000000;
 				console.log('Setting resume position:', startPosition, 'seconds');
 				videoRef.current.currentTime = startPosition;
@@ -726,6 +756,15 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			}
 		}
 	}, [item]);
+
+	const handleLoadedData = useCallback(() => {
+		console.log('Video loadeddata');
+		// If we got data but loading is still true, try to kick off playback
+		if (loading && videoRef.current) {
+			setLoading(false);
+			videoRef.current.play().catch(() => {});
+		}
+	}, [loading]);
 
 	const handleCanPlay = useCallback(async () => {
 		console.log('Video can play');
@@ -738,6 +777,11 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			await videoRef.current.play();
 			setPlaying(true);
 			console.log('Playback started successfully');
+			if (pendingOverrideClearRef.current) {
+				playbackOverrideRef.current = null;
+				pendingOverrideClearRef.current = false;
+			}
+			clearStartWatch();
 			if (startupFallbackTimerRef.current) {
 				clearTimeout(startupFallbackTimerRef.current);
 				startupFallbackTimerRef.current = null;
@@ -751,6 +795,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			console.error('Auto-play failed:', playError);
 			// User may need to click play manually (browser autoplay policy)
 			setPlaying(false);
+			setToastMessage('Playback failed to start. Press Play/Retry.');
 			// If direct playback fails immediately, try a one-time transcode fallback
 			if (!mediaSourceData?.TranscodingUrl) {
 				attemptTranscodeFallback('Auto-play failed');
@@ -901,6 +946,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		
 		if (!videoRef.current) return;
 		
+		lastInteractionRef.current = Date.now();
 		// For HLS streams (native or HLS.js), let the player handle seeking
 		const isHls = mediaSourceData?.TranscodingUrl?.includes('.m3u8') || 
 		              mediaSourceData?.TranscodingUrl?.includes('/hls/');
@@ -953,6 +999,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	};
 
 	const handleVolumeChange = (e) => {
+		lastInteractionRef.current = Date.now();
 		if (videoRef.current) {
 			const newVolume = e.value;
 			videoRef.current.volume = newVolume / 100;
@@ -962,6 +1009,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	};
 
 	const toggleMute = () => {
+		lastInteractionRef.current = Date.now();
 		if (videoRef.current) {
 			const newMuted = !muted;
 			videoRef.current.muted = newMuted;
@@ -1034,6 +1082,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 				}
 			}
 			console.log('Subtitle switching not yet supported for this HLS stream');
+			setToastMessage('Subtitle change may require retry/reload on this stream');
 		}
 		
 		// Fallback: reload playback with the selected subtitle track
@@ -1056,7 +1105,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			const nextEpisode = nextEpisodeData || await getNextEpisode(item);
 			if (nextEpisode) {
 				const opts = buildPlaybackOptions();
-				playbackOverrideRef.current = opts;
+				playbackOverrideRef.current = { ...opts, forceNewSession: true };
 				await handleStop();
 				onPlay(nextEpisode, opts);
 			}
@@ -1071,7 +1120,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			const prevEpisode = await getPreviousEpisode(item);
 			if (prevEpisode) {
 				const opts = buildPlaybackOptions();
-				playbackOverrideRef.current = opts;
+				playbackOverrideRef.current = { ...opts, forceNewSession: true };
 				await handleStop();
 				onPlay(prevEpisode, opts);
 			}
@@ -1126,7 +1175,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			...(playbackOptions || {}),
 			audioStreamIndex: Number.isInteger(audioIndex) ? audioIndex : undefined,
 			subtitleStreamIndex: (subtitleIndex === -1 || Number.isInteger(subtitleIndex)) ? subtitleIndex : undefined,
-			startTimeTicks: Math.floor(currentPosition * 10000000)
+			seekSeconds: currentPosition,
+			forceNewSession: true
 		};
 		console.log('[Player] Reloading with track override', playbackOverrideRef.current);
 		setLoading(true);
@@ -1172,6 +1222,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	useEffect(() => {
 		if (item) {
 			transcodeFallbackAttemptedRef.current = false;
+			reloadAttemptedRef.current = false;
 			setSkipOverlayVisible(false);
 			setCurrentSkipSegment(null);
 			setSkipCountdown(null);
@@ -1189,15 +1240,14 @@ useEffect(() => {
 	let hideTimer;
 	// Only auto-hide when video is playing and no modal is open
 	if (showControls && playing && !showAudioPopup && !showSubtitlePopup) {
-		hideTimer = setTimeout(() => {
-			const active = document.activeElement;
-			const controlsFocused = active && active.closest && active.closest(`.${css.controls}`);
-			if (!controlsFocused) {
+		hideTimer = setInterval(() => {
+			const inactiveFor = Date.now() - lastInteractionRef.current;
+			if (inactiveFor > 5000) {
 				setShowControls(false);
 			}
-		}, 5000);
+		}, 1000);
 	}
-	return () => clearTimeout(hideTimer);
+	return () => clearInterval(hideTimer);
 }, [showControls, playing, showAudioPopup, showSubtitlePopup]);
 
 // Playback health watchdog: if direct playback stalls, try transcode fallback
@@ -1256,7 +1306,9 @@ useEffect(() => {
 	// Auto-focus skip button when overlay appears
 	useEffect(() => {
 		if (skipOverlayVisible && skipButtonRef.current) {
-			skipButtonRef.current.focus({ preventScroll: true });
+			if (skipButtonRef.current.focus) {
+				skipButtonRef.current.focus({ preventScroll: true });
+			}
 		}
 	}, [currentSkipSegment, skipOverlayVisible]);
 
@@ -1272,6 +1324,7 @@ useEffect(() => {
 		if (!isActive) return undefined;
 
 		const handleKeyDown = (e) => {
+			lastInteractionRef.current = Date.now();
 			const code = e.keyCode || e.which;
 			const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
 			const SEEK_STEP = 15; // seconds
@@ -1279,8 +1332,8 @@ useEffect(() => {
 			const PLAY_ONLY_KEYS = [KeyCodes.PLAY];
 			const PAUSE_KEYS = [KeyCodes.PAUSE];
 
-			// If we're not showing controls, bring them up on any navigation key
-			if ([KeyCodes.LEFT, KeyCodes.UP, KeyCodes.RIGHT, KeyCodes.DOWN].includes(code) && !showControls) {
+			// Only bring up controls on up/down when hidden
+			if ([KeyCodes.UP, KeyCodes.DOWN].includes(code) && !showControls) {
 				e.preventDefault();
 				setShowControls(true);
 			}
@@ -1352,7 +1405,7 @@ useEffect(() => {
 					ref={videoRef}
 					className={css.video}
 					onLoadStart={() => console.log('Event: loadstart')}
-					onLoadedData={() => console.log('Event: loadeddata')}
+					onLoadedData={handleLoadedData}
 					onLoadedMetadata={handleLoadedMetadata}
 					onCanPlay={handleCanPlay}
 					onCanPlayThrough={() => console.log('Event: canplaythrough')}
@@ -1399,7 +1452,7 @@ useEffect(() => {
 								size="small"
 								onClick={handleSkipSegment}
 								className={css.skipButton}
-								ref={skipButtonRef}
+								componentRef={skipButtonRef}
 								autoFocus
 							>
 								Skip
@@ -1436,6 +1489,17 @@ useEffect(() => {
 									value={Math.floor(currentTime)}
 									onChange={handleSeek}
 									data-seekable="true"
+									onKeyDown={(e) => {
+										const SEEK_STEP = 15;
+										if (e.keyCode === KeyCodes.LEFT) {
+											e.preventDefault();
+											seekBySeconds(-SEEK_STEP);
+										} else if (e.keyCode === KeyCodes.RIGHT) {
+											e.preventDefault();
+											seekBySeconds(SEEK_STEP);
+										}
+										lastInteractionRef.current = Date.now();
+									}}
 								/>
 								<BodyText className={css.time}>
 									-{formatTime(Math.max(0, duration - currentTime))}
