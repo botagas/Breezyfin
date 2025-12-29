@@ -22,7 +22,7 @@ Breezyfin is a Jellyfin client for LG webOS TVs, built with Enact Sandstone. It 
 Watch out for any new releases in this repository. 
 Releases typically contain a ready-to-use IPK file.
 - Download the IPK file from releases.
-- Use WebOS Dev Manager (or a different tool of your choice) to install the app on the TV
+- Use WebOS Dev Manager (or a different tool of your choice) to install the app on the TV.
 
 ### Development
 
