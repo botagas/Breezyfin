@@ -24,6 +24,9 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const trackPreferenceRef = useRef(null);
 	const lastProgressRef = useRef({ time: 0, timestamp: 0 });
 	const loadVideoRef = useRef(null);
+	const playbackOverrideRef = useRef(null);
+	const skipButtonRef = useRef(null);
+	const playPauseButtonRef = useRef(null);
 	const [toastMessage, setToastMessage] = useState('');
 	
 	const [loading, setLoading] = useState(true);
@@ -179,13 +182,20 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}
 
 		if (hlsRef.current) {
-			hlsRef.current.destroy();
+			try {
+				hlsRef.current.destroy();
+			} catch (err) {
+				console.warn('Error destroying HLS instance:', err);
+			}
 			hlsRef.current = null;
 		}
 
 		if (videoRef.current && item) {
 			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
 			await jellyfinService.reportPlaybackStopped(item.Id, positionTicks);
+			// Clear source to ensure next load starts cleanly
+			videoRef.current.removeAttribute('src');
+			videoRef.current.load();
 		}
 	}, [item]);
 
@@ -235,6 +245,9 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const pickPreferredAudio = (audioStreams, providedAudio, defaultAudio) => {
 		if (!audioStreams.length) return null;
 		const pref = trackPreferenceRef.current?.audio;
+		if (Number.isInteger(pref?.index) && audioStreams.some(s => s.Index === pref.index)) {
+			return pref.index;
+		}
 		if (Number.isInteger(providedAudio) && audioStreams.some(s => s.Index === providedAudio)) {
 			return providedAudio;
 		}
@@ -246,27 +259,46 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	};
 
 	const pickPreferredSubtitle = (subtitleStreams, providedSubtitle, defaultSubtitle) => {
+		// Explicit "off" wins
 		if (providedSubtitle === -1) return -1;
 		if (Number.isInteger(providedSubtitle) && subtitleStreams.some(s => s.Index === providedSubtitle)) {
 			return providedSubtitle;
 		}
-		const pref = trackPreferenceRef.current?.subtitle;
-		// Respect "off" preference
-		if (pref?.off) return -1;
 
+		const pref = trackPreferenceRef.current?.subtitle;
+		// Respect saved "off"
+		if (pref?.off) return -1;
+		if (Number.isInteger(pref?.index) && subtitleStreams.some(s => s.Index === pref.index)) {
+			return pref.index;
+		}
+
+		// Respect saved language, avoiding forced when possible
 		if (pref?.language) {
-			// Prefer non-forced match in the same language
+			const lowerLang = pref.language.toLowerCase();
 			const nonForced = subtitleStreams.find(s =>
-				s.Language && s.Language.toLowerCase() === pref.language.toLowerCase() && !s.IsForced
+				s.Language && s.Language.toLowerCase() === lowerLang && !s.IsForced
 			);
 			if (nonForced) return nonForced.Index;
-			// Fall back to any in that language
 			const anyLang = subtitleStreams.find(s =>
-				s.Language && s.Language.toLowerCase() === pref.language.toLowerCase()
+				s.Language && s.Language.toLowerCase() === lowerLang
 			);
 			if (anyLang) return anyLang.Index;
 		}
-		// Default Jellyfin pick
+
+		// If default is forced, try to find a non-forced alternative in same language, then any non-forced
+		if (defaultSubtitle?.IsForced) {
+			const sameLangNonForced = subtitleStreams.find(s =>
+				!s.IsForced &&
+				defaultSubtitle.Language &&
+				s.Language &&
+				s.Language.toLowerCase() === defaultSubtitle.Language.toLowerCase()
+			);
+			if (sameLangNonForced) return sameLangNonForced.Index;
+			const anyNonForced = subtitleStreams.find(s => !s.IsForced);
+			if (anyNonForced) return anyNonForced.Index;
+		}
+
+		// Default Jellyfin pick, or none
 		return (defaultSubtitle?.Index ?? -1);
 	};
 
@@ -320,11 +352,56 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			let playbackInfo = null;
 			try {
 				const options = { 
-					...(playbackOptions || {}), 
+					...((playbackOverrideRef.current ?? playbackOptions) || {}), 
 					...playbackSettingsRef.current
 				};
+				const requestedAudio = Number.isInteger(options.audioStreamIndex) ? options.audioStreamIndex : null;
+				const requestedSubtitle = (options.subtitleStreamIndex === -1 || Number.isInteger(options.subtitleStreamIndex))
+					? options.subtitleStreamIndex
+					: null;
 				playbackInfo = await jellyfinService.getPlaybackInfo(item.Id, options);
 				console.log('Playback info received:', playbackInfo);
+				// If we end up selecting different tracks than the request, reload with the chosen ones
+				const mediaSource = playbackInfo?.MediaSources?.[0];
+				const audioStreams = mediaSource?.MediaStreams?.filter(s => s.Type === 'Audio') || [];
+				const subtitleStreams = mediaSource?.MediaStreams?.filter(s => s.Type === 'Subtitle') || [];
+
+				// Determine intended defaults before proceeding
+				const defaultAudio = audioStreams.find(s => s.IsDefault) || audioStreams[0];
+				const defaultSubtitle = subtitleStreams.find(s => s.IsDefault);
+				const providedAudio = Number.isInteger(requestedAudio)
+					? requestedAudio
+					: Number.isInteger(playbackOptions?.audioStreamIndex)
+						? playbackOptions.audioStreamIndex
+						: null;
+				const providedSubtitle = (requestedSubtitle === -1 || Number.isInteger(requestedSubtitle))
+					? requestedSubtitle
+					: Number.isInteger(playbackOptions?.subtitleStreamIndex)
+						? playbackOptions.subtitleStreamIndex
+						: null;
+				const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
+				const initialSubtitle = pickPreferredSubtitle(subtitleStreams, providedSubtitle, defaultSubtitle);
+
+				if (!playbackOverrideRef.current && ((requestedAudio ?? null) !== (initialAudio ?? null) || (requestedSubtitle ?? null) !== (initialSubtitle ?? null))) {
+					console.log('[Player] Track mismatch detected, reloading with selected tracks', {
+						requestedAudio,
+						requestedSubtitle,
+						initialAudio,
+						initialSubtitle
+					});
+					const targetAudio = requestedAudio ?? initialAudio;
+					const targetSubtitle = requestedSubtitle ?? initialSubtitle;
+					playbackOverrideRef.current = {
+						...(playbackOptions || {}),
+						audioStreamIndex: Number.isInteger(targetAudio) ? targetAudio : undefined,
+						subtitleStreamIndex: (targetSubtitle === -1 || Number.isInteger(targetSubtitle)) ? targetSubtitle : undefined,
+						startTimeTicks: 0
+					};
+					setLoading(true);
+					await handleStop();
+					loadVideo();
+					return;
+				}
 			} catch (infoError) {
 				console.error('Failed to get playback info:', infoError);
 			}
@@ -381,16 +458,27 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			const providedAudio = Number.isInteger(playbackOptions?.audioStreamIndex)
 				? playbackOptions.audioStreamIndex
 				: null;
-			const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
-
 			const providedSubtitle = Number.isInteger(playbackOptions?.subtitleStreamIndex)
 				? playbackOptions.subtitleStreamIndex
 				: null;
+
+			const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
 			const initialSubtitle = pickPreferredSubtitle(subtitleStreams, providedSubtitle, defaultSubtitle);
+
+			// Respect explicit overrides (e.g., from track switching) if present
+			const overrideAudio = Number.isInteger(playbackOverrideRef.current?.audioStreamIndex)
+				? playbackOverrideRef.current.audioStreamIndex
+				: null;
+			const overrideSubtitle = (playbackOverrideRef.current?.subtitleStreamIndex === -1 || Number.isInteger(playbackOverrideRef.current?.subtitleStreamIndex))
+				? playbackOverrideRef.current.subtitleStreamIndex
+				: null;
+
+			const selectedAudio = Number.isInteger(overrideAudio) ? overrideAudio : initialAudio;
+			const selectedSubtitle = (overrideSubtitle === -1 || Number.isInteger(overrideSubtitle)) ? overrideSubtitle : initialSubtitle;
 			
-			setCurrentAudioTrack(initialAudio);
-			setCurrentSubtitleTrack(initialSubtitle);
-			console.log('Initial tracks set to:', { audio: initialAudio, subtitle: initialSubtitle });
+			setCurrentAudioTrack(selectedAudio);
+			setCurrentSubtitleTrack(selectedSubtitle);
+			console.log('Initial tracks set to:', { audio: selectedAudio, subtitle: selectedSubtitle });
 			
 			console.log('Audio tracks:', audioStreams.map(s => ({ index: s.Index, language: s.Language, title: s.Title })));
 			console.log('Subtitle tracks:', subtitleStreams.map(s => ({ index: s.Index, language: s.Language, title: s.Title })));
@@ -425,6 +513,33 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			} else {
 				throw new Error('No supported playback method available');
 			}
+
+			// When transcoding, enforce the selected tracks and optionally force a fresh PlaySessionId
+			if (mediaSource.TranscodingUrl) {
+				// Server wants to transcode - use the transcoding URL
+				const url = new URL(`${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`);
+				if (Number.isInteger(selectedAudio)) {
+					url.searchParams.set('AudioStreamIndex', selectedAudio);
+				}
+				if (selectedSubtitle === -1 || Number.isInteger(selectedSubtitle)) {
+					url.searchParams.set('SubtitleStreamIndex', selectedSubtitle);
+					if (selectedSubtitle >= 0) {
+						url.searchParams.set('SubtitleMethod', 'Encode');
+					} else {
+						url.searchParams.delete('SubtitleMethod');
+					}
+				}
+				// Always force a fresh PlaySession when we are overriding tracks to avoid reused transcodes
+				if (playbackOverrideRef.current || Number.isInteger(selectedAudio) || (selectedSubtitle === -1 || Number.isInteger(selectedSubtitle))) {
+					const newSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+					url.searchParams.set('PlaySessionId', newSessionId);
+					console.log('[Player] Forcing new PlaySessionId for track override:', newSessionId);
+				}
+				videoUrl = url.toString();
+			}
+			
+			// Clear one-time overrides after we've applied them
+			playbackOverrideRef.current = null;
 
 			console.log('Video URL:', videoUrl);
 			console.log('Is HLS:', isHls);
@@ -478,7 +593,12 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 							lowLatencyMode: false,
 							backBufferLength: 90,
 							maxBufferLength: 30,
-							maxMaxBufferLength: 600
+							maxMaxBufferLength: 600,
+							fragLoadingTimeOut: 20000,
+							levelLoadingTimeOut: 20000,
+							fragLoadingMaxRetry: 4,
+							levelLoadingMaxRetry: 4,
+							startLevel: -1
 						});
 						hlsRef.current = hls;
 
@@ -536,7 +656,12 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 						lowLatencyMode: false,
 						backBufferLength: 90,
 						maxBufferLength: 30,
-						maxMaxBufferLength: 600
+						maxMaxBufferLength: 600,
+						fragLoadingTimeOut: 20000,
+						levelLoadingTimeOut: 20000,
+						fragLoadingMaxRetry: 4,
+						levelLoadingMaxRetry: 4,
+						startLevel: -1
 					});
 					hlsRef.current = hls;
 
@@ -873,32 +998,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 				return;
 			}
 		}
-		
-		// For transcoded non-HLS streams, we need to restart playback with new audio track
-		// Note: This won't work well for HLS, use native track switching above instead
-		if (mediaSourceData?.TranscodingUrl && videoRef.current && !hlsRef.current) {
-			const currentPosition = videoRef.current.currentTime;
-			
-			// Reload with new audio track
-			try {
-				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
-					...playbackOptions,
-					...playbackSettingsRef.current,
-					audioStreamIndex: trackIndex,
-					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
-					startTimeTicks: Math.floor(currentPosition * 10000000)
-				});
-				
-				const newMediaSource = newPlaybackInfo?.MediaSources?.[0];
-				if (newMediaSource?.TranscodingUrl) {
-					const videoUrl = `${jellyfinService.serverUrl}${newMediaSource.TranscodingUrl}`;
-					videoRef.current.src = videoUrl;
-					videoRef.current.load();
-				}
-			} catch (err) {
-				console.error('Failed to change audio track:', err);
-			}
-		}
+		// Fallback: reload playback with the chosen track
+		reloadWithTrackSelection(trackIndex, currentSubtitleTrack);
 	};
 
 	// Change subtitle track
@@ -933,44 +1034,10 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 				}
 			}
 			console.log('Subtitle switching not yet supported for this HLS stream');
-			return;
 		}
 		
-		// For transcoded or direct streams, reload with selected subtitle
-		if (mediaSourceData && videoRef.current) {
-			const currentPosition = videoRef.current.currentTime;
-			
-			try {
-				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
-					...playbackOptions,
-					...playbackSettingsRef.current,
-					audioStreamIndex: currentAudioTrack,
-					subtitleStreamIndex: trackIndex >= 0 ? trackIndex : undefined,
-					startTimeTicks: Math.floor(currentPosition * 10000000)
-				});
-				
-				const newMediaSource = newPlaybackInfo?.MediaSources?.[0];
-				if (newMediaSource?.TranscodingUrl) {
-					const videoUrl = `${jellyfinService.serverUrl}${newMediaSource.TranscodingUrl}`;
-					videoRef.current.src = videoUrl;
-					videoRef.current.load();
-				} else if (newMediaSource) {
-					// Direct path: reload with direct stream URL including subtitle choice
-					const videoUrl = jellyfinService.getPlaybackUrl(
-						item.Id,
-						newMediaSource.Id,
-						newPlaybackInfo.PlaySessionId,
-						newMediaSource.ETag,
-						newMediaSource.Container,
-						newMediaSource.LiveStreamId
-					);
-					videoRef.current.src = videoUrl;
-					videoRef.current.load();
-				}
-			} catch (err) {
-				console.error('Failed to change subtitle track:', err);
-			}
-		}
+		// Fallback: reload playback with the selected subtitle track
+		reloadWithTrackSelection(currentAudioTrack, trackIndex);
 	};
 
 	const getTrackLabel = (track) => {
@@ -988,8 +1055,10 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		try {
 			const nextEpisode = nextEpisodeData || await getNextEpisode(item);
 			if (nextEpisode) {
+				const opts = buildPlaybackOptions();
+				playbackOverrideRef.current = opts;
 				await handleStop();
-				onPlay(nextEpisode, buildPlaybackOptions());
+				onPlay(nextEpisode, opts);
 			}
 		} catch (err) {
 			console.error('Failed to play next episode:', err);
@@ -1001,8 +1070,10 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		try {
 			const prevEpisode = await getPreviousEpisode(item);
 			if (prevEpisode) {
+				const opts = buildPlaybackOptions();
+				playbackOverrideRef.current = opts;
 				await handleStop();
-				onPlay(prevEpisode, buildPlaybackOptions());
+				onPlay(prevEpisode, opts);
 			}
 		} catch (err) {
 			console.error('Failed to play previous episode:', err);
@@ -1016,6 +1087,14 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 
 	const toggleControls = () => {
 		setShowControls(prev => !prev);
+	};
+
+	// Only allow seek shortcuts when focus isn't on another UI element
+	const isSeekContext = (target) => {
+		if (!target) return true;
+		if (target === videoRef.current || target === document.body || target === document.documentElement) return true;
+		if (target.closest && target.closest('[data-seekable="true"]')) return true;
+		return false;
 	};
 
 	const seekBySeconds = useCallback((deltaSeconds) => {
@@ -1038,6 +1117,23 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	};
+
+	// Reload playback with explicit track selections, keeping position
+	const reloadWithTrackSelection = useCallback(async (audioIndex, subtitleIndex) => {
+		if (!videoRef.current) return;
+		const currentPosition = videoRef.current.currentTime || 0;
+		playbackOverrideRef.current = {
+			...(playbackOptions || {}),
+			audioStreamIndex: Number.isInteger(audioIndex) ? audioIndex : undefined,
+			subtitleStreamIndex: (subtitleIndex === -1 || Number.isInteger(subtitleIndex)) ? subtitleIndex : undefined,
+			startTimeTicks: Math.floor(currentPosition * 10000000)
+		};
+		console.log('[Player] Reloading with track override', playbackOverrideRef.current);
+		setLoading(true);
+		// Stop current playback cleanly so the next request starts fresh (important for HLS/transcode)
+		await handleStop();
+		loadVideo();
+	}, [handleStop, loadVideo, playbackOptions]);
 
 	const getSkipButtonLabel = (segmentType) => {
 		switch (segmentType) {
@@ -1091,11 +1187,18 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 
 useEffect(() => {
 	let hideTimer;
-	if (showControls && playing) {
-		hideTimer = setTimeout(() => setShowControls(false), 5000);
+	// Only auto-hide when video is playing and no modal is open
+	if (showControls && playing && !showAudioPopup && !showSubtitlePopup) {
+		hideTimer = setTimeout(() => {
+			const active = document.activeElement;
+			const controlsFocused = active && active.closest && active.closest(`.${css.controls}`);
+			if (!controlsFocused) {
+				setShowControls(false);
+			}
+		}, 5000);
 	}
 	return () => clearTimeout(hideTimer);
-}, [showControls, playing]);
+}, [showControls, playing, showAudioPopup, showSubtitlePopup]);
 
 // Playback health watchdog: if direct playback stalls, try transcode fallback
 useEffect(() => {
@@ -1150,6 +1253,20 @@ useEffect(() => {
 		return () => clearInterval(timer);
 	}, [currentSkipSegment, handlePlayNextEpisode, nextEpisodeData]);
 
+	// Auto-focus skip button when overlay appears
+	useEffect(() => {
+		if (skipOverlayVisible && skipButtonRef.current) {
+			skipButtonRef.current.focus({ preventScroll: true });
+		}
+	}, [currentSkipSegment, skipOverlayVisible]);
+
+	// When paused and controls are visible, focus play/pause for quick resume
+	useEffect(() => {
+		if (!playing && showControls && playPauseButtonRef.current?.focus) {
+			playPauseButtonRef.current.focus({ preventScroll: true });
+		}
+	}, [playing, showControls]);
+
 	// Handle remote/keyboard controls for play/pause, seek, back, and control visibility
 	useEffect(() => {
 		if (!isActive) return undefined;
@@ -1157,7 +1274,7 @@ useEffect(() => {
 		const handleKeyDown = (e) => {
 			const code = e.keyCode || e.which;
 			const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
-			const SEEK_STEP = 10; // seconds
+			const SEEK_STEP = 15; // seconds
 			const PLAY_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE, 179]; // enter/OK, space, media play/pause
 			const PLAY_ONLY_KEYS = [KeyCodes.PLAY];
 			const PAUSE_KEYS = [KeyCodes.PAUSE];
@@ -1170,10 +1287,12 @@ useEffect(() => {
 
 			switch (code) {
 				case KeyCodes.LEFT:
+					if (!isSeekContext(e.target)) break;
 					e.preventDefault();
 					seekBySeconds(-SEEK_STEP);
 					break;
 				case KeyCodes.RIGHT:
+					if (!isSeekContext(e.target)) break;
 					e.preventDefault();
 					seekBySeconds(SEEK_STEP);
 					break;
@@ -1183,7 +1302,7 @@ useEffect(() => {
 					break;
 				case KeyCodes.DOWN:
 					e.preventDefault();
-					setShowControls(false);
+					setShowControls(true);
 					break;
 				default:
 					break;
@@ -1224,7 +1343,7 @@ useEffect(() => {
 
 		document.addEventListener('keydown', handleKeyDown);
 		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [handleBackButton, handlePause, handlePlay, isActive, playing, seekBySeconds, showAudioPopup, showControls, showSubtitlePopup]);
+	}, [handleBackButton, handlePause, handlePlay, isActive, isSeekContext, playing, seekBySeconds, showAudioPopup, showControls, showSubtitlePopup]);
 
 	return (
 		<Panel {...rest} noCloseButton>
@@ -1242,7 +1361,7 @@ useEffect(() => {
 					onError={handleVideoError}
 					onWaiting={() => console.log('Event: waiting (buffering)')}
 					onPlaying={() => { console.log('Event: playing'); setPlaying(true); }}
-					onPause={() => { console.log('Event: pause'); setPlaying(false); }}
+					onPause={() => { console.log('Event: pause'); setPlaying(false); setShowControls(true); }}
 					onStalled={() => console.log('Event: stalled')}
 					onClick={toggleControls}
 					autoPlay
@@ -1276,7 +1395,13 @@ useEffect(() => {
 									<BodyText className={css.skipCountdown}>Next episode in {nextEpisodeCountdown}s</BodyText>
 								)}
 							</div>
-							<Button size="small" onClick={handleSkipSegment} className={css.skipButton}>
+							<Button
+								size="small"
+								onClick={handleSkipSegment}
+								className={css.skipButton}
+								ref={skipButtonRef}
+								autoFocus
+							>
 								Skip
 							</Button>
 						</div>
@@ -1299,7 +1424,7 @@ useEffect(() => {
 						</div>
 
 						<div className={css.bottomBar}>
-							<div className={css.progressContainer}>
+							<div className={css.progressContainer} data-seekable="true">
 								<BodyText className={css.time}>
 									{formatTime(currentTime)}
 								</BodyText>
@@ -1307,9 +1432,10 @@ useEffect(() => {
 									className={css.progressSlider}
 									min={0}
 									max={Math.floor(duration) || 1}
-									step={5}
+									step={1}
 									value={Math.floor(currentTime)}
 									onChange={handleSeek}
+									data-seekable="true"
 								/>
 								<BodyText className={css.time}>
 									-{formatTime(Math.max(0, duration - currentTime))}
@@ -1327,9 +1453,9 @@ useEffect(() => {
 								)}
 
 								{playing ? (
-									<Button onClick={handlePause} size="large" icon="pause" />
+									<Button onClick={handlePause} size="large" icon="pause" componentRef={playPauseButtonRef} />
 								) : (
-									<Button onClick={handlePlay} size="large" icon="play" />
+									<Button onClick={handlePlay} size="large" icon="play" componentRef={playPauseButtonRef} />
 								)}
 
 								{item?.Type === 'Episode' && (

@@ -263,9 +263,21 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	if (!item) return null;
 
-	const backdropUrl = item.Type === 'Episode' && item.SeriesId
-		? jellyfinService.getBackdropUrl(item.SeriesId, 0, 1920)
-		: jellyfinService.getBackdropUrl(item.Id, 0, 1920);
+	const backdropUrl = (() => {
+		// Prefer backdrop if available
+		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
+			return jellyfinService.getBackdropUrl(item.Id, 0, 1920);
+		}
+		// For episodes/series, try series backdrop
+		if (item?.SeriesId) {
+			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 1920);
+		}
+		// Fallback to primary image to avoid 404s
+		if (item?.ImageTags?.Primary) {
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 1920);
+		}
+		return '';
+	})();
 
 	const audioTracks = playbackInfo?.MediaSources?.[0]?.MediaStreams
 		.filter(s => s.Type === 'Audio')
@@ -329,8 +341,13 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		if (season?.ImageTags?.Thumb) {
 			return jellyfinService.getImageUrl(season.Id, 'Thumb', 500);
 		}
-		if (item?.Id) {
+		// Fallback to series backdrop if available
+		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
 			return jellyfinService.getBackdropUrl(item.Id, 0, 800);
+		}
+		// Fallback to series primary
+		if (item?.ImageTags?.Primary) {
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 500);
 		}
 		return '';
 	};
@@ -563,10 +580,18 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 															selected={season.UserData?.Played}
 															backgroundOpacity="transparent"
 														/>
-													</div>															<img
+													</div>
+														<img
 															src={getSeasonImageUrl(season)}
 															alt={season.Name}
 															className={css.seasonPoster}
+															onError={(e) => {
+																if (item?.ImageTags?.Primary) {
+																	e.target.src = jellyfinService.getImageUrl(item.Id, 'Primary', 500);
+																} else {
+																	e.target.style.display = 'none';
+																}
+															}}
 														/>
 														<BodyText className={css.seasonName}>{season.Name}</BodyText>
 														{season.ChildCount && (

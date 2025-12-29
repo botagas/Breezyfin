@@ -86,22 +86,33 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 	};
 
 	const getImageUrl = (item) => {
+		if (!item || !jellyfinService.serverUrl || !jellyfinService.accessToken) return null;
+		const base = `${jellyfinService.serverUrl}/Items`;
+
 		if (item.Type === 'Person') {
 			if (item.PrimaryImageTag) {
-				return `${jellyfinService.serverUrl}/Items/${item.Id}/Images/Primary?maxWidth=200&tag=${item.PrimaryImageTag}`;
+				return `${base}/${item.Id}/Images/Primary?maxWidth=200&tag=${item.PrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
 			}
-			return null;
+			// Fallback without tag
+			return `${base}/${item.Id}/Images/Primary?maxWidth=200&api_key=${jellyfinService.accessToken}`;
 		}
 		
-		if (item.ImageTags && item.ImageTags.Primary) {
-			return `${jellyfinService.serverUrl}/Items/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}`;
+		if (item.ImageTags?.Primary) {
+			return `${base}/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}&api_key=${jellyfinService.accessToken}`;
 		}
-		if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return `${jellyfinService.serverUrl}/Items/${item.Id}/Images/Backdrop/0?maxWidth=400`;
+		// Fallback without tag even if ImageTags missing
+		if (item.Id) {
+			return `${base}/${item.Id}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
+		}
+		if (item.BackdropImageTags?.length) {
+			return `${base}/${item.Id}/Images/Backdrop/0?maxWidth=400&api_key=${jellyfinService.accessToken}`;
 		}
 		// For episodes, try series image
-		if (item.SeriesId && item.SeriesPrimaryImageTag) {
-			return `${jellyfinService.serverUrl}/Items/${item.SeriesId}/Images/Primary?maxWidth=400&tag=${item.SeriesPrimaryImageTag}`;
+		if (item.SeriesId) {
+			if (item.SeriesPrimaryImageTag) {
+				return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&tag=${item.SeriesPrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
+			}
+			return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
 		}
 		return null;
 	};

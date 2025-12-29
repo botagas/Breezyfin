@@ -146,8 +146,19 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 			return jellyfinService.getBackdropUrl(item.Id, 0, 640);
 		}
 
-		if (item?.SeriesId) {
+		// Fallback to series backdrop if available
+		if (item?.SeriesId && item?.ParentBackdropImageTags?.length) {
 			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 640);
+		}
+
+		// Fallback to primary art
+		if (item?.ImageTags?.Primary) {
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 640);
+		}
+
+		// Last resort: series primary
+		if (item?.SeriesId) {
+			return jellyfinService.getImageUrl(item.SeriesId, 'Primary', 640);
 		}
 
 		return '';

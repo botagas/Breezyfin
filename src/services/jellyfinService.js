@@ -215,7 +215,7 @@ class JellyfinService {
 		try {
 			const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
 			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+				`${this.serverUrl}/Users/${this.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
 				{
 					headers: {
 						'X-Emby-Token': this.accessToken
@@ -235,7 +235,7 @@ class JellyfinService {
 	async getRecentlyAdded(limit = 20) {
 		try {
 			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+				`${this.serverUrl}/Users/${this.userId}/Items?limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
 				{
 					headers: {
 						'X-Emby-Token': this.accessToken
@@ -458,6 +458,10 @@ class JellyfinService {
 			}
 			if (options.subtitleStreamIndex !== undefined && options.subtitleStreamIndex !== null) {
 				payload.SubtitleStreamIndex = options.subtitleStreamIndex;
+				// For webOS, prefer burned-in subtitles when a specific track is chosen
+				if (options.subtitleStreamIndex >= 0) {
+					payload.SubtitleMethod = 'Encode';
+				}
 			}
 			if (options.startTimeTicks !== undefined) {
 				payload.StartTimeTicks = options.startTimeTicks;
@@ -692,7 +696,7 @@ class JellyfinService {
 	// Search with type filtering
 	async search(searchTerm, itemTypes = null, limit = 25) {
 		try {
-			let url = `${this.serverUrl}/Users/${this.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
+			let url = `${this.serverUrl}/Users/${this.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
 			
 			if (itemTypes && itemTypes.length > 0) {
 				const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
@@ -717,7 +721,7 @@ class JellyfinService {
 		try {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
 			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${limit}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
+				`${this.serverUrl}/Users/${this.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${limit}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
 				{
 					headers: {
 						'X-Emby-Token': this.accessToken
