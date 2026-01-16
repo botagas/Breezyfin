@@ -177,6 +177,8 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 		(homeRowSettings.nextUp && nextUp.length > 0) ||
 		(homeRowSettings.latestMovies && latestMovies.length > 0) ||
 		(homeRowSettings.latestShows && latestShows.length > 0);
+	const hasHero = heroItems.length > 0;
+	const showEmptyState = !hasContent && !hasHero;
 
 	if (loading) {
 		return (
@@ -202,19 +204,20 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 				onLogout={onLogout}
 				onExit={onExit}
 			/>
+			{showEmptyState && (
+				<div className={css.emptyStateCenter}>
+					<div className={css.emptyState}>
+						<BodyText>No content found. Check browser console (F12) for API errors.</BodyText>
+					</div>
+				</div>
+			)}
 			<Scroller className={css.scroller}>
 				<div className={css.content}>
-					{heroItems.length > 0 && (
+					{hasHero && (
 						<HeroBanner
 							items={heroItems}
 							onPlayClick={handleItemClick}
 						/>
-					)}
-
-					{!hasContent && (
-						<div className={css.emptyState}>
-							<BodyText>No content found. Check browser console (F12) for API errors.</BodyText>
-						</div>
 					)}
 
 					{homeRowSettings.recentlyAdded && recentlyAdded.length > 0 && (
