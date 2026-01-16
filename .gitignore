@@ -13,6 +13,7 @@ tests/
 # production
 build
 dist
+*.ipk
 
 # OS files
 .DS_Store
