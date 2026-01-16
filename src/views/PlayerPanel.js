@@ -888,6 +888,8 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		await handleStop();
 
 		setError(errorMessage);
+		setToastMessage(errorMessage);
+		setShowControls(true);
 		setLoading(false);
 	}, [attemptTranscodeFallback, handleStop, mediaSourceData]);
 
@@ -1306,9 +1308,8 @@ useEffect(() => {
 	// Auto-focus skip button when overlay appears
 	useEffect(() => {
 		if (skipOverlayVisible && skipButtonRef.current) {
-			if (skipButtonRef.current.focus) {
-				skipButtonRef.current.focus({ preventScroll: true });
-			}
+			const target = skipButtonRef.current.nodeRef?.current || skipButtonRef.current;
+			if (target?.focus) target.focus({ preventScroll: true });
 		}
 	}, [currentSkipSegment, skipOverlayVisible]);
 
@@ -1378,6 +1379,10 @@ useEffect(() => {
 
 			if (PLAY_KEYS.includes(code)) {
 				e.preventDefault();
+				// Avoid double-trigger when an actual button is focused
+				if (e.target && e.target.closest && e.target.closest('button')) {
+					return;
+				}
 				playing ? handlePause() : handlePlay();
 				return;
 			}

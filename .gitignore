@@ -24,6 +24,7 @@ Desktop.ini
 # misc
 .DS_Store
 npm-debug.log
+*.psd
 
 # IDE files
 .vscode/
