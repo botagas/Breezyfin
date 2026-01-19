@@ -9,7 +9,7 @@ import css from './MediaRow.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaCard = ({ item, imageUrl, onClick, ...rest }) => {
+const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) => {
 	const [imageError, setImageError] = useState(false);
 
 	// Format title: for episodes show "Series Name" and "S1:E2" below
@@ -46,6 +46,19 @@ const MediaCard = ({ item, imageUrl, onClick, ...rest }) => {
 			if (unwatchedCount > 0) {
 				return unwatchedCount;
 			}
+		}
+		return null;
+	};
+
+	const getUnwatchedCount = () => {
+		if (!showEpisodeProgress) return null;
+		if (item.Type === 'Series') {
+			const unplayedCount = item.UserData?.UnplayedItemCount;
+			return Number.isInteger(unplayedCount) ? unplayedCount : null;
+		}
+		if (item.Type === 'Episode') {
+			const unplayedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
+			return Number.isInteger(unplayedCount) ? unplayedCount : null;
 		}
 		return null;
 	};
@@ -87,10 +100,16 @@ const MediaCard = ({ item, imageUrl, onClick, ...rest }) => {
 						<BodyText>{getDisplayTitle()}</BodyText>
 					</div>
 				)}
-				{getRemainingCount() && (
-					<div className={css.episodeBadge}>
-						{getRemainingCount()}
+				{showEpisodeProgress && getUnwatchedCount() !== null ? (
+					<div className={css.progressBadge}>
+						{getUnwatchedCount() === 0 ? '✓' : getUnwatchedCount()}
 					</div>
+				) : (
+					getRemainingCount() && (
+						<div className={css.episodeBadge}>
+							{getRemainingCount()}
+						</div>
+					)
 				)}
 				{item.UserData?.PlayedPercentage > 0 && (
 					<div className={css.progressBar}>
@@ -120,7 +139,7 @@ const Container = SpotlightContainerDecorator({
 	restrict: 'self-only'
 }, 'div');
 
-const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, ...rest }) => {
+const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, ...rest }) => {
 	const scrollerRef = useRef(null);
 
 	// Handle focus to scroll item into view
@@ -170,6 +189,7 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, ...rest }) 
 							item={item}
 							imageUrl={getImageUrl(item.Id, item)}
 							onClick={onItemClick}
+							showEpisodeProgress={showEpisodeProgress}
 							spotlightId={`${title}-${index}`}
 						/>
 					))}

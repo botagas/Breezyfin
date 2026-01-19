@@ -10,6 +10,15 @@ import Toolbar from '../components/Toolbar';
 
 import css from './HomePanel.module.less';
 
+const HOME_ROW_ORDER = [
+	'myRequests',
+	'continueWatching',
+	'nextUp',
+	'recentlyAdded',
+	'latestMovies',
+	'latestShows'
+];
+
 const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [heroItems, setHeroItems] = useState([]);
@@ -18,13 +27,16 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const [nextUp, setNextUp] = useState([]);
 	const [latestMovies, setLatestMovies] = useState([]);
 	const [latestShows, setLatestShows] = useState([]);
+	const [myRequests, setMyRequests] = useState([]);
 	const [homeRowSettings, setHomeRowSettings] = useState({
 		recentlyAdded: true,
 		continueWatching: true,
 		nextUp: true,
 		latestMovies: true,
-		latestShows: true
+		latestShows: true,
+		myRequests: true
 	});
+	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 
 	useEffect(() => {
 		try {
@@ -37,8 +49,17 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						continueWatching: parsed.homeRows.continueWatching !== false,
 						nextUp: parsed.homeRows.nextUp !== false,
 						latestMovies: parsed.homeRows.latestMovies !== false,
-						latestShows: parsed.homeRows.latestShows !== false
+						latestShows: parsed.homeRows.latestShows !== false,
+						myRequests: parsed.homeRows.myRequests !== false
 					});
+				}
+				if (Array.isArray(parsed.homeRowOrder)) {
+					const normalized = parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
+					const resolved = [
+						...normalized,
+						...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
+					];
+					setHomeRowOrder(resolved);
 				}
 			}
 		} catch (err) {
@@ -52,7 +73,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 		try {
 			console.log('Loading content...');
 			// Load multiple content sections in parallel
-			const [recently, resume, next, movies, shows] = await Promise.all([
+			const [recently, resume, next, movies, shows, taggedLatest] = await Promise.all([
 				jellyfinService.getRecentlyAdded(20).catch(err => {
 					console.error('Failed to load recently added:', err);
 					return [];
@@ -72,8 +93,34 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 				jellyfinService.getLatestMedia(['Series'], 20).catch(err => {
 					console.error('Failed to load latest shows:', err);
 					return [];
+				}),
+				jellyfinService.getLatestMedia(['Movie', 'Series'], 60).catch(err => {
+					console.error('Failed to load tagged latest media:', err);
+					return [];
 				})
 			]);
+
+			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
+			const userNeedle = userName.trim();
+			const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const userTagPattern = userNeedle
+				? new RegExp(`^\\s*\\d+\\s*-\\s*${escapeRegex(userNeedle)}\\s*$`, 'i')
+				: null;
+			const tagMatchesUser = (item) => {
+				if (!userTagPattern) return false;
+				const tags = [
+					...(item?.Tags || []),
+					...(item?.TagItems?.map(tag => tag.Name) || [])
+				].filter(Boolean);
+				return tags.some(tag => userTagPattern.test(tag));
+			};
+
+			const requestItems = (taggedLatest || []).filter(tagMatchesUser);
+			console.log('[Home] My Requests match:', {
+				userName,
+				taggedLatest: taggedLatest.length,
+				matched: requestItems.length
+			});
 
 			// For episodes in resume/next, fetch series data to get unwatched count
 			const enhanceEpisodes = async (episodes) => {
@@ -125,6 +172,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 			setNextUp(enhancedNext || []);
 			setLatestMovies(movies || []);
 			setLatestShows(shows || []);
+			setMyRequests(requestItems || []);
 		} catch (error) {
 			console.error('Failed to load content:', error);
 		} finally {
@@ -171,12 +219,44 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 		}
 	};
 
-	const hasContent =
-		(homeRowSettings.recentlyAdded && recentlyAdded.length > 0) ||
-		(homeRowSettings.continueWatching && continueWatching.length > 0) ||
-		(homeRowSettings.nextUp && nextUp.length > 0) ||
-		(homeRowSettings.latestMovies && latestMovies.length > 0) ||
-		(homeRowSettings.latestShows && latestShows.length > 0);
+	const rowConfig = {
+		recentlyAdded: {
+			title: 'Recently Added',
+			items: recentlyAdded,
+			showEpisodeProgress: false
+		},
+		continueWatching: {
+			title: 'Continue Watching',
+			items: continueWatching,
+			showEpisodeProgress: false
+		},
+		nextUp: {
+			title: 'Next Up',
+			items: nextUp,
+			showEpisodeProgress: false
+		},
+		latestMovies: {
+			title: 'Latest Movies',
+			items: latestMovies,
+			showEpisodeProgress: false
+		},
+		latestShows: {
+			title: 'Latest TV Shows',
+			items: latestShows,
+			showEpisodeProgress: false
+		},
+		myRequests: {
+			title: 'My Requests',
+			items: myRequests,
+			showEpisodeProgress: true
+		}
+	};
+
+	const hasContent = homeRowOrder.some((key) => {
+		const row = rowConfig[key];
+		if (!row) return false;
+		return homeRowSettings[key] && row.items.length > 0;
+	});
 	const hasHero = heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
 
@@ -220,50 +300,21 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						/>
 					)}
 
-					{homeRowSettings.recentlyAdded && recentlyAdded.length > 0 && (
-						<MediaRow
-							title="Recently Added"
-							items={recentlyAdded}
-							onItemClick={handleItemClick}
-							getImageUrl={(id, item) => getCardImageUrl(item)}
-						/>
-					)}
-
-					{homeRowSettings.continueWatching && continueWatching.length > 0 && (
-						<MediaRow
-							title="Continue Watching"
-							items={continueWatching}
-							onItemClick={handleItemClick}
-							getImageUrl={(id, item) => getCardImageUrl(item)}
-						/>
-					)}
-
-					{homeRowSettings.nextUp && nextUp.length > 0 && (
-						<MediaRow
-							title="Next Up"
-							items={nextUp}
-							onItemClick={handleItemClick}
-							getImageUrl={(id, item) => getCardImageUrl(item)}
-						/>
-					)}
-
-					{homeRowSettings.latestMovies && latestMovies.length > 0 && (
-						<MediaRow
-							title="Latest Movies"
-							items={latestMovies}
-							onItemClick={handleItemClick}
-							getImageUrl={(id, item) => getCardImageUrl(item)}
-						/>
-					)}
-
-					{homeRowSettings.latestShows && latestShows.length > 0 && (
-						<MediaRow
-							title="Latest TV Shows"
-							items={latestShows}
-							onItemClick={handleItemClick}
-							getImageUrl={(id, item) => getCardImageUrl(item)}
-						/>
-					)}
+					{homeRowOrder.map((key) => {
+						const row = rowConfig[key];
+						if (!row) return null;
+						if (!homeRowSettings[key] || row.items.length === 0) return null;
+						return (
+							<MediaRow
+								key={key}
+								title={row.title}
+								items={row.items}
+								onItemClick={handleItemClick}
+								getImageUrl={(id, item) => getCardImageUrl(item)}
+								showEpisodeProgress={row.showEpisodeProgress}
+							/>
+						);
+					})}
 				</div>
 			</Scroller>
 		</Panel>

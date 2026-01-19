@@ -13,6 +13,15 @@ import {KeyCodes, isBackKey} from '../utils/keyCodes';
 
 import css from './SettingsPanel.module.less';
 
+const HOME_ROW_ORDER = [
+	'myRequests',
+	'continueWatching',
+	'nextUp',
+	'recentlyAdded',
+	'latestMovies',
+	'latestShows'
+];
+
 // Settings defaults
 const DEFAULT_SETTINGS = {
 	maxBitrate: '40',
@@ -29,8 +38,10 @@ const DEFAULT_SETTINGS = {
 		continueWatching: true,
 		nextUp: true,
 		latestMovies: true,
-		latestShows: true
-	}
+		latestShows: true,
+		myRequests: true
+	},
+	homeRowOrder: HOME_ROW_ORDER
 };
 
 const BITRATE_OPTIONS = [
@@ -78,7 +89,23 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		try {
 			const stored = localStorage.getItem('breezyfinSettings');
 			if (stored) {
-				setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
+				const parsed = JSON.parse(stored);
+				const normalizedOrder = Array.isArray(parsed.homeRowOrder)
+					? parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key))
+					: [];
+				const resolvedOrder = [
+					...normalizedOrder,
+					...HOME_ROW_ORDER.filter((key) => !normalizedOrder.includes(key))
+				];
+				setSettings({
+					...DEFAULT_SETTINGS,
+					...parsed,
+					homeRows: {
+						...DEFAULT_SETTINGS.homeRows,
+						...(parsed.homeRows || {})
+					},
+					homeRowOrder: resolvedOrder
+				});
 			}
 		} catch (error) {
 			console.error('Failed to load settings:', error);
@@ -124,6 +151,35 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 			}
 		};
 		saveSettings(updated);
+	};
+
+	const handleHomeRowReorder = (rowKey, direction) => {
+		const order = Array.isArray(settings.homeRowOrder) ? [...settings.homeRowOrder] : [...HOME_ROW_ORDER];
+		const index = order.indexOf(rowKey);
+		if (index === -1) return;
+		const swapIndex = direction === 'up' ? index - 1 : index + 1;
+		if (swapIndex < 0 || swapIndex >= order.length) return;
+		[order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+		saveSettings({ ...settings, homeRowOrder: order });
+	};
+
+	const getHomeRowLabel = (rowKey) => {
+		switch (rowKey) {
+			case 'recentlyAdded':
+				return 'Recently Added';
+			case 'continueWatching':
+				return 'Continue Watching';
+			case 'nextUp':
+				return 'Next Up';
+			case 'latestMovies':
+				return 'Latest Movies';
+			case 'latestShows':
+				return 'Latest TV Shows';
+			case 'myRequests':
+				return 'My Requests';
+			default:
+				return rowKey;
+		}
 	};
 
 	const refreshSavedServers = () => {
@@ -286,6 +342,39 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						>
 							Latest TV Shows
 						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
+							selected={settings.homeRows?.myRequests !== false}
+							onToggle={() => handleHomeRowToggle('myRequests')}
+						>
+							My Requests
+						</SwitchItem>
+						<div className={css.rowOrderHeader}>Row Order</div>
+						<div className={css.rowOrderList}>
+							{(settings.homeRowOrder || HOME_ROW_ORDER).map((rowKey, index, list) => (
+								<div key={rowKey} className={css.rowOrderItem}>
+									<BodyText className={css.rowOrderLabel}>{getHomeRowLabel(rowKey)}</BodyText>
+									<div className={css.rowOrderActions}>
+										<Button
+											size="small"
+											minWidth={false}
+											disabled={index === 0}
+											onClick={() => handleHomeRowReorder(rowKey, 'up')}
+										>
+											Up
+										</Button>
+										<Button
+											size="small"
+											minWidth={false}
+											disabled={index === list.length - 1}
+											onClick={() => handleHomeRowReorder(rowKey, 'down')}
+										>
+											Down
+										</Button>
+									</div>
+								</div>
+							))}
+						</div>
 					</section>
 
 					{/* User Info Section */}

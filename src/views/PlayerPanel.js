@@ -28,6 +28,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const playbackOverrideRef = useRef(null);
 	const skipButtonRef = useRef(null);
 	const playPauseButtonRef = useRef(null);
+	const controlsRef = useRef(null);
 	const lastInteractionRef = useRef(Date.now());
 	const startWatchTimerRef = useRef(null);
 	const failStartTimerRef = useRef(null);
@@ -918,9 +919,10 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const handlePlay = async () => {
 		if (videoRef.current) {
 			try {
+				const resumeFromPaused = videoRef.current.currentTime > 0;
 				await videoRef.current.play();
 				setPlaying(true);
-				setShowControls(true);
+				setShowControls(!resumeFromPaused);
 
 				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
 				await jellyfinService.reportPlaybackStart(item.Id, positionTicks);
@@ -1315,8 +1317,9 @@ useEffect(() => {
 
 	// When paused and controls are visible, focus play/pause for quick resume
 	useEffect(() => {
-		if (!playing && showControls && playPauseButtonRef.current?.focus) {
-			playPauseButtonRef.current.focus({ preventScroll: true });
+		if (!playing && showControls && playPauseButtonRef.current) {
+			const target = playPauseButtonRef.current.nodeRef?.current || playPauseButtonRef.current;
+			if (target?.focus) target.focus({ preventScroll: true });
 		}
 	}, [playing, showControls]);
 
@@ -1380,7 +1383,8 @@ useEffect(() => {
 			if (PLAY_KEYS.includes(code)) {
 				e.preventDefault();
 				// Avoid double-trigger when an actual button is focused
-				if (e.target && e.target.closest && e.target.closest('button')) {
+				const activeEl = document.activeElement;
+				if (controlsRef.current && activeEl && controlsRef.current.contains(activeEl)) {
 					return;
 				}
 				playing ? handlePause() : handlePlay();
@@ -1471,7 +1475,7 @@ useEffect(() => {
 				)}
 
 				{showControls && !loading && !error && (
-					<div className={css.controls}>
+					<div className={css.controls} ref={controlsRef}>
 						<div className={css.topBar}>
 							<Button
 								onClick={handleBackButton}

@@ -49,6 +49,12 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 		return '';
 	};
 
+	const getUnwatchedCount = (item) => {
+		if (item.Type !== 'Series') return null;
+		const unplayedCount = item.UserData?.UnplayedItemCount;
+		return Number.isInteger(unplayedCount) ? unplayedCount : null;
+	};
+
 	if (loading) {
 		return (
 			<Panel {...rest}>
@@ -114,6 +120,19 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 										e.target.parentElement.classList.add(css.placeholder);
 									}}
 								/>
+								{getUnwatchedCount(item) !== null && (
+									<div className={css.progressBadge}>
+										{getUnwatchedCount(item) === 0 ? '✓' : getUnwatchedCount(item)}
+									</div>
+								)}
+								{item.Type !== 'Series' && item.UserData?.PlayedPercentage > 0 && (
+									<div className={css.progressBar}>
+										<div
+											className={css.progress}
+											style={{ width: `${item.UserData.PlayedPercentage}%` }}
+										/>
+									</div>
+								)}
 							</div>
 							<BodyText className={css.cardTitle}>{item.Name}</BodyText>
 							{item.ProductionYear && (

@@ -62,6 +62,42 @@
 	}
 }
 
+.progressBadge {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	background: rgba(0, 164, 220, 0.95);
+	color: #ffffff;
+	padding: 4px 8px;
+	border-radius: 12px;
+	font-weight: 700;
+	font-size: 0.78em;
+	backdrop-filter: blur(8px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+	text-align: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+	line-height: 1.2;
+	min-height: 22px;
+}
+
+.progressBar {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.progress {
+	height: 100%;
+	background: #00a4dc;
+	transition: width 0.3s ease;
+}
+
 .cardTitle {
 	margin: 0.75rem 0 0 0;
 	font-size: 0.9em;

@@ -215,7 +215,7 @@ class JellyfinService {
 		try {
 			const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
 			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+				`${this.serverUrl}/Users/${this.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
 				{
 					headers: {
 						'X-Emby-Token': this.accessToken
@@ -328,7 +328,7 @@ class JellyfinService {
 	// Get items from a library
 	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0) {
 		try {
-			let url = `${this.serverUrl}/Users/${this.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData`;
+			let url = `${this.serverUrl}/Users/${this.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount`;
 			
 			if (itemTypes) {
 				const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
