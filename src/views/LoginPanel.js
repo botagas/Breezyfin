@@ -8,6 +8,7 @@ import Spinner from '@enact/sandstone/Spinner';
 import Input from '@enact/sandstone/Input';
 import Item from '@enact/sandstone/Item';
 import jellyfinService from '../services/jellyfinService';
+import {getUserErrorMessage} from '../utils/errorMessages';
 
 import css from './LoginPanel.module.less';
 
@@ -65,7 +66,7 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 			setStep('login');
 			setStatus('Connected. Enter your credentials.');
 		} catch (err) {
-			setError('Failed to connect to server. Please check the URL.');
+			setError(getUserErrorMessage(err, 'Failed to connect to server. Please check the URL.'));
 			setStatus('');
 		} finally {
 			setLoading(false);
@@ -86,7 +87,7 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 			await jellyfinService.authenticate(username, password);
 			onLogin();
 		} catch (err) {
-			setError('Login failed. Please check your credentials.');
+			setError(getUserErrorMessage(err, 'Login failed. Please check your credentials.'));
 			setStatus('');
 		} finally {
 			setLoading(false);
@@ -116,7 +117,7 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 			onLogin();
 		} catch (err) {
 			console.error('Failed to resume session:', err);
-			setError('Could not resume saved session. Please sign in again.');
+			setError(getUserErrorMessage(err, 'Could not resume saved session. Please sign in again.'));
 			setStep('server');
 		} finally {
 			setLoading(false);

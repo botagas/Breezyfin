@@ -7,13 +7,25 @@ import Spinner from '@enact/sandstone/Spinner';
 import Popup from '@enact/sandstone/Popup';
 import Item from '@enact/sandstone/Item';
 import Scroller from '@enact/sandstone/Scroller';
+import Spotlight from '@enact/spotlight';
 import Hls from 'hls.js';
 import jellyfinService from '../services/jellyfinService';
-import {KeyCodes, isBackKey} from '../utils/keyCodes';
+import {KeyCodes} from '../utils/keyCodes';
+import {getPlaybackErrorMessage, isFatalPlaybackError} from '../utils/errorMessages';
 
 import css from './PlayerPanel.module.less';
 
-const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, ...rest }) => {
+const PlayerPanel = ({
+	item,
+	playbackOptions,
+	onBack,
+	onPlay,
+	isActive = false,
+	requestedControlsVisible,
+	onControlsVisibilityChange,
+	registerBackHandler,
+	...rest
+}) => {
 	const videoRef = useRef(null);
 	const hlsRef = useRef(null);
 	const progressIntervalRef = useRef(null);
@@ -28,11 +40,16 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const playbackOverrideRef = useRef(null);
 	const skipButtonRef = useRef(null);
 	const playPauseButtonRef = useRef(null);
+	const skipOverlayRef = useRef(null);
 	const controlsRef = useRef(null);
 	const lastInteractionRef = useRef(Date.now());
 	const startWatchTimerRef = useRef(null);
 	const failStartTimerRef = useRef(null);
 	const pendingOverrideClearRef = useRef(false);
+	const seekFeedbackTimerRef = useRef(null);
+	const nextEpisodePromptStartTicksRef = useRef(null);
+	const wasSkipOverlayVisibleRef = useRef(false);
+	const skipFocusRetryTimerRef = useRef(null);
 	const [toastMessage, setToastMessage] = useState('');
 	
 	const [loading, setLoading] = useState(true);
@@ -59,8 +76,25 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	const [currentSkipSegment, setCurrentSkipSegment] = useState(null);
 	const [skipCountdown, setSkipCountdown] = useState(null);
 	const [skipOverlayVisible, setSkipOverlayVisible] = useState(false);
+	const [dismissedSkipSegmentId, setDismissedSkipSegmentId] = useState(null);
+	const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false);
+	const [nextEpisodePromptDismissed, setNextEpisodePromptDismissed] = useState(false);
 	const [nextEpisodeData, setNextEpisodeData] = useState(null);
-	const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(null);
+	const [seekFeedback, setSeekFeedback] = useState('');
+
+	useEffect(() => {
+		if (typeof requestedControlsVisible === 'boolean') {
+			setShowControls((prev) => (
+				prev === requestedControlsVisible ? prev : requestedControlsVisible
+			));
+		}
+	}, [requestedControlsVisible]);
+
+	useEffect(() => {
+		if (typeof onControlsVisibilityChange === 'function') {
+			onControlsVisibilityChange(showControls);
+		}
+	}, [onControlsVisibilityChange, showControls]);
 
 	// Build playback options to carry current selections to the next item
 	const buildPlaybackOptions = useCallback(() => {
@@ -187,6 +221,41 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}
 	}, []);
 
+	const focusSkipOverlayAction = useCallback(() => {
+		if (skipFocusRetryTimerRef.current) {
+			clearTimeout(skipFocusRetryTimerRef.current);
+			skipFocusRetryTimerRef.current = null;
+		}
+
+		let attempts = 0;
+		const maxAttempts = 10;
+		const tryFocus = () => {
+			Spotlight.focus('skip-overlay-action');
+			const target = skipButtonRef.current?.nodeRef?.current || skipButtonRef.current;
+			if (target?.focus) {
+				target.focus({ preventScroll: true });
+			}
+			const active = document.activeElement;
+			const focused = !!(active && skipOverlayRef.current && skipOverlayRef.current.contains(active));
+			if (!focused && attempts < maxAttempts) {
+				attempts += 1;
+				skipFocusRetryTimerRef.current = setTimeout(tryFocus, 40);
+			} else {
+				skipFocusRetryTimerRef.current = null;
+			}
+		};
+		tryFocus();
+	}, []);
+
+	const showPlaybackError = useCallback((message) => {
+		const errorMessage = message || 'Failed to play video';
+		setError(errorMessage);
+		setToastMessage(errorMessage);
+		setShowControls(true);
+		setLoading(false);
+		clearStartWatch();
+	}, [clearStartWatch]);
+
 	// Stop playback and clean up
 	const handleStop = useCallback(async () => {
 		if (progressIntervalRef.current) {
@@ -210,7 +279,14 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 
 		if (videoRef.current && item) {
 			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-			await jellyfinService.reportPlaybackStopped(item.Id, positionTicks);
+			try {
+				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks);
+			} catch (err) {
+				console.warn('Failed to report playback stopped:', err);
+			}
+		}
+
+		if (videoRef.current) {
 			// Clear source to ensure next load starts cleanly
 			videoRef.current.removeAttribute('src');
 			videoRef.current.load();
@@ -595,8 +671,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 									console.log('Attempting HLS.js recovery (media)...');
 									hls.recoverMediaError();
 								} else {
-									setError('HLS playback error: ' + data.details);
-									setLoading(false);
+									showPlaybackError(`HLS playback error: ${data.details}`);
 								}
 							}
 						});
@@ -658,8 +733,7 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 								console.log('Attempting HLS recovery (media)...');
 								hls.recoverMediaError();
 							} else {
-								setError('HLS playback error: ' + data.details);
-								setLoading(false);
+								showPlaybackError(`HLS playback error: ${data.details}`);
 							}
 						}
 					});
@@ -675,6 +749,21 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			// Load the video
 			video.load();
 			console.log('video.load() called');
+			try {
+				await video.play();
+			} catch (playError) {
+				if (isFatalPlaybackError(playError)) {
+					const errorMessage = getPlaybackErrorMessage(playError);
+					if (!mediaSource.TranscodingUrl) {
+						const didFallback = await attemptTranscodeFallback(errorMessage);
+						if (didFallback) {
+							return;
+						}
+					}
+					showPlaybackError(errorMessage);
+					return;
+				}
+			}
 
 			// Startup watchdog: if playback hasn't begun shortly after load, try to kick it
 			if (startWatchTimerRef.current) {
@@ -722,18 +811,16 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			failStartTimerRef.current = setTimeout(() => {
 				if (!loading) return;
 				console.warn('[Player] Playback failed to start within timeout, showing retry');
-				setError('Playback failed to start. Please try again.');
-				setToastMessage('Playback failed to start. Press Retry or Back.');
+				showPlaybackError('Playback failed to start. Please try again.');
 			}, 12000);
 
 			// Note: Position will be set in handleLoadedMetadata after metadata loads
 
 		} catch (err) {
 			console.error('Failed to load video:', err);
-			setError('Failed to load video: ' + err.message);
-			setLoading(false);
+			showPlaybackError(getPlaybackErrorMessage(err, 'Failed to load video'));
 		}
-	}, [attemptTranscodeFallback, item, playbackOptions, playing]);
+	}, [attemptTranscodeFallback, item, playbackOptions, playing, showPlaybackError]);
 
 	// Video event handlers
 	const handleLoadedMetadata = useCallback(() => {
@@ -758,14 +845,21 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}
 	}, [item]);
 
-	const handleLoadedData = useCallback(() => {
+	const handleLoadedData = useCallback(async () => {
 		console.log('Video loadeddata');
 		// If we got data but loading is still true, try to kick off playback
 		if (loading && videoRef.current) {
 			setLoading(false);
-			videoRef.current.play().catch(() => {});
+			try {
+				await videoRef.current.play();
+			} catch (playError) {
+				// Ignore non-fatal autoplay interruptions; surface unsupported formats immediately.
+				if (isFatalPlaybackError(playError)) {
+					showPlaybackError(getPlaybackErrorMessage(playError));
+				}
+			}
 		}
-	}, [loading]);
+	}, [loading, showPlaybackError]);
 
 	const handleCanPlay = useCallback(async () => {
 		console.log('Video can play');
@@ -794,32 +888,39 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			startProgressReporting();
 		} catch (playError) {
 			console.error('Auto-play failed:', playError);
-			// User may need to click play manually (browser autoplay policy)
+			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
 			setPlaying(false);
-			setToastMessage('Playback failed to start. Press Play/Retry.');
 			// If direct playback fails immediately, try a one-time transcode fallback
-			if (!mediaSourceData?.TranscodingUrl) {
-				attemptTranscodeFallback('Auto-play failed');
+			if (!mediaSourceData?.TranscodingUrl && isFatalPlaybackError(playError)) {
+				const didFallback = await attemptTranscodeFallback(errorMessage);
+				if (didFallback) {
+					return;
+				}
+			}
+			if (isFatalPlaybackError(playError)) {
+				showPlaybackError(errorMessage);
+			} else {
+				setToastMessage('Playback failed to start. Press Play/Retry.');
 			}
 		}
-	}, [attemptTranscodeFallback, loading, item, mediaSourceData?.TranscodingUrl, startProgressReporting]);
+	}, [attemptTranscodeFallback, loading, item, mediaSourceData?.TranscodingUrl, showPlaybackError, startProgressReporting]);
 
 	// Detect skip intro/credits segments based on current playback position
 	const checkSkipSegments = useCallback((positionSeconds) => {
-		if (!mediaSegments || mediaSegments.length === 0) return;
+		if (!Number.isFinite(positionSeconds)) return;
+		let skipSegmentPromptsEnabled = true;
+		let playNextPromptEnabled = true;
+		let playNextPromptMode = 'segmentsOrLast60';
 
-		// Optional opt-out if setting exists
+		// Optional opt-out for intro/recap/preview skip prompts.
 		try {
 			const settingsJson = localStorage.getItem('breezyfinSettings');
 			if (settingsJson) {
 				const settings = JSON.parse(settingsJson);
-				if (settings.skipIntro === false) {
-					if (skipOverlayVisible) {
-						setSkipOverlayVisible(false);
-						setCurrentSkipSegment(null);
-						setSkipCountdown(null);
-					}
-					return;
+				skipSegmentPromptsEnabled = settings.skipIntro !== false;
+				playNextPromptEnabled = settings.showPlayNextPrompt !== false;
+				if (settings.playNextPromptMode === 'segmentsOnly' || settings.playNextPromptMode === 'segmentsOrLast60') {
+					playNextPromptMode = settings.playNextPromptMode;
 				}
 			}
 		} catch (_) {
@@ -832,18 +933,79 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		);
 
 		if (activeSegment) {
+			const isOutro = activeSegment.Type === 'Outro' || activeSegment.Type === 'Credits';
+			if (!isOutro && dismissedSkipSegmentId === activeSegment.Id) {
+				setSkipOverlayVisible(false);
+				setCurrentSkipSegment(activeSegment);
+				return;
+			}
+			if (!isOutro && !skipSegmentPromptsEnabled) {
+				setSkipOverlayVisible(false);
+				setCurrentSkipSegment(null);
+				setSkipCountdown(null);
+				return;
+			}
 			if (!currentSkipSegment || currentSkipSegment.Id !== activeSegment.Id) {
 				setCurrentSkipSegment(activeSegment);
 			}
 			setSkipOverlayVisible(true);
+			if (isOutro && nextEpisodeData && playNextPromptEnabled) {
+				setShowNextEpisodePrompt(true);
+				nextEpisodePromptStartTicksRef.current = activeSegment.StartTicks;
+			} else {
+				setShowNextEpisodePrompt(false);
+				nextEpisodePromptStartTicksRef.current = null;
+			}
 			const remainingSeconds = Math.max(0, (activeSegment.EndTicks / 10000000) - positionSeconds);
 			setSkipCountdown(Math.ceil(remainingSeconds));
+		} else if (
+			playNextPromptEnabled &&
+			playNextPromptMode === 'segmentsOrLast60' &&
+			!nextEpisodePromptDismissed &&
+			nextEpisodeData &&
+			Number.isFinite(duration) &&
+			duration > 0
+		) {
+			const remainingSeconds = Math.max(0, duration - positionSeconds);
+			if (remainingSeconds > 0 && remainingSeconds <= 60) {
+				setSkipOverlayVisible(true);
+				setShowNextEpisodePrompt(true);
+				setCurrentSkipSegment(null);
+				setSkipCountdown(Math.ceil(remainingSeconds));
+			} else if (showNextEpisodePrompt) {
+				setShowNextEpisodePrompt(false);
+				setSkipOverlayVisible(false);
+				setCurrentSkipSegment(null);
+				setSkipCountdown(null);
+			}
+		} else if (showNextEpisodePrompt) {
+			const promptStartTicks = nextEpisodePromptStartTicksRef.current || 0;
+			// If user rewinds before outro/credits start, hide the sticky Next Episode prompt.
+			if (positionTicks < promptStartTicks) {
+				setShowNextEpisodePrompt(false);
+				setSkipOverlayVisible(false);
+				setCurrentSkipSegment(null);
+				setSkipCountdown(null);
+				nextEpisodePromptStartTicksRef.current = null;
+			} else {
+				if (!playNextPromptEnabled || (playNextPromptMode === 'segmentsOnly' && !currentSkipSegment)) {
+					setShowNextEpisodePrompt(false);
+					setSkipOverlayVisible(false);
+					setCurrentSkipSegment(null);
+					setSkipCountdown(null);
+					nextEpisodePromptStartTicksRef.current = null;
+					return;
+				}
+				setSkipOverlayVisible(true);
+				setSkipCountdown(null);
+			}
 		} else if (skipOverlayVisible) {
 			setSkipOverlayVisible(false);
 			setCurrentSkipSegment(null);
 			setSkipCountdown(null);
+			setDismissedSkipSegmentId(null);
 		}
-	}, [currentSkipSegment, mediaSegments, skipOverlayVisible]);
+	}, [currentSkipSegment, dismissedSkipSegmentId, duration, mediaSegments, nextEpisodeData, nextEpisodePromptDismissed, showNextEpisodePrompt, skipOverlayVisible]);
 
 	const handleTimeUpdate = useCallback(() => {
 		if (videoRef.current) {
@@ -886,13 +1048,13 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		}
 
 		// Clean up the playback session on error
-		await handleStop();
-
-		setError(errorMessage);
-		setToastMessage(errorMessage);
-		setShowControls(true);
-		setLoading(false);
-	}, [attemptTranscodeFallback, handleStop, mediaSourceData]);
+		try {
+			await handleStop();
+		} catch (stopErr) {
+			console.warn('Error while handling playback failure:', stopErr);
+		}
+		showPlaybackError(errorMessage);
+	}, [attemptTranscodeFallback, handleStop, mediaSourceData, showPlaybackError]);
 
 	const handleEnded = useCallback(async () => {
 		console.log('Video ended');
@@ -916,37 +1078,53 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	}, [getNextEpisode, handleStop, hasNextEpisode, item, onBack, onPlay]);
 
 	// Playback controls
-	const handlePlay = async () => {
+	const handlePlay = async ({keepHidden = false} = {}) => {
 		if (videoRef.current) {
 			try {
 				const resumeFromPaused = videoRef.current.currentTime > 0;
 				await videoRef.current.play();
 				setPlaying(true);
-				setShowControls(!resumeFromPaused);
+				setShowControls(keepHidden ? false : !resumeFromPaused);
 
 				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
 				await jellyfinService.reportPlaybackStart(item.Id, positionTicks);
 				startProgressReporting();
 			} catch (err) {
 				console.error('Play failed:', err);
+				const errorMessage = getPlaybackErrorMessage(err);
+				if (isFatalPlaybackError(err)) {
+					showPlaybackError(errorMessage);
+				} else {
+					setToastMessage(errorMessage);
+				}
 			}
 		}
 	};
 
-	const handlePause = async () => {
+	const handlePause = async ({keepHidden = false} = {}) => {
 		if (videoRef.current) {
 			videoRef.current.pause();
 			setPlaying(false);
-			setShowControls(true);
+			setShowControls(keepHidden ? false : true);
 
 			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
 			await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, true);
 		}
 	};
 
+	const handleRetryPlayback = useCallback(async () => {
+		setError(null);
+		setToastMessage('');
+		reloadAttemptedRef.current = false;
+		transcodeFallbackAttemptedRef.current = false;
+		await handleStop();
+		loadVideo();
+	}, [handleStop, loadVideo]);
+
 	const handleSeek = async (e) => {
 		const seekTime = e.value;
 		setCurrentTime(seekTime);
+		checkSkipSegments(seekTime);
 		
 		if (!videoRef.current) return;
 		
@@ -964,34 +1142,21 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			const seekTicks = Math.floor(seekTime * 10000000);
 			await jellyfinService.reportPlaybackProgress(item.Id, seekTicks, videoRef.current.paused);
 		} else if (mediaSourceData?.TranscodingUrl) {
-			// For non-HLS transcoded streams, we need to reload from the new position
+			// For transcoding, rebuild the session at the target timestamp.
 			try {
 				const seekTicks = Math.floor(seekTime * 10000000);
 				console.log('Seeking transcoded stream to:', seekTime, 'seconds (', seekTicks, 'ticks)');
 				setLoading(true);
-				
-				const newPlaybackInfo = await jellyfinService.getPlaybackInfo(item.Id, {
-					...playbackOptions,
-					audioStreamIndex: currentAudioTrack,
+				playbackOverrideRef.current = {
+					...(playbackOptions || {}),
+					audioStreamIndex: Number.isInteger(currentAudioTrack) ? currentAudioTrack : undefined,
 					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
-					startTimeTicks: seekTicks
-				});
-				
-				const newMediaSource = newPlaybackInfo?.MediaSources?.[0];
-				if (newMediaSource?.TranscodingUrl) {
-					// Set the offset so time displays correctly
-					seekOffsetRef.current = seekTime;
-					
-					// Build URL and ensure StartTimeTicks is included
-					let videoUrl = `${jellyfinService.serverUrl}${newMediaSource.TranscodingUrl}`;
-					if (!videoUrl.includes('StartTimeTicks')) {
-						videoUrl += `&StartTimeTicks=${seekTicks}`;
-					}
-					console.log('Seek URL:', videoUrl);
-					
-					videoRef.current.src = videoUrl;
-					videoRef.current.load();
-				}
+					startTimeTicks: seekTicks,
+					seekSeconds: seekTime,
+					forceNewSession: true
+				};
+				await handleStop();
+				loadVideo();
 			} catch (err) {
 				console.error('Failed to seek:', err);
 				setLoading(false);
@@ -1155,8 +1320,18 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		if (!video || !Number.isFinite(deltaSeconds)) return;
 		const nextTime = Math.min(Math.max(0, video.currentTime + deltaSeconds), duration || video.duration || 0);
 		video.currentTime = nextTime;
-		setCurrentTime(nextTime);
-	}, [duration]);
+		const actualTime = nextTime + seekOffsetRef.current;
+		setCurrentTime(actualTime);
+		checkSkipSegments(actualTime);
+		setSeekFeedback(`${deltaSeconds > 0 ? '+' : '-'}${Math.abs(deltaSeconds)}s`);
+		if (seekFeedbackTimerRef.current) {
+			clearTimeout(seekFeedbackTimerRef.current);
+		}
+		seekFeedbackTimerRef.current = setTimeout(() => {
+			setSeekFeedback('');
+			seekFeedbackTimerRef.current = null;
+		}, 900);
+	}, [checkSkipSegments, duration]);
 
 	// Format time for display
 	const formatTime = (seconds) => {
@@ -1206,6 +1381,10 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 	};
 
 	const handleSkipSegment = () => {
+		if (showNextEpisodePrompt && nextEpisodeData) {
+			handlePlayNextEpisode();
+			return;
+		}
 		if (!currentSkipSegment) return;
 		const isOutro = currentSkipSegment.Type === 'Outro' || currentSkipSegment.Type === 'Credits';
 		if (isOutro && nextEpisodeData) {
@@ -1220,7 +1399,52 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 		setSkipOverlayVisible(false);
 		setCurrentSkipSegment(null);
 		setSkipCountdown(null);
+		setDismissedSkipSegmentId(null);
+		setShowNextEpisodePrompt(false);
+		setNextEpisodePromptDismissed(false);
+		nextEpisodePromptStartTicksRef.current = null;
 	};
+
+	const handleDismissNextEpisodePrompt = () => {
+		setShowNextEpisodePrompt(false);
+		setSkipOverlayVisible(false);
+		setCurrentSkipSegment(null);
+		setSkipCountdown(null);
+		setNextEpisodePromptDismissed(true);
+		nextEpisodePromptStartTicksRef.current = null;
+	};
+
+	const handleDismissSkipOverlay = () => {
+		if (showNextEpisodePrompt) {
+			handleDismissNextEpisodePrompt();
+			return;
+		}
+		setDismissedSkipSegmentId(currentSkipSegment?.Id || null);
+		setSkipOverlayVisible(false);
+		setSkipCountdown(null);
+	};
+
+	const handleInternalBack = useCallback(() => {
+		// Close secondary UI first before leaving the player.
+		if (showAudioPopup) {
+			setShowAudioPopup(false);
+			return true;
+		}
+		if (showSubtitlePopup) {
+			setShowSubtitlePopup(false);
+			return true;
+		}
+		if (skipOverlayVisible) {
+			handleDismissSkipOverlay();
+			return true;
+		}
+		// Back hides controls first; only exits when already hidden.
+		if (showControls) {
+			setShowControls(false);
+			return true;
+		}
+		return false;
+	}, [handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
 
 	// Effects
 	useEffect(() => {
@@ -1230,6 +1454,10 @@ const PlayerPanel = ({ item, playbackOptions, onBack, onPlay, isActive = false, 
 			setSkipOverlayVisible(false);
 			setCurrentSkipSegment(null);
 			setSkipCountdown(null);
+			setDismissedSkipSegmentId(null);
+			setShowNextEpisodePrompt(false);
+			setNextEpisodePromptDismissed(false);
+			nextEpisodePromptStartTicksRef.current = null;
 			loadVideo();
 			// Prefetch skip segments for intro/credits
 			jellyfinService.getMediaSegments(item.Id).then(setMediaSegments).catch(() => setMediaSegments([]));
@@ -1271,6 +1499,13 @@ useEffect(() => {
 	return () => clearInterval(interval);
 	}, [attemptTranscodeFallback, mediaSourceData, playing]);
 
+	useEffect(() => () => {
+		if (skipFocusRetryTimerRef.current) {
+			clearTimeout(skipFocusRetryTimerRef.current);
+			skipFocusRetryTimerRef.current = null;
+		}
+	}, []);
+
 	// Auto-hide toast messages
 	useEffect(() => {
 		if (!toastMessage) return undefined;
@@ -1278,50 +1513,42 @@ useEffect(() => {
 		return () => clearTimeout(t);
 	}, [toastMessage]);
 
-	// Auto-start a countdown to next episode when credits/outro segment is active
-	useEffect(() => {
-		if (!currentSkipSegment || !nextEpisodeData || playbackSettingsRef.current.autoPlayNext === false) {
-			setNextEpisodeCountdown(null);
-			return undefined;
+	useEffect(() => () => {
+		if (seekFeedbackTimerRef.current) {
+			clearTimeout(seekFeedbackTimerRef.current);
+			seekFeedbackTimerRef.current = null;
 		}
+	}, []);
 
-		const isOutro = currentSkipSegment.Type === 'Outro' || currentSkipSegment.Type === 'Credits';
-		if (!isOutro) {
-			setNextEpisodeCountdown(null);
-			return undefined;
-		}
-
-		setNextEpisodeCountdown(8);
-		const timer = setInterval(() => {
-			setNextEpisodeCountdown((prev) => {
-				if (prev === null) return null;
-				if (prev <= 1) {
-					clearInterval(timer);
-					handlePlayNextEpisode();
-					return null;
-				}
-				return prev - 1;
-			});
-		}, 1000);
-
-		return () => clearInterval(timer);
-	}, [currentSkipSegment, handlePlayNextEpisode, nextEpisodeData]);
-
-	// Auto-focus skip button when overlay appears
 	useEffect(() => {
-		if (skipOverlayVisible && skipButtonRef.current) {
-			const target = skipButtonRef.current.nodeRef?.current || skipButtonRef.current;
-			if (target?.focus) target.focus({ preventScroll: true });
-		}
-	}, [currentSkipSegment, skipOverlayVisible]);
+		if (typeof registerBackHandler !== 'function') return undefined;
+		registerBackHandler(handleInternalBack);
+		return () => registerBackHandler(null);
+	}, [handleInternalBack, registerBackHandler]);
 
-	// When paused and controls are visible, focus play/pause for quick resume
+	// Auto-focus skip when it appears; otherwise, focus play/pause after pausing.
 	useEffect(() => {
-		if (!playing && showControls && playPauseButtonRef.current) {
+		let focusTimer = null;
+		const becameVisible = skipOverlayVisible && !wasSkipOverlayVisibleRef.current;
+		wasSkipOverlayVisibleRef.current = skipOverlayVisible;
+
+		if (becameVisible) {
+			focusTimer = setTimeout(() => {
+				focusSkipOverlayAction();
+			}, 20);
+		} else if (!playing && showControls && playPauseButtonRef.current) {
 			const target = playPauseButtonRef.current.nodeRef?.current || playPauseButtonRef.current;
-			if (target?.focus) target.focus({ preventScroll: true });
+			if (target?.focus) {
+				focusTimer = setTimeout(() => target.focus({ preventScroll: true }), 0);
+			}
 		}
-	}, [playing, showControls]);
+
+		return () => {
+			if (focusTimer !== null) {
+				clearTimeout(focusTimer);
+			}
+		};
+	}, [focusSkipOverlayAction, playing, showControls, skipOverlayVisible]);
 
 	// Handle remote/keyboard controls for play/pause, seek, back, and control visibility
 	useEffect(() => {
@@ -1344,17 +1571,22 @@ useEffect(() => {
 
 			switch (code) {
 				case KeyCodes.LEFT:
-					if (!isSeekContext(e.target)) break;
+					if (showControls || skipOverlayVisible || showAudioPopup || showSubtitlePopup || !isSeekContext(e.target)) break;
 					e.preventDefault();
 					seekBySeconds(-SEEK_STEP);
 					break;
 				case KeyCodes.RIGHT:
-					if (!isSeekContext(e.target)) break;
+					if (showControls || skipOverlayVisible || showAudioPopup || showSubtitlePopup || !isSeekContext(e.target)) break;
 					e.preventDefault();
 					seekBySeconds(SEEK_STEP);
 					break;
 				case KeyCodes.UP:
 					e.preventDefault();
+					if (skipOverlayVisible) {
+						setShowControls(true);
+						focusSkipOverlayAction();
+						return;
+					}
 					setShowControls(true);
 					break;
 				case KeyCodes.DOWN:
@@ -1367,45 +1599,42 @@ useEffect(() => {
 
 			if (BACK_KEYS.includes(code)) {
 				e.preventDefault();
-				// Close secondary UI first before leaving the player
-				if (showAudioPopup) {
-					setShowAudioPopup(false);
-					return;
-				}
-				if (showSubtitlePopup) {
-					setShowSubtitlePopup(false);
-					return;
-				}
+				e.stopPropagation();
+				e.stopImmediatePropagation?.();
+				if (handleInternalBack()) return;
 				handleBackButton();
 				return;
 			}
 
 			if (PLAY_KEYS.includes(code)) {
-				e.preventDefault();
 				// Avoid double-trigger when an actual button is focused
 				const activeEl = document.activeElement;
-				if (controlsRef.current && activeEl && controlsRef.current.contains(activeEl)) {
+				const isControlFocused = controlsRef.current && activeEl && controlsRef.current.contains(activeEl);
+				const isSkipFocused = skipOverlayRef.current && activeEl && skipOverlayRef.current.contains(activeEl);
+				if (isControlFocused || isSkipFocused) {
 					return;
 				}
-				playing ? handlePause() : handlePlay();
+				e.preventDefault();
+				const keepHidden = !showControls;
+				playing ? handlePause({keepHidden}) : handlePlay({keepHidden});
 				return;
 			}
 
 			if (PLAY_ONLY_KEYS.includes(code)) {
 				e.preventDefault();
-				handlePlay();
+				handlePlay({keepHidden: !showControls});
 				return;
 			}
 
 			if (PAUSE_KEYS.includes(code)) {
 				e.preventDefault();
-				handlePause();
+				handlePause({keepHidden: !showControls});
 			}
 		};
 
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [handleBackButton, handlePause, handlePlay, isActive, isSeekContext, playing, seekBySeconds, showAudioPopup, showControls, showSubtitlePopup]);
+		document.addEventListener('keydown', handleKeyDown, true);
+		return () => document.removeEventListener('keydown', handleKeyDown, true);
+	}, [handleBackButton, handleInternalBack, handlePause, handlePlay, isActive, isSeekContext, playing, seekBySeconds, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
 
 	return (
 		<Panel {...rest} noCloseButton>
@@ -1423,7 +1652,7 @@ useEffect(() => {
 					onError={handleVideoError}
 					onWaiting={() => console.log('Event: waiting (buffering)')}
 					onPlaying={() => { console.log('Event: playing'); setPlaying(true); }}
-					onPause={() => { console.log('Event: pause'); setPlaying(false); setShowControls(true); }}
+					onPause={() => { console.log('Event: pause'); setPlaying(false); }}
 					onStalled={() => console.log('Event: stalled')}
 					onClick={toggleControls}
 					autoPlay
@@ -1438,34 +1667,54 @@ useEffect(() => {
 					</div>
 				)}
 
-				{error && (
-					<div className={css.error}>
-						<BodyText>{error}</BodyText>
-						<Button onClick={handleBackButton} size="large">Go Back</Button>
+				{seekFeedback && (
+					<div className={css.seekFeedback}>
+						<BodyText className={css.seekFeedbackText}>{seekFeedback}</BodyText>
 					</div>
 				)}
 
-				{skipOverlayVisible && currentSkipSegment && (
-					<div className={css.skipOverlay}>
-						<div className={css.skipPill}>
-							<div className={css.skipText}>
-								<BodyText className={css.skipTitle}>{getSkipButtonLabel(currentSkipSegment.Type)}</BodyText>
-								{skipCountdown !== null && (
-									<BodyText className={css.skipCountdown}>Ends in {skipCountdown}s</BodyText>
-								)}
-								{nextEpisodeCountdown !== null && (
-									<BodyText className={css.skipCountdown}>Next episode in {nextEpisodeCountdown}s</BodyText>
-								)}
-							</div>
+				<Popup
+					open={!!error}
+					onClose={() => setError(null)}
+					noAutoDismiss
+					className={css.errorPopup}
+				>
+					<div className={css.errorPopupContent}>
+						<BodyText className={css.popupTitle}>Playback Error</BodyText>
+						<BodyText className={css.errorMessage}>{error}</BodyText>
+						<div className={css.errorActions}>
+							<Button onClick={handleRetryPlayback} autoFocus>
+								Retry
+							</Button>
+							<Button onClick={handleBackButton}>
+								Go Back
+							</Button>
+						</div>
+					</div>
+				</Popup>
+
+				{skipOverlayVisible && (currentSkipSegment || showNextEpisodePrompt) && (
+					<div className={css.skipOverlay} ref={skipOverlayRef}>
+						<div className={`${css.skipPill} ${css.skipPillCompact}`}>
 							<Button
 								size="small"
 								onClick={handleSkipSegment}
 								className={css.skipButton}
 								componentRef={skipButtonRef}
+								spotlightId="skip-overlay-action"
 								autoFocus
 							>
-								Skip
+								{showNextEpisodePrompt ? 'Play Next' : getSkipButtonLabel(currentSkipSegment.Type)}
 							</Button>
+							{skipCountdown !== null && (
+								<BodyText className={css.skipCountdownCompact}>{skipCountdown}s</BodyText>
+							)}
+							<Button
+								size="small"
+								icon="closex"
+								onClick={handleDismissSkipOverlay}
+								className={css.skipCloseButton}
+							/>
 						</div>
 					</div>
 				)}
@@ -1576,7 +1825,6 @@ useEffect(() => {
 					</div>
 				)}
 
-				{/* Audio Track Selection Popup */}
 				<Popup
 					open={showAudioPopup}
 					onClose={() => setShowAudioPopup(false)}
@@ -1598,7 +1846,6 @@ useEffect(() => {
 					</div>
 				</Popup>
 
-				{/* Subtitle Track Selection Popup */}
 				<Popup
 					open={showSubtitlePopup}
 					onClose={() => setShowSubtitlePopup(false)}

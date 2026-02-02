@@ -20,6 +20,43 @@
 	z-index: 100;
 }
 
+.playerToast {
+	position: absolute;
+	left: 50%;
+	bottom: 24px;
+	transform: translateX(-50%);
+	background: rgba(0, 0, 0, 0.8);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 10px;
+	padding: 12px 18px;
+	z-index: 140;
+}
+
+.seekFeedback {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 126px;
+	height: 126px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 145;
+	pointer-events: none;
+	background: transparent;
+	border: 4px solid rgba(255, 255, 255, 0.75);
+	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 8px 18px rgba(0, 0, 0, 0.3);
+}
+
+.seekFeedbackText {
+	font-size: 0.7em;
+	font-weight: 700;
+	text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+	margin: 0;
+}
+
 .alwaysVisibleBack {
 	position: absolute;
 	top: 24px;
@@ -122,11 +159,37 @@
 	max-height: 70vh;
 }
 
+.errorPopup {
+	z-index: 150;
+}
+
+.errorPopupContent {
+	padding: 18px;
+	min-width: 720px;
+	max-width: 70vw;
+	border-radius: 18px;
+	background: linear-gradient(145deg, rgba(18, 36, 48, 0.94), rgba(9, 14, 24, 0.95));
+	border: 1px solid rgba(122, 214, 255, 0.32);
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
 .popupTitle {
 	font-size: 1.5em;
 	font-weight: 600;
 	margin-bottom: 16px;
 	text-align: center;
+}
+
+.errorMessage {
+	margin: 6px 0 16px;
+	text-align: center;
+	opacity: 0.9;
+}
+
+.errorActions {
+	display: flex;
+	justify-content: center;
+	gap: 12px;
 }
 
 .trackList {
@@ -154,6 +217,15 @@
 	pointer-events: auto;
 }
 
+.skipPillCompact {
+	gap: 10px;
+	padding: 8px 10px;
+	border-radius: 999px;
+	background: linear-gradient(135deg, rgba(10, 28, 38, 0.88), rgba(8, 12, 20, 0.9));
+	border-color: rgba(122, 214, 255, 0.35);
+	box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
 .skipText {
 	display: flex;
 	flex-direction: column;
@@ -169,7 +241,28 @@
 	font-size: 0.95em;
 }
 
+.skipCountdownCompact {
+	opacity: 0.88;
+	font-size: 0.85em;
+	font-weight: 700;
+	min-width: 52px;
+	text-align: center;
+	align-self: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 34px;
+	margin: 0;
+	padding: 0 6px;
+	line-height: 1;
+	color: rgba(218, 246, 255, 0.95);
+}
+
 .skipButton {
 	min-width: 120px;
+}
+
+.skipCloseButton {
+	min-width: 56px;
 }
 

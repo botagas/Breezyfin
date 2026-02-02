@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import Panels from '@enact/sandstone/Panels';
 
@@ -11,7 +11,8 @@ import SettingsPanel from '../views/SettingsPanel';
 import PlayerPanel from '../views/PlayerPanel';
 import MediaDetailsPanel from '../views/MediaDetailsPanel';
 import jellyfinService from '../services/jellyfinService';
-import {KeyCodes, isBackKey} from '../utils/keyCodes';
+import {isBackKey} from '../utils/keyCodes';
+import AppCrashBoundary from './AppCrashBoundary';
 
 import css from './App.module.less';
 
@@ -21,6 +22,9 @@ const App = (props) => {
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [previousItem, setPreviousItem] = useState(null); // For back navigation from episode to series
+	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
+	const playerBackHandlerRef = useRef(null);
+	const handleBackRef = useRef(null);
 
 	useEffect(() => {
 		// Try to restore session on load
@@ -55,6 +59,16 @@ const App = (props) => {
 				setPlaybackOptions(null);
 				return true;
 			case 'player':
+				if (typeof playerBackHandlerRef.current === 'function') {
+					const handledInPlayer = playerBackHandlerRef.current();
+					if (handledInPlayer) {
+						return true;
+					}
+				}
+				if (playerControlsVisible) {
+					setPlayerControlsVisible(false);
+					return true;
+				}
 				setCurrentView('details');
 				return true;
 			case 'home':
@@ -62,7 +76,11 @@ const App = (props) => {
 			default:
 				return false; // Allow default behavior (exit prompt)
 		}
-	}, [currentView, previousItem]);
+	}, [currentView, playerControlsVisible, previousItem]);
+
+	useEffect(() => {
+		handleBackRef.current = handleBack;
+	}, [handleBack]);
 
 	// Global back-key listener to keep navigation consistent outside the player
 	useEffect(() => {
@@ -84,20 +102,21 @@ const App = (props) => {
 	// Intercept browser history back (webOS back triggers popstate)
 	useEffect(() => {
 		const handlePopState = (e) => {
-			const handled = handleBack();
+			const handled = handleBackRef.current?.();
 			if (handled) {
 				e.preventDefault?.();
 				// Re-push a dummy state so the next back event stays in-app
-				window.history.pushState(null, document.title);
+				window.history.pushState({breezyfin: true}, document.title);
 			}
 		};
-		// Push an initial state to keep back within the app
-		window.history.pushState(null, document.title);
+		// Push only once to avoid history flooding when component re-renders.
+		const state = window.history.state || {};
+		if (!state.breezyfin) {
+			window.history.pushState({breezyfin: true}, document.title);
+		}
 		window.addEventListener('popstate', handlePopState);
 		return () => window.removeEventListener('popstate', handlePopState);
-	}, [handleBack]);
-
-	// Back button handling removed - using Panels onBack instead
+	}, []);
 
 	const handleLogin = () => {
 		setCurrentView('home');
@@ -158,6 +177,7 @@ const App = (props) => {
 	const handlePlay = (item, options = null) => {
 		setSelectedItem(item);
 		setPlaybackOptions(options);
+		setPlayerControlsVisible(true);
 		setCurrentView('player');
 	};
 
@@ -169,6 +189,7 @@ const App = (props) => {
 	};
 
 	const handleBackToDetails = () => {
+		setPlayerControlsVisible(true);
 		setCurrentView('details');
 	};
 
@@ -194,14 +215,7 @@ const App = (props) => {
 		<div className={css.app} {...props}>
 			<Panels 
 				index={getPanelIndex()}
-				onBack={() => {
-					if (currentView === 'library') handleBackToHome();
-					else if (currentView === 'search') handleBackToHome();
-					else if (currentView === 'favorites') handleBackToHome();
-					else if (currentView === 'settings') handleBackToHome();
-					else if (currentView === 'details') handleBackToHome();
-					else if (currentView === 'player') handleBackToDetails();
-				}}
+				onBack={handleBack}
 			>
 				<LoginPanel onLogin={handleLogin} />
 				<HomePanel
@@ -255,10 +269,21 @@ const App = (props) => {
 					playbackOptions={playbackOptions}
 					onBack={handleBackToDetails}
 					onPlay={handlePlay}
+					requestedControlsVisible={playerControlsVisible}
+					onControlsVisibilityChange={setPlayerControlsVisible}
+					registerBackHandler={(handler) => {
+						playerBackHandlerRef.current = handler;
+					}}
 				/>
 			</Panels>
 		</div>
 	);
 };
 
-export default ThemeDecorator(App);
+const AppWithBoundary = (props) => (
+	<AppCrashBoundary>
+		<App {...props} />
+	</AppCrashBoundary>
+);
+
+export default ThemeDecorator(AppWithBoundary);

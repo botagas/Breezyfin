@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Spottable } from '@enact/spotlight/Spottable';
 import Button from '@enact/sandstone/Button';
 import Icon from '@enact/sandstone/Icon';
 import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
+import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 
 import css from './Toolbar.module.less';
 
@@ -14,6 +15,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [userName, setUserName] = useState('User');
 	const [showUserMenu, setShowUserMenu] = useState(false);
+	const centerRef = useRef(null);
 
 	useEffect(() => {
 		loadLibraries();
@@ -45,6 +47,15 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 			minute: '2-digit',
 			hour12: true 
 		});
+	};
+
+	const handleCenterFocus = (e) => {
+		if (!centerRef.current || !centerRef.current.contains(e.target)) return;
+		const target = e.target.closest(`.${css.iconButton}, .${css.toolbarButton}`);
+		if (!target) return;
+
+		const scroller = centerRef.current;
+		scrollElementIntoHorizontalView(scroller, target, {minBuffer: 40, edgeRatio: 0.10});
 	};
 
 		return (
@@ -81,7 +92,8 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 						</div>
 					)}
 				</div>
-			</div>			<div className={css.center}>
+			</div>
+			<div className={css.center} ref={centerRef} onFocus={handleCenterFocus}>
 				<SpottableDiv
 					onClick={() => onNavigate('home')}
 					className={`${css.iconButton} ${activeSection === 'home' ? css.selected : ''}`}

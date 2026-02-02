@@ -94,6 +94,16 @@
 .popupContent {
 	padding: 1.5rem;
 	min-width: 300px;
+	border-radius: 14px;
+	background: linear-gradient(145deg, rgba(9, 22, 30, 0.92), rgba(10, 12, 20, 0.94));
+	border: 1px solid rgba(122, 214, 255, 0.28);
+	box-shadow: 0 14px 28px rgba(0, 0, 0, 0.45);
+}
+
+.logPopupContent {
+	padding: 1.5rem;
+	min-width: 980px;
+	max-width: 92vw;
 }
 
 .popupTitle {
@@ -119,6 +129,11 @@
 	padding: 0.5rem 0.75rem;
 	min-height: auto;
 	font-size: 0.9em;
+	border-radius: 999px;
+
+	&:global(.spottable):focus {
+		background: rgba(122, 214, 255, 0.22);
+	}
 }
 
 .popupActions {
@@ -139,6 +154,41 @@
 	&:focus {
 		background: rgba(244, 67, 54, 0.8);
 	}
+}
+
+.logActions {
+	display: flex;
+	gap: 0.75rem;
+	margin-bottom: 0.75rem;
+}
+
+.logScroller {
+	max-height: 60vh;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 10px;
+	padding: 0.75rem;
+	background: rgba(0, 0, 0, 0.35);
+}
+
+.logEntry {
+	padding: 0.6rem 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.logEntry:last-child {
+	border-bottom: none;
+}
+
+.logMeta {
+	font-size: 0.82em;
+	opacity: 0.75;
+	margin-bottom: 0.2rem;
+}
+
+.logText {
+	font-size: 0.9em;
+	word-break: break-word;
+	white-space: pre-wrap;
 }
 
 .rowOrderHeader {

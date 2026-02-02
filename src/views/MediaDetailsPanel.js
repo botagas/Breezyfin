@@ -7,10 +7,15 @@ import Spinner from '@enact/sandstone/Spinner';
 import Icon from '@enact/sandstone/Icon';
 import Popup from '@enact/sandstone/Popup';
 import BodyText from '@enact/sandstone/BodyText';
+import Spottable from '@enact/spotlight/Spottable';
+import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
+import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import {KeyCodes} from '../utils/keyCodes';
 
 import css from './MediaDetailsPanel.module.less';
+
+const SpottableDiv = Spottable('div');
 
 const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, ...rest }) => {
 	const [loading, setLoading] = useState(true);
@@ -29,6 +34,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [toastMessage, setToastMessage] = useState('');
 	const castRowRef = useRef(null);
 	const castScrollerRef = useRef(null);
+	const seasonScrollerRef = useRef(null);
+	const episodesListRef = useRef(null);
+	const episodeSelectorButtonRef = useRef(null);
 
 	useEffect(() => {
 		loadPlaybackInfo();
@@ -233,15 +241,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			if (PLAY_KEYS.includes(code)) {
 				// Avoid triggering play when user is interacting with another control
 				const target = e.target;
-				const tag = target?.tagName?.toLowerCase();
-				const role = target?.getAttribute?.('role');
-				const isInteractive =
-					tag === 'button' ||
-					tag === 'input' ||
-					tag === 'select' ||
-					tag === 'textarea' ||
-					role === 'button' ||
-					role === 'textbox';
+				const interactiveTarget = target?.closest?.(
+					'button, input, select, textarea, [role=\"button\"], [role=\"textbox\"], [tabindex], .spottable, [data-spotlight-id]'
+				);
+				const isInteractive = !!interactiveTarget;
 				if (isInteractive) {
 					return;
 				}
@@ -299,19 +302,50 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const cast = item?.People?.filter(p => p.Type === 'Actor') || [];
 	const directors = (item?.People || []).filter(p => p.Type === 'Director');
 	const writers = (item?.People || []).filter(p => p.Type === 'Writer');
+	const focusSeasonWatchedButton = (seasonCard) => {
+		const watchedTarget = seasonCard?.querySelector(
+			`.${css.seasonWatchedButton} .spottable, .${css.seasonWatchedButton} [tabindex], .${css.seasonWatchedButton} button`
+		);
+		if (watchedTarget?.focus) watchedTarget.focus();
+	};
 
 	const scrollCastIntoView = (element) => {
 		if (!element || !castScrollerRef.current) return;
 		const scroller = castScrollerRef.current;
-		const scrollerRect = scroller.getBoundingClientRect();
-		const elementRect = element.getBoundingClientRect();
-		const buffer = 60;
+		scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+	};
 
-		if (elementRect.left < scrollerRect.left + buffer) {
-			scroller.scrollLeft -= (scrollerRect.left + buffer) - elementRect.left;
-		} else if (elementRect.right > scrollerRect.right - buffer) {
-			scroller.scrollLeft += elementRect.right - (scrollerRect.right - buffer);
+	const scrollSeasonIntoView = (element) => {
+		if (!element || !seasonScrollerRef.current) return;
+		const scroller = seasonScrollerRef.current;
+		scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+	};
+
+	const focusEpisodeCardByIndex = (index) => {
+		const cards = Array.from(episodesListRef.current?.querySelectorAll(`.${css.episodeCard}`) || []);
+		if (index >= 0 && index < cards.length) {
+			cards[index].focus();
 		}
+	};
+
+	const focusEpisodeSelector = () => {
+		if (Spotlight?.focus?.('episode-selector-button')) return true;
+		const spotlightTarget = document.querySelector('[data-spotlight-id="episode-selector-button"]');
+		if (spotlightTarget?.focus) {
+			spotlightTarget.focus({preventScroll: true});
+			return true;
+		}
+		const selector = episodeSelectorButtonRef.current?.nodeRef?.current || episodeSelectorButtonRef.current;
+		if (selector?.focus) {
+			selector.focus({preventScroll: true});
+			return true;
+		}
+		return false;
+	};
+
+	const focusBelowSeasons = () => {
+		if (focusEpisodeSelector()) return;
+		focusEpisodeCardByIndex(0);
 	};
 
 	const getAudioLabel = () => {
@@ -561,13 +595,30 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 											<div className={css.seriesContent}>
 											<div className={css.seasonsSection}>
 												<Heading size="medium" className={css.sectionHeading}>Seasons</Heading>
-												<div className={css.seasonCards}>
+												<div className={css.seasonCards} ref={seasonScrollerRef}>
 												{seasons.map(season => (
-													<div
+													<SpottableDiv
 														key={season.Id}
 														className={`${css.seasonCard} ${selectedSeason?.Id === season.Id ? css.selected : ''}`}
 														onClick={() => handleSeasonClick(season)}
-													>													<div 
+														onFocus={(e) => scrollSeasonIntoView(e.currentTarget)}
+														onKeyDown={(e) => {
+															if (e.keyCode === KeyCodes.ENTER || e.keyCode === KeyCodes.OK) {
+																e.preventDefault();
+																e.stopPropagation();
+																handleSeasonClick(season);
+															} else if (e.keyCode === KeyCodes.UP) {
+																e.preventDefault();
+																e.stopPropagation();
+																focusSeasonWatchedButton(e.currentTarget);
+															} else if (e.keyCode === KeyCodes.DOWN) {
+																e.preventDefault();
+																e.stopPropagation();
+																focusBelowSeasons();
+															}
+														}}
+													>
+													<div 
 														className={css.seasonWatchedButton}
 														onClick={(e) => {
 															e.stopPropagation();
@@ -579,6 +630,19 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 															icon="check"
 															selected={season.UserData?.Played}
 															backgroundOpacity="transparent"
+															onKeyDown={(e) => {
+																if (e.keyCode === KeyCodes.DOWN) {
+																	e.preventDefault();
+																	e.stopPropagation();
+																	const card = e.currentTarget.closest(`.${css.seasonCard}`);
+																	if (card?.focus) card.focus();
+																} else if (e.keyCode === KeyCodes.UP) {
+																	e.preventDefault();
+																	e.stopPropagation();
+																	const card = e.currentTarget.closest(`.${css.seasonCard}`);
+																	if (card?.focus) card.focus();
+																}
+															}}
 														/>
 													</div>
 														<img
@@ -597,7 +661,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 														{season.ChildCount && (
 															<BodyText className={css.episodeCount}>{season.ChildCount} Episodes</BodyText>
 														)}
-													</div>
+													</SpottableDiv>
 												))}
 											</div>
 										</div>
@@ -609,6 +673,15 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 														size="large"
 														onClick={() => setShowEpisodePicker(true)}
 														className={css.dropdown}
+														componentRef={episodeSelectorButtonRef}
+														spotlightId="episode-selector-button"
+														onKeyDown={(e) => {
+															if (e.keyCode === KeyCodes.DOWN) {
+																e.preventDefault();
+																e.stopPropagation();
+																focusEpisodeCardByIndex(0);
+															}
+														}}
 													>
 														Episode {selectedEpisode.IndexNumber}: {selectedEpisode.Name}
 													</Button>
@@ -655,16 +728,29 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 										{episodes.length > 0 && (
 											<div className={css.episodesSection}>
 												<Heading size="medium" className={css.sectionHeading}>Episodes</Heading>
-												<div className={css.episodeCards}>
-													{episodes.map(episode => (
-														<div
+												<div className={css.episodeCards} ref={episodesListRef}>
+													{episodes.map((episode, index) => (
+														<SpottableDiv
 															key={episode.Id}
 															className={`${css.episodeCard} ${selectedEpisode?.Id === episode.Id ? css.selected : ''}`}
+															onClick={() => handleEpisodeClick(episode)}
+															onKeyDown={(e) => {
+																if (e.keyCode === KeyCodes.DOWN) {
+																	e.preventDefault();
+																	e.stopPropagation();
+																	focusEpisodeCardByIndex(index + 1);
+																} else if (e.keyCode === KeyCodes.UP) {
+																	e.preventDefault();
+																	e.stopPropagation();
+																	if (index === 0) {
+																		focusEpisodeSelector();
+																		return;
+																	}
+																	focusEpisodeCardByIndex(index - 1);
+																}
+															}}
 														>
-															<div
-																className={css.episodeImageContainer}
-																onClick={() => handleEpisodeClick(episode)}
-															>
+															<div className={css.episodeImageContainer}>
 																<img
 																	src={jellyfinService.getImageUrl(episode.Id, 'Primary', 400)}
 																	alt={episode.Name}
@@ -683,7 +769,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																	</BodyText>
 																)}
 															</div>
-														</div>
+														</SpottableDiv>
 													))}
 												</div>
 											</div>

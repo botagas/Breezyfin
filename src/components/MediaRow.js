@@ -4,6 +4,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import Scroller from '@enact/sandstone/Scroller';
 import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
+import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 
 import css from './MediaRow.module.less';
 
@@ -148,14 +149,7 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 			const scroller = scrollerRef.current;
 			const element = e.target.closest('.' + css.card);
 			if (element) {
-				const scrollerRect = scroller.getBoundingClientRect();
-				const elementRect = element.getBoundingClientRect();
-
-				if (elementRect.left < scrollerRect.left + 60) {
-					scroller.scrollLeft -= (scrollerRect.left + 60) - elementRect.left + 20;
-				} else if (elementRect.right > scrollerRect.right - 60) {
-					scroller.scrollLeft += elementRect.right - (scrollerRect.right - 60) + 20;
-				}
+				scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
 			}
 		}
 	}, []);

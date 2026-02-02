@@ -10,6 +10,7 @@ import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import {KeyCodes, isBackKey} from '../utils/keyCodes';
+import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 
 import css from './SettingsPanel.module.less';
 
@@ -31,6 +32,8 @@ const DEFAULT_SETTINGS = {
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
 	autoPlayNext: true,
+	showPlayNextPrompt: true,
+	playNextPromptMode: 'segmentsOrLast60',
 	skipIntro: true,
 	showBackdrops: true,
 	homeRows: {
@@ -75,9 +78,12 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 	const [bitratePopupOpen, setBitratePopupOpen] = useState(false);
 	const [audioLangPopupOpen, setAudioLangPopupOpen] = useState(false);
 	const [subtitleLangPopupOpen, setSubtitleLangPopupOpen] = useState(false);
+	const [playNextPromptModePopupOpen, setPlayNextPromptModePopupOpen] = useState(false);
 	const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 	const [savedServers, setSavedServers] = useState([]);
 	const [switchingServerId, setSwitchingServerId] = useState(null);
+	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
+	const [appLogs, setAppLogs] = useState([]);
 
 	useEffect(() => {
 		loadSettings();
@@ -215,6 +221,16 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		onLogout();
 	};
 
+	const openLogsPopup = () => {
+		setAppLogs(getAppLogs().slice().reverse());
+		setLogsPopupOpen(true);
+	};
+
+	const handleClearLogs = () => {
+		clearAppLogs();
+		setAppLogs([]);
+	};
+
 	const getBitrateLabel = (value) => {
 		const option = BITRATE_OPTIONS.find(o => o.value === value);
 		return option ? option.label : `${value} Mbps`;
@@ -223,6 +239,16 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 	const getLanguageLabel = (value) => {
 		const option = LANGUAGE_OPTIONS.find(o => o.value === value);
 		return option ? option.label : value;
+	};
+
+	const getPlayNextPromptModeLabel = (value) => {
+		switch (value) {
+			case 'segmentsOnly':
+				return 'Outro/Credits Only';
+			case 'segmentsOrLast60':
+			default:
+				return 'Segments or Last 60s';
+		}
 	};
 
 	// Improve remote back handling so physical back/escape keys always leave settings
@@ -250,7 +276,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 			/>
 			<Scroller className={css.settingsContainer}>
 				<div className={css.content}>
-					{/* Server Info Section */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Server Information</BodyText>
 						{loading ? (
@@ -266,7 +291,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						)}
 					</section>
 
-					{/* Saved Servers */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Saved Servers</BodyText>
 						{savedServers.length === 0 && (
@@ -304,7 +328,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						</div>
 					</section>
 
-					{/* Home Rows */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Home Rows</BodyText>
 						<SwitchItem
@@ -377,7 +400,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						</div>
 					</section>
 
-					{/* User Info Section */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Account</BodyText>
 						{loading ? (
@@ -399,7 +421,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						)}
 					</section>
 
-					{/* Playback Settings */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Playback</BodyText>
 						
@@ -428,6 +449,25 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 
 						<SwitchItem
 							className={css.switchItem}
+							onToggle={() => handleSettingChange('showPlayNextPrompt', !settings.showPlayNextPrompt)}
+							selected={settings.showPlayNextPrompt !== false}
+						>
+							Show Play Next Prompt
+						</SwitchItem>
+
+						<Item
+							className={css.settingItem}
+							label="Play Next Prompt Mode"
+							slotAfter={getPlayNextPromptModeLabel(settings.playNextPromptMode)}
+							onClick={() => {
+								if (settings.showPlayNextPrompt !== false) {
+									setPlayNextPromptModePopupOpen(true);
+								}
+							}}
+						/>
+						
+						<SwitchItem
+							className={css.switchItem}
 							onToggle={() => handleSettingChange('skipIntro', !settings.skipIntro)}
 							selected={settings.skipIntro}
 						>
@@ -435,7 +475,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						</SwitchItem>
 					</section>
 
-					{/* Language Preferences */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Language Preferences</BodyText>
 						
@@ -454,7 +493,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						/>
 					</section>
 
-					{/* Playback Settings */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Playback</BodyText>
 						
@@ -475,7 +513,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						</SwitchItem>
 					</section>
 
-					{/* Display Settings */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Display</BodyText>
 						
@@ -488,16 +525,24 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						</SwitchItem>
 					</section>
 
-					{/* About Section */}
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>About</BodyText>
 						<Item className={css.infoItem} label="App Version" slotAfter="1.0.0" />
 						<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
 					</section>
+
+					<section className={css.section}>
+						<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
+						<Item
+							className={css.settingItem}
+							label="Logs"
+							slotAfter={`${getAppLogs().length} entries`}
+							onClick={openLogsPopup}
+						/>
+					</section>
 				</div>
 			</Scroller>
 
-			{/* Bitrate Selection Popup */}
 			<Popup
 				open={bitratePopupOpen}
 				onClose={() => setBitratePopupOpen(false)}
@@ -521,7 +566,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				</div>
 			</Popup>
 
-			{/* Audio Language Popup */}
 			<Popup
 				open={audioLangPopupOpen}
 				onClose={() => setAudioLangPopupOpen(false)}
@@ -547,7 +591,6 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				</div>
 			</Popup>
 
-			{/* Subtitle Language Popup */}
 			<Popup
 				open={subtitleLangPopupOpen}
 				onClose={() => setSubtitleLangPopupOpen(false)}
@@ -573,7 +616,36 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				</div>
 			</Popup>
 
-			{/* Logout Confirmation Popup */}
+			<Popup
+				open={playNextPromptModePopupOpen}
+				onClose={() => setPlayNextPromptModePopupOpen(false)}
+				className={css.popup}
+			>
+				<div className={css.popupContent}>
+					<BodyText className={css.popupTitle}>Play Next Prompt Mode</BodyText>
+					<Button
+						className={css.popupOption}
+						selected={settings.playNextPromptMode === 'segmentsOnly'}
+						onClick={() => {
+							handleSettingChange('playNextPromptMode', 'segmentsOnly');
+							setPlayNextPromptModePopupOpen(false);
+						}}
+					>
+						Outro/Credits Only
+					</Button>
+					<Button
+						className={css.popupOption}
+						selected={settings.playNextPromptMode !== 'segmentsOnly'}
+						onClick={() => {
+							handleSettingChange('playNextPromptMode', 'segmentsOrLast60');
+							setPlayNextPromptModePopupOpen(false);
+						}}
+					>
+						Segments or Last 60s
+					</Button>
+				</div>
+			</Popup>
+
 			<Popup
 				open={logoutConfirmOpen}
 				onClose={() => setLogoutConfirmOpen(false)}
@@ -588,6 +660,31 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						<Button onClick={() => setLogoutConfirmOpen(false)}>Cancel</Button>
 						<Button onClick={handleLogoutConfirm} className={css.dangerButton}>Sign Out</Button>
 					</div>
+				</div>
+			</Popup>
+
+			<Popup
+				open={logsPopupOpen}
+				onClose={() => setLogsPopupOpen(false)}
+				className={css.popup}
+			>
+				<div className={css.logPopupContent}>
+					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
+					<div className={css.logActions}>
+						<Button size="small" onClick={handleClearLogs}>Clear Logs</Button>
+						<Button size="small" onClick={() => setLogsPopupOpen(false)}>Close</Button>
+					</div>
+					<Scroller className={css.logScroller}>
+						{appLogs.length === 0 && (
+							<BodyText className={css.mutedText}>No logs captured yet.</BodyText>
+						)}
+						{appLogs.map((entry, index) => (
+							<div key={`${entry.ts}-${index}`} className={css.logEntry}>
+								<BodyText className={css.logMeta}>[{entry.ts}] {entry.level?.toUpperCase()}</BodyText>
+								<BodyText className={css.logText}>{entry.message}</BodyText>
+							</div>
+						))}
+					</Scroller>
 				</div>
 			</Popup>
 		</Panel>

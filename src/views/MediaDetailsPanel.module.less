@@ -269,10 +269,18 @@
 	background: rgba(255, 255, 255, 0.05);
 	border: 3px solid transparent;
 	position: relative;
+	outline: none;
 
 	&:hover {
 		transform: scale(1.05);
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+	}
+
+	&:global(.spottable):focus,
+	&:focus {
+		transform: scale(1.05);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+		border-color: rgba(0, 164, 220, 0.95);
 	}
 
 	&.selected {
