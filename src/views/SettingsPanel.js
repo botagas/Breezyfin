@@ -11,6 +11,7 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import {KeyCodes, isBackKey} from '../utils/keyCodes';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
+import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 
 import css from './SettingsPanel.module.less';
 
@@ -71,6 +72,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest }) => {
+	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
 	const [userInfo, setUserInfo] = useState(null);
@@ -89,6 +91,18 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		loadSettings();
 		loadServerInfo();
 		refreshSavedServers();
+	}, []);
+
+	useEffect(() => {
+		let cancelled = false;
+		loadAppVersion().then((resolvedVersion) => {
+			if (!cancelled && resolvedVersion) {
+				setAppVersion(resolvedVersion);
+			}
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	const loadSettings = () => {
@@ -303,7 +317,7 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 									<div key={key} className={`${css.serverCard} ${entry.isActive ? css.activeCard : ''}`}>
 										<div className={css.serverCardMain}>
 											<div className={css.serverTitle}>{entry.serverName || 'Jellyfin Server'}</div>
-											<div className={css.serverMeta}>{entry.username} • {entry.url}</div>
+											<div className={css.serverMeta}>{entry.username} - {entry.url}</div>
 										</div>
 										<div className={css.serverCardActions}>
 											<Button
@@ -527,7 +541,7 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>About</BodyText>
-						<Item className={css.infoItem} label="App Version" slotAfter="1.0.0" />
+						<Item className={css.infoItem} label="App Version" slotAfter={appVersion} />
 						<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
 					</section>
 

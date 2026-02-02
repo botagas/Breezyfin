@@ -24,6 +24,7 @@ const App = (props) => {
 	const [previousItem, setPreviousItem] = useState(null); // For back navigation from episode to series
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
 	const playerBackHandlerRef = useRef(null);
+	const detailsBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
 
 	useEffect(() => {
@@ -48,6 +49,12 @@ const App = (props) => {
 				setPlaybackOptions(null);
 				return true;
 			case 'details':
+				if (typeof detailsBackHandlerRef.current === 'function') {
+					const handledInDetails = detailsBackHandlerRef.current();
+					if (handledInDetails) {
+						return true;
+					}
+				}
 				// If we have a previous item (series), go back to it
 				if (previousItem) {
 					setSelectedItem(previousItem);
@@ -261,6 +268,9 @@ const App = (props) => {
 					onBack={handleBackToHome}
 					onPlay={handlePlay}
 					onItemSelect={handleItemSelect}
+					registerBackHandler={(handler) => {
+						detailsBackHandlerRef.current = handler;
+					}}
 					noCloseButton
 				/>
 				<PlayerPanel

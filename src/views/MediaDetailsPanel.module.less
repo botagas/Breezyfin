@@ -73,10 +73,18 @@
 }
 
 .episodeInfo {
-	font-size: 1.3em;
 	margin-bottom: 16px;
-	color: rgba(255, 255, 255, 0.85);
-	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.episodeNavActions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.episodeNavButton {
+	background: rgba(255, 255, 255, 0.08) !important;
+	border: 1px solid rgba(255, 255, 255, 0.18) !important;
 }
 
 .metadata {
@@ -373,6 +381,7 @@
 	border-radius: 60px;
 	transition: background 0.2s, transform 0.2s;
 	height: 15rem;
+	overflow: hidden;
 
 	&:hover,
 	&:focus {
@@ -434,9 +443,11 @@
 
 .episodeInfo {
 	flex: 1;
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	overflow: hidden;
 }
 
 .episodeNumber {
@@ -449,6 +460,11 @@
 	font-size: 1.2em;
 	font-weight: 600;
 	color: rgba(255, 255, 255, 0.95);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
 }
 
 .episodeOverview {
@@ -456,8 +472,8 @@
 	line-height: 1.5;
 	color: rgba(255, 255, 255, 0.75);
 	display: -webkit-box;
-	-webkit-line-clamp: 3;
-	line-clamp: 3;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 }

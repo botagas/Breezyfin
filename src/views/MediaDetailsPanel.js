@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Panel, Header } from '@enact/sandstone/Panels';
 import Button from '@enact/sandstone/Button';
 import Heading from '@enact/sandstone/Heading';
@@ -17,7 +17,7 @@ import css from './MediaDetailsPanel.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, ...rest }) => {
+const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [playbackInfo, setPlaybackInfo] = useState(null);
 	const [selectedAudioTrack, setSelectedAudioTrack] = useState(null);
@@ -29,6 +29,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [showAudioPicker, setShowAudioPicker] = useState(false);
 	const [showSubtitlePicker, setShowSubtitlePicker] = useState(false);
 	const [showEpisodePicker, setShowEpisodePicker] = useState(false);
+	const [episodeNavList, setEpisodeNavList] = useState([]);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
 	const [toastMessage, setToastMessage] = useState('');
@@ -37,17 +38,51 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const seasonScrollerRef = useRef(null);
 	const episodesListRef = useRef(null);
 	const episodeSelectorButtonRef = useRef(null);
+	const detailsScrollerRef = useRef(null);
+	const detailsScrollToRef = useRef(null);
+	const favoriteActionButtonRef = useRef(null);
+	const watchedActionButtonRef = useRef(null);
 
 	useEffect(() => {
 		loadPlaybackInfo();
 		if (item?.Type === 'Series') {
 			loadSeasons();
+		} else {
+			setSeasons([]);
+			setEpisodes([]);
+			setSelectedSeason(null);
+			setSelectedEpisode(null);
 		}
 		// Initialize favorite and watched status
 		if (item?.UserData) {
 			setIsFavorite(item.UserData.IsFavorite || false);
 			setIsWatched(item.UserData.Played || false);
 		}
+	}, [item]);
+
+	useEffect(() => {
+		let cancelled = false;
+		const loadEpisodeNavList = async () => {
+			if (item?.Type !== 'Episode' || !item.SeriesId || !item.SeasonId) {
+				setEpisodeNavList([]);
+				return;
+			}
+			try {
+				const seasonEpisodes = await jellyfinService.getEpisodes(item.SeriesId, item.SeasonId);
+				if (!cancelled) {
+					setEpisodeNavList(seasonEpisodes || []);
+				}
+			} catch (error) {
+				console.error('Failed to load episode navigation list:', error);
+				if (!cancelled) {
+					setEpisodeNavList([]);
+				}
+			}
+		};
+		loadEpisodeNavList();
+		return () => {
+			cancelled = true;
+		};
 	}, [item]);
 
 	// Pick sensible defaults based on the media streams we got back
@@ -89,13 +124,29 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			const seasonsData = await jellyfinService.getSeasons(item.Id);
 			setSeasons(seasonsData);
 			if (seasonsData.length > 0) {
-				setSelectedSeason(seasonsData[0]);
-				await loadEpisodes(seasonsData[0].Id);
+				const preferredSeasonId = item?.__initialSeasonId || null;
+				const initialSeason = (preferredSeasonId && seasonsData.find(s => s.Id === preferredSeasonId)) || seasonsData[0];
+				setSelectedSeason(initialSeason);
+				await loadEpisodes(initialSeason.Id);
 			}
 		} catch (error) {
 			console.error('Failed to load seasons:', error);
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	const openSeriesFromEpisode = async (seasonId = null) => {
+		if (item.Type !== 'Episode' || !item.SeriesId || !onItemSelect) return false;
+		try {
+			const series = await jellyfinService.getItem(item.SeriesId);
+			if (!series) return false;
+			const target = seasonId ? {...series, __initialSeasonId: seasonId} : series;
+			onItemSelect(target, item);
+			return true;
+		} catch (error) {
+			console.error('Error opening series from episode details:', error);
+			return false;
 		}
 	};
 
@@ -148,19 +199,29 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	// Handle back navigation - for episodes, go to series instead of home
 	const handleBack = async () => {
 		if (item.Type === 'Episode' && item.SeriesId) {
-			try {
-				const series = await jellyfinService.getItem(item.SeriesId);
-				if (series && onItemSelect) {
-					onItemSelect(series);
-					return;
-				}
-			} catch (error) {
-				console.error('Error fetching series for back navigation:', error);
-			}
+			const opened = await openSeriesFromEpisode(item.SeasonId || null);
+			if (opened) return;
 		}
 		// Fall back to default back behavior
 		onBack();
 	};
+
+	const handleInternalBack = useCallback(() => {
+		if (showEpisodePicker) {
+			setShowEpisodePicker(false);
+			return true;
+		}
+		if (showAudioPicker) {
+			setShowAudioPicker(false);
+			return true;
+		}
+		if (showSubtitlePicker) {
+			setShowSubtitlePicker(false);
+			return true;
+		}
+		handleBack();
+		return true;
+	}, [handleBack, showAudioPicker, showEpisodePicker, showSubtitlePicker]);
 
 	const handleEpisodeClick = async (episode) => {
 		setSelectedEpisode(episode);
@@ -234,7 +295,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 			if (BACK_KEYS.includes(code)) {
 				e.preventDefault();
-				onBack();
+				e.stopPropagation();
+				e.stopImmediatePropagation?.();
+				handleInternalBack();
 				return;
 			}
 
@@ -255,7 +318,13 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 		document.addEventListener('keydown', handleKeyDown);
 		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [handlePlay, isActive, onBack]);
+	}, [handleInternalBack, handlePlay, isActive]);
+
+	useEffect(() => {
+		if (typeof registerBackHandler !== 'function') return undefined;
+		registerBackHandler(handleInternalBack);
+		return () => registerBackHandler(null);
+	}, [handleInternalBack, registerBackHandler]);
 
 	// Auto-hide toast after a short delay
 	useEffect(() => {
@@ -319,6 +388,72 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		if (!element || !seasonScrollerRef.current) return;
 		const scroller = seasonScrollerRef.current;
 		scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+	};
+
+	const focusSeasonCardByIndex = (index) => {
+		const cards = Array.from(seasonScrollerRef.current?.querySelectorAll(`.${css.seasonCard}`) || []);
+		if (index >= 0 && index < cards.length) {
+			cards[index].focus();
+			return true;
+		}
+		return false;
+	};
+
+	const getDetailsScrollElement = () => {
+		const scrollerNode = detailsScrollerRef.current?.nodeRef?.current || detailsScrollerRef.current;
+		if (!scrollerNode) return null;
+		if (typeof scrollerNode.scrollTop === 'number') return scrollerNode;
+		return scrollerNode.querySelector?.('[id$="_content"]') || scrollerNode.querySelector?.('[data-webos-voice-intent="Scroll"]');
+	};
+
+	const alignElementBelowPanelHeader = (element, behavior = 'smooth') => {
+		const scrollEl = getDetailsScrollElement();
+		if (!scrollEl || !element) return;
+		const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+		const panelHeaderOffset = 9 * rootFontSize;
+		const visualBuffer = 16;
+		const desiredTop = scrollEl.getBoundingClientRect().top + panelHeaderOffset + visualBuffer;
+		const elementTop = element.getBoundingClientRect().top;
+		const delta = elementTop - desiredTop;
+		if (Math.abs(delta) < 2) return;
+		const nextTop = Math.max(0, scrollEl.scrollTop + delta);
+		scrollEl.scrollTo({top: nextTop, behavior});
+	};
+
+	const focusTopHeaderAction = () => {
+		const favoriteTarget = document.querySelector('[data-spotlight-id="details-favorite-action"]') ||
+			favoriteActionButtonRef.current?.nodeRef?.current ||
+			favoriteActionButtonRef.current;
+		const watchedTarget = document.querySelector('[data-spotlight-id="details-watched-action"]') ||
+			watchedActionButtonRef.current?.nodeRef?.current ||
+			watchedActionButtonRef.current;
+		const primaryTarget = favoriteTarget || watchedTarget;
+
+		if (primaryTarget?.focus) {
+			primaryTarget.focus({preventScroll: true});
+		}
+		if (typeof detailsScrollToRef.current === 'function') {
+			detailsScrollToRef.current({align: 'top', animate: true});
+		}
+		alignElementBelowPanelHeader(primaryTarget, 'smooth');
+		window.requestAnimationFrame(() => {
+			alignElementBelowPanelHeader(primaryTarget, 'auto');
+		});
+		if (favoriteTarget?.focus) {
+			favoriteTarget.focus({preventScroll: true});
+			return true;
+		}
+		if (Spotlight?.focus?.('details-favorite-action')) return true;
+		if (favoriteTarget?.focus) {
+			favoriteTarget.focus({preventScroll: true});
+			return true;
+		}
+		if (watchedTarget?.focus) {
+			watchedTarget.focus({preventScroll: true});
+			return true;
+		}
+		if (Spotlight?.focus?.('details-watched-action')) return true;
+		return false;
 	};
 
 	const focusEpisodeCardByIndex = (index) => {
@@ -427,7 +562,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	};
 
 	const renderEpisodePopup = () => {
-		if (item.Type !== 'Series' || !episodes?.length) return null;
+		const isSeriesMode = item.Type === 'Series';
+		const popupEpisodes = isSeriesMode ? episodes : episodeNavList;
+		if (!popupEpisodes?.length) return null;
 		return (
 			<Popup open={showEpisodePicker} onClose={() => setShowEpisodePicker(false)} noAutoDismiss>
 				<Heading size="medium" spacing="none" className={css.popupHeading}>
@@ -435,13 +572,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				</Heading>
 				<Scroller className={css.popupScroller}>
 					<div className={css.popupList}>
-						{episodes.map(ep => (
+						{popupEpisodes.map(ep => (
 							<Button
 								key={ep.Id}
 								size="large"
-								selected={selectedEpisode?.Id === ep.Id}
+								selected={isSeriesMode ? selectedEpisode?.Id === ep.Id : item?.Id === ep.Id}
 								onClick={() => {
-									handleEpisodeClick(ep);
+									if (isSeriesMode) {
+										handleEpisodeClick(ep);
+									} else if (onItemSelect) {
+										onItemSelect(ep, item);
+									}
 									setShowEpisodePicker(false);
 								}}
 								className={css.popupButton}
@@ -465,7 +606,13 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 					<div className={css.gradient} />
 				</div>
 			)}
-			<Scroller className={css.scroller}>
+			<Scroller
+				className={css.scroller}
+				componentRef={detailsScrollerRef}
+				cbScrollTo={(fn) => {
+					detailsScrollToRef.current = fn;
+				}}
+			>
 				<div className={css.detailsContainer}>
 					{loading ? (
 						<div className={css.loading}>
@@ -480,9 +627,33 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 									</Heading>
 
 									{item.Type === 'Episode' && (
-										<BodyText className={css.episodeInfo}>
-											{item.SeriesName} - S{item.ParentIndexNumber}:E{item.IndexNumber}
-										</BodyText>
+										<div className={css.episodeInfo}>
+											<div className={css.episodeNavActions}>
+												<Button
+													size="small"
+													className={css.episodeNavButton}
+													onClick={() => openSeriesFromEpisode(item.SeasonId || null)}
+												>
+													{item.SeriesName}
+												</Button>
+												{item.ParentIndexNumber !== undefined && item.ParentIndexNumber !== null && (
+													<Button
+														size="small"
+														className={css.episodeNavButton}
+														onClick={() => openSeriesFromEpisode(item.SeasonId || null)}
+													>
+														Season {item.ParentIndexNumber}
+													</Button>
+												)}
+												<Button
+													size="small"
+													className={css.episodeNavButton}
+													onClick={() => setShowEpisodePicker(true)}
+												>
+													Episode {item.IndexNumber}
+												</Button>
+											</div>
+										</div>
 									)}
 
 									<div className={css.metadata}>
@@ -507,6 +678,8 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												size="small"
 												icon={isFavorite ? 'heart' : 'hearthollow'}
 												onClick={handleToggleFavorite}
+												componentRef={favoriteActionButtonRef}
+												spotlightId="details-favorite-action"
 												className={`${css.actionButton} ${isFavorite ? css.activeAction : ''}`}
 											/>
 											<Button
@@ -514,6 +687,8 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												icon="check"
 												selected={isWatched}
 												onClick={() => handleToggleWatched()}
+												componentRef={watchedActionButtonRef}
+												spotlightId="details-watched-action"
 												className={`${css.actionButton} ${isWatched ? css.activeAction : ''}`}
 											/>
 										</div>
@@ -603,10 +778,20 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 														onClick={() => handleSeasonClick(season)}
 														onFocus={(e) => scrollSeasonIntoView(e.currentTarget)}
 														onKeyDown={(e) => {
+															const cards = Array.from(seasonScrollerRef.current?.querySelectorAll(`.${css.seasonCard}`) || []);
+															const currentIndex = cards.indexOf(e.currentTarget);
 															if (e.keyCode === KeyCodes.ENTER || e.keyCode === KeyCodes.OK) {
 																e.preventDefault();
 																e.stopPropagation();
 																handleSeasonClick(season);
+															} else if (e.keyCode === KeyCodes.LEFT) {
+																e.preventDefault();
+																e.stopPropagation();
+																focusSeasonCardByIndex(currentIndex - 1);
+															} else if (e.keyCode === KeyCodes.RIGHT) {
+																e.preventDefault();
+																e.stopPropagation();
+																focusSeasonCardByIndex(currentIndex + 1);
 															} else if (e.keyCode === KeyCodes.UP) {
 																e.preventDefault();
 																e.stopPropagation();
@@ -639,8 +824,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																} else if (e.keyCode === KeyCodes.UP) {
 																	e.preventDefault();
 																	e.stopPropagation();
-																	const card = e.currentTarget.closest(`.${css.seasonCard}`);
-																	if (card?.focus) card.focus();
+																	if (!focusTopHeaderAction()) {
+																		const card = e.currentTarget.closest(`.${css.seasonCard}`);
+																		if (card?.focus) card.focus();
+																	}
 																}
 															}}
 														/>
@@ -819,7 +1006,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												size="large"
 												onClick={handleBack}
 											>
-												Back
+												{item.Type === 'Episode' && item.SeriesId ? 'Back to Series' : 'Back'}
 											</Button>
 										</div>
 										</>

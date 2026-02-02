@@ -1,7 +1,7 @@
 {
 	"name": "breezyfin",
-	"version": "1.0.0",
-	"description": "A general template for an Enact Sandstone application.",
+	"version": "0.1.1",
+	"description": "Jellyfin client for LG webOS TVs, built with Enact Sandstone.",
 	"author": "",
 	"main": "src/index.js",
 	"scripts": {

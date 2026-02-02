@@ -1,13 +1,14 @@
 import { Jellyfin } from '@jellyfin/sdk';
 import { getPlaystateApi } from '@jellyfin/sdk/lib/utils/api/playstate-api';
 import serverManager from './serverManager';
+import {APP_VERSION} from '../utils/appInfo';
 
 class JellyfinService {
 	constructor() {
 		this.jellyfin = new Jellyfin({
 			clientInfo: {
 				name: 'Breezyfin',
-				version: '1.0.0'
+				version: APP_VERSION
 			},
 			deviceInfo: {
 				name: 'webOS TV',
@@ -50,7 +51,7 @@ class JellyfinService {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						'X-Emby-Authorization': `MediaBrowser Client="Breezyfin", Device="webOS", DeviceId="breezyfin-webos", Version="1.0.0"`
+						'X-Emby-Authorization': `MediaBrowser Client="Breezyfin", Device="webOS", DeviceId="breezyfin-webos", Version="${APP_VERSION}"`
 					},
 					body: JSON.stringify({
 						Username: username,
