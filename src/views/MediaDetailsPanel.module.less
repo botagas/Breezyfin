@@ -523,11 +523,6 @@
 	gap: 24px;
 	align-items: center;
 	flex-wrap: wrap;
-
-	:global(.bf-button-bg) {
-		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.18) !important;
-	}
 }
 
 .controlsTitle {
@@ -560,11 +555,6 @@
 	display: flex;
 	gap: 16px;
 	margin-top: 40px;
-
-	:global(.bf-button-bg) {
-		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.18) !important;
-	}
 }
 
 /* Popup track picker */
@@ -594,8 +584,29 @@
 	font-size: 1em !important;
 
 	:global(.bf-button-bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.1) !important;
+		border: none !important;
+	}
+}
+
+.primaryButton {
+	:global(.bf-button-bg) {
+		background: rgba(0, 164, 220, 0.28) !important;
+		border: 1px solid rgba(0, 164, 220, 0.65) !important;
+	}
+}
+
+.secondaryButton {
+	:global(.bf-button-bg) {
 		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+		border: 1px solid rgba(255, 255, 255, 0.2) !important;
 	}
 }
 

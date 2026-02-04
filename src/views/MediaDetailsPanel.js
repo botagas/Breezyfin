@@ -1043,6 +1043,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												<Button
 													size="large"
 													icon="play"
+													className={css.primaryButton}
 													onClick={handlePlay}
 												>
 													Play Episode
@@ -1124,12 +1125,14 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 											<Button
 												size="large"
 												icon="play"
+												className={css.primaryButton}
 												onClick={handlePlay}
 											>
 												Play
 											</Button>
 											<Button
 												size="large"
+												className={css.secondaryButton}
 												onClick={handleBack}
 											>
 												{item.Type === 'Episode' && item.SeriesId ? 'Back to Series' : 'Back'}
@@ -1142,6 +1145,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 									<div className={css.buttons}>
 										<Button
 											size="large"
+											className={css.secondaryButton}
 											onClick={onBack}
 										>
 											Back
