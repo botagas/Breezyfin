@@ -92,14 +92,21 @@ jobs:
 
           echo "manifest_path=${MANIFEST_PATH}" >> "$GITHUB_OUTPUT"
 
+      - name: Move nightly tag to current develop commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -fa nightly -m "Nightly prerelease"
+          git push origin refs/tags/nightly --force
+
       - name: Publish prerelease assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: develop
+          tag_name: nightly
           target_commitish: ${{ github.sha }}
-          name: Breezyfin Develop
+          name: Breezyfin Nightly
           body: |
-            Automated prerelease from `develop`.
+            Automated prerelease from `develop` (nightly channel).
             Commit: `${{ github.sha }}`
             Version: `${{ steps.metadata.outputs.version }}`
           prerelease: true
