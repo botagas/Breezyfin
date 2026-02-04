@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import Button from '@enact/sandstone/Button';
+import Button from './BreezyButton';
 import BodyText from '@enact/sandstone/BodyText';
 import Heading from '@enact/sandstone/Heading';
 import Marquee from '@enact/sandstone/Marquee';

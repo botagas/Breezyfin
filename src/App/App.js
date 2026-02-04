@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
-import Panels from '@enact/sandstone/Panels';
+import { Panels } from '../components/BreezyPanels';
 
 import LoginPanel from '../views/LoginPanel';
 import HomePanel from '../views/HomePanel';

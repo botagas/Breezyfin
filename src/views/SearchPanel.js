@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Panel, Header } from '@enact/sandstone/Panels';
+import { Panel, Header } from '../components/BreezyPanels';
 import Input from '@enact/sandstone/Input';
-import Button from '@enact/sandstone/Button';
+import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';

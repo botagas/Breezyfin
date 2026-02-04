@@ -1,6 +1,6 @@
-import Button from '@enact/sandstone/Button';
+import Button from '../components/BreezyButton';
 import kind from '@enact/core/kind';
-import {Panel, Header} from '@enact/sandstone/Panels';
+import {Panel, Header} from '../components/BreezyPanels';
 
 const MainPanel = kind({
 	name: 'MainPanel',

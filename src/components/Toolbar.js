@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Spottable } from '@enact/spotlight/Spottable';
-import Button from '@enact/sandstone/Button';
+import Button from './BreezyButton';
 import Icon from '@enact/sandstone/Icon';
 import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';

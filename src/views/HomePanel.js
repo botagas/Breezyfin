@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Panel } from '@enact/sandstone/Panels';
+import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
