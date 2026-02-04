@@ -597,16 +597,52 @@
 }
 
 .primaryButton {
+	:global(.bf-button) {
+		color: #111 !important;
+		font-size: 0.88em !important;
+		font-weight: 700 !important;
+		min-height: 2.2rem !important;
+		padding: 0 1.1rem !important;
+	}
+
+	:global(.Icon) {
+		font-size: 0.85rem !important;
+		width: 0.85rem !important;
+		height: 0.85rem !important;
+	}
+
 	:global(.bf-button-bg) {
-		background: rgba(0, 164, 220, 0.28) !important;
-		border: 1px solid rgba(0, 164, 220, 0.65) !important;
+		background: #ffffff !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: 0 0.16667rem 0.5rem rgba(0, 0, 0, 0.35) !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: #f1f3f5 !important;
 	}
 }
 
 .secondaryButton {
+	:global(.bf-button) {
+		color: #111 !important;
+		font-size: 0.88em !important;
+		font-weight: 700 !important;
+		min-height: 2.2rem !important;
+		padding: 0 1.1rem !important;
+	}
+
 	:global(.bf-button-bg) {
-		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.2) !important;
+		background: #ffffff !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: 0 0.16667rem 0.5rem rgba(0, 0, 0, 0.35) !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: #f1f3f5 !important;
 	}
 }
 

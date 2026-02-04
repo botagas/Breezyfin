@@ -18,10 +18,6 @@
 	padding: 2rem 0.5rem 0.5rem 0.5rem !important;
 }
 
-.bf-header * {
-	background: transparent !important;
-}
-
 /* Strip default Sandstone button chrome from Breezy button wrapper */
 .bf-button,
 .bf-button:hover,

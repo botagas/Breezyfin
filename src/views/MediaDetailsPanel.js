@@ -203,15 +203,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		await loadEpisodes(season.Id);
 	}, [loadEpisodes]);
 
-	// Handle back navigation - for episodes, go to series instead of home
-	const handleBack = useCallback(async () => {
-		if (item?.Type === 'Episode' && item.SeriesId) {
-			const opened = await openSeriesFromEpisode(item.SeasonId || null);
-			if (opened) return;
-		}
-		// Fall back to default back behavior
+	// Keep "Back" behavior consistent with other panels; series jump is exposed explicitly.
+	const handleBack = useCallback(() => {
 		onBack();
-	}, [item, onBack, openSeriesFromEpisode]);
+	}, [onBack]);
 
 	useEffect(() => {
 		loadPlaybackInfo();
@@ -1041,7 +1036,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												</div>
 
 												<Button
-													size="large"
+													size="small"
 													icon="play"
 													className={css.primaryButton}
 													onClick={handlePlay}
@@ -1123,7 +1118,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 										<div className={css.buttons}>
 											<Button
-												size="large"
+												size="small"
 												icon="play"
 												className={css.primaryButton}
 												onClick={handlePlay}
@@ -1131,11 +1126,11 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												Play
 											</Button>
 											<Button
-												size="large"
+												size="small"
 												className={css.secondaryButton}
 												onClick={handleBack}
 											>
-												{item.Type === 'Episode' && item.SeriesId ? 'Back to Series' : 'Back'}
+												Back
 											</Button>
 										</div>
 										</>
@@ -1144,7 +1139,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 								{item.Type === 'Series' && (
 									<div className={css.buttons}>
 										<Button
-											size="large"
+											size="small"
 											className={css.secondaryButton}
 											onClick={onBack}
 										>
