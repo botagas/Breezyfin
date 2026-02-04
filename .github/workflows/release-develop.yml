@@ -51,10 +51,10 @@ jobs:
             cp icon.png dist/icon.png
           fi
 
-	          python3 scripts/release/collect_metadata.py \
-	            --appinfo dist/appinfo.json \
-	            --package-json package.json \
-	            > /tmp/release-metadata.txt
+          python3 scripts/release/collect_metadata.py \
+            --appinfo dist/appinfo.json \
+            --package-json package.json \
+            > /tmp/release-metadata.txt
 
           cat /tmp/release-metadata.txt >> "$GITHUB_OUTPUT"
 
