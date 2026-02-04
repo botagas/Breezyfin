@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Build production bundle
-        run: npm run pack-p
+        run: CI=false npm run pack-p
 
       - name: Prepare release metadata
         id: metadata
