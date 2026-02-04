@@ -1035,14 +1035,14 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 													)}
 												</div>
 
-												<Button
-													size="small"
-													icon="play"
-													className={css.primaryButton}
-													onClick={handlePlay}
-												>
-													Play Episode
-												</Button>
+													<Button
+														size="small"
+														icon="play"
+														className={css.primaryButton}
+														onClick={handlePlay}
+													>
+														Play
+													</Button>
 											</div>
 										)}
 
