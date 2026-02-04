@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install build CLIs
+        run: npm install --global @enact/cli @webos-tools/cli
+
       - name: Lint
         run: npm run lint
 
@@ -66,9 +69,6 @@ jobs:
             > /tmp/release-metadata.txt
 
           cat /tmp/release-metadata.txt >> "$GITHUB_OUTPUT"
-
-      - name: Install webOS CLI
-        run: npm install --global @webos-tools/cli
 
       - name: Build IPK
         id: package

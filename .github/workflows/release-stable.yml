@@ -78,6 +78,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install build CLIs
+        run: npm install --global @enact/cli @webos-tools/cli
+
       - name: Lint
         run: npm run lint
 
@@ -109,9 +112,6 @@ jobs:
           if [ -f icon.png ] && [ ! -f dist/icon.png ]; then
             cp icon.png dist/icon.png
           fi
-
-      - name: Install webOS CLI
-        run: npm install --global @webos-tools/cli
 
       - name: Build IPK
         id: package
