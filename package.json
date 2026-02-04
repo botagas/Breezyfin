@@ -22,10 +22,7 @@
 		"theme": "sandstone"
 	},
 	"eslintConfig": {
-		"extends": "enact-proxy",
-		"rules": {
-			"react/jsx-no-bind": "off"
-		}
+		"extends": "enact-proxy"
 	},
 	"eslintIgnore": [
 		"node_modules/*",
