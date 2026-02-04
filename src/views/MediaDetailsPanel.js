@@ -1125,28 +1125,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 											>
 												Play
 											</Button>
-											<Button
-												size="small"
-												className={css.secondaryButton}
-												onClick={handleBack}
-											>
-												Back
-											</Button>
 										</div>
 										</>
 								)}
 
-								{item.Type === 'Series' && (
-									<div className={css.buttons}>
-										<Button
-											size="small"
-											className={css.secondaryButton}
-											onClick={onBack}
-										>
-											Back
-										</Button>
-									</div>
-								)}
 							</div>
 						</>
 					)}

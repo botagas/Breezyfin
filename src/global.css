@@ -9,13 +9,9 @@
 /* Make panel headers transparent so backdrop imagery remains visible */
 .bf-header {
 	background: rgba(0, 0, 0, 0.35) !important;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-	z-index: 20 !important;
 	backdrop-filter: blur(0.1rem) !important;
 	-webkit-backdrop-filter: blur(0.1rem) !important;
 	box-shadow: none !important;
-	border: none !important;
-	padding: 2rem 0.5rem 0.5rem 0.5rem !important;
 }
 
 /* Strip default Sandstone button chrome from Breezy button wrapper */
