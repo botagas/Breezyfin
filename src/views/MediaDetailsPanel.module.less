@@ -83,8 +83,10 @@
 }
 
 .episodeNavButton {
-	background: rgba(255, 255, 255, 0.08) !important;
-	border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	}
 }
 
 .metadata {
@@ -106,18 +108,24 @@
 }
 
 .actionButton {
-	background: transparent;
+	:global(.bf-button-bg) {
+		background: transparent !important;
+	}
 
 	&:hover,
 	&:focus {
-		background: rgba(255, 255, 255, 0.25) !important;
+		:global(.bf-button-bg) {
+			background: rgba(255, 255, 255, 0.25) !important;
+		}
 		color: white !important;
 	}
 }
 
 .activeAction {
-	background: rgba(0, 200, 255, 0.3) !important;
-	border: 1px solid rgba(0, 200, 255, 0.6) !important;
+	:global(.bf-button-bg) {
+		background: rgba(0, 200, 255, 0.3) !important;
+		border: 1px solid rgba(0, 200, 255, 0.6) !important;
+	}
 }
 
 .actionsRow {
@@ -515,6 +523,11 @@
 	gap: 24px;
 	align-items: center;
 	flex-wrap: wrap;
+
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	}
 }
 
 .controlsTitle {
@@ -547,6 +560,11 @@
 	display: flex;
 	gap: 16px;
 	margin-top: 40px;
+
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	}
 }
 
 /* Popup track picker */
@@ -574,6 +592,11 @@
 	text-align: left !important;
 	margin: 0 !important;
 	font-size: 1em !important;
+
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	}
 }
 
 /* Normalize text margins for headings/body text */

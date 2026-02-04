@@ -85,10 +85,19 @@
 .form :global(.bf-button:hover),
 .form :global(.bf-button:focus),
 .form :global(.bf-button:active) {
+	color: #ffffff !important;
+}
+
+.form :global(.bf-button-bg) {
 	background: rgba(255, 255, 255, 0.14) !important;
 	border: 1px solid rgba(255, 255, 255, 0.2) !important;
 	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35) !important;
-	color: #ffffff !important;
+}
+
+.form :global(.bf-button:hover .bf-button-bg),
+.form :global(.bf-button:focus .bf-button-bg),
+.form :global(.bf-button:active .bf-button-bg) {
+	background: rgba(255, 255, 255, 0.22) !important;
 }
 
 .inputField {

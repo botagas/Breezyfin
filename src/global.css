@@ -35,6 +35,11 @@
 	max-width: none !important;
 }
 
+.bf-button-bg {
+	box-shadow: none !important;
+	background: transparent !important;
+}
+
 /* Shared toast styling across panels */
 .toast,
 .playerToast,
