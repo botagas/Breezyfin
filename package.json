@@ -7,7 +7,7 @@
 	"scripts": {
 		"serve": "enact serve",
 		"pack": "enact pack",
-		"pack-p": "enact pack -p",
+		"pack-p": "enact pack -p --content-hash",
 		"watch": "enact pack --watch",
 		"clean": "enact clean",
 		"lint": "enact lint .",

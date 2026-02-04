@@ -36,7 +36,9 @@ jobs:
         run: CI=true npm run test -- --watch=false --passWithNoTests
 
       - name: Build production bundle
-        run: npm run pack-p
+        run: |
+          npm run clean
+          npm run pack-p
 
       - name: Prepare release metadata
         id: metadata

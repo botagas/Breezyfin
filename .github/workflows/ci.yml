@@ -37,7 +37,9 @@ jobs:
         run: CI=true npm run test -- --watch=false --passWithNoTests
 
       - name: Build production bundle
-        run: npm run pack-p
+        run: |
+          npm run clean
+          npm run pack-p
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
