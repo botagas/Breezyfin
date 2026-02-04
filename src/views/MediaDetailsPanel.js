@@ -38,7 +38,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const seasonScrollerRef = useRef(null);
 	const episodesListRef = useRef(null);
 	const episodeSelectorButtonRef = useRef(null);
-	const detailsScrollerRef = useRef(null);
+	const detailsContainerRef = useRef(null);
 	const detailsScrollToRef = useRef(null);
 	const favoriteActionButtonRef = useRef(null);
 	const watchedActionButtonRef = useRef(null);
@@ -422,10 +422,11 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	};
 
 	const getDetailsScrollElement = useCallback(() => {
-		const scrollerNode = detailsScrollerRef.current?.nodeRef?.current || detailsScrollerRef.current;
-		if (!scrollerNode) return null;
-		if (typeof scrollerNode.scrollTop === 'number') return scrollerNode;
-		return scrollerNode.querySelector?.('[id$="_content"]') || scrollerNode.querySelector?.('[data-webos-voice-intent="Scroll"]');
+		const container = detailsContainerRef.current;
+		if (!container) return null;
+		const contentNode = container.closest?.('[id$="_content"]');
+		if (contentNode && typeof contentNode.scrollTop === 'number') return contentNode;
+		return container.closest?.('[data-webos-voice-intent="Scroll"]') || null;
 	}, []);
 
 	const alignElementBelowPanelHeader = useCallback((element, behavior = 'smooth') => {
@@ -809,10 +810,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			)}
 				<Scroller
 					className={css.scroller}
-					componentRef={detailsScrollerRef}
 					cbScrollTo={captureDetailsScrollTo}
 				>
-				<div className={css.detailsContainer}>
+				<div className={css.detailsContainer} ref={detailsContainerRef}>
 					{loading ? (
 						<div className={css.loading}>
 							<Spinner />

@@ -1,7 +1,9 @@
 /* Global styles to override Enact defaults */
 
-/* Remove Enact Panels default horizontal padding - using multiple selectors for maximum specificity */
-div[class*="Panels_Panel"] section[class*="Panel_body"] {
+/* Remove Enact Panels default horizontal padding.
+ * Keep the selector tag-agnostic because Panel root/body tags vary across Enact versions.
+ */
+[class*="Panels_Panel"] [class*="Panel_body"] {
 	padding-left: 0 !important;
 	padding-right: 0 !important;
 }
