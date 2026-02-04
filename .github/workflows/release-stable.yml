@@ -1,0 +1,165 @@
+name: Release Stable
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and overwrite assets for current appinfo.json version.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      release_needed: ${{ steps.guard.outputs.release_needed }}
+      version: ${{ steps.metadata.outputs.version }}
+      app_id: ${{ steps.metadata.outputs.app_id }}
+      description: ${{ steps.metadata.outputs.description }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: metadata
+        run: |
+          python3 scripts/release/collect_metadata.py \
+            --appinfo appinfo.json \
+            --package-json package.json \
+            > /tmp/release-metadata.txt
+
+          cat /tmp/release-metadata.txt >> "$GITHUB_OUTPUT"
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Determine whether to publish
+        id: guard
+        env:
+          FORCE_RELEASE: ${{ github.event.inputs.force || 'false' }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+
+          if [ "${FORCE_RELEASE}" = "true" ]; then
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+            echo "Forcing release for ${TAG}."
+            exit 0
+          fi
+
+          if git tag -l "${TAG}" | grep -qx "${TAG}"; then
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} already exists; skipping stable release."
+          else
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: decide
+    if: needs.decide.outputs.release_needed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests (if present)
+        run: |
+          if command -v rg >/dev/null 2>&1; then
+            TEST_FILE="$(rg --files -g '*.{test,spec}.{js,jsx,ts,tsx}' . | head -n 1 || true)"
+          else
+            TEST_FILE="$(find . -type f \( -name '*.test.js' -o -name '*.test.jsx' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) | head -n 1 || true)"
+          fi
+
+          if [ -n "${TEST_FILE}" ]; then
+            CI=true npm run test -- --watch=false
+          else
+            echo "No test files found; skipping test step."
+          fi
+
+      - name: Build production bundle
+        run: npm run pack-p
+
+      - name: Prepare bundle metadata
+        run: |
+          mkdir -p dist
+
+          if [ ! -f dist/appinfo.json ]; then
+            cp appinfo.json dist/appinfo.json
+          fi
+
+          if [ -f icon.png ] && [ ! -f dist/icon.png ]; then
+            cp icon.png dist/icon.png
+          fi
+
+      - name: Install webOS CLI
+        run: npm install --global @webos-tools/cli
+
+      - name: Build IPK
+        id: package
+        run: |
+          rm -rf build release
+          mkdir -p build release
+
+          ares-config --profile tv
+          ares-package dist --outdir build
+
+          IPK_PATH="$(find build -maxdepth 1 -name '*.ipk' | head -n 1)"
+          if [ -z "${IPK_PATH}" ]; then
+            echo "No IPK was generated."
+            exit 1
+          fi
+
+          echo "ipk_path=${IPK_PATH}" >> "$GITHUB_OUTPUT"
+          echo "ipk_name=$(basename "${IPK_PATH}")" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifest
+        id: manifest
+        run: |
+          MANIFEST_PATH="release/${{ needs.decide.outputs.app_id }}.manifest.json"
+          python3 scripts/release/generate_manifest.py \
+            --appinfo dist/appinfo.json \
+            --ipk "${{ steps.package.outputs.ipk_path }}" \
+            --output "${MANIFEST_PATH}" \
+            --ipk-url "${{ steps.package.outputs.ipk_name }}" \
+            --icon-uri "https://raw.githubusercontent.com/${{ github.repository }}/main/icon.png" \
+            --source-url "https://github.com/${{ github.repository }}" \
+            --app-description "${{ needs.decide.outputs.description }}" \
+            --root-required false
+
+          echo "manifest_path=${MANIFEST_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish stable release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.decide.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Breezyfin v${{ needs.decide.outputs.version }}
+          body: |
+            Automated stable release from `main`.
+            Commit: `${{ github.sha }}`
+          prerelease: false
+          make_latest: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.package.outputs.ipk_path }}
+            ${{ steps.manifest.outputs.manifest_path }}

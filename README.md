@@ -48,6 +48,15 @@ npm run pack-p
 ```
 Output will be in the `dist/` folder.
 
+## Release automation
+
+This repository supports automated prerelease/stable publishing for webOS Homebrew distribution:
+
+- `develop` branch -> prerelease assets under tag `develop`
+- `main` branch -> stable release under tag `v<appinfo.json version>`
+
+See `docs/homebrew-release-flow.md` for the full branch/release/version workflow.
+
 ## Contributing
 
 Pull requests and issues are welcome! Please follow the code style and add tests for new features. See the [components/README.md](src/components/README.md) for reusable UI guidelines.

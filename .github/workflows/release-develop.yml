@@ -1,0 +1,123 @@
+name: Release Develop
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prerelease:
+    if: github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests (if present)
+        run: |
+          if command -v rg >/dev/null 2>&1; then
+            TEST_FILE="$(rg --files -g '*.{test,spec}.{js,jsx,ts,tsx}' . | head -n 1 || true)"
+          else
+            TEST_FILE="$(find . -type f \( -name '*.test.js' -o -name '*.test.jsx' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) | head -n 1 || true)"
+          fi
+
+          if [ -n "${TEST_FILE}" ]; then
+            CI=true npm run test -- --watch=false
+          else
+            echo "No test files found; skipping test step."
+          fi
+
+      - name: Build production bundle
+        run: npm run pack-p
+
+      - name: Prepare release metadata
+        id: metadata
+        run: |
+          mkdir -p dist
+
+          if [ ! -f dist/appinfo.json ]; then
+            cp appinfo.json dist/appinfo.json
+          fi
+
+          if [ -f icon.png ] && [ ! -f dist/icon.png ]; then
+            cp icon.png dist/icon.png
+          fi
+
+          python3 scripts/release/collect_metadata.py \
+            --appinfo dist/appinfo.json \
+            --package-json package.json \
+            --append-version-suffix "${GITHUB_RUN_NUMBER}" \
+            > /tmp/release-metadata.txt
+
+          cat /tmp/release-metadata.txt >> "$GITHUB_OUTPUT"
+
+      - name: Install webOS CLI
+        run: npm install --global @webos-tools/cli
+
+      - name: Build IPK
+        id: package
+        run: |
+          rm -rf build release
+          mkdir -p build release
+
+          ares-config --profile tv
+          ares-package dist --outdir build
+
+          IPK_PATH="$(find build -maxdepth 1 -name '*.ipk' | head -n 1)"
+          if [ -z "${IPK_PATH}" ]; then
+            echo "No IPK was generated."
+            exit 1
+          fi
+
+          echo "ipk_path=${IPK_PATH}" >> "$GITHUB_OUTPUT"
+          echo "ipk_name=$(basename "${IPK_PATH}")" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifest
+        id: manifest
+        run: |
+          MANIFEST_PATH="release/${{ steps.metadata.outputs.app_id }}.manifest.json"
+          python3 scripts/release/generate_manifest.py \
+            --appinfo dist/appinfo.json \
+            --ipk "${{ steps.package.outputs.ipk_path }}" \
+            --output "${MANIFEST_PATH}" \
+            --ipk-url "${{ steps.package.outputs.ipk_name }}" \
+            --icon-uri "https://raw.githubusercontent.com/${{ github.repository }}/develop/icon.png" \
+            --source-url "https://github.com/${{ github.repository }}" \
+            --app-description "${{ steps.metadata.outputs.description }}" \
+            --root-required false
+
+          echo "manifest_path=${MANIFEST_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish prerelease assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: develop
+          target_commitish: ${{ github.sha }}
+          name: Breezyfin Develop
+          body: |
+            Automated prerelease from `develop`.
+            Commit: `${{ github.sha }}`
+            Version: `${{ steps.metadata.outputs.version }}`
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.package.outputs.ipk_path }}
+            ${{ steps.manifest.outputs.manifest_path }}
