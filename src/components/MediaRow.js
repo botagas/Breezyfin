@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
-import Scroller from '@enact/sandstone/Scroller';
 import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
@@ -12,6 +11,25 @@ const SpottableDiv = Spottable('div');
 
 const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) => {
 	const [imageError, setImageError] = useState(false);
+
+	const handleCardClick = useCallback(() => {
+		onClick(item);
+	}, [item, onClick]);
+
+	const handleCardKeyDown = useCallback((e) => {
+		// Ensure left/right navigation moves focus predictably across cards
+		if (e.keyCode === 37 && e.target.previousElementSibling) { // left
+			e.preventDefault();
+			e.target.previousElementSibling.focus();
+		} else if (e.keyCode === 39 && e.target.nextElementSibling) { // right
+			e.preventDefault();
+			e.target.nextElementSibling.focus();
+		}
+	}, []);
+
+	const handleImageError = useCallback(() => {
+		setImageError(true);
+	}, []);
 
 	// Format title: for episodes show "Series Name" and "S1:E2" below
 	const getDisplayTitle = () => {
@@ -73,29 +91,20 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 		return imageUrl;
 	};
 
-	return (
-		<SpottableDiv
-			className={css.card}
-			onClick={() => onClick(item)}
-			onKeyDown={(e) => {
-				// Ensure left/right navigation moves focus predictably across cards
-				if (e.keyCode === 37 && e.target.previousElementSibling) { // left
-					e.preventDefault();
-					e.target.previousElementSibling.focus();
-				} else if (e.keyCode === 39 && e.target.nextElementSibling) { // right
-					e.preventDefault();
-					e.target.nextElementSibling.focus();
-				}
-			}}
-			{...rest}
-		>
+		return (
+			<SpottableDiv
+				className={css.card}
+				onClick={handleCardClick}
+				onKeyDown={handleCardKeyDown}
+				{...rest}
+			>
 			<div className={css.cardImage}>
-				{!imageError ? (
-					<img
-						src={getImageUrl()}
-						alt={item.Name}
-						onError={() => setImageError(true)}
-					/>
+					{!imageError ? (
+						<img
+							src={getImageUrl()}
+							alt={item.Name}
+							onError={handleImageError}
+						/>
 				) : (
 					<div className={css.placeholder}>
 						<BodyText>{getDisplayTitle()}</BodyText>
@@ -172,7 +181,7 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 	return (
 		<div className={css.row} {...rest}>
 			<BodyText className={css.rowTitle}>{title}</BodyText>
-			<Container 
+			<Container
 				className={css.rowContent}
 				onFocus={handleFocus}
 			>

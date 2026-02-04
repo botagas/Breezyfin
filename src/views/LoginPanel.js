@@ -22,6 +22,14 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 	const [step, setStep] = useState('server'); // 'server' or 'login'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
+	const savedServersByKey = useMemo(() => {
+		const map = new Map();
+		savedServers.forEach((entry) => {
+			const key = `${entry.serverId}:${entry.userId}`;
+			map.set(key, entry);
+		});
+		return map;
+	}, [savedServers]);
 
 	const refreshSavedServers = useCallback(() => {
 		try {
@@ -45,12 +53,12 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 	);
 	const serverUrlValid = /^https?:\/\//i.test(normalizedServerUrl);
 
-	const resetMessages = () => {
+	const resetMessages = useCallback(() => {
 		setError(null);
 		setStatus('');
-	};
+	}, []);
 
-	const handleConnect = async () => {
+	const handleConnect = useCallback(async () => {
 		if (!serverUrlValid) {
 			setError('Enter a valid http(s) server URL.');
 			return;
@@ -71,9 +79,9 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [normalizedServerUrl, serverUrlValid]);
 
-	const handleLogin = async () => {
+	const handleLogin = useCallback(async () => {
 		if (!username || !password) {
 			setError('Username and password are required.');
 			return;
@@ -93,14 +101,14 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 			setLoading(false);
 			refreshSavedServers();
 		}
-	};
+	}, [onLogin, password, refreshSavedServers, username]);
 
-	const handleBack = () => {
+	const handleBack = useCallback(() => {
 		setStep('server');
 		resetMessages();
-	};
+	}, [resetMessages]);
 
-	const handleResume = async (entry) => {
+	const handleResume = useCallback(async (entry) => {
 		if (!entry) return;
 		const key = `${entry.serverId}:${entry.userId}`;
 		setResumingKey(key);
@@ -125,7 +133,44 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 			setStatus('');
 			refreshSavedServers();
 		}
-	};
+	}, [onLogin, refreshSavedServers]);
+
+	const handleResumeClick = useCallback((event) => {
+		const key = event.currentTarget.dataset.resumeKey;
+		const entry = savedServersByKey.get(key);
+		if (!entry) return;
+		handleResume(entry);
+	}, [handleResume, savedServersByKey]);
+
+	const handleServerUrlChange = useCallback((event) => {
+		setServerUrl(event.value);
+	}, []);
+
+	const handleServerUrlKeyDown = useCallback((event) => {
+		if (event.key === 'Enter') {
+			handleConnect();
+		}
+	}, [handleConnect]);
+
+	const handleUsernameChange = useCallback((event) => {
+		setUsername(event.value);
+	}, []);
+
+	const handleUsernameKeyDown = useCallback((event) => {
+		if (event.key === 'Enter') {
+			handleLogin();
+		}
+	}, [handleLogin]);
+
+	const handlePasswordChange = useCallback((event) => {
+		setPassword(event.value);
+	}, []);
+
+	const handlePasswordKeyDown = useCallback((event) => {
+		if (event.key === 'Enter') {
+			handleLogin();
+		}
+	}, [handleLogin]);
 
 	return (
 		<Panel {...rest} noCloseButton>
@@ -149,11 +194,12 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 									{savedServers.map((entry) => {
 										const key = `${entry.serverId}:${entry.userId}`;
 										return (
-											<Item
-												key={key}
-												className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
-												onClick={() => handleResume(entry)}
-											>
+												<Item
+													key={key}
+													data-resume-key={key}
+													className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
+													onClick={handleResumeClick}
+												>
 												<div className={css.savedMain}>
 													<div className={css.savedTitle}>{entry.serverName || 'Jellyfin Server'}</div>
 													<div className={css.savedMeta}>{entry.username} • {entry.url}</div>
@@ -183,15 +229,15 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 
 						{step === 'server' ? (
 							<div className={css.form}>
-									<Input
-										type="url"
-										placeholder="http://192.168.1.100:8096"
-										value={serverUrl}
-										onChange={(e) => setServerUrl(e.value)}
-										onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
-										disabled={loading}
-										invalid={!serverUrlValid}
-										className={css.inputField}
+										<Input
+											type="url"
+											placeholder="http://192.168.1.100:8096"
+											value={serverUrl}
+											onChange={handleServerUrlChange}
+											onKeyDown={handleServerUrlKeyDown}
+											disabled={loading}
+											invalid={!serverUrlValid}
+											className={css.inputField}
 									/>
 								<Button
 									onClick={handleConnect}
@@ -204,22 +250,22 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 						) : (
 							<div className={css.form}>
 								<BodyText className={css.serverInfo}>Server: {serverUrl}</BodyText>
+									<Input
+										placeholder="Username"
+										value={username}
+										onChange={handleUsernameChange}
+										disabled={loading}
+										onKeyDown={handleUsernameKeyDown}
+										className={css.inputField}
+									/>
 								<Input
-									placeholder="Username"
-									value={username}
-									onChange={(e) => setUsername(e.value)}
-									disabled={loading}
-									onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-									className={css.inputField}
-								/>
-								<Input
-									type="password"
-									placeholder="Password"
-									value={password}
-									onChange={(e) => setPassword(e.value)}
-									onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-									disabled={loading}
-									className={css.inputField}
+										type="password"
+										placeholder="Password"
+										value={password}
+										onChange={handlePasswordChange}
+										onKeyDown={handlePasswordKeyDown}
+										disabled={loading}
+										className={css.inputField}
 								/>
 								<div className={css.buttonRow}>
 									<Button onClick={handleBack} disabled={loading} size="large">

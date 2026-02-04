@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel, Header } from '@enact/sandstone/Panels';
 import Button from '@enact/sandstone/Button';
 import Scroller from '@enact/sandstone/Scroller';
@@ -9,7 +9,7 @@ import SwitchItem from '@enact/sandstone/SwitchItem';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
-import {KeyCodes, isBackKey} from '../utils/keyCodes';
+import {isBackKey} from '../utils/keyCodes';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 
@@ -86,26 +86,15 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 	const [switchingServerId, setSwitchingServerId] = useState(null);
 	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
 	const [appLogs, setAppLogs] = useState([]);
-
-	useEffect(() => {
-		loadSettings();
-		loadServerInfo();
-		refreshSavedServers();
-	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-		loadAppVersion().then((resolvedVersion) => {
-			if (!cancelled && resolvedVersion) {
-				setAppVersion(resolvedVersion);
-			}
+	const savedServersByKey = useMemo(() => {
+		const map = new Map();
+		savedServers.forEach((entry) => {
+			map.set(`${entry.serverId}:${entry.userId}`, entry);
 		});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
+		return map;
+	}, [savedServers]);
 
-	const loadSettings = () => {
+	const loadSettings = useCallback(() => {
 		try {
 			const stored = localStorage.getItem('breezyfinSettings');
 			if (stored) {
@@ -130,18 +119,9 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		} catch (error) {
 			console.error('Failed to load settings:', error);
 		}
-	};
+	}, []);
 
-	const saveSettings = (newSettings) => {
-		try {
-			localStorage.setItem('breezyfinSettings', JSON.stringify(newSettings));
-			setSettings(newSettings);
-		} catch (error) {
-			console.error('Failed to save settings:', error);
-		}
-	};
-
-	const loadServerInfo = async () => {
+	const loadServerInfo = useCallback(async () => {
 		setLoading(true);
 		try {
 			const [server, user] = await Promise.all([
@@ -155,33 +135,81 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, []);
 
-	const handleSettingChange = (key, value) => {
-		const newSettings = { ...settings, [key]: value };
-		saveSettings(newSettings);
-	};
+	const refreshSavedServers = useCallback(() => {
+		try {
+			setSavedServers(jellyfinService.getSavedServers() || []);
+		} catch (err) {
+			console.error('Failed to fetch saved servers:', err);
+		}
+	}, []);
 
-	const handleHomeRowToggle = (rowKey) => {
-		const updated = {
-			...settings,
-			homeRows: {
-				...settings.homeRows,
-				[rowKey]: !settings.homeRows?.[rowKey]
+	useEffect(() => {
+		loadSettings();
+		loadServerInfo();
+		refreshSavedServers();
+	}, [loadServerInfo, loadSettings, refreshSavedServers]);
+
+	useEffect(() => {
+		let cancelled = false;
+		loadAppVersion().then((resolvedVersion) => {
+			if (!cancelled && resolvedVersion) {
+				setAppVersion(resolvedVersion);
 			}
+		});
+		return () => {
+			cancelled = true;
 		};
-		saveSettings(updated);
-	};
+	}, []);
 
-	const handleHomeRowReorder = (rowKey, direction) => {
-		const order = Array.isArray(settings.homeRowOrder) ? [...settings.homeRowOrder] : [...HOME_ROW_ORDER];
-		const index = order.indexOf(rowKey);
-		if (index === -1) return;
-		const swapIndex = direction === 'up' ? index - 1 : index + 1;
-		if (swapIndex < 0 || swapIndex >= order.length) return;
-		[order[index], order[swapIndex]] = [order[swapIndex], order[index]];
-		saveSettings({ ...settings, homeRowOrder: order });
-	};
+	const handleSettingChange = useCallback((key, value) => {
+		setSettings((prevSettings) => {
+			const newSettings = { ...prevSettings, [key]: value };
+			try {
+				localStorage.setItem('breezyfinSettings', JSON.stringify(newSettings));
+			} catch (error) {
+				console.error('Failed to save settings:', error);
+			}
+			return newSettings;
+		});
+	}, []);
+
+	const handleHomeRowToggle = useCallback((rowKey) => {
+		setSettings((prevSettings) => {
+			const updated = {
+				...prevSettings,
+				homeRows: {
+					...prevSettings.homeRows,
+					[rowKey]: !prevSettings.homeRows?.[rowKey]
+				}
+			};
+			try {
+				localStorage.setItem('breezyfinSettings', JSON.stringify(updated));
+			} catch (error) {
+				console.error('Failed to save settings:', error);
+			}
+			return updated;
+		});
+	}, []);
+
+	const handleHomeRowReorder = useCallback((rowKey, direction) => {
+		setSettings((prevSettings) => {
+			const order = Array.isArray(prevSettings.homeRowOrder) ? [...prevSettings.homeRowOrder] : [...HOME_ROW_ORDER];
+			const index = order.indexOf(rowKey);
+			if (index === -1) return prevSettings;
+			const swapIndex = direction === 'up' ? index - 1 : index + 1;
+			if (swapIndex < 0 || swapIndex >= order.length) return prevSettings;
+			[order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+			const updated = { ...prevSettings, homeRowOrder: order };
+			try {
+				localStorage.setItem('breezyfinSettings', JSON.stringify(updated));
+			} catch (error) {
+				console.error('Failed to save settings:', error);
+			}
+			return updated;
+		});
+	}, []);
 
 	const getHomeRowLabel = (rowKey) => {
 		switch (rowKey) {
@@ -202,15 +230,7 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		}
 	};
 
-	const refreshSavedServers = () => {
-		try {
-			setSavedServers(jellyfinService.getSavedServers() || []);
-		} catch (err) {
-			console.error('Failed to fetch saved servers:', err);
-		}
-	};
-
-	const handleSwitchServer = async (entry) => {
+	const handleSwitchServer = useCallback(async (entry) => {
 		if (!entry) return;
 		setSwitchingServerId(entry.serverId + ':' + entry.userId);
 		try {
@@ -222,28 +242,183 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 			setSwitchingServerId(null);
 			refreshSavedServers();
 		}
-	};
+	}, [loadServerInfo, refreshSavedServers]);
 
-	const handleForgetServer = (entry) => {
+	const handleForgetServer = useCallback((entry) => {
 		if (!entry) return;
 		jellyfinService.forgetServer(entry.serverId, entry.userId);
 		refreshSavedServers();
-	};
+	}, [refreshSavedServers]);
 
-	const handleLogoutConfirm = () => {
+	const handleLogoutConfirm = useCallback(() => {
 		setLogoutConfirmOpen(false);
 		onLogout();
-	};
+	}, [onLogout]);
 
-	const openLogsPopup = () => {
+	const openLogsPopup = useCallback(() => {
 		setAppLogs(getAppLogs().slice().reverse());
 		setLogsPopupOpen(true);
-	};
+	}, []);
 
-	const handleClearLogs = () => {
+	const handleClearLogs = useCallback(() => {
 		clearAppLogs();
 		setAppLogs([]);
-	};
+	}, []);
+
+	const toggleHomeRowRecentlyAdded = useCallback(() => {
+		handleHomeRowToggle('recentlyAdded');
+	}, [handleHomeRowToggle]);
+
+	const toggleHomeRowContinueWatching = useCallback(() => {
+		handleHomeRowToggle('continueWatching');
+	}, [handleHomeRowToggle]);
+
+	const toggleHomeRowNextUp = useCallback(() => {
+		handleHomeRowToggle('nextUp');
+	}, [handleHomeRowToggle]);
+
+	const toggleHomeRowLatestMovies = useCallback(() => {
+		handleHomeRowToggle('latestMovies');
+	}, [handleHomeRowToggle]);
+
+	const toggleHomeRowLatestShows = useCallback(() => {
+		handleHomeRowToggle('latestShows');
+	}, [handleHomeRowToggle]);
+
+	const toggleHomeRowMyRequests = useCallback(() => {
+		handleHomeRowToggle('myRequests');
+	}, [handleHomeRowToggle]);
+
+	const moveHomeRowUp = useCallback((event) => {
+		const rowKey = event.currentTarget.dataset.rowKey;
+		if (!rowKey) return;
+		handleHomeRowReorder(rowKey, 'up');
+	}, [handleHomeRowReorder]);
+
+	const moveHomeRowDown = useCallback((event) => {
+		const rowKey = event.currentTarget.dataset.rowKey;
+		if (!rowKey) return;
+		handleHomeRowReorder(rowKey, 'down');
+	}, [handleHomeRowReorder]);
+
+	const handleSwitchServerClick = useCallback((event) => {
+		const serverKey = event.currentTarget.dataset.serverKey;
+		const entry = savedServersByKey.get(serverKey);
+		if (!entry) return;
+		handleSwitchServer(entry);
+	}, [handleSwitchServer, savedServersByKey]);
+
+	const handleForgetServerClick = useCallback((event) => {
+		const serverKey = event.currentTarget.dataset.serverKey;
+		const entry = savedServersByKey.get(serverKey);
+		if (!entry) return;
+		handleForgetServer(entry);
+	}, [handleForgetServer, savedServersByKey]);
+
+	const openLogoutConfirm = useCallback(() => {
+		setLogoutConfirmOpen(true);
+	}, []);
+
+	const closeLogoutConfirm = useCallback(() => {
+		setLogoutConfirmOpen(false);
+	}, []);
+
+	const openBitratePopup = useCallback(() => {
+		setBitratePopupOpen(true);
+	}, []);
+
+	const closeBitratePopup = useCallback(() => {
+		setBitratePopupOpen(false);
+	}, []);
+
+	const openAudioLangPopup = useCallback(() => {
+		setAudioLangPopupOpen(true);
+	}, []);
+
+	const closeAudioLangPopup = useCallback(() => {
+		setAudioLangPopupOpen(false);
+	}, []);
+
+	const openSubtitleLangPopup = useCallback(() => {
+		setSubtitleLangPopupOpen(true);
+	}, []);
+
+	const closeSubtitleLangPopup = useCallback(() => {
+		setSubtitleLangPopupOpen(false);
+	}, []);
+
+	const closePlayNextPromptModePopup = useCallback(() => {
+		setPlayNextPromptModePopupOpen(false);
+	}, []);
+
+	const closeLogsPopup = useCallback(() => {
+		setLogsPopupOpen(false);
+	}, []);
+
+	const toggleEnableTranscoding = useCallback(() => {
+		handleSettingChange('enableTranscoding', !settings.enableTranscoding);
+	}, [handleSettingChange, settings.enableTranscoding]);
+
+	const toggleAutoPlayNext = useCallback(() => {
+		handleSettingChange('autoPlayNext', !settings.autoPlayNext);
+	}, [handleSettingChange, settings.autoPlayNext]);
+
+	const toggleShowPlayNextPrompt = useCallback(() => {
+		handleSettingChange('showPlayNextPrompt', !settings.showPlayNextPrompt);
+	}, [handleSettingChange, settings.showPlayNextPrompt]);
+
+	const openPlayNextPromptModePopup = useCallback(() => {
+		if (settings.showPlayNextPrompt !== false) {
+			setPlayNextPromptModePopupOpen(true);
+		}
+	}, [settings.showPlayNextPrompt]);
+
+	const toggleSkipIntro = useCallback(() => {
+		handleSettingChange('skipIntro', !settings.skipIntro);
+	}, [handleSettingChange, settings.skipIntro]);
+
+	const toggleForceTranscoding = useCallback(() => {
+		handleSettingChange('forceTranscoding', !settings.forceTranscoding);
+	}, [handleSettingChange, settings.forceTranscoding]);
+
+	const toggleForceTranscodingWithSubtitles = useCallback(() => {
+		handleSettingChange('forceTranscodingWithSubtitles', !settings.forceTranscodingWithSubtitles);
+	}, [handleSettingChange, settings.forceTranscodingWithSubtitles]);
+
+	const toggleShowBackdrops = useCallback(() => {
+		handleSettingChange('showBackdrops', !settings.showBackdrops);
+	}, [handleSettingChange, settings.showBackdrops]);
+
+	const handleBitrateSelect = useCallback((event) => {
+		const bitrate = event.currentTarget.dataset.bitrate;
+		if (!bitrate) return;
+		handleSettingChange('maxBitrate', bitrate);
+		setBitratePopupOpen(false);
+	}, [handleSettingChange]);
+
+	const handleAudioLanguageSelect = useCallback((event) => {
+		const language = event.currentTarget.dataset.language;
+		if (!language) return;
+		handleSettingChange('preferredAudioLanguage', language);
+		setAudioLangPopupOpen(false);
+	}, [handleSettingChange]);
+
+	const handleSubtitleLanguageSelect = useCallback((event) => {
+		const language = event.currentTarget.dataset.language;
+		if (!language) return;
+		handleSettingChange('preferredSubtitleLanguage', language);
+		setSubtitleLangPopupOpen(false);
+	}, [handleSettingChange]);
+
+	const setSegmentsOnlyPromptMode = useCallback(() => {
+		handleSettingChange('playNextPromptMode', 'segmentsOnly');
+		setPlayNextPromptModePopupOpen(false);
+	}, [handleSettingChange]);
+
+	const setSegmentsOrLast60PromptMode = useCallback(() => {
+		handleSettingChange('playNextPromptMode', 'segmentsOrLast60');
+		setPlayNextPromptModePopupOpen(false);
+	}, [handleSettingChange]);
 
 	const getBitrateLabel = (value) => {
 		const option = BITRATE_OPTIONS.find(o => o.value === value);
@@ -320,19 +495,21 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 											<div className={css.serverMeta}>{entry.username} - {entry.url}</div>
 										</div>
 										<div className={css.serverCardActions}>
-											<Button
-												size="small"
-												minWidth={false}
-												onClick={() => handleSwitchServer(entry)}
-												selected={switchingServerId === key}
-											>
+												<Button
+													size="small"
+													minWidth={false}
+													data-server-key={key}
+													onClick={handleSwitchServerClick}
+													selected={switchingServerId === key}
+												>
 												{entry.isActive ? 'Active' : switchingServerId === key ? 'Switching...' : 'Switch'}
 											</Button>
-											<Button
-												size="small"
-												minWidth={false}
-												onClick={() => handleForgetServer(entry)}
-											>
+												<Button
+													size="small"
+													minWidth={false}
+													data-server-key={key}
+													onClick={handleForgetServerClick}
+												>
 												Forget
 											</Button>
 										</div>
@@ -344,46 +521,46 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Home Rows</BodyText>
-						<SwitchItem
-							className={css.switchItem}
-							selected={settings.homeRows?.recentlyAdded !== false}
-							onToggle={() => handleHomeRowToggle('recentlyAdded')}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								selected={settings.homeRows?.recentlyAdded !== false}
+								onToggle={toggleHomeRowRecentlyAdded}
+							>
 							Recently Added
 						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							selected={settings.homeRows?.continueWatching !== false}
-							onToggle={() => handleHomeRowToggle('continueWatching')}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								selected={settings.homeRows?.continueWatching !== false}
+								onToggle={toggleHomeRowContinueWatching}
+							>
 							Continue Watching
 						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							selected={settings.homeRows?.nextUp !== false}
-							onToggle={() => handleHomeRowToggle('nextUp')}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								selected={settings.homeRows?.nextUp !== false}
+								onToggle={toggleHomeRowNextUp}
+							>
 							Next Up
 						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							selected={settings.homeRows?.latestMovies !== false}
-							onToggle={() => handleHomeRowToggle('latestMovies')}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								selected={settings.homeRows?.latestMovies !== false}
+								onToggle={toggleHomeRowLatestMovies}
+							>
 							Latest Movies
 						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							selected={settings.homeRows?.latestShows !== false}
-							onToggle={() => handleHomeRowToggle('latestShows')}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								selected={settings.homeRows?.latestShows !== false}
+								onToggle={toggleHomeRowLatestShows}
+							>
 							Latest TV Shows
 						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							selected={settings.homeRows?.myRequests !== false}
-							onToggle={() => handleHomeRowToggle('myRequests')}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								selected={settings.homeRows?.myRequests !== false}
+								onToggle={toggleHomeRowMyRequests}
+							>
 							My Requests
 						</SwitchItem>
 						<div className={css.rowOrderHeader}>Row Order</div>
@@ -392,20 +569,22 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 								<div key={rowKey} className={css.rowOrderItem}>
 									<BodyText className={css.rowOrderLabel}>{getHomeRowLabel(rowKey)}</BodyText>
 									<div className={css.rowOrderActions}>
-										<Button
-											size="small"
-											minWidth={false}
-											disabled={index === 0}
-											onClick={() => handleHomeRowReorder(rowKey, 'up')}
-										>
+											<Button
+												size="small"
+												minWidth={false}
+												disabled={index === 0}
+												data-row-key={rowKey}
+												onClick={moveHomeRowUp}
+											>
 											Up
 										</Button>
-										<Button
-											size="small"
-											minWidth={false}
-											disabled={index === list.length - 1}
-											onClick={() => handleHomeRowReorder(rowKey, 'down')}
-										>
+											<Button
+												size="small"
+												minWidth={false}
+												disabled={index === list.length - 1}
+												data-row-key={rowKey}
+												onClick={moveHomeRowDown}
+											>
 											Down
 										</Button>
 									</div>
@@ -424,11 +603,11 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 							<>
 								<Item className={css.infoItem} label="Username" slotAfter={userInfo?.Name || 'Unknown'} />
 								<Item className={css.infoItem} label="User ID" slotAfter={userInfo?.Id?.substring(0, 8) + '...' || 'Unknown'} />
-								<Button
-									className={css.logoutButton}
-									onClick={() => setLogoutConfirmOpen(true)}
-									icon="closex"
-								>
+									<Button
+										className={css.logoutButton}
+										onClick={openLogoutConfirm}
+										icon="closex"
+									>
 									Sign Out
 								</Button>
 							</>
@@ -437,104 +616,100 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Playback</BodyText>
-						
-						<Item
-							className={css.settingItem}
-							label="Maximum Bitrate"
-							slotAfter={getBitrateLabel(settings.maxBitrate)}
-							onClick={() => setBitratePopupOpen(true)}
-						/>
-						
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('enableTranscoding', !settings.enableTranscoding)}
-							selected={settings.enableTranscoding}
-						>
+
+							<Item
+								className={css.settingItem}
+								label="Maximum Bitrate"
+								slotAfter={getBitrateLabel(settings.maxBitrate)}
+								onClick={openBitratePopup}
+							/>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleEnableTranscoding}
+								selected={settings.enableTranscoding}
+							>
 							Enable Transcoding
 						</SwitchItem>
-						
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('autoPlayNext', !settings.autoPlayNext)}
-							selected={settings.autoPlayNext}
-						>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleAutoPlayNext}
+								selected={settings.autoPlayNext}
+							>
 							Auto-play Next Episode
 						</SwitchItem>
 
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('showPlayNextPrompt', !settings.showPlayNextPrompt)}
-							selected={settings.showPlayNextPrompt !== false}
-						>
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowPlayNextPrompt}
+								selected={settings.showPlayNextPrompt !== false}
+							>
 							Show Play Next Prompt
 						</SwitchItem>
 
-						<Item
-							className={css.settingItem}
-							label="Play Next Prompt Mode"
-							slotAfter={getPlayNextPromptModeLabel(settings.playNextPromptMode)}
-							onClick={() => {
-								if (settings.showPlayNextPrompt !== false) {
-									setPlayNextPromptModePopupOpen(true);
-								}
-							}}
-						/>
-						
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('skipIntro', !settings.skipIntro)}
-							selected={settings.skipIntro}
-						>
+							<Item
+								className={css.settingItem}
+								label="Play Next Prompt Mode"
+								slotAfter={getPlayNextPromptModeLabel(settings.playNextPromptMode)}
+								onClick={openPlayNextPromptModePopup}
+							/>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleSkipIntro}
+								selected={settings.skipIntro}
+							>
 							Show Skip Intro/Recap Prompt
 						</SwitchItem>
 					</section>
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Language Preferences</BodyText>
-						
-						<Item
-							className={css.settingItem}
-							label="Preferred Audio Language"
-							slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
-							onClick={() => setAudioLangPopupOpen(true)}
-						/>
-						
-						<Item
-							className={css.settingItem}
-							label="Preferred Subtitle Language"
-							slotAfter={getLanguageLabel(settings.preferredSubtitleLanguage)}
-							onClick={() => setSubtitleLangPopupOpen(true)}
-						/>
+
+							<Item
+								className={css.settingItem}
+								label="Preferred Audio Language"
+								slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
+								onClick={openAudioLangPopup}
+							/>
+
+							<Item
+								className={css.settingItem}
+								label="Preferred Subtitle Language"
+								slotAfter={getLanguageLabel(settings.preferredSubtitleLanguage)}
+								onClick={openSubtitleLangPopup}
+							/>
 					</section>
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Playback</BodyText>
-						
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('forceTranscoding', !settings.forceTranscoding)}
-							selected={settings.forceTranscoding}
-						>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleForceTranscoding}
+								selected={settings.forceTranscoding}
+							>
 							Force Transcoding (always)
 						</SwitchItem>
-						
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('forceTranscodingWithSubtitles', !settings.forceTranscodingWithSubtitles)}
-							selected={settings.forceTranscodingWithSubtitles}
-						>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleForceTranscodingWithSubtitles}
+								selected={settings.forceTranscodingWithSubtitles}
+							>
 							Force Transcoding with Subtitles (burn-in subs)
 						</SwitchItem>
 					</section>
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Display</BodyText>
-						
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={() => handleSettingChange('showBackdrops', !settings.showBackdrops)}
-							selected={settings.showBackdrops}
-						>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowBackdrops}
+								selected={settings.showBackdrops}
+							>
 							Show Background Images
 						</SwitchItem>
 					</section>
@@ -557,47 +732,43 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				</div>
 			</Scroller>
 
-			<Popup
-				open={bitratePopupOpen}
-				onClose={() => setBitratePopupOpen(false)}
-				className={css.popup}
-			>
+				<Popup
+					open={bitratePopupOpen}
+					onClose={closeBitratePopup}
+					className={css.popup}
+				>
 				<div className={css.popupContent}>
 					<BodyText className={css.popupTitle}>Select Maximum Bitrate</BodyText>
-					{BITRATE_OPTIONS.map(option => (
-						<Button
-							key={option.value}
-							className={css.popupOption}
-							selected={settings.maxBitrate === option.value}
-							onClick={() => {
-								handleSettingChange('maxBitrate', option.value);
-								setBitratePopupOpen(false);
-							}}
-						>
+						{BITRATE_OPTIONS.map(option => (
+							<Button
+								key={option.value}
+								data-bitrate={option.value}
+								className={css.popupOption}
+								selected={settings.maxBitrate === option.value}
+								onClick={handleBitrateSelect}
+							>
 							{option.label}
 						</Button>
 					))}
 				</div>
 			</Popup>
 
-			<Popup
-				open={audioLangPopupOpen}
-				onClose={() => setAudioLangPopupOpen(false)}
-				className={css.popup}
-			>
+				<Popup
+					open={audioLangPopupOpen}
+					onClose={closeAudioLangPopup}
+					className={css.popup}
+				>
 				<div className={css.popupContent}>
 					<BodyText className={css.popupTitle}>Preferred Audio Language</BodyText>
 					<div className={css.popupOptions}>
-						{LANGUAGE_OPTIONS.map(option => (
-							<Button
-								key={option.value}
-								className={css.popupOption}
-								selected={settings.preferredAudioLanguage === option.value}
-								onClick={() => {
-									handleSettingChange('preferredAudioLanguage', option.value);
-									setAudioLangPopupOpen(false);
-								}}
-							>
+							{LANGUAGE_OPTIONS.map(option => (
+								<Button
+									key={option.value}
+									data-language={option.value}
+									className={css.popupOption}
+									selected={settings.preferredAudioLanguage === option.value}
+									onClick={handleAudioLanguageSelect}
+								>
 								{option.label}
 							</Button>
 						))}
@@ -605,24 +776,22 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				</div>
 			</Popup>
 
-			<Popup
-				open={subtitleLangPopupOpen}
-				onClose={() => setSubtitleLangPopupOpen(false)}
-				className={css.popup}
-			>
+				<Popup
+					open={subtitleLangPopupOpen}
+					onClose={closeSubtitleLangPopup}
+					className={css.popup}
+				>
 				<div className={css.popupContent}>
 					<BodyText className={css.popupTitle}>Preferred Subtitle Language</BodyText>
 					<div className={css.popupOptions}>
-						{LANGUAGE_OPTIONS.map(option => (
-							<Button
-								key={option.value}
-								className={css.popupOption}
-								selected={settings.preferredSubtitleLanguage === option.value}
-								onClick={() => {
-									handleSettingChange('preferredSubtitleLanguage', option.value);
-									setSubtitleLangPopupOpen(false);
-								}}
-							>
+							{LANGUAGE_OPTIONS.map(option => (
+								<Button
+									key={option.value}
+									data-language={option.value}
+									className={css.popupOption}
+									selected={settings.preferredSubtitleLanguage === option.value}
+									onClick={handleSubtitleLanguageSelect}
+								>
 								{option.label}
 							</Button>
 						))}
@@ -630,64 +799,58 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				</div>
 			</Popup>
 
-			<Popup
-				open={playNextPromptModePopupOpen}
-				onClose={() => setPlayNextPromptModePopupOpen(false)}
-				className={css.popup}
-			>
+				<Popup
+					open={playNextPromptModePopupOpen}
+					onClose={closePlayNextPromptModePopup}
+					className={css.popup}
+				>
 				<div className={css.popupContent}>
 					<BodyText className={css.popupTitle}>Play Next Prompt Mode</BodyText>
-					<Button
-						className={css.popupOption}
-						selected={settings.playNextPromptMode === 'segmentsOnly'}
-						onClick={() => {
-							handleSettingChange('playNextPromptMode', 'segmentsOnly');
-							setPlayNextPromptModePopupOpen(false);
-						}}
-					>
+						<Button
+							className={css.popupOption}
+							selected={settings.playNextPromptMode === 'segmentsOnly'}
+							onClick={setSegmentsOnlyPromptMode}
+						>
 						Outro/Credits Only
 					</Button>
-					<Button
-						className={css.popupOption}
-						selected={settings.playNextPromptMode !== 'segmentsOnly'}
-						onClick={() => {
-							handleSettingChange('playNextPromptMode', 'segmentsOrLast60');
-							setPlayNextPromptModePopupOpen(false);
-						}}
-					>
+						<Button
+							className={css.popupOption}
+							selected={settings.playNextPromptMode !== 'segmentsOnly'}
+							onClick={setSegmentsOrLast60PromptMode}
+						>
 						Segments or Last 60s
 					</Button>
 				</div>
 			</Popup>
 
-			<Popup
-				open={logoutConfirmOpen}
-				onClose={() => setLogoutConfirmOpen(false)}
-				className={css.popup}
-			>
+				<Popup
+					open={logoutConfirmOpen}
+					onClose={closeLogoutConfirm}
+					className={css.popup}
+				>
 				<div className={css.popupContent}>
 					<BodyText className={css.popupTitle}>Sign Out</BodyText>
-					<BodyText className={css.popupMessage}>
-						Are you sure you want to sign out from {serverInfo?.ServerName || 'this server'}?
-					</BodyText>
-					<div className={css.popupActions}>
-						<Button onClick={() => setLogoutConfirmOpen(false)}>Cancel</Button>
-						<Button onClick={handleLogoutConfirm} className={css.dangerButton}>Sign Out</Button>
+						<BodyText className={css.popupMessage}>
+							Are you sure you want to sign out from {serverInfo?.ServerName || 'this server'}?
+						</BodyText>
+						<div className={css.popupActions}>
+							<Button onClick={closeLogoutConfirm}>Cancel</Button>
+							<Button onClick={handleLogoutConfirm} className={css.dangerButton}>Sign Out</Button>
+						</div>
 					</div>
-				</div>
-			</Popup>
+				</Popup>
 
-			<Popup
-				open={logsPopupOpen}
-				onClose={() => setLogsPopupOpen(false)}
-				className={css.popup}
-			>
+				<Popup
+					open={logsPopupOpen}
+					onClose={closeLogsPopup}
+					className={css.popup}
+				>
 				<div className={css.logPopupContent}>
 					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
-					<div className={css.logActions}>
-						<Button size="small" onClick={handleClearLogs}>Clear Logs</Button>
-						<Button size="small" onClick={() => setLogsPopupOpen(false)}>Close</Button>
-					</div>
+						<div className={css.logActions}>
+							<Button size="small" onClick={handleClearLogs}>Clear Logs</Button>
+							<Button size="small" onClick={closeLogsPopup}>Close</Button>
+						</div>
 					<Scroller className={css.logScroller}>
 						{appLogs.length === 0 && (
 							<BodyText className={css.mutedText}>No logs captured yet.</BodyText>

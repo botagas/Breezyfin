@@ -22,7 +22,10 @@
 		"theme": "sandstone"
 	},
 	"eslintConfig": {
-		"extends": "enact-proxy"
+		"extends": "enact-proxy",
+		"rules": {
+			"react/jsx-no-bind": "off"
+		}
 	},
 	"eslintIgnore": [
 		"node_modules/*",
@@ -46,6 +49,7 @@
 		"web-vitals": "^3.5.1"
 	},
 	"devDependencies": {
+		"@enact/cli": "^7.2.1",
 		"eslint-config-enact-proxy": "^1.0.7"
 	}
 }

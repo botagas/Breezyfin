@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel, Header } from '@enact/sandstone/Panels';
-import Button from '@enact/sandstone/Button';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
@@ -9,17 +8,19 @@ import Toolbar from '../components/Toolbar';
 
 import css from './LibraryPanel.module.less';
 
-const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onBack, ...rest }) => {
+const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [items, setItems] = useState([]);
+	const itemsById = useMemo(() => {
+		const map = new Map();
+		items.forEach((item) => {
+			map.set(String(item.Id), item);
+		});
+		return map;
+	}, [items]);
 
-	useEffect(() => {
-		if (library) {
-			loadLibraryItems();
-		}
-	}, [library]);
-
-	const loadLibraryItems = async () => {
+	const loadLibraryItems = useCallback(async () => {
+		if (!library) return;
 		setLoading(true);
 		try {
 			console.log('Loading library items for:', library);
@@ -33,11 +34,45 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [library]);
 
-	const handleItemClick = (item) => {
-		onItemSelect(item);
-	};
+	useEffect(() => {
+		if (library) {
+			loadLibraryItems();
+		}
+	}, [library, loadLibraryItems]);
+
+	const handleGridCardClick = useCallback((event) => {
+		const itemId = event.currentTarget.dataset.itemId;
+		const selectedItem = itemsById.get(itemId);
+		if (!selectedItem) return;
+		onItemSelect(selectedItem);
+	}, [itemsById, onItemSelect]);
+
+	const handleGridCardKeyDown = useCallback((e) => {
+		const card = e.currentTarget;
+		const cards = Array.from(card.parentElement.querySelectorAll(`.${css.gridCard}`));
+		const idx = cards.indexOf(card);
+		const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
+		if (e.keyCode === 37 && idx > 0) { // left
+			e.preventDefault();
+			cards[idx - 1].focus();
+		} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
+			e.preventDefault();
+			cards[idx + 1].focus();
+		} else if (e.keyCode === 38 && idx - columns >= 0) { // up
+			e.preventDefault();
+			cards[idx - columns].focus();
+		} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
+			e.preventDefault();
+			cards[idx + columns].focus();
+		}
+	}, []);
+
+	const handleGridImageError = useCallback((e) => {
+		e.target.style.display = 'none';
+		e.target.parentElement.classList.add(css.placeholder);
+	}, []);
 
 	const getImageUrl = (itemId, item) => {
 		if (item.ImageTags && item.ImageTags.Primary) {
@@ -59,7 +94,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 		return (
 			<Panel {...rest}>
 				<Header title={library?.Name || 'Library'} />
-				<Toolbar 
+				<Toolbar
 					activeSection="library"
 					activeLibraryId={library?.Id}
 					onNavigate={onNavigate}
@@ -76,7 +111,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 	return (
 		<Panel {...rest}>
 			<Header title={library?.Name || 'Library'} />
-			<Toolbar 
+			<Toolbar
 				activeSection="library"
 				activeLibraryId={library?.Id}
 				onNavigate={onNavigate}
@@ -85,41 +120,21 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, onB
 			/>
 			<Scroller className={css.scroller}>
 				<div className={css.gridContainer}>
-					{items.map(item => (
-						<div
-							key={item.Id}
-							className={css.gridCard}
-							onClick={() => handleItemClick(item)}
-							tabIndex={0}
-							onKeyDown={(e) => {
-								const card = e.currentTarget;
-								const cards = Array.from(card.parentElement.querySelectorAll(`.${css.gridCard}`));
-								const idx = cards.indexOf(card);
-								const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
-								if (e.keyCode === 37 && idx > 0) { // left
-									e.preventDefault();
-									cards[idx - 1].focus();
-								} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
-									e.preventDefault();
-									cards[idx + 1].focus();
-								} else if (e.keyCode === 38 && idx - columns >= 0) { // up
-									e.preventDefault();
-									cards[idx - columns].focus();
-								} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
-									e.preventDefault();
-									cards[idx + columns].focus();
-								}
-							}}
-						>
+						{items.map(item => (
+							<div
+								key={item.Id}
+								data-item-id={item.Id}
+								className={css.gridCard}
+								onClick={handleGridCardClick}
+								tabIndex={0}
+								onKeyDown={handleGridCardKeyDown}
+							>
 							<div className={css.cardImage}>
-								<img 
-									src={getImageUrl(item.Id, item)} 
-									alt={item.Name}
-									onError={(e) => {
-										e.target.style.display = 'none';
-										e.target.parentElement.classList.add(css.placeholder);
-									}}
-								/>
+									<img
+										src={getImageUrl(item.Id, item)}
+										alt={item.Name}
+										onError={handleGridImageError}
+									/>
 								{getUnwatchedCount(item) !== null && (
 									<div className={css.progressBadge}>
 										{getUnwatchedCount(item) === 0 ? '✓' : getUnwatchedCount(item)}

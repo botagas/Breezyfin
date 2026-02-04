@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Panel } from '@enact/sandstone/Panels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '@enact/sandstone/Scroller';
@@ -38,37 +38,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	});
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 
-	useEffect(() => {
-		try {
-			const stored = localStorage.getItem('breezyfinSettings');
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				if (parsed.homeRows) {
-					setHomeRowSettings({
-						recentlyAdded: parsed.homeRows.recentlyAdded !== false,
-						continueWatching: parsed.homeRows.continueWatching !== false,
-						nextUp: parsed.homeRows.nextUp !== false,
-						latestMovies: parsed.homeRows.latestMovies !== false,
-						latestShows: parsed.homeRows.latestShows !== false,
-						myRequests: parsed.homeRows.myRequests !== false
-					});
-				}
-				if (Array.isArray(parsed.homeRowOrder)) {
-					const normalized = parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
-					const resolved = [
-						...normalized,
-						...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
-					];
-					setHomeRowOrder(resolved);
-				}
-			}
-		} catch (err) {
-			console.warn('Failed to load home row settings:', err);
-		}
-		loadContent();
-	}, []);
-
-	const loadContent = async () => {
+	const loadContent = useCallback(async () => {
 		setLoading(true);
 		try {
 			console.log('Loading content...');
@@ -126,7 +96,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 			const enhanceEpisodes = async (episodes) => {
 				const seriesIds = [...new Set(episodes.filter(e => e.Type === 'Episode' && e.SeriesId).map(e => e.SeriesId))];
 				const seriesDataMap = {};
-				
+
 				await Promise.all(seriesIds.map(async (seriesId) => {
 					try {
 						const series = await jellyfinService.getItem(seriesId);
@@ -178,13 +148,43 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, []);
 
-	const handleItemClick = (item) => {
+	useEffect(() => {
+		try {
+			const stored = localStorage.getItem('breezyfinSettings');
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				if (parsed.homeRows) {
+					setHomeRowSettings({
+						recentlyAdded: parsed.homeRows.recentlyAdded !== false,
+						continueWatching: parsed.homeRows.continueWatching !== false,
+						nextUp: parsed.homeRows.nextUp !== false,
+						latestMovies: parsed.homeRows.latestMovies !== false,
+						latestShows: parsed.homeRows.latestShows !== false,
+						myRequests: parsed.homeRows.myRequests !== false
+					});
+				}
+				if (Array.isArray(parsed.homeRowOrder)) {
+					const normalized = parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
+					const resolved = [
+						...normalized,
+						...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
+					];
+					setHomeRowOrder(resolved);
+				}
+			}
+		} catch (err) {
+			console.warn('Failed to load home row settings:', err);
+		}
+		loadContent();
+	}, [loadContent]);
+
+	const handleItemClick = useCallback((item) => {
 		onItemSelect(item);
-	};
+	}, [onItemSelect]);
 
-	const getCardImageUrl = (item) => {
+	const getCardImageUrl = useCallback((item) => {
 		// Prefer episode-specific art when the item is an episode (e.g., Continue Watching / Next Up)
 		if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
 			return jellyfinService.getImageUrl(item.Id, 'Primary', 640);
@@ -210,14 +210,18 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 		}
 
 		return '';
-	};
+	}, []);
 
-	const handleNavigation = (section, data) => {
+	const getMediaRowImageUrl = useCallback((id, mediaItem) => {
+		return getCardImageUrl(mediaItem);
+	}, [getCardImageUrl]);
+
+	const handleNavigation = useCallback((section, data) => {
 		console.log('Navigate to:', section, data);
 		if (onNavigate) {
 			onNavigate(section, data);
 		}
-	};
+	}, [onNavigate]);
 
 	const rowConfig = {
 		recentlyAdded: {
@@ -263,7 +267,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	if (loading) {
 		return (
 			<Panel {...rest}>
-				<Toolbar 
+				<Toolbar
 					activeSection="home"
 					onNavigate={handleNavigation}
 					onLogout={onLogout}
@@ -305,14 +309,14 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 						if (!row) return null;
 						if (!homeRowSettings[key] || row.items.length === 0) return null;
 						return (
-							<MediaRow
-								key={key}
-								title={row.title}
-								items={row.items}
-								onItemClick={handleItemClick}
-								getImageUrl={(id, item) => getCardImageUrl(item)}
-								showEpisodeProgress={row.showEpisodeProgress}
-							/>
+								<MediaRow
+									key={key}
+									title={row.title}
+									items={row.items}
+									onItemClick={handleItemClick}
+									getImageUrl={getMediaRowImageUrl}
+									showEpisodeProgress={row.showEpisodeProgress}
+								/>
 						);
 					})}
 				</div>

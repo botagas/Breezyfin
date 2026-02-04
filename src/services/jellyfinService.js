@@ -28,11 +28,11 @@ class JellyfinService {
 		try {
 			this.serverUrl = serverUrl;
 			this.api = this.jellyfin.createApi(serverUrl);
-			
+
 			// Test connection
 			const response = await fetch(`${serverUrl}/System/Info/Public`);
 			if (!response.ok) throw new Error('Server not reachable');
-			
+
 			const info = await response.json();
 			this.serverName = info?.ServerName || info?.Name || serverUrl;
 			return info;
@@ -330,12 +330,12 @@ class JellyfinService {
 	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0) {
 		try {
 			let url = `${this.serverUrl}/Users/${this.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount`;
-			
+
 			if (itemTypes) {
 				const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
 				url += `&includeItemTypes=${types}`;
 			}
-			
+
 			const response = await fetch(url, {
 				headers: {
 					'X-Emby-Token': this.accessToken
@@ -422,7 +422,7 @@ class JellyfinService {
 			if (data.Items && data.Items.length > 0) {
 				return data.Items[0];
 			}
-			
+
 			// If no next up, get first episode of first season
 			const seasonsResponse = await fetch(
 				`${this.serverUrl}/Shows/${seriesId}/Seasons?userId=${this.userId}`,
@@ -439,7 +439,7 @@ class JellyfinService {
 				const episodes = await this.getEpisodes(seriesId, firstSeason.Id);
 				return episodes[0] || null;
 			}
-			
+
 			return null;
 		} catch (error) {
 			console.error('getNextUpEpisode error:', error);
@@ -506,19 +506,19 @@ class JellyfinService {
 				TranscodingProfiles: [
 					// HLS transcoding - BEST for webOS (hardware accelerated)
 					// Use stereo for maximum compatibility
-					{ 
-						Container: 'ts', 
-						Type: 'Video', 
-						AudioCodec: 'aac', 
-						VideoCodec: 'h264', 
-						Context: 'Streaming', 
-						Protocol: 'hls', 
-						MaxAudioChannels: '2', 
+					{
+						Container: 'ts',
+						Type: 'Video',
+						AudioCodec: 'aac',
+						VideoCodec: 'h264',
+						Context: 'Streaming',
+						Protocol: 'hls',
+						MaxAudioChannels: '2',
 						MinSegments: '1',
-						BreakOnNonKeyFrames: false 
+						BreakOnNonKeyFrames: false
 					},
 					// HLS Audio
-					{ 
+					{
 						Container: 'ts',
 						Type: 'Audio',
 						AudioCodec: 'aac',
@@ -698,12 +698,12 @@ class JellyfinService {
 	async search(searchTerm, itemTypes = null, limit = 25) {
 		try {
 			let url = `${this.serverUrl}/Users/${this.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
-			
+
 			if (itemTypes && itemTypes.length > 0) {
 				const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
 				url += `&includeItemTypes=${types}`;
 			}
-			
+
 			const response = await fetch(url, {
 				headers: {
 					'X-Emby-Token': this.accessToken
@@ -750,11 +750,11 @@ class JellyfinService {
 					}
 				}
 			);
-			
+
 			if (!response.ok) {
 				throw new Error(`Failed to toggle favorite: ${response.status}`);
 			}
-			
+
 			// Return the new favorite status
 			return !isFavorite;
 		} catch (error) {
@@ -785,11 +785,11 @@ class JellyfinService {
 					}
 				}
 			);
-			
+
 			if (!response.ok) {
 				throw new Error(`Failed to mark watched: ${response.status}`);
 			}
-			
+
 			return true;
 		} catch (error) {
 			console.error('markWatched error:', error);
@@ -809,11 +809,11 @@ class JellyfinService {
 					}
 				}
 			);
-			
+
 			if (!response.ok) {
 				throw new Error(`Failed to mark unwatched: ${response.status}`);
 			}
-			
+
 			return false;
 		} catch (error) {
 			console.error('markUnwatched error:', error);
