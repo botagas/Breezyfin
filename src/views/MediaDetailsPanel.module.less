@@ -1,8 +1,8 @@
 .scroller {
-	min-height: calc(100vh + 0.75rem);
+	min-height: 100vh;
 	overflow-y: auto;
 	background: transparent;
-	margin-top: -9rem;
+	margin-top: 0;
 }
 
 .detailsContainer {
@@ -55,7 +55,7 @@
 }
 
 .content {
-	padding: 10rem 48px 120px 48px;
+	padding: 1rem 48px 120px 48px;
 	position: relative;
 	z-index: 2;
 }
@@ -64,11 +64,40 @@
 	margin-bottom: 32px;
 }
 
-.title {
-	margin-bottom: 12px;
+.backdropFallback {
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+}
+
+.headerLogoWrap {
+	display: flex;
+	align-items: flex-start;
+	justify-content: flex-start;
+	min-height: 1rem;
+	max-width: 80vw;
+}
+
+.headerLogo {
+	display: block;
+	max-width: 100%;
+	max-height: 8rem;
+	width: auto;
+	object-fit: contain;
+}
+
+.pageHeader {
+	padding: 2.1rem 0 1.5rem;
+	margin-bottom: 24px;
+}
+
+.pageHeaderTitle {
 	color: #ffffff;
-	font-size: 2.5em;
+	font-size: 1.875rem;
 	font-weight: 700;
+	line-height: 1.2;
 	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
 }
 
@@ -83,8 +112,10 @@
 }
 
 .episodeNavButton {
-	background: rgba(255, 255, 255, 0.08) !important;
-	border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	}
 }
 
 .metadata {
@@ -106,18 +137,24 @@
 }
 
 .actionButton {
-	background: transparent;
+	:global(.bf-button-bg) {
+		background: transparent !important;
+	}
 
 	&:hover,
 	&:focus {
-		background: rgba(255, 255, 255, 0.25) !important;
+		:global(.bf-button-bg) {
+			background: rgba(255, 255, 255, 0.25) !important;
+		}
 		color: white !important;
 	}
 }
 
 .activeAction {
-	background: rgba(0, 200, 255, 0.3) !important;
-	border: 1px solid rgba(0, 200, 255, 0.6) !important;
+	:global(.bf-button-bg) {
+		background: rgba(0, 200, 255, 0.3) !important;
+		border: 1px solid rgba(0, 200, 255, 0.6) !important;
+	}
 }
 
 .actionsRow {
@@ -134,12 +171,6 @@
 	max-width: 100%;
 	color: rgba(255, 255, 255, 0.9);
 	font-size: 1.1em;
-}
-
-.genres {
-	margin-bottom: 24px;
-	color: rgba(255, 255, 255, 0.7);
-	font-size: 1em;
 }
 
 .richMeta {
@@ -501,7 +532,7 @@
 
 .stickyControls {
 	position: sticky;
-	top: 10rem;
+	top: 1rem;
 	background: rgba(18, 18, 18, 0.95);
 	padding: 16px 24px;
 	border-radius: 12px;
@@ -574,6 +605,78 @@
 	text-align: left !important;
 	margin: 0 !important;
 	font-size: 1em !important;
+
+	:global(.bf-button-bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.1) !important;
+		border: none !important;
+	}
+}
+
+.primaryButton {
+	:global(.bf-button),
+	:global(.bf-button *) {
+		color: #ffffff !important;
+		font-size: 0.84em !important;
+		font-weight: 700 !important;
+		min-height: 2rem !important;
+		padding: 0 1rem !important;
+	}
+
+	:global(.Icon) {
+		font-size: 0.68rem !important;
+		width: 0.68rem !important;
+		height: 0.68rem !important;
+	}
+
+	:global(.bf-button-bg) {
+		background: transparent !important;
+		border: 1px solid rgba(255, 255, 255, 0.4) !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: #ffffff !important;
+		border-color: #ffffff !important;
+	}
+
+	&:hover :global(.bf-button),
+	&:hover :global(.bf-button *),
+	&:focus :global(.bf-button),
+	&:focus :global(.bf-button *) {
+		color: #111 !important;
+	}
+}
+
+.secondaryButton {
+	:global(.bf-button),
+	:global(.bf-button *) {
+		color: #111 !important;
+		font-size: 0.88em !important;
+		font-weight: 700 !important;
+		min-height: 2.2rem !important;
+		padding: 0 1.1rem !important;
+	}
+
+	:global(.bf-button-bg) {
+		background: #ffffff !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: 0 0.16667rem 0.5rem rgba(0, 0, 0, 0.35) !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: #f1f3f5 !important;
+	}
 }
 
 /* Normalize text margins for headings/body text */

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
-import Panels from '@enact/sandstone/Panels';
+import { Panels } from '../components/BreezyPanels';
 
 import LoginPanel from '../views/LoginPanel';
 import HomePanel from '../views/HomePanel';
@@ -125,19 +125,19 @@ const App = (props) => {
 		return () => window.removeEventListener('popstate', handlePopState);
 	}, []);
 
-	const handleLogin = () => {
+	const handleLogin = useCallback(() => {
 		setCurrentView('home');
-	};
+	}, []);
 
-	const handleLogout = () => {
+	const handleLogout = useCallback(() => {
 		jellyfinService.logout();
 		setCurrentView('login');
 		setSelectedItem(null);
 		setSelectedLibrary(null);
 		setPlaybackOptions(null);
-	};
+	}, []);
 
-	const handleItemSelect = (item, fromItem = null) => {
+	const handleItemSelect = useCallback((item, fromItem = null) => {
 		// Track the previous item for back navigation (e.g., series -> episode)
 		if (fromItem) {
 			setPreviousItem(fromItem);
@@ -151,9 +151,9 @@ const App = (props) => {
 		setSelectedItem(item);
 		setPlaybackOptions(null);
 		setCurrentView('details');
-	};
+	}, [selectedItem]);
 
-	const handleNavigate = (section, data) => {
+	const handleNavigate = useCallback((section, data) => {
 		console.log('Navigate to:', section, data);
 		switch (section) {
 			case 'home':
@@ -179,32 +179,40 @@ const App = (props) => {
 			default:
 				break;
 		}
-	};
+	}, []);
 
-	const handlePlay = (item, options = null) => {
+	const handlePlay = useCallback((item, options = null) => {
 		setSelectedItem(item);
 		setPlaybackOptions(options);
 		setPlayerControlsVisible(true);
 		setCurrentView('player');
-	};
+	}, []);
 
-	const handleBackToHome = () => {
+	const handleBackToHome = useCallback(() => {
 		setCurrentView('home');
 		setSelectedItem(null);
 		setSelectedLibrary(null);
 		setPlaybackOptions(null);
-	};
+	}, []);
 
-	const handleBackToDetails = () => {
+	const handleBackToDetails = useCallback(() => {
 		setPlayerControlsVisible(true);
 		setCurrentView('details');
-	};
+	}, []);
 
-	const handleExit = () => {
+	const handleExit = useCallback(() => {
 		if (typeof window !== 'undefined' && window.close) {
 			window.close();
 		}
-	};
+	}, []);
+
+	const registerDetailsBackHandler = useCallback((handler) => {
+		detailsBackHandlerRef.current = handler;
+	}, []);
+
+	const registerPlayerBackHandler = useCallback((handler) => {
+		playerBackHandlerRef.current = handler;
+	}, []);
 
 	const getPanelIndex = () => {
 		if (currentView === 'login') return 0;
@@ -220,7 +228,7 @@ const App = (props) => {
 
 	return (
 		<div className={css.app} {...props}>
-			<Panels 
+			<Panels
 				index={getPanelIndex()}
 				onBack={handleBack}
 			>
@@ -262,29 +270,25 @@ const App = (props) => {
 					onExit={handleExit}
 					noCloseButton
 				/>
-				<MediaDetailsPanel
-					isActive={currentView === 'details'}
-					item={selectedItem}
-					onBack={handleBackToHome}
-					onPlay={handlePlay}
-					onItemSelect={handleItemSelect}
-					registerBackHandler={(handler) => {
-						detailsBackHandlerRef.current = handler;
-					}}
-					noCloseButton
-				/>
+					<MediaDetailsPanel
+						isActive={currentView === 'details'}
+						item={selectedItem}
+						onBack={handleBackToHome}
+						onPlay={handlePlay}
+						onItemSelect={handleItemSelect}
+						registerBackHandler={registerDetailsBackHandler}
+						noCloseButton
+					/>
 				<PlayerPanel
 					isActive={currentView === 'player'}
 					item={selectedItem}
 					playbackOptions={playbackOptions}
-					onBack={handleBackToDetails}
-					onPlay={handlePlay}
-					requestedControlsVisible={playerControlsVisible}
-					onControlsVisibilityChange={setPlayerControlsVisible}
-					registerBackHandler={(handler) => {
-						playerBackHandlerRef.current = handler;
-					}}
-				/>
+						onBack={handleBackToDetails}
+						onPlay={handlePlay}
+						requestedControlsVisible={playerControlsVisible}
+						onControlsVisibilityChange={setPlayerControlsVisible}
+						registerBackHandler={registerPlayerBackHandler}
+					/>
 			</Panels>
 		</div>
 	);

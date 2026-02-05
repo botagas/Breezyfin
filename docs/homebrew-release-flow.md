@@ -9,10 +9,10 @@ This repository uses a two-branch strategy:
 
 - `.github/workflows/ci.yml`
   - Runs on push/PR for `develop` and `main`.
-  - Installs dependencies, runs lint, runs tests if present, and builds with `npm run pack-p`.
+  - Installs dependencies, runs lint, runs tests if present, and builds with `npm run pack-p` (content-hashed assets).
 - `.github/workflows/release-develop.yml`
   - Runs on pushes to `develop`.
-  - Builds IPK and updates a prerelease under tag `develop`.
+  - Builds IPK and updates a prerelease under tag `nightly`.
   - Generates and uploads:
     - `<app-id>_<version>_all.ipk`
     - `<app-id>.manifest.json`

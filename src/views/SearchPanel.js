@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
-import { Panel, Header } from '@enact/sandstone/Panels';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { Panel, Header } from '../components/BreezyPanels';
 import Input from '@enact/sandstone/Input';
-import Button from '@enact/sandstone/Button';
+import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
@@ -13,77 +13,132 @@ import css from './SearchPanel.module.less';
 
 const SpottableDiv = Spottable('div');
 
-// Debounce helper
-const debounce = (func, wait) => {
-	let timeout;
-	return (...args) => {
-		clearTimeout(timeout);
-		timeout = setTimeout(() => func.apply(null, args), wait);
-	};
-};
-
 const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [hasSearched, setHasSearched] = useState(false);
 	const [activeFilter, setActiveFilter] = useState('all');
-
-	const filters = [
+	const searchDebounceRef = useRef(null);
+	const filters = useMemo(() => ([
 		{ id: 'all', label: 'All', types: null },
 		{ id: 'movies', label: 'Movies', types: ['Movie'] },
 		{ id: 'series', label: 'Series', types: ['Series'] },
 		{ id: 'episodes', label: 'Episodes', types: ['Episode'] },
 		{ id: 'people', label: 'People', types: ['Person'] }
-	];
+	]), []);
+	const filtersById = useMemo(() => {
+		const map = new Map();
+		filters.forEach((filter) => {
+			map.set(filter.id, filter);
+		});
+		return map;
+	}, [filters]);
+	const resultsById = useMemo(() => {
+		const map = new Map();
+		results.forEach((item) => {
+			map.set(String(item.Id), item);
+		});
+		return map;
+	}, [results]);
 
-	const performSearch = useCallback(
-		debounce(async (term, filterTypes) => {
-			if (!term || term.trim().length < 2) {
-				setResults([]);
-				setHasSearched(false);
-				return;
-			}
+	const performSearch = useCallback(async (term, filterTypes) => {
+		if (!term || term.trim().length < 2) {
+			setResults([]);
+			setHasSearched(false);
+			return;
+		}
 
-			setLoading(true);
-			setHasSearched(true);
-			try {
-				const items = await jellyfinService.search(term.trim(), filterTypes, 50);
-				setResults(items);
-			} catch (error) {
-				console.error('Search failed:', error);
-				setResults([]);
-			} finally {
-				setLoading(false);
-			}
-		}, 500),
-		[]
-	);
+		setLoading(true);
+		setHasSearched(true);
+		try {
+			const items = await jellyfinService.search(term.trim(), filterTypes, 50);
+			setResults(items);
+		} catch (error) {
+			console.error('Search failed:', error);
+			setResults([]);
+		} finally {
+			setLoading(false);
+		}
+	}, []);
 
-	const handleSearchChange = (e) => {
+	const scheduleSearch = useCallback((term, filterTypes) => {
+		if (searchDebounceRef.current) {
+			clearTimeout(searchDebounceRef.current);
+		}
+		searchDebounceRef.current = setTimeout(() => {
+			performSearch(term, filterTypes);
+		}, 500);
+	}, [performSearch]);
+
+	useEffect(() => () => {
+		if (searchDebounceRef.current) {
+			clearTimeout(searchDebounceRef.current);
+			searchDebounceRef.current = null;
+		}
+	}, []);
+
+	const handleSearchChange = useCallback((e) => {
 		const value = e.value;
 		setSearchTerm(value);
-		const filterTypes = filters.find(f => f.id === activeFilter)?.types;
-		performSearch(value, filterTypes);
-	};
+		const filterTypes = filtersById.get(activeFilter)?.types;
+		scheduleSearch(value, filterTypes);
+	}, [activeFilter, filtersById, scheduleSearch]);
 
-	const handleFilterChange = (filterId) => {
+	const handleFilterChange = useCallback((filterId) => {
 		setActiveFilter(filterId);
-		const filterTypes = filters.find(f => f.id === filterId)?.types;
+		const filterTypes = filtersById.get(filterId)?.types;
 		if (searchTerm.trim().length >= 2) {
-			setLoading(true);
-			performSearch(searchTerm, filterTypes);
+			scheduleSearch(searchTerm, filterTypes);
 		}
-	};
+	}, [filtersById, scheduleSearch, searchTerm]);
 
-	const handleItemClick = (item) => {
+	const handleItemClick = useCallback((item) => {
 		if (item.Type === 'Person') {
 			// Could navigate to person detail view in the future
 			console.log('Person clicked:', item);
 			return;
 		}
 		onItemSelect(item);
-	};
+	}, [onItemSelect]);
+
+	const handleFilterButtonClick = useCallback((event) => {
+		const filterId = event.currentTarget.dataset.filterId;
+		if (!filterId) return;
+		handleFilterChange(filterId);
+	}, [handleFilterChange]);
+
+	const handleResultCardClick = useCallback((event) => {
+		const itemId = event.currentTarget.dataset.itemId;
+		const selectedItem = resultsById.get(itemId);
+		if (!selectedItem) return;
+		handleItemClick(selectedItem);
+	}, [handleItemClick, resultsById]);
+
+	const handleResultCardKeyDown = useCallback((e) => {
+		const card = e.currentTarget;
+		const cards = Array.from(card.parentElement.querySelectorAll(`.${css.resultCard}`));
+		const idx = cards.indexOf(card);
+		const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
+		if (e.keyCode === 37 && idx > 0) { // left
+			e.preventDefault();
+			cards[idx - 1].focus();
+		} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
+			e.preventDefault();
+			cards[idx + 1].focus();
+		} else if (e.keyCode === 38 && idx - columns >= 0) { // up
+			e.preventDefault();
+			cards[idx - columns].focus();
+		} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
+			e.preventDefault();
+			cards[idx + columns].focus();
+		}
+	}, []);
+
+	const handleResultImageError = useCallback((e) => {
+		e.target.style.display = 'none';
+		e.target.parentElement.classList.add(css.placeholder);
+	}, []);
 
 	const getImageUrl = (item) => {
 		if (!item || !jellyfinService.serverUrl || !jellyfinService.accessToken) return null;
@@ -96,7 +151,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 			// Fallback without tag
 			return `${base}/${item.Id}/Images/Primary?maxWidth=200&api_key=${jellyfinService.accessToken}`;
 		}
-		
+
 		if (item.ImageTags?.Primary) {
 			return `${base}/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}&api_key=${jellyfinService.accessToken}`;
 		}
@@ -144,23 +199,25 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 			<div className={css.searchContainer}>
 				<div className={css.searchBox}>
 					<Input
-						className={css.searchInput}
+						className={`bf-input-trigger ${css.searchInput}`}
 						placeholder="Search movies, shows, people..."
 						value={searchTerm}
 						onChange={handleSearchChange}
 						dismissOnEnter
+						size="small"
 					/>
 				</div>
-				
+
 				<div className={css.filters}>
-					{filters.map(filter => (
-						<Button
-							key={filter.id}
-							className={css.filterButton}
-							selected={activeFilter === filter.id}
-							onClick={() => handleFilterChange(filter.id)}
-							size="small"
-						>
+						{filters.map(filter => (
+							<Button
+								key={filter.id}
+								data-filter-id={filter.id}
+								className={css.filterButton}
+								selected={activeFilter === filter.id}
+								onClick={handleFilterButtonClick}
+								size="small"
+							>
 							{filter.label}
 						</Button>
 					))}
@@ -170,10 +227,10 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 					<div className={css.loadingState}>
 						<Spinner />
 					</div>
-				) : hasSearched && results.length === 0 ? (
-					<div className={css.emptyState}>
-						<BodyText>No results found for "{searchTerm}"</BodyText>
-					</div>
+					) : hasSearched && results.length === 0 ? (
+						<div className={css.emptyState}>
+							<BodyText>No results found for {searchTerm}</BodyText>
+						</div>
 				) : !hasSearched ? (
 					<div className={css.emptyState}>
 						<BodyText>Enter a search term to find movies, shows, and more</BodyText>
@@ -181,41 +238,21 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 				) : (
 					<Scroller className={css.resultsScroller}>
 						<div className={css.resultsGrid}>
-							{results.map(item => (
-								<SpottableDiv
-									key={item.Id}
-									className={css.resultCard}
-									onClick={() => handleItemClick(item)}
-									onKeyDown={(e) => {
-										const card = e.currentTarget;
-										const cards = Array.from(card.parentElement.querySelectorAll(`.${css.resultCard}`));
-										const idx = cards.indexOf(card);
-										const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
-										if (e.keyCode === 37 && idx > 0) { // left
-											e.preventDefault();
-											cards[idx - 1].focus();
-										} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
-											e.preventDefault();
-											cards[idx + 1].focus();
-										} else if (e.keyCode === 38 && idx - columns >= 0) { // up
-											e.preventDefault();
-											cards[idx - columns].focus();
-										} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
-											e.preventDefault();
-											cards[idx + columns].focus();
-										}
-									}}
-								>
+								{results.map(item => (
+									<SpottableDiv
+										key={item.Id}
+										data-item-id={item.Id}
+										className={css.resultCard}
+										onClick={handleResultCardClick}
+										onKeyDown={handleResultCardKeyDown}
+									>
 									<div className={css.cardImage}>
 										{getImageUrl(item) ? (
-											<img
-												src={getImageUrl(item)}
-												alt={item.Name}
-												onError={(e) => {
-													e.target.style.display = 'none';
-													e.target.parentElement.classList.add(css.placeholder);
-												}}
-											/>
+												<img
+													src={getImageUrl(item)}
+													alt={item.Name}
+													onError={handleResultImageError}
+												/>
 										) : (
 											<div className={css.placeholderInner}>
 												<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>

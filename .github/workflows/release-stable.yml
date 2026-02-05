@@ -84,22 +84,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Run tests (if present)
-        run: |
-          if command -v rg >/dev/null 2>&1; then
-            TEST_FILE="$(rg --files -g '*.{test,spec}.{js,jsx,ts,tsx}' . | head -n 1 || true)"
-          else
-            TEST_FILE="$(find . -type f \( -name '*.test.js' -o -name '*.test.jsx' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) | head -n 1 || true)"
-          fi
-
-          if [ -n "${TEST_FILE}" ]; then
-            CI=true npm run test -- --watch=false
-          else
-            echo "No test files found; skipping test step."
-          fi
+      - name: Run tests
+        run: CI=true npm run test -- --watch=false --passWithNoTests
 
       - name: Build production bundle
-        run: CI=false npm run pack-p
+        run: |
+          npm run clean
+          npm run pack-p
 
       - name: Prepare bundle metadata
         run: |

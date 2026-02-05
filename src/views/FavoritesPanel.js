@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Panel, Header } from '@enact/sandstone/Panels';
-import Button from '@enact/sandstone/Button';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Panel, Header } from '../components/BreezyPanels';
+import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
@@ -11,27 +11,29 @@ import Toolbar from '../components/Toolbar';
 import css from './FavoritesPanel.module.less';
 
 const SpottableDiv = Spottable('div');
+const FILTERS = [
+	{ id: 'all', label: 'All', types: ['Movie', 'Series', 'Episode'] },
+	{ id: 'movies', label: 'Movies', types: ['Movie'] },
+	{ id: 'series', label: 'Series', types: ['Series'] },
+	{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
+];
 
 const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
+	const favoritesById = useMemo(() => {
+		const map = new Map();
+		favorites.forEach((favorite) => {
+			map.set(String(favorite.Id), favorite);
+		});
+		return map;
+	}, [favorites]);
 
-	const filters = [
-		{ id: 'all', label: 'All', types: ['Movie', 'Series', 'Episode'] },
-		{ id: 'movies', label: 'Movies', types: ['Movie'] },
-		{ id: 'series', label: 'Series', types: ['Series'] },
-		{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
-	];
-
-	useEffect(() => {
-		loadFavorites();
-	}, [activeFilter]);
-
-	const loadFavorites = async () => {
+	const loadFavorites = useCallback(async () => {
 		setLoading(true);
 		try {
-			const filterTypes = filters.find(f => f.id === activeFilter)?.types;
+			const filterTypes = FILTERS.find(f => f.id === activeFilter)?.types;
 			const items = await jellyfinService.getFavorites(filterTypes, 100);
 			setFavorites(items);
 		} catch (error) {
@@ -40,15 +42,11 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [activeFilter]);
 
-	const handleFilterChange = (filterId) => {
-		setActiveFilter(filterId);
-	};
-
-	const handleItemClick = (item) => {
-		onItemSelect(item);
-	};
+	useEffect(() => {
+		loadFavorites();
+	}, [loadFavorites]);
 
 	const handleRemoveFavorite = async (e, item) => {
 		e.stopPropagation();
@@ -60,6 +58,31 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 			console.error('Failed to remove favorite:', error);
 		}
 	};
+
+	const handleFilterButtonClick = useCallback((event) => {
+		const filterId = event.currentTarget.dataset.filterId;
+		if (!filterId) return;
+		setActiveFilter(filterId);
+	}, []);
+
+	const handleFavoriteCardClick = useCallback((event) => {
+		const itemId = event.currentTarget.dataset.itemId;
+		const item = favoritesById.get(itemId);
+		if (!item) return;
+		onItemSelect(item);
+	}, [favoritesById, onItemSelect]);
+
+	const handleUnfavoriteClick = useCallback((event) => {
+		const itemId = event.currentTarget.dataset.itemId;
+		const item = favoritesById.get(itemId);
+		if (!item) return;
+		handleRemoveFavorite(event, item);
+	}, [favoritesById]);
+
+	const handleCardImageError = useCallback((event) => {
+		event.target.style.display = 'none';
+		event.target.parentElement.classList.add(css.placeholder);
+	}, []);
 
 	const getImageUrl = (item) => {
 		if (!item || !jellyfinService.serverUrl || !jellyfinService.accessToken) return null;
@@ -109,15 +132,16 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 				onExit={onExit}
 			/>
 			<div className={css.favoritesContainer}>
-				<div className={css.filters}>
-					{filters.map(filter => (
-						<Button
-							key={filter.id}
-							className={css.filterButton}
-							selected={activeFilter === filter.id}
-							onClick={() => handleFilterChange(filter.id)}
-							size="small"
-						>
+					<div className={css.filters}>
+						{FILTERS.map(filter => (
+							<Button
+								key={filter.id}
+								data-filter-id={filter.id}
+								className={css.filterButton}
+								selected={activeFilter === filter.id}
+								onClick={handleFilterButtonClick}
+								size="small"
+							>
 							{filter.label}
 						</Button>
 					))}
@@ -126,9 +150,7 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 						onClick={loadFavorites}
 						size="small"
 						icon="refresh"
-					>
-						Refresh
-					</Button>
+					/>
 				</div>
 
 				{loading ? (
@@ -145,34 +167,33 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 				) : (
 					<Scroller className={css.favoritesScroller}>
 						<div className={css.favoritesGrid}>
-							{favorites.map(item => (
-								<SpottableDiv
-									key={item.Id}
-									className={css.favoriteCard}
-									onClick={() => handleItemClick(item)}
-								>
+								{favorites.map(item => (
+									<SpottableDiv
+										key={item.Id}
+										data-item-id={item.Id}
+										className={css.favoriteCard}
+										onClick={handleFavoriteCardClick}
+									>
 									<div className={css.cardImage}>
 										{getImageUrl(item) ? (
-											<img
-												src={getImageUrl(item)}
-												alt={item.Name}
-												onError={(e) => {
-													e.target.style.display = 'none';
-													e.target.parentElement.classList.add(css.placeholder);
-												}}
-											/>
+												<img
+													src={getImageUrl(item)}
+													alt={item.Name}
+													onError={handleCardImageError}
+												/>
 										) : (
 											<div className={css.placeholderInner}>
 												<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
 											</div>
 										)}
-										<Button
-											className={css.unfavoriteButton}
-											icon="hearthollow"
-											size="small"
-											onClick={(e) => handleRemoveFavorite(e, item)}
-											title="Remove from favorites"
-										/>
+											<Button
+												className={css.unfavoriteButton}
+												icon="hearthollow"
+												size="small"
+												data-item-id={item.Id}
+												onClick={handleUnfavoriteClick}
+												title="Remove from favorites"
+											/>
 										{item.UserData?.Played && (
 											<div className={css.watchedBadge}>✓</div>
 										)}

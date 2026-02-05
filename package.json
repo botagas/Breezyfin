@@ -1,13 +1,13 @@
 {
 	"name": "breezyfin",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Jellyfin client for LG webOS TVs, built with Enact Sandstone.",
 	"author": "",
 	"main": "src/index.js",
 	"scripts": {
 		"serve": "enact serve",
 		"pack": "enact pack",
-		"pack-p": "enact pack -p",
+		"pack-p": "enact pack -p --content-hash",
 		"watch": "enact pack --watch",
 		"clean": "enact clean",
 		"lint": "enact lint .",
@@ -46,6 +46,7 @@
 		"web-vitals": "^3.5.1"
 	},
 	"devDependencies": {
+		"@enact/cli": "^7.2.1",
 		"eslint-config-enact-proxy": "^1.0.7"
 	}
 }

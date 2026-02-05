@@ -5,11 +5,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
+
+WEBOS_VERSION_RE = re.compile(r"^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$")
 
 
 def clean_single_line(value: str) -> str:
     return " ".join(value.replace("\r", "\n").split())
+
+
+def parse_webos_version(version: str) -> tuple[str, str, str]:
+    match = WEBOS_VERSION_RE.fullmatch(version)
+    if not match:
+        raise SystemExit(
+            "Invalid appinfo version. webOS requires X.X.X where each segment is a non-negative "
+            "integer up to 9 digits with no leading zeroes."
+        )
+    return match.group(1), match.group(2), match.group(3)
 
 
 def main() -> None:
@@ -19,7 +32,7 @@ def main() -> None:
     parser.add_argument(
         "--append-version-suffix",
         default="",
-        help="Suffix appended to appinfo version as '.<suffix>'",
+        help="When set, replaces patch version with this numeric suffix (keeps webOS X.X.X format).",
     )
     args = parser.parse_args()
 
@@ -27,9 +40,16 @@ def main() -> None:
     package_info = json.loads(args.package_json.read_text(encoding="utf-8"))
 
     version = str(appinfo["version"])
+    major, minor, _ = parse_webos_version(version)
     suffix = args.append_version_suffix.strip()
     if suffix:
-        version = f"{version}.{suffix}"
+        if not suffix.isdigit():
+            raise SystemExit("--append-version-suffix must be numeric for webOS versioning.")
+        if len(suffix) > 9:
+            raise SystemExit("--append-version-suffix must be at most 9 digits.")
+
+        patch = str(int(suffix))
+        version = f"{major}.{minor}.{patch}"
         appinfo["version"] = version
         args.appinfo.write_text(json.dumps(appinfo, indent=4) + "\n", encoding="utf-8")
 

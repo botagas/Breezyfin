@@ -1,7 +1,9 @@
 .scroller {
 	background: #121212;
 	padding-top: 0;
-    min-height: 100vh;
+	min-height: calc(100vh + 14rem);
+	position: relative;
+	top: -12rem;
 }
 
 .loading {
@@ -15,7 +17,7 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 	gap: 2rem;
-	padding: 5rem 4rem 4rem;
+	padding: 14rem 4rem 4rem;
 	background: #121212;
 }
 
