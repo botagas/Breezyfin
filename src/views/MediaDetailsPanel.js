@@ -381,6 +381,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	}, [item]);
 
 	const useHeaderLogo = Boolean(headerLogoUrl) && !headerLogoUnavailable;
+	const headerTitle = useHeaderLogo ? undefined : (item?.Name || 'Details');
 	const handleHeaderLogoError = useCallback(() => {
 		setHeaderLogoUnavailable(true);
 	}, []);
@@ -812,9 +813,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	return (
 		<Panel {...rest}>
-			<Header title={useHeaderLogo ? '' : (item?.Name || 'Details')}>
+			<Header title={headerTitle}>
 				{useHeaderLogo && (
-					<slotBefore>
+					<title>
 						<div className={css.headerLogoWrap}>
 							<img
 								src={headerLogoUrl}
@@ -823,7 +824,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 								onError={handleHeaderLogoError}
 							/>
 						</div>
-					</slotBefore>
+					</title>
 				)}
 			</Header>
 			{renderToast()}
