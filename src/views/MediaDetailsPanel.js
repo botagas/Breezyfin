@@ -29,6 +29,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [showAudioPicker, setShowAudioPicker] = useState(false);
 	const [showSubtitlePicker, setShowSubtitlePicker] = useState(false);
 	const [showEpisodePicker, setShowEpisodePicker] = useState(false);
+	const [headerLogoUnavailable, setHeaderLogoUnavailable] = useState(false);
 	const [episodeNavList, setEpisodeNavList] = useState([]);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
@@ -91,6 +92,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			cancelled = true;
 		};
 	}, [item]);
+
+	useEffect(() => {
+		setHeaderLogoUnavailable(false);
+	}, [item?.Id, item?.SeriesId, item?.Type]);
 
 	// Pick sensible defaults based on the media streams we got back
 	const applyDefaultTracks = useCallback((mediaStreams) => {
@@ -367,6 +372,18 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		}
 		return '';
 	})();
+
+	const headerLogoUrl = useMemo(() => {
+		if (!item) return '';
+		const logoItemId = item.Type === 'Episode' && item.SeriesId ? item.SeriesId : item.Id;
+		if (!logoItemId) return '';
+		return jellyfinService.getImageUrl(logoItemId, 'Logo', 800) || '';
+	}, [item]);
+
+	const useHeaderLogo = Boolean(headerLogoUrl) && !headerLogoUnavailable;
+	const handleHeaderLogoError = useCallback(() => {
+		setHeaderLogoUnavailable(true);
+	}, []);
 
 	const audioTracks = playbackInfo?.MediaSources?.[0]?.MediaStreams
 		.filter(s => s.Type === 'Audio')
@@ -795,7 +812,20 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	return (
 		<Panel {...rest}>
-			<Header title={item?.Name || 'Details'} />
+			<Header title={useHeaderLogo ? '' : (item?.Name || 'Details')}>
+				{useHeaderLogo && (
+					<slotBefore>
+						<div className={css.headerLogoWrap}>
+							<img
+								src={headerLogoUrl}
+								alt={item?.Name || 'Details'}
+								className={css.headerLogo}
+								onError={handleHeaderLogoError}
+							/>
+						</div>
+					</slotBefore>
+				)}
+			</Header>
 			{renderToast()}
 			{!loading && (
 				<div className={css.backdrop}>

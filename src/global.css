@@ -8,9 +8,10 @@
 
 /* Make panel headers transparent so backdrop imagery remains visible */
 .bf-header {
-	background: rgba(0, 0, 0, 0.35) !important;
-	backdrop-filter: blur(0.1rem) !important;
-	-webkit-backdrop-filter: blur(0.1rem) !important;
+	background: rgba(8, 12, 18, 0.82) !important;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+	backdrop-filter: blur(0.25rem) !important;
+	-webkit-backdrop-filter: blur(0.25rem) !important;
 	box-shadow: none !important;
 }
 
