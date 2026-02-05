@@ -1,35 +1,40 @@
 .favoritesContainer {
 	display: flex;
 	flex-direction: column;
-	min-height: calc(100vh + 9rem);
+	min-height: calc(100vh + 14rem);
 	background: #121212;
-	padding-top: 9rem;
-	margin-top: -9rem;
+	position: relative;
+	top: -12rem;
 }
 
 .filters {
 	display: flex;
 	gap: 0.75rem;
-	padding: 2rem 4rem 1.5rem;
+	padding: 14rem 4rem 1.5rem;
 	background: #121212;
 	position: sticky;
 	top: 0;
 	z-index: 10;
 	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
 }
 
 .filterButton {
-	min-width: auto;
-	padding: 0.5rem 1.25rem;
+	min-width: 7rem !important;
+	padding: 0.5rem 1.25rem !important;
+	background: rgba(255, 255, 255, 0.08) !important;
+	border: 1px solid rgba(255, 255, 255, 0.2) !important;
 	
 	&:global(.selected),
 	&[aria-pressed="true"] {
-		background: rgba(138, 180, 248, 0.3);
+		background: rgba(138, 180, 248, 0.3) !important;
+		border-color: rgba(138, 180, 248, 0.8) !important;
 	}
 }
 
 .refreshButton {
-	margin-left: auto;
+	margin-left: 0;
 }
 
 .loadingState {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Panel, Header } from '../components/BreezyPanels';
+import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
 import Scroller from '@enact/sandstone/Scroller';
@@ -372,12 +372,13 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		}
 		return '';
 	})();
+	const hasBackdropImage = Boolean(backdropUrl);
 
 	const headerLogoUrl = useMemo(() => {
 		if (!item) return '';
 		const logoItemId = item.Type === 'Episode' && item.SeriesId ? item.SeriesId : item.Id;
 		if (!logoItemId) return '';
-		return jellyfinService.getImageUrl(logoItemId, 'Logo', 800) || '';
+		return jellyfinService.getImageUrl(logoItemId, 'Logo', 1600) || '';
 	}, [item]);
 
 	const useHeaderLogo = Boolean(headerLogoUrl) && !headerLogoUnavailable;
@@ -813,24 +814,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	return (
 		<Panel {...rest}>
-			<Header title={headerTitle}>
-				{useHeaderLogo && (
-					<title>
-						<div className={css.headerLogoWrap}>
-							<img
-								src={headerLogoUrl}
-								alt={item?.Name || 'Details'}
-								className={css.headerLogo}
-								onError={handleHeaderLogoError}
-							/>
-						</div>
-					</title>
-				)}
-			</Header>
 			{renderToast()}
 			{!loading && (
-				<div className={css.backdrop}>
-					<img src={backdropUrl} alt={item.Name} />
+				<div className={`${css.backdrop} ${hasBackdropImage ? '' : css.backdropFallback}`}>
+					{hasBackdropImage && <img src={backdropUrl} alt={item.Name} />}
 					<div className={css.gradient} />
 				</div>
 			)}
@@ -846,11 +833,23 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 					) : (
 						<>
 							<div className={css.content}>
+								<div className={css.pageHeader}>
+									{useHeaderLogo ? (
+										<div className={css.headerLogoWrap}>
+											<img
+												src={headerLogoUrl}
+												alt={item?.Name || 'Details'}
+												className={css.headerLogo}
+												onError={handleHeaderLogoError}
+											/>
+										</div>
+									) : (
+										<Heading size="large" className={css.pageHeaderTitle}>
+											{headerTitle}
+										</Heading>
+									)}
+								</div>
 								<div className={css.header}>
-									<Heading size="large" className={css.title}>
-										{item.Name}
-									</Heading>
-
 									{item.Type === 'Episode' && (
 										<div className={css.episodeInfo}>
 											<div className={css.episodeNavActions}>

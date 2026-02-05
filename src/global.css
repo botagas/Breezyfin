@@ -8,11 +8,13 @@
 
 /* Make panel headers transparent so backdrop imagery remains visible */
 .bf-header {
-	background: rgba(8, 12, 18, 0.82) !important;
+	background: rgba(0, 0, 0, 0.22) !important;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-	backdrop-filter: blur(0.25rem) !important;
-	-webkit-backdrop-filter: blur(0.25rem) !important;
+	backdrop-filter: blur(0.15rem) !important;
+	-webkit-backdrop-filter: blur(0.15rem) !important;
 	box-shadow: none !important;
+	position: relative;
+	z-index: 120 !important;
 }
 
 /* Strip default Sandstone button chrome from Breezy button wrapper */
@@ -31,6 +33,18 @@
 .bf-button-bg {
 	box-shadow: none !important;
 	background: transparent !important;
+}
+
+/* Search input trigger (Sandstone Input button) */
+.bf-search-input,
+.bf-search-input:hover,
+.bf-search-input:focus,
+.bf-search-input:active {
+	background: rgba(255, 255, 255, 0.08) !important;
+	border: 1px solid rgba(255, 255, 255, 0.2) !important;
+	border-radius: 0.25rem !important;
+	box-shadow: none !important;
+	filter: none !important;
 }
 
 /* Shared toast styling across panels */

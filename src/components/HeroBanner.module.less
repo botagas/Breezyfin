@@ -66,7 +66,7 @@
 }
 
 .logoWrapper {
-	width: 20rem;
+	width: 50vw;
 	height: 10rem;
 	display: flex;
 	align-items: center;
@@ -76,8 +76,8 @@
 }
 
 .logo {
-	max-width: 100%;
-	max-height: 100%;
+	max-width: 50vw;
+	max-height: 10rem;
 	object-fit: contain;
 	filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.7));
 }
@@ -92,7 +92,7 @@
 .overview {
 	font-size: 1em;
 	line-height: 1.5;
-	margin: 0 0 12px 0;
+	margin: 1rem;
 	opacity: 0.95;
 	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
 	flex: 0 0 4.5rem;
@@ -106,10 +106,10 @@
 
 .metadata {
 	display: flex;
-	gap: 18px;
+	gap: 1rem;
 	font-size: 0.95em;
 	opacity: 0.9;
-	margin: 0 0.75rem 1.25rem 0.75rem
+	margin: 1rem;
 }
 
 .metadataItem {
@@ -119,14 +119,54 @@
 
 .buttons {
 	display: flex;
-	gap: 18px;
+	gap: 1rem;
 }
 
 .heroBannerButton {
-	background: transparent !important;
-	
-	& * {
+	color: #ffffff !important;
+	font-size: 0.84em !important;
+	font-weight: 700 !important;
+	min-height: 2rem !important;
+	padding: 0 1rem !important;
+	margin: 0 !important;
+
+	:global(.icon) {
+		font-size: 0.68rem !important;
+		width: 0.68rem !important;
+		height: 0.68rem !important;
+		margin-right: 0 !important;
+	}
+
+	:global(.bf-button-bg) {
 		background: transparent !important;
+		border: 1px solid rgba(255, 255, 255, 0.4) !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: #ffffff !important;
+		border-color: #ffffff !important;
+	}
+
+	&:hover,
+	&:hover *,
+	&:focus,
+	&:focus * {
+		color: #111 !important;
+	}
+
+	:global(.client) {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		gap: 0.45rem !important;
+		padding: 0 !important;
+	}
+
+	:global(.marquee) {
+		text-align: center !important;
 	}
 }
 

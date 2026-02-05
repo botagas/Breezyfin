@@ -199,11 +199,12 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 			<div className={css.searchContainer}>
 				<div className={css.searchBox}>
 					<Input
-						className={css.searchInput}
+						className={`bf-search-input ${css.searchInput}`}
 						placeholder="Search movies, shows, people..."
 						value={searchTerm}
 						onChange={handleSearchChange}
 						dismissOnEnter
+						size="small"
 					/>
 				</div>
 

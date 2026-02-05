@@ -124,7 +124,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 						<div className={css.controls}>
 							<div className={css.buttons}>
 								<Button
-									size="large"
+									size="small"
 									onClick={handlePlay}
 									icon="play"
 									className={css.heroBannerButton}
@@ -132,7 +132,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 									Play
 								</Button>
 								<Button
-									size="large"
+									size="small"
 									onClick={handleMoreInfo}
 									className={css.heroBannerButton}
 								>

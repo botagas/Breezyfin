@@ -150,9 +150,7 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 						onClick={loadFavorites}
 						size="small"
 						icon="refresh"
-					>
-						Refresh
-					</Button>
+					/>
 				</div>
 
 				{loading ? (

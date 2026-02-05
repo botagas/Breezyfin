@@ -1,41 +1,55 @@
 .searchContainer {
 	display: flex;
 	flex-direction: column;
-	min-height: calc(100vh + 9rem);
+	min-height: calc(100vh + 14rem);
 	background: #121212;
-	padding-top: 9rem;
-	margin-top: -9rem;
 	overflow: hidden;
+	position: relative;
+	top: -12rem;
 }
 
 .searchBox {
-	padding: 2rem 4rem 1rem;
+	padding: 14rem 4rem 0.75rem;
 	background: #121212;
 	z-index: 10;
 	flex-shrink: 0;
+	display: flex;
+	justify-content: center;
+	width: 100%;
+	box-sizing: border-box;
 }
 
 .searchInput {
-	width: 100%;
+	flex: 1 1 auto;
+	width: 100% !important;
+	max-width: none !important;
+	min-width: 0 !important;
+	margin: 0 !important;
+	display: block !important;
 	font-size: 1.2em;
 }
 
 .filters {
 	display: flex;
 	gap: 0.75rem;
-	padding: 0.5rem 4rem 1.5rem;
+	padding: 0.5rem 4rem 1rem;
+	justify-content: center;
+	flex-wrap: wrap;
 	background: #121212;
 	z-index: 10;
 	flex-shrink: 0;
 }
 
 .filterButton {
-	min-width: auto;
-	padding: 0.5rem 1.25rem;
+	min-width: 7rem !important;
+	padding: 0.5rem 1.25rem !important;
+	background: rgba(255, 255, 255, 0.08) !important;
+	border: 1px solid rgba(255, 255, 255, 0.2) !important;
 	
 	&:global(.selected),
 	&[aria-pressed="true"] {
-		background: rgba(138, 180, 248, 0.3);
+		background: rgba(138, 180, 248, 0.3) !important;
+		border-color: rgba(138, 180, 248, 0.8) !important;
 	}
 }
 
@@ -50,13 +64,21 @@
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	flex: 1;
+	height: 50vh;
 	opacity: 0.6;
 	text-align: center;
-	padding: 2rem;
-	width: 80vw;
-	max-width: 1200px;
+	padding: 2rem 4rem;
+	width: 100%;
+	max-width: none;
 	box-sizing: border-box;
+	align-self: center;
+}
+
+.emptyState :global(.BodyText) {
+	display: block;
+	width: 100%;
+	text-align: center;
+	margin: 0 auto;
 }
 
 .resultsScroller {

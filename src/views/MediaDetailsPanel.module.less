@@ -1,13 +1,13 @@
 .scroller {
-	min-height: calc(100vh + 0.75rem);
+	min-height: 100vh;
 	overflow-y: auto;
-	background: #121212;
-	margin-top: -9rem;
+	background: transparent;
+	margin-top: 0;
 }
 
 .detailsContainer {
 	min-height: 100vh;
-	background: rgba(18, 18, 18, 0.78);
+	background: rgba(18, 18, 18, 0.45);
 	position: relative;
 }
 
@@ -27,7 +27,6 @@
 	overflow: hidden;
 	z-index: 0;
 	pointer-events: none;
-	background: #121212;
 
 	img {
 		width: 100%;
@@ -56,7 +55,7 @@
 }
 
 .content {
-	padding: 10rem 48px 120px 48px;
+	padding: 1rem 48px 120px 48px;
 	position: relative;
 	z-index: 2;
 }
@@ -65,20 +64,41 @@
 	margin-bottom: 32px;
 }
 
+.backdropFallback {
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+}
+
 .headerLogoWrap {
 	display: flex;
-	align-items: center;
-	justify-content: center;
-	min-height: 2.2rem;
-	max-width: 30rem;
+	align-items: flex-start;
+	justify-content: flex-start;
+	min-height: 1rem;
+	max-width: 80vw;
 }
 
 .headerLogo {
 	display: block;
 	max-width: 100%;
-	max-height: 2.2rem;
+	max-height: 8rem;
 	width: auto;
 	object-fit: contain;
+}
+
+.pageHeader {
+	padding: 2.1rem 0 1.5rem;
+	margin-bottom: 24px;
+}
+
+.pageHeaderTitle {
+	color: #ffffff;
+	font-size: 1.875rem;
+	font-weight: 700;
+	line-height: 1.2;
+	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
 }
 
 .title {
@@ -526,7 +546,7 @@
 
 .stickyControls {
 	position: sticky;
-	top: 10rem;
+	top: 1rem;
 	background: rgba(18, 18, 18, 0.95);
 	padding: 16px 24px;
 	border-radius: 12px;
