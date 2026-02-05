@@ -237,7 +237,7 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 											onKeyDown={handleServerUrlKeyDown}
 											disabled={loading}
 											invalid={!serverUrlValid}
-											className={css.inputField}
+											className={`bf-input-trigger ${css.inputField}`}
 									/>
 								<Button
 									onClick={handleConnect}
@@ -256,7 +256,7 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 										onChange={handleUsernameChange}
 										disabled={loading}
 										onKeyDown={handleUsernameKeyDown}
-										className={css.inputField}
+										className={`bf-input-trigger ${css.inputField}`}
 									/>
 								<Input
 										type="password"
@@ -265,7 +265,7 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 										onChange={handlePasswordChange}
 										onKeyDown={handlePasswordKeyDown}
 										disabled={loading}
-										className={css.inputField}
+										className={`bf-input-trigger ${css.inputField}`}
 								/>
 								<div className={css.buttonRow}>
 									<Button onClick={handleBack} disabled={loading} size="large">

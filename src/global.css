@@ -35,16 +35,54 @@
 	background: transparent !important;
 }
 
-/* Search input trigger (Sandstone Input button) */
-.bf-search-input,
-.bf-search-input:hover,
-.bf-search-input:focus,
-.bf-search-input:active {
-	background: rgba(255, 255, 255, 0.08) !important;
-	border: 1px solid rgba(255, 255, 255, 0.2) !important;
-	border-radius: 0.25rem !important;
+/* Sandstone Input trigger (used in Login/Search panels) */
+.bf-input-trigger {
+	background: transparent !important;
+	border: none !important;
+	border-radius: 999px !important;
 	box-shadow: none !important;
 	filter: none !important;
+	color: #ffffff !important;
+	margin: 0 !important;
+}
+
+.bf-input-trigger.focusExpand {
+	margin: 0.03rem !important;
+}
+
+.bf-input-trigger::before,
+.bf-input-trigger::after,
+.bf-input-trigger [class*="bg"],
+.bf-input-trigger [class*="client"] {
+	box-shadow: none !important;
+	filter: none !important;
+}
+
+.bf-input-trigger::before,
+.bf-input-trigger::after {
+	content: none !important;
+	display: none !important;
+}
+
+.bf-input-trigger [class*="bg"] {
+	background: rgba(255, 255, 255, 0.015) !important;
+	border: 1px solid rgba(255, 255, 255, 0.22) !important;
+	border-radius: 999px !important;
+	opacity: 1 !important;
+	transform: scale(1) !important;
+}
+
+.bf-input-trigger:hover [class*="bg"],
+.bf-input-trigger:focus [class*="bg"],
+.bf-input-trigger:active [class*="bg"] {
+	background: rgba(255, 255, 255, 0.03) !important;
+	border-color: rgba(255, 255, 255, 0.32) !important;
+	opacity: 1 !important;
+	transform: scale(1.01) !important;
+}
+
+.bf-input-trigger * {
+	color: #ffffff !important;
 }
 
 /* Shared toast styling across panels */
