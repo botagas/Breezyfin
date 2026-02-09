@@ -13,7 +13,7 @@ import css from './SearchPanel.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
+const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
@@ -190,12 +190,13 @@ const SearchPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) =>
 	return (
 		<Panel {...rest}>
 			<Header title="Search" />
-			<Toolbar
-				activeSection="search"
-				onNavigate={onNavigate}
-				onLogout={onLogout}
-				onExit={onExit}
-			/>
+				<Toolbar
+					activeSection="search"
+					onNavigate={onNavigate}
+					onSwitchUser={onSwitchUser}
+					onLogout={onLogout}
+					onExit={onExit}
+				/>
 			<div className={css.searchContainer}>
 				<div className={css.searchBox}>
 					<Input

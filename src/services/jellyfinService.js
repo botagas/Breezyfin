@@ -79,13 +79,14 @@ class JellyfinService {
 				}));
 
 				// Persist to multi-server store
-				const saved = serverManager.addServer({
-					serverUrl: this.serverUrl,
-					serverName: this.serverName,
-					userId: this.userId,
-					username: this.username,
-					accessToken: this.accessToken
-				});
+					const saved = serverManager.addServer({
+						serverUrl: this.serverUrl,
+						serverName: this.serverName,
+						userId: this.userId,
+						username: this.username,
+						accessToken: this.accessToken,
+						avatarTag: data.User?.PrimaryImageTag || null
+					});
 				if (saved) {
 					serverManager.setActiveServer(saved.serverId, saved.userId);
 				}
@@ -133,13 +134,14 @@ class JellyfinService {
 			this.api = this.jellyfin.createApi(serverUrl, accessToken);
 
 			// Promote to server manager for future use
-			const saved = serverManager.addServer({
-				serverUrl,
-				serverName: serverUrl,
-				userId: storedUserId,
-				username: 'User',
-				accessToken: accessToken
-			});
+				const saved = serverManager.addServer({
+					serverUrl,
+					serverName: serverUrl,
+					userId: storedUserId,
+					username: 'User',
+					accessToken: accessToken,
+					avatarTag: null
+				});
 			if (saved) {
 				serverManager.setActiveServer(saved.serverId, saved.userId);
 			}
@@ -155,6 +157,18 @@ class JellyfinService {
 		if (active?.id && active?.activeUser?.userId) {
 			serverManager.removeUser(active.id, active.activeUser.userId);
 		}
+		serverManager.clearActive();
+		this.api = null;
+		this.userId = null;
+		this.serverUrl = null;
+		this.accessToken = null;
+		this.serverName = null;
+		this.username = null;
+	}
+
+	// Leave the current session but keep saved accounts for quick switching.
+	switchUser() {
+		localStorage.removeItem('jellyfinAuth');
 		serverManager.clearActive();
 		this.api = null;
 		this.userId = null;
@@ -300,6 +314,16 @@ class JellyfinService {
 			}
 		})
 			.then(res => res.json())
+			.then((user) => {
+				const active = serverManager.getActiveServer();
+				if (active?.id && active?.activeUser?.userId) {
+					serverManager.updateUser(active.id, active.activeUser.userId, {
+						username: user?.Name || active.activeUser.username || 'User',
+						avatarTag: user?.PrimaryImageTag || null
+					});
+				}
+				return user;
+			})
 			.catch(err => {
 				console.error('Failed to get current user:', err);
 				return null;

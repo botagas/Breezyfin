@@ -3,12 +3,15 @@ import { Panel, Header } from '../components/BreezyPanels';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
+import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 
 import css from './LibraryPanel.module.less';
 
-const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
+const SpottableDiv = Spottable('div');
+
+const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [items, setItems] = useState([]);
 	const itemsById = useMemo(() => {
@@ -49,26 +52,6 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, ...
 		onItemSelect(selectedItem);
 	}, [itemsById, onItemSelect]);
 
-	const handleGridCardKeyDown = useCallback((e) => {
-		const card = e.currentTarget;
-		const cards = Array.from(card.parentElement.querySelectorAll(`.${css.gridCard}`));
-		const idx = cards.indexOf(card);
-		const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
-		if (e.keyCode === 37 && idx > 0) { // left
-			e.preventDefault();
-			cards[idx - 1].focus();
-		} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
-			e.preventDefault();
-			cards[idx + 1].focus();
-		} else if (e.keyCode === 38 && idx - columns >= 0) { // up
-			e.preventDefault();
-			cards[idx - columns].focus();
-		} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
-			e.preventDefault();
-			cards[idx + columns].focus();
-		}
-	}, []);
-
 	const handleGridImageError = useCallback((e) => {
 		e.target.style.display = 'none';
 		e.target.parentElement.classList.add(css.placeholder);
@@ -94,13 +77,14 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, ...
 		return (
 			<Panel {...rest}>
 				<Header title={library?.Name || 'Library'} />
-				<Toolbar
-					activeSection="library"
-					activeLibraryId={library?.Id}
-					onNavigate={onNavigate}
-					onLogout={onLogout}
-					onExit={onExit}
-				/>
+					<Toolbar
+						activeSection="library"
+						activeLibraryId={library?.Id}
+						onNavigate={onNavigate}
+						onSwitchUser={onSwitchUser}
+						onLogout={onLogout}
+						onExit={onExit}
+					/>
 				<div className={css.loading}>
 					<Spinner />
 				</div>
@@ -111,24 +95,23 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, ...
 	return (
 		<Panel {...rest}>
 			<Header title={library?.Name || 'Library'} />
-			<Toolbar
-				activeSection="library"
-				activeLibraryId={library?.Id}
-				onNavigate={onNavigate}
-				onLogout={onLogout}
-				onExit={onExit}
-			/>
+				<Toolbar
+					activeSection="library"
+					activeLibraryId={library?.Id}
+					onNavigate={onNavigate}
+					onSwitchUser={onSwitchUser}
+					onLogout={onLogout}
+					onExit={onExit}
+				/>
 			<Scroller className={css.scroller}>
 				<div className={css.gridContainer}>
 						{items.map(item => (
-							<div
-								key={item.Id}
-								data-item-id={item.Id}
-								className={css.gridCard}
-								onClick={handleGridCardClick}
-								tabIndex={0}
-								onKeyDown={handleGridCardKeyDown}
-							>
+								<SpottableDiv
+									key={item.Id}
+									data-item-id={item.Id}
+									className={css.gridCard}
+									onClick={handleGridCardClick}
+								>
 							<div className={css.cardImage}>
 									<img
 										src={getImageUrl(item.Id, item)}
@@ -153,7 +136,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onLogout, onExit, ...
 							{item.ProductionYear && (
 								<BodyText className={css.cardSubtitle}>{item.ProductionYear}</BodyText>
 							)}
-						</div>
+						</SpottableDiv>
 					))}
 				</div>
 			</Scroller>

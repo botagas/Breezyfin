@@ -44,6 +44,8 @@
 	filter: none !important;
 	color: #ffffff !important;
 	margin: 0 !important;
+	overflow: hidden !important;
+	transition: transform 0.14s ease, box-shadow 0.14s ease !important;
 }
 
 .bf-input-trigger.focusExpand {
@@ -52,8 +54,8 @@
 
 .bf-input-trigger::before,
 .bf-input-trigger::after,
-.bf-input-trigger [class*="bg"],
-.bf-input-trigger [class*="client"] {
+.bf-input-trigger > div:first-of-type,
+.bf-input-trigger > div:nth-of-type(2) {
 	box-shadow: none !important;
 	filter: none !important;
 }
@@ -64,20 +66,29 @@
 	display: none !important;
 }
 
-.bf-input-trigger [class*="bg"] {
+.bf-input-trigger > div:first-of-type {
 	background: rgba(255, 255, 255, 0.015) !important;
 	border: 1px solid rgba(255, 255, 255, 0.22) !important;
 	border-radius: 999px !important;
 	opacity: 1 !important;
-	transform: scale(1) !important;
+	transform: none !important;
+	transition: background 0.14s ease, border-color 0.14s ease !important;
 }
 
-.bf-input-trigger:hover [class*="bg"],
-.bf-input-trigger:focus [class*="bg"],
-.bf-input-trigger:active [class*="bg"] {
+.bf-input-trigger:hover > div:first-of-type,
+.bf-input-trigger:focus > div:first-of-type,
+.bf-input-trigger:active > div:first-of-type,
+.bf-input-trigger.spottable:focus > div:first-of-type {
 	background: rgba(255, 255, 255, 0.03) !important;
 	border-color: rgba(255, 255, 255, 0.32) !important;
 	opacity: 1 !important;
+	transform: none !important;
+}
+
+.bf-input-trigger:hover,
+.bf-input-trigger:focus,
+.bf-input-trigger:active,
+.bf-input-trigger.spottable:focus {
 	transform: scale(1.01) !important;
 }
 

@@ -19,7 +19,7 @@ const HOME_ROW_ORDER = [
 	'latestShows'
 ];
 
-const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
+const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [heroItems, setHeroItems] = useState([]);
 	const [recentlyAdded, setRecentlyAdded] = useState([]);
@@ -267,12 +267,13 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 	if (loading) {
 		return (
 			<Panel {...rest}>
-				<Toolbar
-					activeSection="home"
-					onNavigate={handleNavigation}
-					onLogout={onLogout}
-					onExit={onExit}
-				/>
+					<Toolbar
+						activeSection="home"
+						onNavigate={handleNavigation}
+						onSwitchUser={onSwitchUser}
+						onLogout={onLogout}
+						onExit={onExit}
+					/>
 				<div className={css.loading}>
 					<Spinner />
 				</div>
@@ -282,12 +283,13 @@ const HomePanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
 
 	return (
 		<Panel {...rest}>
-			<Toolbar
-				activeSection="home"
-				onNavigate={handleNavigation}
-				onLogout={onLogout}
-				onExit={onExit}
-			/>
+				<Toolbar
+					activeSection="home"
+					onNavigate={handleNavigation}
+					onSwitchUser={onSwitchUser}
+					onLogout={onLogout}
+					onExit={onExit}
+				/>
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>
 					<div className={css.emptyState}>

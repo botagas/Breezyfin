@@ -18,7 +18,7 @@ const FILTERS = [
 	{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
 ];
 
-const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
+const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
@@ -125,12 +125,13 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 	return (
 		<Panel {...rest}>
 			<Header title="Favorites" />
-			<Toolbar
-				activeSection="favorites"
-				onNavigate={onNavigate}
-				onLogout={onLogout}
-				onExit={onExit}
-			/>
+				<Toolbar
+					activeSection="favorites"
+					onNavigate={onNavigate}
+					onSwitchUser={onSwitchUser}
+					onLogout={onLogout}
+					onExit={onExit}
+				/>
 			<div className={css.favoritesContainer}>
 					<div className={css.filters}>
 						{FILTERS.map(filter => (

@@ -27,6 +27,14 @@ const App = (props) => {
 	const detailsBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
 
+	const resetSessionState = useCallback(() => {
+		setSelectedItem(null);
+		setSelectedLibrary(null);
+		setPlaybackOptions(null);
+		setPreviousItem(null);
+		setPlayerControlsVisible(true);
+	}, []);
+
 	useEffect(() => {
 		// Try to restore session on load
 		const restored = jellyfinService.restoreSession();
@@ -131,11 +139,21 @@ const App = (props) => {
 
 	const handleLogout = useCallback(() => {
 		jellyfinService.logout();
+		resetSessionState();
 		setCurrentView('login');
-		setSelectedItem(null);
-		setSelectedLibrary(null);
-		setPlaybackOptions(null);
-	}, []);
+	}, [resetSessionState]);
+
+	const handleSignOut = useCallback(() => {
+		jellyfinService.logout();
+		resetSessionState();
+		setCurrentView('login');
+	}, [resetSessionState]);
+
+	const handleSwitchUser = useCallback(() => {
+		jellyfinService.switchUser();
+		resetSessionState();
+		setCurrentView('login');
+	}, [resetSessionState]);
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
 		// Track the previous item for back navigation (e.g., series -> episode)
@@ -232,44 +250,50 @@ const App = (props) => {
 				index={getPanelIndex()}
 				onBack={handleBack}
 			>
-				<LoginPanel onLogin={handleLogin} />
-				<HomePanel
-					onItemSelect={handleItemSelect}
-					onNavigate={handleNavigate}
-					onLogout={handleLogout}
-					onExit={handleExit}
-					noCloseButton
-				/>
-				<LibraryPanel
-					library={selectedLibrary}
-					onItemSelect={handleItemSelect}
-					onNavigate={handleNavigate}
-					onLogout={handleLogout}
-					onExit={handleExit}
-					onBack={handleBackToHome}
-					noCloseButton
-				/>
-				<SearchPanel
-					onItemSelect={handleItemSelect}
-					onNavigate={handleNavigate}
-					onLogout={handleLogout}
-					onExit={handleExit}
-					noCloseButton
-				/>
-				<FavoritesPanel
-					onItemSelect={handleItemSelect}
-					onNavigate={handleNavigate}
-					onLogout={handleLogout}
-					onExit={handleExit}
-					noCloseButton
-				/>
-				<SettingsPanel
-					isActive={currentView === 'settings'}
-					onNavigate={handleNavigate}
-					onLogout={handleLogout}
-					onExit={handleExit}
-					noCloseButton
-				/>
+					<LoginPanel onLogin={handleLogin} isActive={currentView === 'login'} />
+					<HomePanel
+						onItemSelect={handleItemSelect}
+						onNavigate={handleNavigate}
+						onSwitchUser={handleSwitchUser}
+						onLogout={handleLogout}
+						onExit={handleExit}
+						noCloseButton
+					/>
+					<LibraryPanel
+						library={selectedLibrary}
+						onItemSelect={handleItemSelect}
+						onNavigate={handleNavigate}
+						onSwitchUser={handleSwitchUser}
+						onLogout={handleLogout}
+						onExit={handleExit}
+						onBack={handleBackToHome}
+						noCloseButton
+					/>
+					<SearchPanel
+						onItemSelect={handleItemSelect}
+						onNavigate={handleNavigate}
+						onSwitchUser={handleSwitchUser}
+						onLogout={handleLogout}
+						onExit={handleExit}
+						noCloseButton
+					/>
+					<FavoritesPanel
+						onItemSelect={handleItemSelect}
+						onNavigate={handleNavigate}
+						onSwitchUser={handleSwitchUser}
+						onLogout={handleLogout}
+						onExit={handleExit}
+						noCloseButton
+					/>
+						<SettingsPanel
+							isActive={currentView === 'settings'}
+							onNavigate={handleNavigate}
+							onSwitchUser={handleSwitchUser}
+							onLogout={handleLogout}
+							onSignOut={handleSignOut}
+							onExit={handleExit}
+							noCloseButton
+						/>
 					<MediaDetailsPanel
 						isActive={currentView === 'details'}
 						item={selectedItem}

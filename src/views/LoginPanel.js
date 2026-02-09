@@ -6,20 +6,22 @@ import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import Input from '@enact/sandstone/Input';
-import Item from '@enact/sandstone/Item';
+import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import {getUserErrorMessage} from '../utils/errorMessages';
 
 import css from './LoginPanel.module.less';
 
-const LoginPanel = ({ onLogin, ...rest }) => {
+const SpottableDiv = Spottable('div');
+
+const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
 	const [status, setStatus] = useState('');
-	const [step, setStep] = useState('server'); // 'server' or 'login'
+	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'login'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
 	const savedServersByKey = useMemo(() => {
@@ -31,11 +33,19 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 		return map;
 	}, [savedServers]);
 
+	const getInitialStep = useCallback((entries) => {
+		return entries.length > 0 ? 'saved' : 'server';
+	}, []);
+
 	const refreshSavedServers = useCallback(() => {
 		try {
-			setSavedServers(jellyfinService.getSavedServers() || []);
+			const entries = jellyfinService.getSavedServers() || [];
+			setSavedServers(entries);
+			return entries;
 		} catch (err) {
 			console.error('Failed to load saved servers:', err);
+			setSavedServers([]);
+			return [];
 		}
 	}, []);
 
@@ -44,19 +54,27 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 		if (lastServer) {
 			setServerUrl(lastServer);
 		}
-		refreshSavedServers();
-	}, [refreshSavedServers]);
+		const entries = refreshSavedServers();
+		setStep(getInitialStep(entries));
+	}, [getInitialStep, refreshSavedServers]);
+
+	useEffect(() => {
+		if (!isActive) return;
+		const entries = refreshSavedServers();
+		setStep(getInitialStep(entries));
+		setUsername('');
+		setPassword('');
+		setError(null);
+		setStatus('');
+		setResumingKey(null);
+		setLoading(false);
+	}, [getInitialStep, isActive, refreshSavedServers]);
 
 	const normalizedServerUrl = useMemo(
 		() => serverUrl.trim().replace(/\/+$/, ''),
 		[serverUrl]
 	);
 	const serverUrlValid = /^https?:\/\//i.test(normalizedServerUrl);
-
-	const resetMessages = useCallback(() => {
-		setError(null);
-		setStatus('');
-	}, []);
 
 	const handleConnect = useCallback(async () => {
 		if (!serverUrlValid) {
@@ -104,9 +122,16 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 	}, [onLogin, password, refreshSavedServers, username]);
 
 	const handleBack = useCallback(() => {
+		setError(null);
+		setStatus('');
+		setStep(savedServers.length > 0 ? 'saved' : 'server');
+	}, [savedServers.length]);
+
+	const handleManualLogin = useCallback(() => {
+		setError(null);
+		setStatus('');
 		setStep('server');
-		resetMessages();
-	}, [resetMessages]);
+	}, []);
 
 	const handleResume = useCallback(async (entry) => {
 		if (!entry) return;
@@ -117,7 +142,6 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 		setStatus('Restoring saved session...');
 		try {
 			jellyfinService.setActiveServer(entry.serverId, entry.userId);
-			// Validate quickly by fetching user info; failures will return null/throw
 			const user = await jellyfinService.getCurrentUser();
 			if (!user) {
 				throw new Error('Session is no longer valid');
@@ -126,14 +150,14 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 		} catch (err) {
 			console.error('Failed to resume session:', err);
 			setError(getUserErrorMessage(err, 'Could not resume saved session. Please sign in again.'));
-			setStep('server');
+			setStep(savedServers.length > 0 ? 'saved' : 'server');
 		} finally {
 			setLoading(false);
 			setResumingKey(null);
 			setStatus('');
 			refreshSavedServers();
 		}
-	}, [onLogin, refreshSavedServers]);
+	}, [onLogin, refreshSavedServers, savedServers.length]);
 
 	const handleResumeClick = useCallback((event) => {
 		const key = event.currentTarget.dataset.resumeKey;
@@ -172,6 +196,34 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 		}
 	}, [handleLogin]);
 
+	const getSavedUserAvatarUrl = useCallback((entry) => {
+		if (!entry?.url || !entry?.userId || !entry?.accessToken) return '';
+		const base = `${entry.url}/Users/${entry.userId}/Images/Primary`;
+		const params = new URLSearchParams({
+			width: '88',
+			api_key: entry.accessToken
+		});
+		if (entry.avatarTag) {
+			params.set('tag', entry.avatarTag);
+		}
+		return `${base}?${params.toString()}`;
+	}, []);
+
+	const handleSavedAvatarError = useCallback((event) => {
+		event.currentTarget.style.display = 'none';
+	}, []);
+
+	const headingText = step === 'saved'
+		? 'Choose Account'
+		: step === 'server'
+			? 'Connect to Jellyfin Server'
+			: 'Sign In';
+	const leadText = step === 'saved'
+		? 'Select a saved account, or continue with manual login.'
+		: step === 'server'
+			? 'Enter your Jellyfin server URL to get started.'
+			: 'Use your Jellyfin credentials to sign in.';
+
 	return (
 		<Panel {...rest} noCloseButton>
 			<Scroller>
@@ -179,66 +231,69 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 					<div className={css.loginBox}>
 						<div className={css.header}>
 							<Heading size="large" spacing="medium">
-								{step === 'server' ? 'Connect to Jellyfin Server' : 'Sign In'}
+								{headingText}
 							</Heading>
 							{loading && <Spinner className={css.inlineSpinner} />}
 						</div>
 
-						{savedServers.length > 0 && (
+						<BodyText className={css.lead}>{leadText}</BodyText>
+
+						{step === 'saved' ? (
 							<div className={css.savedServers}>
-								<div className={css.savedHeader}>
-									<Heading size="small" spacing="none">Saved servers</Heading>
-									<BodyText className={css.savedHint}>Jump back into a remembered server without re-entering credentials.</BodyText>
-								</div>
 								<div className={css.savedList}>
 									{savedServers.map((entry) => {
 										const key = `${entry.serverId}:${entry.userId}`;
+										const isResuming = resumingKey === key;
+										const userInitial = (entry.username || '?').charAt(0).toUpperCase();
+										const avatarUrl = getSavedUserAvatarUrl(entry);
 										return (
-												<Item
-													key={key}
-													data-resume-key={key}
-													className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
-													onClick={handleResumeClick}
-												>
-												<div className={css.savedMain}>
-													<div className={css.savedTitle}>{entry.serverName || 'Jellyfin Server'}</div>
-													<div className={css.savedMeta}>{entry.username} • {entry.url}</div>
+											<SpottableDiv
+												key={key}
+												data-resume-key={key}
+												className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
+												onClick={handleResumeClick}
+											>
+												<div className={css.savedAvatar}>
+													{avatarUrl && (
+														<img
+															src={avatarUrl}
+															alt={`${entry.username || 'User'} avatar`}
+															onError={handleSavedAvatarError}
+														/>
+													)}
+													<span className={css.savedAvatarFallback}>{userInitial}</span>
 												</div>
-												<div className={css.savedActions}>
-													<Button
-														size="small"
-														minWidth={false}
-														disabled={loading}
-														selected={resumingKey === key}
-													>
-														{resumingKey === key ? 'Resuming...' : 'Resume'}
-													</Button>
-												</div>
-											</Item>
+												<BodyText className={css.savedName}>
+													{entry.username || 'User'}
+												</BodyText>
+												<BodyText className={css.savedState}>
+													{isResuming ? 'Opening...' : (entry.serverName || 'Jellyfin Server')}
+												</BodyText>
+											</SpottableDiv>
 										);
 									})}
 								</div>
+								<Button
+									onClick={handleManualLogin}
+									disabled={loading}
+									size="large"
+									className={css.manualLoginButton}
+								>
+									Log in manually
+								</Button>
 							</div>
-						)}
-
-						<BodyText className={css.lead}>
-							{step === 'server'
-								? 'Enter your Jellyfin server URL to get started.'
-								: 'Use your Jellyfin credentials to sign in.'}
-						</BodyText>
-
-						{step === 'server' ? (
+						) : step === 'server' ? (
 							<div className={css.form}>
-										<Input
-											type="url"
-											placeholder="http://192.168.1.100:8096"
-											value={serverUrl}
-											onChange={handleServerUrlChange}
-											onKeyDown={handleServerUrlKeyDown}
-											disabled={loading}
-											invalid={!serverUrlValid}
-											className={`bf-input-trigger ${css.inputField}`}
-									/>
+								<Input
+									type="url"
+									placeholder="http://192.168.1.100:8096"
+									value={serverUrl}
+									onChange={handleServerUrlChange}
+									onKeyDown={handleServerUrlKeyDown}
+									disabled={loading}
+									invalid={!serverUrlValid}
+									className={`bf-input-trigger ${css.inputField}`}
+								/>
 								<Button
 									onClick={handleConnect}
 									disabled={!serverUrlValid || loading}
@@ -250,22 +305,22 @@ const LoginPanel = ({ onLogin, ...rest }) => {
 						) : (
 							<div className={css.form}>
 								<BodyText className={css.serverInfo}>Server: {serverUrl}</BodyText>
-									<Input
-										placeholder="Username"
-										value={username}
-										onChange={handleUsernameChange}
-										disabled={loading}
-										onKeyDown={handleUsernameKeyDown}
-										className={`bf-input-trigger ${css.inputField}`}
-									/>
 								<Input
-										type="password"
-										placeholder="Password"
-										value={password}
-										onChange={handlePasswordChange}
-										onKeyDown={handlePasswordKeyDown}
-										disabled={loading}
-										className={`bf-input-trigger ${css.inputField}`}
+									placeholder="Username"
+									value={username}
+									onChange={handleUsernameChange}
+									disabled={loading}
+									onKeyDown={handleUsernameKeyDown}
+									className={`bf-input-trigger ${css.inputField}`}
+								/>
+								<Input
+									type="password"
+									placeholder="Password"
+									value={password}
+									onChange={handlePasswordChange}
+									onKeyDown={handlePasswordKeyDown}
+									disabled={loading}
+									className={`bf-input-trigger ${css.inputField}`}
 								/>
 								<div className={css.buttonRow}>
 									<Button onClick={handleBack} disabled={loading} size="large">

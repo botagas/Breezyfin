@@ -71,7 +71,7 @@ const LANGUAGE_OPTIONS = [
 	{ value: 'rus', label: 'Russian' }
 ];
 
-const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest }) => {
+const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, isActive = false, ...rest }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
@@ -252,8 +252,12 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 
 	const handleLogoutConfirm = useCallback(() => {
 		setLogoutConfirmOpen(false);
+		if (typeof onSignOut === 'function') {
+			onSignOut();
+			return;
+		}
 		onLogout();
-	}, [onLogout]);
+	}, [onLogout, onSignOut]);
 
 	const openLogsPopup = useCallback(() => {
 		setAppLogs(getAppLogs().slice().reverse());
@@ -460,6 +464,7 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 			<Toolbar
 				activeSection="settings"
 				onNavigate={onNavigate}
+				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}
 				onExit={onExit}
 			/>

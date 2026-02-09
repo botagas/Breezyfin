@@ -10,7 +10,7 @@ import css from './Toolbar.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, onLogout, onExit }) => {
+const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, onSwitchUser, onLogout, onExit }) => {
 	const [libraries, setLibraries] = useState([]);
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [userName, setUserName] = useState('User');
@@ -56,9 +56,9 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 		});
 	};
 
-	const handleCenterFocus = useCallback((e) => {
-		if (!centerRef.current || !centerRef.current.contains(e.target)) return;
-		const target = e.target.closest(`.${css.iconButton}, .${css.toolbarButton}`);
+	const handleCenterFocus = useCallback((event) => {
+		if (!centerRef.current || !centerRef.current.contains(event.target)) return;
+		const target = event.target.closest(`.${css.iconButton}, .${css.toolbarButton}`);
 		if (!target) return;
 
 		const scroller = centerRef.current;
@@ -71,6 +71,22 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 
 	const handleUserMenuClose = useCallback(() => {
 		setShowUserMenu(false);
+	}, []);
+
+	const handleUserContainerFocus = useCallback(() => {
+		setShowUserMenu(true);
+	}, []);
+
+	const handleUserContainerBlur = useCallback((event) => {
+		const nextFocused = event.relatedTarget;
+		if (nextFocused && event.currentTarget.contains(nextFocused)) {
+			return;
+		}
+		setShowUserMenu(false);
+	}, []);
+
+	const handleUserButtonClick = useCallback(() => {
+		setShowUserMenu((prevOpen) => !prevOpen);
 	}, []);
 
 	const handleNavigateHome = useCallback(() => {
@@ -101,18 +117,46 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 		}
 	}, [librariesById, onNavigate]);
 
-		return (
+	const handleLogoutClick = useCallback(() => {
+		setShowUserMenu(false);
+		if (typeof onLogout === 'function') {
+			onLogout();
+		}
+	}, [onLogout]);
+
+	const handleSwitchUserClick = useCallback(() => {
+		setShowUserMenu(false);
+		if (typeof onSwitchUser === 'function') {
+			onSwitchUser();
+			return;
+		}
+		if (typeof onLogout === 'function') {
+			onLogout();
+		}
+	}, [onLogout, onSwitchUser]);
+
+	const handleExitClick = useCallback(() => {
+		setShowUserMenu(false);
+		if (typeof onExit === 'function') {
+			onExit();
+		}
+	}, [onExit]);
+
+	return (
 		<div className={css.toolbar}>
 			<div className={css.start}>
-					<div
-						className={css.userContainer}
-						onMouseEnter={handleUserMenuOpen}
-						onMouseLeave={handleUserMenuClose}
-					>
+				<div
+					className={css.userContainer}
+					onMouseEnter={handleUserMenuOpen}
+					onMouseLeave={handleUserMenuClose}
+					onFocus={handleUserContainerFocus}
+					onBlur={handleUserContainerBlur}
+				>
 					<Button
 						size="small"
 						className={css.userButton}
 						aria-label="User Profile"
+						onClick={handleUserButtonClick}
 					>
 						{userName}
 					</Button>
@@ -120,14 +164,21 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 						<div className={css.userMenu}>
 							<Button
 								size="small"
-								onClick={onLogout}
+								onClick={handleLogoutClick}
 								className={css.menuButton}
 							>
-								Logout
+								Log Out
 							</Button>
 							<Button
 								size="small"
-								onClick={onExit}
+								onClick={handleSwitchUserClick}
+								className={css.menuButton}
+							>
+								Switch User
+							</Button>
+							<Button
+								size="small"
+								onClick={handleExitClick}
 								className={css.menuButton}
 							>
 								Exit
@@ -137,60 +188,60 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 				</div>
 			</div>
 			<div className={css.center} ref={centerRef} onFocus={handleCenterFocus}>
-					<SpottableDiv
-						onClick={handleNavigateHome}
-						className={`${css.iconButton} ${activeSection === 'home' ? css.selected : ''}`}
-						aria-label="Home"
-					>
+				<SpottableDiv
+					onClick={handleNavigateHome}
+					className={`${css.iconButton} ${activeSection === 'home' ? css.selected : ''}`}
+					aria-label="Home"
+				>
 					<Icon size="small">home</Icon>
 				</SpottableDiv>
 
-					<SpottableDiv
-						onClick={handleNavigateSearch}
-						className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
-						aria-label="Search"
-					>
+				<SpottableDiv
+					onClick={handleNavigateSearch}
+					className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
+					aria-label="Search"
+				>
 					<Icon size="small">search</Icon>
 				</SpottableDiv>
 
-					<SpottableDiv
-						onClick={handleNavigateShuffle}
-						className={css.iconButton}
-						aria-label="Shuffle"
-					>
+				<SpottableDiv
+					onClick={handleNavigateShuffle}
+					className={css.iconButton}
+					aria-label="Shuffle"
+				>
 					<Icon size="small">arrowhookright</Icon>
 				</SpottableDiv>
 
-					<SpottableDiv
-						onClick={handleNavigateFavorites}
-						className={css.iconButton}
-						aria-label="Favorites"
-					>
+				<SpottableDiv
+					onClick={handleNavigateFavorites}
+					className={css.iconButton}
+					aria-label="Favorites"
+				>
 					<Icon size="small">star</Icon>
 				</SpottableDiv>
 
 				{libraries.map((library) => (
 					<Button
 						key={library.Id}
-							size="small"
-							backgroundOpacity="transparent"
-							shadowed={false}
-							data-library-id={library.Id}
-							onClick={handleLibraryNavigate}
-							selected={activeSection === 'library' && activeLibraryId === library.Id}
-							className={css.toolbarButton}
-						>
+						size="small"
+						backgroundOpacity="transparent"
+						shadowed={false}
+						data-library-id={library.Id}
+						onClick={handleLibraryNavigate}
+						selected={activeSection === 'library' && activeLibraryId === library.Id}
+						className={css.toolbarButton}
+					>
 						{library.Name}
 					</Button>
 				))}
 			</div>
 
-				<div className={css.end}>
-					<SpottableDiv
-						onClick={handleNavigateSettings}
-						className={css.iconButton}
-						aria-label="Settings"
-					>
+			<div className={css.end}>
+				<SpottableDiv
+					onClick={handleNavigateSettings}
+					className={css.iconButton}
+					aria-label="Settings"
+				>
 					<Icon size="small">gear</Icon>
 				</SpottableDiv>
 				<BodyText className={css.clock}>{formatTime()}</BodyText>

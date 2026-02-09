@@ -146,70 +146,103 @@
 }
 
 .savedServers {
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.06);
-	border-radius: 12px;
-	padding: 16px 18px;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	padding: 0;
 	margin-bottom: 12px;
-}
-
-.savedHeader {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	margin-bottom: 12px;
-}
-
-.savedHint {
-	opacity: 0.72;
-	font-size: 0.95em;
 }
 
 .savedList {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+	gap: 1.25rem 1rem;
+	justify-items: center;
 }
 
 .savedItem {
-	display: grid !important;
-	grid-template-columns: 1fr auto;
+	display: flex !important;
+	flex-direction: column;
 	align-items: center;
-	background: rgba(0, 0, 0, 0.25) !important;
-	border-radius: 10px;
-	padding: 10px 12px !important;
+	justify-content: flex-start;
+	gap: 0.5rem;
+	background: transparent !important;
+	border-radius: 12px;
+	padding: 0.4rem 0.25rem !important;
 	border: 1px solid transparent;
+	width: 100%;
+	max-width: 10rem;
+	min-height: 9.5rem;
+	transition: transform 0.18s ease, border-color 0.18s ease;
 }
 
 .savedItem:global(.spottable):focus {
-	border-color: rgba(255, 255, 255, 0.22);
+	border-color: rgba(255, 255, 255, 0.24);
+	transform: scale(1.05);
 }
 
 .activeSaved {
-	border-color: rgba(0, 200, 255, 0.4);
+	border-color: rgba(0, 200, 255, 0.4) !important;
 }
 
-.savedMain {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
+.savedAvatar {
+	width: 5.6rem;
+	height: 5.6rem;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.12);
+	border: 2px solid rgba(255, 255, 255, 0.18);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
 	overflow: hidden;
-}
-
-.savedTitle {
+	flex-shrink: 0;
 	font-weight: 700;
+	font-size: 1.35rem;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		position: absolute;
+		inset: 0;
+	}
 }
 
-.savedMeta {
-	opacity: 0.75;
-	font-size: 0.95em;
-	white-space: nowrap;
+.savedAvatarFallback {
+	position: relative;
+	z-index: 0;
+}
+
+.savedName {
+	display: block;
+	width: 100%;
+	margin: 0 !important;
+	font-weight: 700;
+	font-size: 0.95rem;
+	text-align: center !important;
+	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.savedActions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+.savedState {
+	display: block;
+	width: 100%;
+	margin: 0 !important;
+	font-size: 0.72rem;
+	opacity: 0.76;
+	text-align: center !important;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.manualLoginButton {
+	margin-top: 1.1rem !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+	width: min(100%, 16rem) !important;
 }
