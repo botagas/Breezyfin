@@ -481,6 +481,44 @@
 	overflow: hidden;
 }
 
+.episodeActions {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.episodeInfoButton {
+	min-width: 3rem !important;
+	width: 3rem !important;
+	height: 3rem !important;
+	padding: 0 !important;
+
+	:global(.bf-button),
+	:global(.bf-button *) {
+		color: #ffffff !important;
+	}
+
+	:global(.Icon) {
+		font-size: 1rem !important;
+		width: 1rem !important;
+		height: 1rem !important;
+	}
+
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.24) !important;
+		border-radius: 999px !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: rgba(0, 164, 220, 0.22) !important;
+		border-color: rgba(0, 164, 220, 0.95) !important;
+	}
+}
+
 .episodeNumber {
 	font-size: 0.9em;
 	color: rgba(255, 255, 255, 0.6);
@@ -620,6 +658,10 @@
 }
 
 .primaryButton {
+	--bf-button-fg: #ffffff;
+	--bf-button-fg-hover: #111111;
+	--bf-button-fg-active: #111111;
+
 	:global(.bf-button),
 	:global(.bf-button *) {
 		color: #ffffff !important;
@@ -657,6 +699,10 @@
 }
 
 .secondaryButton {
+	--bf-button-fg: #111111;
+	--bf-button-fg-hover: #111111;
+	--bf-button-fg-active: #111111;
+
 	:global(.bf-button),
 	:global(.bf-button *) {
 		color: #111 !important;

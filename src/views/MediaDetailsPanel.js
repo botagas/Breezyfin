@@ -500,6 +500,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		}
 	}, []);
 
+	const focusEpisodeInfoButtonByIndex = useCallback((index) => {
+		const cards = Array.from(episodesListRef.current?.querySelectorAll(`.${css.episodeCard}`) || []);
+		if (index < 0 || index >= cards.length) return false;
+		const infoButton = cards[index].querySelector(`.${css.episodeInfoButton}`);
+		if (infoButton?.focus) {
+			infoButton.focus();
+			return true;
+		}
+		return false;
+	}, []);
+
 	const focusEpisodeSelector = useCallback(() => {
 		if (Spotlight?.focus?.('episode-selector-button')) return true;
 		const spotlightTarget = document.querySelector('[data-spotlight-id="episode-selector-button"]');
@@ -727,6 +738,14 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		handleEpisodeClick(episode);
 	}, [episodesById, handleEpisodeClick]);
 
+	const handleEpisodeInfoClick = useCallback((e) => {
+		e.stopPropagation();
+		const episodeId = e.currentTarget.dataset.episodeId;
+		const episode = episodesById.get(episodeId);
+		if (!episode || typeof onItemSelect !== 'function') return;
+		onItemSelect(episode, item);
+	}, [episodesById, item, onItemSelect]);
+
 	const handleEpisodeCardKeyDown = useCallback((e) => {
 		const index = Number(e.currentTarget.dataset.episodeIndex);
 		if (!Number.isInteger(index)) return;
@@ -742,8 +761,38 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				return;
 			}
 			focusEpisodeCardByIndex(index - 1);
+		} else if (e.keyCode === KeyCodes.RIGHT) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeInfoButtonByIndex(index);
 		}
-	}, [focusEpisodeCardByIndex, focusEpisodeSelector]);
+	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector]);
+
+	const handleEpisodeInfoButtonKeyDown = useCallback((e) => {
+		const index = Number(e.currentTarget.dataset.episodeIndex);
+		if (!Number.isInteger(index)) return;
+		if (e.keyCode === KeyCodes.LEFT) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeCardByIndex(index);
+		} else if (e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!focusEpisodeInfoButtonByIndex(index + 1)) {
+				focusEpisodeCardByIndex(index + 1);
+			}
+		} else if (e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (index === 0) {
+				focusEpisodeSelector();
+				return;
+			}
+			if (!focusEpisodeInfoButtonByIndex(index - 1)) {
+				focusEpisodeCardByIndex(index - 1);
+			}
+		}
+	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector]);
 
 	const renderTrackPopup = (type) => {
 		const isAudio = type === 'audio';
@@ -1108,6 +1157,19 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																	</BodyText>
 																)}
 															</div>
+															{typeof onItemSelect === 'function' && (
+																<div className={css.episodeActions}>
+																	<Button
+																		size="small"
+																		icon="info"
+																		data-episode-id={episode.Id}
+																		data-episode-index={index}
+																		className={css.episodeInfoButton}
+																		onClick={handleEpisodeInfoClick}
+																		onKeyDown={handleEpisodeInfoButtonKeyDown}
+																	/>
+																</div>
+															)}
 														</SpottableDiv>
 													))}
 												</div>

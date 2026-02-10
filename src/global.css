@@ -1,5 +1,4 @@
 /* Global styles for stable Breezy wrapper classes (prod-safe). */
-
 /* Remove Panel body horizontal padding app-wide */
 .bf-panel-body {
 	padding-left: 0 !important;
@@ -33,6 +32,25 @@
 .bf-button-bg {
 	box-shadow: none !important;
 	background: transparent !important;
+}
+
+.bf-button,
+.bf-button * {
+	color: var(--bf-button-fg, #ffffff) !important;
+}
+
+.bf-button:hover,
+.bf-button:hover *,
+.bf-button:focus,
+.bf-button:focus *,
+.bf-button[data-webos-voice-focused="true"],
+.bf-button[data-webos-voice-focused="true"] * {
+	color: var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff)) !important;
+}
+
+.bf-button:active,
+.bf-button:active * {
+	color: var(--bf-button-fg-active, var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff))) !important;
 }
 
 /* Sandstone Input trigger (used in Login/Search panels) */
