@@ -123,10 +123,48 @@
 }
 
 .buttonRow {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	display: flex;
 	gap: 12px;
 	width: 100%;
+	align-items: stretch;
+}
+
+.buttonRow > * {
+	flex: 1 1 0;
+	min-width: 0;
+	width: 0;
+	max-width: none !important;
+	margin: 0 !important;
+}
+
+.authTextButton {
+	:global(.bf-button-bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:active :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: transparent !important;
+		border: none !important;
+	}
+
+	:global(.bf-button),
+	:global(.bf-button *) {
+		color: rgba(255, 255, 255, 0.85) !important;
+	}
+
+	&:hover :global(.bf-button),
+	&:hover :global(.bf-button *),
+	&:focus :global(.bf-button),
+	&:focus :global(.bf-button *),
+	&:active :global(.bf-button),
+	&:active :global(.bf-button *) {
+		color: #ffffff !important;
+	}
 }
 
 .status {
@@ -242,7 +280,8 @@
 
 .manualLoginButton {
 	margin-top: 1.1rem !important;
-	margin-left: auto !important;
-	margin-right: auto !important;
-	width: min(100%, 16rem) !important;
+	width: 100% !important;
+	max-width: none !important;
+	margin-left: 0 !important;
+	margin-right: 0 !important;
 }

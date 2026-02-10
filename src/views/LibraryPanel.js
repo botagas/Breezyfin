@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Spottable from '@enact/spotlight/Spottable';
+import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
+import {KeyCodes} from '../utils/keyCodes';
 
 import css from './LibraryPanel.module.less';
 
@@ -14,6 +16,8 @@ const SpottableDiv = Spottable('div');
 const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [items, setItems] = useState([]);
+	const libraryScrollToRef = useRef(null);
+	const gridRef = useRef(null);
 	const itemsById = useMemo(() => {
 		const map = new Map();
 		items.forEach((item) => {
@@ -73,6 +77,39 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 		return Number.isInteger(unplayedCount) ? unplayedCount : null;
 	};
 
+	const captureLibraryScrollTo = useCallback((fn) => {
+		libraryScrollToRef.current = fn;
+	}, []);
+
+	const focusTopToolbarAction = useCallback(() => {
+		if (library?.Id && Spotlight?.focus?.(`toolbar-library-${library.Id}`)) return true;
+		if (Spotlight?.focus?.('toolbar-home')) return true;
+		const target = document.querySelector('[data-spotlight-id="toolbar-home"]') ||
+			document.querySelector('[data-spotlight-id="toolbar-user"]');
+		if (target?.focus) {
+			target.focus({preventScroll: true});
+			return true;
+		}
+		return false;
+	}, [library?.Id]);
+
+	const handleGridCardKeyDown = useCallback((event) => {
+		const code = event.keyCode || event.which;
+		if (code !== KeyCodes.UP) return;
+		const cards = Array.from(gridRef.current?.querySelectorAll(`.${css.gridCard}`) || []);
+		if (cards.length === 0) return;
+		const firstRowTop = Math.min(...cards.map((card) => card.offsetTop));
+		const currentTop = event.currentTarget.offsetTop;
+		if (currentTop > firstRowTop + 1) return;
+
+		event.preventDefault();
+		event.stopPropagation();
+		if (typeof libraryScrollToRef.current === 'function') {
+			libraryScrollToRef.current({align: 'top', animate: true});
+		}
+		focusTopToolbarAction();
+	}, [focusTopToolbarAction]);
+
 	if (loading) {
 		return (
 			<Panel {...rest}>
@@ -103,14 +140,15 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 					onLogout={onLogout}
 					onExit={onExit}
 				/>
-			<Scroller className={css.scroller}>
-				<div className={css.gridContainer}>
+			<Scroller className={css.scroller} cbScrollTo={captureLibraryScrollTo}>
+				<div className={css.gridContainer} ref={gridRef}>
 						{items.map(item => (
 								<SpottableDiv
 									key={item.Id}
 									data-item-id={item.Id}
 									className={css.gridCard}
 									onClick={handleGridCardClick}
+									onKeyDown={handleGridCardKeyDown}
 								>
 							<div className={css.cardImage}>
 									<img

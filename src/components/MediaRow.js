@@ -9,7 +9,7 @@ import css from './MediaRow.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) => {
+const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown, ...rest }) => {
 	const [imageError, setImageError] = useState(false);
 
 	const handleCardClick = useCallback(() => {
@@ -17,6 +17,10 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 	}, [item, onClick]);
 
 	const handleCardKeyDown = useCallback((e) => {
+		if (typeof onCardKeyDown === 'function') {
+			onCardKeyDown(e, item);
+		}
+		if (e.defaultPrevented) return;
 		// Ensure left/right navigation moves focus predictably across cards
 		if (e.keyCode === 37 && e.target.previousElementSibling) { // left
 			e.preventDefault();
@@ -25,7 +29,7 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 			e.preventDefault();
 			e.target.nextElementSibling.focus();
 		}
-	}, []);
+	}, [item, onCardKeyDown]);
 
 	const handleImageError = useCallback(() => {
 		setImageError(true);
@@ -149,7 +153,7 @@ const Container = SpotlightContainerDecorator({
 	restrict: 'self-only'
 }, 'div');
 
-const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, ...rest }) => {
+const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, rowIndex = 0, onCardKeyDown, ...rest }) => {
 	const scrollerRef = useRef(null);
 
 	// Handle focus to scroll item into view
@@ -194,6 +198,9 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 							onClick={onItemClick}
 							showEpisodeProgress={showEpisodeProgress}
 							spotlightId={`${title}-${index}`}
+							data-row-index={rowIndex}
+							data-card-index={index}
+							onCardKeyDown={onCardKeyDown}
 						/>
 					))}
 				</div>

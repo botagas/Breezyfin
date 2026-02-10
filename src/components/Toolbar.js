@@ -16,6 +16,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	const [userName, setUserName] = useState('User');
 	const [showUserMenu, setShowUserMenu] = useState(false);
 	const centerRef = useRef(null);
+	const suppressUserMenuUntilRef = useRef(0);
 	const librariesById = useMemo(() => {
 		const map = new Map();
 		libraries.forEach((library) => {
@@ -66,6 +67,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	}, []);
 
 	const handleUserMenuOpen = useCallback(() => {
+		if (Date.now() < suppressUserMenuUntilRef.current) return;
 		setShowUserMenu(true);
 	}, []);
 
@@ -74,6 +76,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	}, []);
 
 	const handleUserContainerFocus = useCallback(() => {
+		if (Date.now() < suppressUserMenuUntilRef.current) return;
 		setShowUserMenu(true);
 	}, []);
 
@@ -86,6 +89,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	}, []);
 
 	const handleUserButtonClick = useCallback(() => {
+		if (Date.now() < suppressUserMenuUntilRef.current) return;
 		setShowUserMenu((prevOpen) => !prevOpen);
 	}, []);
 
@@ -118,14 +122,22 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	}, [librariesById, onNavigate]);
 
 	const handleLogoutClick = useCallback(() => {
+		suppressUserMenuUntilRef.current = Date.now() + 500;
 		setShowUserMenu(false);
+		if (document.activeElement && typeof document.activeElement.blur === 'function') {
+			document.activeElement.blur();
+		}
 		if (typeof onLogout === 'function') {
 			onLogout();
 		}
 	}, [onLogout]);
 
 	const handleSwitchUserClick = useCallback(() => {
+		suppressUserMenuUntilRef.current = Date.now() + 500;
 		setShowUserMenu(false);
+		if (document.activeElement && typeof document.activeElement.blur === 'function') {
+			document.activeElement.blur();
+		}
 		if (typeof onSwitchUser === 'function') {
 			onSwitchUser();
 			return;
@@ -136,7 +148,11 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 	}, [onLogout, onSwitchUser]);
 
 	const handleExitClick = useCallback(() => {
+		suppressUserMenuUntilRef.current = Date.now() + 500;
 		setShowUserMenu(false);
+		if (document.activeElement && typeof document.activeElement.blur === 'function') {
+			document.activeElement.blur();
+		}
 		if (typeof onExit === 'function') {
 			onExit();
 		}
@@ -156,6 +172,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 						size="small"
 						className={css.userButton}
 						aria-label="User Profile"
+						spotlightId="toolbar-user"
 						onClick={handleUserButtonClick}
 					>
 						{userName}
@@ -192,6 +209,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 					onClick={handleNavigateHome}
 					className={`${css.iconButton} ${activeSection === 'home' ? css.selected : ''}`}
 					aria-label="Home"
+					spotlightId="toolbar-home"
 				>
 					<Icon size="small">home</Icon>
 				</SpottableDiv>
@@ -200,6 +218,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 					onClick={handleNavigateSearch}
 					className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
 					aria-label="Search"
+					spotlightId="toolbar-search"
 				>
 					<Icon size="small">search</Icon>
 				</SpottableDiv>
@@ -208,6 +227,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 					onClick={handleNavigateShuffle}
 					className={css.iconButton}
 					aria-label="Shuffle"
+					spotlightId="toolbar-shuffle"
 				>
 					<Icon size="small">arrowhookright</Icon>
 				</SpottableDiv>
@@ -216,6 +236,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 					onClick={handleNavigateFavorites}
 					className={css.iconButton}
 					aria-label="Favorites"
+					spotlightId="toolbar-favorites"
 				>
 					<Icon size="small">star</Icon>
 				</SpottableDiv>
@@ -230,6 +251,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 						onClick={handleLibraryNavigate}
 						selected={activeSection === 'library' && activeLibraryId === library.Id}
 						className={css.toolbarButton}
+						spotlightId={`toolbar-library-${library.Id}`}
 					>
 						{library.Name}
 					</Button>
@@ -241,6 +263,7 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 					onClick={handleNavigateSettings}
 					className={css.iconButton}
 					aria-label="Settings"
+					spotlightId="toolbar-settings"
 				>
 					<Icon size="small">gear</Icon>
 				</SpottableDiv>

@@ -323,13 +323,21 @@ const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
 									className={`bf-input-trigger ${css.inputField}`}
 								/>
 								<div className={css.buttonRow}>
-									<Button onClick={handleBack} disabled={loading} size="large">
+									<Button
+										onClick={handleBack}
+										disabled={loading}
+										size="large"
+										focusEffect="static"
+										className={css.authTextButton}
+									>
 										Back
 									</Button>
 									<Button
 										onClick={handleLogin}
 										disabled={!username || !password || loading}
 										size="large"
+										focusEffect="static"
+										className={css.authTextButton}
 									>
 										{loading ? 'Signing In...' : 'Sign In'}
 									</Button>

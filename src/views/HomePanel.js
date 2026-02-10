@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
+import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
 import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
+import {KeyCodes} from '../utils/keyCodes';
 
 import css from './HomePanel.module.less';
 
@@ -37,6 +39,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 		myRequests: true
 	});
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
+	const homeScrollToRef = useRef(null);
 
 	const loadContent = useCallback(async () => {
 		setLoading(true);
@@ -223,6 +226,34 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 		}
 	}, [onNavigate]);
 
+	const captureHomeScrollTo = useCallback((fn) => {
+		homeScrollToRef.current = fn;
+	}, []);
+
+	const focusTopToolbarAction = useCallback(() => {
+		if (Spotlight?.focus?.('toolbar-home')) return true;
+		const target = document.querySelector('[data-spotlight-id="toolbar-home"]') ||
+			document.querySelector('[data-spotlight-id="toolbar-user"]');
+		if (target?.focus) {
+			target.focus({preventScroll: true});
+			return true;
+		}
+		return false;
+	}, []);
+
+	const handleHomeCardKeyDown = useCallback((e) => {
+		const code = e.keyCode || e.which;
+		if (code !== KeyCodes.UP) return;
+		const rowIndex = Number(e.currentTarget.dataset.rowIndex);
+		if (!Number.isInteger(rowIndex) || rowIndex !== 0) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (typeof homeScrollToRef.current === 'function') {
+			homeScrollToRef.current({align: 'top', animate: true});
+		}
+		focusTopToolbarAction();
+	}, [focusTopToolbarAction]);
+
 	const rowConfig = {
 		recentlyAdded: {
 			title: 'Recently Added',
@@ -256,11 +287,10 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 		}
 	};
 
-	const hasContent = homeRowOrder.some((key) => {
-		const row = rowConfig[key];
-		if (!row) return false;
-		return homeRowSettings[key] && row.items.length > 0;
-	});
+	const visibleRows = homeRowOrder
+		.map((key) => ({key, row: rowConfig[key]}))
+		.filter(({key, row}) => row && homeRowSettings[key] && row.items.length > 0);
+	const hasContent = visibleRows.length > 0;
 	const hasHero = heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
 
@@ -297,7 +327,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 					</div>
 				</div>
 			)}
-			<Scroller className={css.scroller}>
+			<Scroller className={css.scroller} cbScrollTo={captureHomeScrollTo}>
 				<div className={css.content}>
 					{hasHero && (
 						<HeroBanner
@@ -306,21 +336,18 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 						/>
 					)}
 
-					{homeRowOrder.map((key) => {
-						const row = rowConfig[key];
-						if (!row) return null;
-						if (!homeRowSettings[key] || row.items.length === 0) return null;
-						return (
-								<MediaRow
-									key={key}
-									title={row.title}
-									items={row.items}
-									onItemClick={handleItemClick}
-									getImageUrl={getMediaRowImageUrl}
-									showEpisodeProgress={row.showEpisodeProgress}
-								/>
-						);
-					})}
+					{visibleRows.map(({key, row}, rowIndex) => (
+						<MediaRow
+							key={key}
+							title={row.title}
+							items={row.items}
+							onItemClick={handleItemClick}
+							getImageUrl={getMediaRowImageUrl}
+							showEpisodeProgress={row.showEpisodeProgress}
+							rowIndex={rowIndex}
+							onCardKeyDown={handleHomeCardKeyDown}
+						/>
+					))}
 				</div>
 			</Scroller>
 		</Panel>
