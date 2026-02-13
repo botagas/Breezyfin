@@ -71,6 +71,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
 	const [toastMessage, setToastMessage] = useState('');
+	const [toastVisible, setToastVisible] = useState(false);
 	const castRowRef = useRef(null);
 	const castScrollerRef = useRef(null);
 	const seasonScrollerRef = useRef(null);
@@ -414,11 +415,21 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		return () => registerBackHandler(null);
 	}, [handleInternalBack, registerBackHandler]);
 
-	// Auto-hide toast after a short delay
+	// Auto-hide toast after a short delay with a fade-out phase
 	useEffect(() => {
-		if (!toastMessage) return undefined;
-		const t = setTimeout(() => setToastMessage(''), 2000);
-		return () => clearTimeout(t);
+		if (!toastMessage) {
+			setToastVisible(false);
+			return undefined;
+		}
+		setToastVisible(false);
+		const frame = window.requestAnimationFrame(() => setToastVisible(true));
+		const hideTimer = setTimeout(() => setToastVisible(false), 1700);
+		const clearTimer = setTimeout(() => setToastMessage(''), 2050);
+		return () => {
+			window.cancelAnimationFrame(frame);
+			clearTimeout(hideTimer);
+			clearTimeout(clearTimer);
+		};
 	}, [toastMessage]);
 
 	const backdropUrl = (() => {
@@ -623,7 +634,11 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const renderToast = () => {
 		if (!toastMessage) return null;
 		return (
-			<div className={css.toast} role="status">
+			<div
+				className={`${css.toast} ${toastVisible ? css.toastVisible : ''}`}
+				role="status"
+				aria-live="polite"
+			>
 				{toastMessage}
 			</div>
 		);
@@ -960,6 +975,39 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 					) : (
 						<>
 							<div className={css.content}>
+								{item.Type === 'Episode' && (
+									<div className={css.episodeBreadcrumb}>
+										<div className={css.episodeNavActions}>
+											<Button
+												size="small"
+												className={`${css.episodeNavButton} ${css.episodeSeriesButton}`}
+												onClick={handleOpenEpisodeSeries}
+											>
+												{item.SeriesName}
+											</Button>
+											<span className={css.breadcrumbDivider} aria-hidden="true">/</span>
+											{item.ParentIndexNumber !== undefined && item.ParentIndexNumber !== null && (
+												<>
+													<Button
+														size="small"
+														className={css.episodeNavButton}
+														onClick={handleOpenEpisodeSeries}
+													>
+														Season {item.ParentIndexNumber}
+													</Button>
+													<span className={css.breadcrumbDivider} aria-hidden="true">/</span>
+												</>
+											)}
+											<Button
+												size="small"
+												className={`${css.episodeNavButton} ${css.episodeCurrentButton}`}
+												onClick={openEpisodePicker}
+											>
+												Episode {item.IndexNumber}
+											</Button>
+										</div>
+									</div>
+								)}
 								<div className={css.pageHeader}>
 									{useHeaderLogo ? (
 										<div className={css.headerLogoWrap}>
@@ -977,78 +1025,53 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 									)}
 								</div>
 								<div className={css.header}>
-									{item.Type === 'Episode' && (
-										<div className={css.episodeInfo}>
-											<div className={css.episodeNavActions}>
-												<Button
-													size="small"
-													className={css.episodeNavButton}
-													onClick={handleOpenEpisodeSeries}
-												>
-													{item.SeriesName}
-												</Button>
-												{item.ParentIndexNumber !== undefined && item.ParentIndexNumber !== null && (
-													<Button
-														size="small"
-														className={css.episodeNavButton}
-														onClick={handleOpenEpisodeSeries}
-													>
-														Season {item.ParentIndexNumber}
-													</Button>
-												)}
-												<Button
-													size="small"
-													className={css.episodeNavButton}
-													onClick={openEpisodePicker}
-												>
-													Episode {item.IndexNumber}
-												</Button>
-											</div>
+									<div className={css.metadataRow}>
+										<div className={css.metadata}>
+											{item.ProductionYear && (
+												<div className={css.metadataItem}>{item.ProductionYear}</div>
+											)}
+											{item.OfficialRating && (
+												<div className={`${css.metadataItem} ${css.metadataRating}`}>{item.OfficialRating}</div>
+											)}
+											{item.CommunityRating && (
+												<div className={`${css.metadataItem} ${css.metadataScore}`}>
+													<Icon size="small" className={css.ratingStar}>star</Icon> {item.CommunityRating.toFixed(1)}
+												</div>
+											)}
+											{item.RunTimeTicks && (
+												<div className={css.metadataItem}>
+													{Math.floor(item.RunTimeTicks / 600000000)} min
+												</div>
+											)}
+											{item.Genres && item.Genres.length > 0 && (
+												<div className={`${css.metadataItem} ${css.metadataItemWide}`}>
+													{item.Genres.join(', ')}
+												</div>
+											)}
 										</div>
-									)}
-
-									<div className={css.metadata}>
-										{item.ProductionYear && (
-											<div className={css.metadataItem}>{item.ProductionYear}</div>
-										)}
-										{item.OfficialRating && (
-											<div className={css.metadataItem}>{item.OfficialRating}</div>
-										)}
-										{item.CommunityRating && (
-											<div className={css.metadataItem}>
-												<Icon size="small">star</Icon> {item.CommunityRating.toFixed(1)}
-											</div>
-										)}
-										{item.RunTimeTicks && (
-											<div className={css.metadataItem}>
-												{Math.floor(item.RunTimeTicks / 600000000)} min
-											</div>
-										)}
 										<div className={css.actionsRow}>
 											<Button
 												size="small"
 												icon={isFavorite ? 'heart' : 'hearthollow'}
 												onClick={handleToggleFavorite}
+												css={{icon: css.actionIcon}}
 												componentRef={favoriteActionButtonRef}
 												spotlightId="details-favorite-action"
-												className={`${css.actionButton} ${isFavorite ? css.activeAction : ''}`}
+												className={`${css.actionButton} ${css.favoriteAction} ${isFavorite ? css.favoriteActive : ''}`}
+												title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
 											/>
-												<Button
-													size="small"
-													icon="check"
-													selected={isWatched}
-													onClick={handleToggleWatchedMain}
-													componentRef={watchedActionButtonRef}
-													spotlightId="details-watched-action"
-													className={`${css.actionButton} ${isWatched ? css.activeAction : ''}`}
+											<Button
+												size="small"
+												icon="check"
+												onClick={handleToggleWatchedMain}
+												css={{icon: css.actionIcon}}
+												componentRef={watchedActionButtonRef}
+												spotlightId="details-watched-action"
+												className={`${css.actionButton} ${css.watchedAction} ${isWatched ? css.watchedActive : ''}`}
+												title={isWatched ? 'Mark as unwatched' : 'Mark as watched'}
 											/>
 										</div>
 									</div>
-									{item.Genres && item.Genres.length > 0 && (
-										<div className={css.metadataItem}>
-											{item.Genres.join(', ')}
-										</div>
-									)}
 									{item.Overview && (
 										<BodyText className={css.overview}>
 											{item.Overview}
@@ -1260,7 +1283,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 								{item.Type !== 'Series' && (
 									<>
-										<div className={`${css.trackSelectors} ${css.movieTracks}`}>
+										<div className={css.trackSelectors}>
 											{audioTracks.length > 0 && (
 												<div className={css.trackSection}>
 													<BodyText className={css.trackLabel}>Audio Track</BodyText>
@@ -1314,3 +1337,4 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 };
 
 export default MediaDetailsPanel;
+

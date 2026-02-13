@@ -2,9 +2,11 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Input from '@enact/sandstone/Input';
 import Button from '../components/BreezyButton';
+import SandstoneButton from '@enact/sandstone/Button';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
+import Popup from '@enact/sandstone/Popup';
 import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
@@ -12,28 +14,29 @@ import Toolbar from '../components/Toolbar';
 import css from './SearchPanel.module.less';
 
 const SpottableDiv = Spottable('div');
+const FILTER_OPTIONS = [
+	{ id: 'movies', label: 'Movies', types: ['Movie'] },
+	{ id: 'series', label: 'Series', types: ['Series'] },
+	{ id: 'episodes', label: 'Episodes', types: ['Episode'] },
+	{ id: 'people', label: 'People', types: ['Person'] }
+];
+const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
 
 const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [hasSearched, setHasSearched] = useState(false);
-	const [activeFilter, setActiveFilter] = useState('all');
+	const [filterPopupOpen, setFilterPopupOpen] = useState(false);
+	const [selectedFilterIds, setSelectedFilterIds] = useState(ALL_FILTER_IDS);
 	const searchDebounceRef = useRef(null);
-	const filters = useMemo(() => ([
-		{ id: 'all', label: 'All', types: null },
-		{ id: 'movies', label: 'Movies', types: ['Movie'] },
-		{ id: 'series', label: 'Series', types: ['Series'] },
-		{ id: 'episodes', label: 'Episodes', types: ['Episode'] },
-		{ id: 'people', label: 'People', types: ['Person'] }
-	]), []);
 	const filtersById = useMemo(() => {
 		const map = new Map();
-		filters.forEach((filter) => {
+		FILTER_OPTIONS.forEach((filter) => {
 			map.set(filter.id, filter);
 		});
 		return map;
-	}, [filters]);
+	}, []);
 	const resultsById = useMemo(() => {
 		const map = new Map();
 		results.forEach((item) => {
@@ -41,6 +44,21 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		});
 		return map;
 	}, [results]);
+	const appliedFilterCount = useMemo(
+		() => (selectedFilterIds.length < FILTER_OPTIONS.length ? selectedFilterIds.length : 0),
+		[selectedFilterIds]
+	);
+
+	const buildFilterTypes = useCallback((filterIds) => {
+		if (!Array.isArray(filterIds) || filterIds.length === 0) return null;
+		if (filterIds.length >= FILTER_OPTIONS.length) return null;
+		const selectedTypeSet = new Set();
+		filterIds.forEach((id) => {
+			const option = filtersById.get(id);
+			option?.types?.forEach((type) => selectedTypeSet.add(type));
+		});
+		return Array.from(selectedTypeSet);
+	}, [filtersById]);
 
 	const performSearch = useCallback(async (term, filterTypes) => {
 		if (!term || term.trim().length < 2) {
@@ -81,17 +99,16 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 	const handleSearchChange = useCallback((e) => {
 		const value = e.value;
 		setSearchTerm(value);
-		const filterTypes = filtersById.get(activeFilter)?.types;
+		const filterTypes = buildFilterTypes(selectedFilterIds);
 		scheduleSearch(value, filterTypes);
-	}, [activeFilter, filtersById, scheduleSearch]);
+	}, [buildFilterTypes, scheduleSearch, selectedFilterIds]);
 
-	const handleFilterChange = useCallback((filterId) => {
-		setActiveFilter(filterId);
-		const filterTypes = filtersById.get(filterId)?.types;
+	const handleFilterSelection = useCallback((nextSelectedFilterIds) => {
+		setSelectedFilterIds(nextSelectedFilterIds);
 		if (searchTerm.trim().length >= 2) {
-			scheduleSearch(searchTerm, filterTypes);
+			scheduleSearch(searchTerm, buildFilterTypes(nextSelectedFilterIds));
 		}
-	}, [filtersById, scheduleSearch, searchTerm]);
+	}, [buildFilterTypes, scheduleSearch, searchTerm]);
 
 	const handleItemClick = useCallback((item) => {
 		if (item.Type === 'Person') {
@@ -102,11 +119,34 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		onItemSelect(item);
 	}, [onItemSelect]);
 
-	const handleFilterButtonClick = useCallback((event) => {
+	const openFilterPopup = useCallback(() => {
+		setFilterPopupOpen(true);
+	}, []);
+
+	const closeFilterPopup = useCallback(() => {
+		setFilterPopupOpen(false);
+	}, []);
+
+	const handleFilterToggleClick = useCallback((event) => {
 		const filterId = event.currentTarget.dataset.filterId;
 		if (!filterId) return;
-		handleFilterChange(filterId);
-	}, [handleFilterChange]);
+		const isCurrentlySelected = selectedFilterIds.includes(filterId);
+		let nextSelected;
+
+		if (isCurrentlySelected) {
+			// Keep at least one selected option.
+			if (selectedFilterIds.length === 1) return;
+			nextSelected = selectedFilterIds.filter((id) => id !== filterId);
+		} else {
+			nextSelected = [...selectedFilterIds, filterId];
+		}
+
+		handleFilterSelection(nextSelected);
+	}, [handleFilterSelection, selectedFilterIds]);
+
+	const handleSelectAllFilters = useCallback(() => {
+		handleFilterSelection(ALL_FILTER_IDS);
+	}, [handleFilterSelection]);
 
 	const handleResultCardClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
@@ -198,47 +238,48 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 					onExit={onExit}
 				/>
 			<div className={css.searchContainer}>
-				<div className={css.searchBox}>
-					<Input
-						className={`bf-input-trigger ${css.searchInput}`}
-						placeholder="Search movies, shows, people..."
-						value={searchTerm}
-						onChange={handleSearchChange}
-						dismissOnEnter
-						size="small"
-					/>
-				</div>
-
-				<div className={css.filters}>
-						{filters.map(filter => (
-							<Button
-								key={filter.id}
-								data-filter-id={filter.id}
-								className={css.filterButton}
-								selected={activeFilter === filter.id}
-								onClick={handleFilterButtonClick}
-								size="small"
-							>
-							{filter.label}
-						</Button>
-					))}
-				</div>
-
-				{loading ? (
-					<div className={css.loadingState}>
-						<Spinner />
-					</div>
-					) : hasSearched && results.length === 0 ? (
-						<div className={css.emptyState}>
-							<BodyText>No results found for {searchTerm}</BodyText>
+				<Scroller className={css.resultsScroller}>
+					<div className={css.resultsContent}>
+						<div className={css.searchBox}>
+							<div className={css.searchControls}>
+								<div className={css.searchFieldShell}>
+									<Input
+										className={`bf-input-trigger ${css.searchInput}`}
+										placeholder="Search movies, shows, people..."
+										value={searchTerm}
+										onChange={handleSearchChange}
+										dismissOnEnter
+										size="small"
+									/>
+								</div>
+								<Button
+									className={css.filterTriggerButton}
+									onClick={openFilterPopup}
+									size="small"
+									icon="edit"
+									aria-label={`Filters${appliedFilterCount ? `, ${appliedFilterCount} applied` : ''}`}
+								>
+									{appliedFilterCount > 0 && (
+										<span className={css.filterAppliedBadge}>{appliedFilterCount}</span>
+									)}
+								</Button>
+							</div>
 						</div>
-				) : !hasSearched ? (
-					<div className={css.emptyState}>
-						<BodyText>Enter a search term to find movies, shows, and more</BodyText>
-					</div>
-				) : (
-					<Scroller className={css.resultsScroller}>
-						<div className={css.resultsGrid}>
+
+						{loading ? (
+							<div className={css.loadingState}>
+								<Spinner />
+							</div>
+						) : hasSearched && results.length === 0 ? (
+							<div className={css.emptyState}>
+								<BodyText>No results found for {searchTerm}</BodyText>
+							</div>
+						) : !hasSearched ? (
+							<div className={css.emptyState}>
+								<BodyText>Enter a search term to find movies, shows, and more</BodyText>
+							</div>
+						) : (
+							<div className={css.resultsGrid}>
 								{results.map(item => (
 									<SpottableDiv
 										key={item.Id}
@@ -247,8 +288,8 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 										onClick={handleResultCardClick}
 										onKeyDown={handleResultCardKeyDown}
 									>
-									<div className={css.cardImage}>
-										{getImageUrl(item) ? (
+										<div className={css.cardImage}>
+											{getImageUrl(item) ? (
 												<img
 													src={getImageUrl(item)}
 													alt={item.Name}
@@ -257,32 +298,60 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 													decoding="async"
 													draggable={false}
 												/>
-										) : (
-											<div className={css.placeholderInner}>
-												<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-											</div>
-										)}
-										{item.UserData?.Played && (
-											<div className={css.watchedBadge}>{'\u2713'}</div>
-										)}
-										{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-											<div className={css.progressBar}>
-												<div
-													className={css.progress}
-													style={{ width: `${item.UserData.PlayedPercentage}%` }}
-												/>
-											</div>
-										)}
-									</div>
-									<div className={css.cardInfo}>
-										<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-										<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-									</div>
-								</SpottableDiv>
+											) : (
+												<div className={css.placeholderInner}>
+													<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
+												</div>
+											)}
+											{item.UserData?.Played && (
+												<div className={css.watchedBadge}>{'\u2713'}</div>
+											)}
+											{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
+												<div className={css.progressBar}>
+													<div
+														className={css.progress}
+														style={{ width: `${item.UserData.PlayedPercentage}%` }}
+													/>
+												</div>
+											)}
+										</div>
+										<div className={css.cardInfo}>
+											<BodyText className={css.cardTitle}>{item.Name}</BodyText>
+											<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
+										</div>
+									</SpottableDiv>
+								))}
+							</div>
+						)}
+					</div>
+				</Scroller>
+
+				<Popup open={filterPopupOpen} onClose={closeFilterPopup}>
+					<div>
+						<BodyText>Search Filters</BodyText>
+						<div>
+							<SandstoneButton size="small" onClick={handleSelectAllFilters}>
+								Select All
+							</SandstoneButton>
+							<SandstoneButton size="small" onClick={closeFilterPopup}>
+								Done
+							</SandstoneButton>
+						</div>
+						<div>
+							{FILTER_OPTIONS.map((filter) => (
+								<SandstoneButton
+									key={filter.id}
+									data-filter-id={filter.id}
+									selected={selectedFilterIds.includes(filter.id)}
+									onClick={handleFilterToggleClick}
+									size="small"
+								>
+									{filter.label}
+								</SandstoneButton>
 							))}
 						</div>
-					</Scroller>
-				)}
+					</div>
+				</Popup>
 			</div>
 		</Panel>
 	);

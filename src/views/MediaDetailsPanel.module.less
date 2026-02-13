@@ -13,6 +13,37 @@
 	position: relative;
 }
 
+.toast {
+	position: fixed;
+	top: 1.25rem;
+	left: 50%;
+	transform: translate(-50%, -0.65rem);
+	opacity: 0;
+	padding: 0.72rem 1.35rem;
+	max-width: calc(100vw - 2.5rem);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	background: rgba(18, 24, 36, 0.86);
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	border-radius: 0.8rem;
+	color: rgba(245, 250, 255, 0.96);
+	font-size: 0.88em;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	line-height: 1.2;
+	backdrop-filter: blur(12px);
+	box-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4);
+	pointer-events: none;
+	z-index: 30;
+	transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.toastVisible {
+	opacity: 1;
+	transform: translate(-50%, 0);
+}
+
 .loading {
 	display: flex;
 	justify-content: center;
@@ -103,67 +134,281 @@
 	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
 }
 
-.episodeInfo {
-	margin-bottom: 16px;
+.episodeBreadcrumb {
+	margin: 0 0 0.9rem 0;
+	max-width: 100%;
+	min-width: 0;
 }
 
 .episodeNavActions {
 	display: flex;
-	gap: 10px;
+	align-items: center;
+	gap: 0.45rem;
 	flex-wrap: wrap;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.breadcrumbDivider {
+	flex: 0 0 auto;
+	font-size: 0.82rem;
+	line-height: 1;
+	color: rgba(214, 224, 237, 0.62);
+	padding: 0 0.05rem;
 }
 
 .episodeNavButton {
-	:global(.bf-button-bg) {
-		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	max-width: min(32rem, 100%) !important;
+	min-width: 0 !important;
+	flex: 0 1 auto;
+
+	&:global(.focusExpand) {
+		margin: 0 !important;
 	}
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.client) {
+		max-width: 100% !important;
+		min-width: 0 !important;
+		transform: none !important;
+	}
+
+	:global(.client) {
+		display: block !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		white-space: nowrap !important;
+		font-size: 0.86em !important;
+		line-height: 1.15 !important;
+	}
+
+	:global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.06) !important;
+		border: 1px solid rgba(255, 255, 255, 0.22) !important;
+		border-radius: 999px !important;
+		transition: background 0.16s ease, border-color 0.16s ease !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.14) !important;
+		border-color: rgba(255, 255, 255, 0.4) !important;
+	}
+}
+
+.episodeSeriesButton {
+	max-width: min(34rem, 100%) !important;
+}
+
+.episodeCurrentButton {
+	:global(.bf-button-bg) {
+		background: rgba(63, 184, 255, 0.2) !important;
+		border-color: rgba(143, 213, 255, 0.58) !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: rgba(63, 184, 255, 0.28) !important;
+		border-color: rgba(143, 213, 255, 0.78) !important;
+	}
+}
+
+.metadataRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
 }
 
 .metadata {
 	display: flex;
-	gap: 12px;
+	gap: 0.85rem;
 	flex-wrap: wrap;
 	align-items: center;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .metadataItem {
-	padding: 8px 16px;
+	padding: 0;
 	background: transparent;
-	border-radius: 6px;
-	font-size: 1em;
+	border: none;
+	border-radius: 0;
+	font-size: 0.92em;
 	font-weight: 500;
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 0.35rem;
+	line-height: 1;
+	min-height: 1.05rem;
+	overflow: visible;
+	color: rgba(235, 242, 249, 0.95);
+	white-space: nowrap;
+}
+
+.metadataRating {
+	padding: 0.24rem 0.62rem;
+	border-radius: 0.32rem;
+	border: 1px solid rgba(255, 255, 255, 0.42);
+	background: rgba(255, 255, 255, 0.03);
+	font-size: 0.78em;
+	font-weight: 650;
+	letter-spacing: 0.03em;
+	line-height: 1;
+	min-height: 1.05rem;
+}
+
+.metadataScore {
+	color: rgba(255, 255, 255, 0.95);
+	line-height: 1.1;
+	display: inline-flex;
+	align-items: center;
+	overflow: visible;
+
+	:global(.Icon) {
+		color: inherit !important;
+	}
+}
+
+.ratingStar {
+	font-size: 0.86rem !important;
+	width: 0.86rem !important;
+	height: 0.86rem !important;
+	line-height: 0.86rem !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	margin: 0 !important;
+	overflow: visible !important;
+	vertical-align: middle !important;
+	color: #ffd166 !important;
+	transform: none !important;
+
+	:global(*) {
+		color: #ffd166 !important;
+	}
+}
+
+.metadataItemWide {
+	max-width: min(46rem, 100%);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: rgba(215, 226, 240, 0.86);
 }
 
 .actionButton {
+	min-width: 2.35rem !important;
+	width: 2.35rem !important;
+	height: 2.35rem !important;
+	padding: 0 !important;
+
+	:global(.bf-button) {
+		min-width: 2.35rem !important;
+		width: 2.35rem !important;
+		height: 2.35rem !important;
+		min-height: 2.35rem !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		line-height: 2.35rem !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: visible !important;
+	}
+
+	:global(.client) {
+		width: 100% !important;
+		height: 100% !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: visible !important;
+	}
+
 	:global(.bf-button-bg) {
-		background: transparent !important;
+		background: rgba(255, 255, 255, 0.06) !important;
+		border: 1px solid rgba(255, 255, 255, 0.24) !important;
+		border-radius: 999px !important;
 	}
 
 	&:hover,
 	&:focus {
 		:global(.bf-button-bg) {
-			background: rgba(255, 255, 255, 0.25) !important;
+			background: rgba(255, 255, 255, 0.14) !important;
+			border-color: rgba(255, 255, 255, 0.4) !important;
 		}
-		color: white !important;
 	}
 }
 
-.activeAction {
-	:global(.bf-button-bg) {
-		background: rgba(0, 200, 255, 0.3) !important;
-		border: 1px solid rgba(0, 200, 255, 0.6) !important;
+.actionIcon {
+	font-size: 1rem !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	line-height: 1rem !important;
+	margin: 0 !important;
+	display: block !important;
+	color: #ffffff !important;
+}
+
+.favoriteAction {
+	&.favoriteActive {
+		:global(.bf-button-bg) {
+			background: rgba(255, 107, 127, 0.14) !important;
+			border: 1px solid rgba(255, 143, 161, 0.65) !important;
+		}
+
+		.actionIcon {
+			color: #ff6b7f !important;
+		}
+
+		&:hover .actionIcon,
+		&:active .actionIcon {
+			color: #ffffff !important;
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg) {
+			background: rgba(255, 107, 127, 0.28) !important;
+			border-color: rgba(255, 167, 181, 0.95) !important;
+		}
+	}
+}
+
+.watchedAction {
+	&.watchedActive {
+		:global(.bf-button-bg) {
+			background: rgba(109, 220, 154, 0.14) !important;
+			border: 1px solid rgba(148, 233, 183, 0.65) !important;
+		}
+
+		.actionIcon {
+			color: #6ddc9a !important;
+		}
+
+		&:hover .actionIcon,
+		&:active .actionIcon {
+			color: #ffffff !important;
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg) {
+			background: rgba(109, 220, 154, 0.28) !important;
+			border-color: rgba(173, 242, 201, 0.95) !important;
+		}
 	}
 }
 
 .actionsRow {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	margin-left: 12px;
+	gap: 0.5rem;
+	flex-shrink: 0;
 }
 
 .overview {
@@ -558,31 +803,6 @@
 	transition: transform 340ms ease, filter 340ms ease;
 }
 
-.episodeWatchedButton {
-	position: absolute;
-	top: 8px;
-	right: 8px;
-	z-index: 10;
-	
-	:global(.button) {
-		min-width: auto !important;
-		padding: 0 !important;
-		
-		&:global(.selected) {
-			color: rgba(0, 164, 220, 0.95);
-		}
-		
-		&:not(:global(.selected)) {
-			color: rgba(255, 255, 255, 0.4);
-			
-			&:hover,
-			&:focus {
-				color: rgba(255, 255, 255, 0.7);
-			}
-		}
-	}
-}
-
 .episodeInfo {
 	flex: 1;
 	min-width: 0;
@@ -604,11 +824,6 @@
 	width: 3rem !important;
 	height: 3rem !important;
 	padding: 0 !important;
-
-	:global(.bf-button),
-	:global(.bf-button *) {
-		color: #ffffff !important;
-	}
 
 	:global(.Icon) {
 		font-size: 1rem !important;
@@ -815,19 +1030,20 @@
 	--bf-button-fg-hover: #111111;
 	--bf-button-fg-active: #111111;
 
-	:global(.bf-button),
-	:global(.bf-button *) {
-		color: #ffffff !important;
-		font-size: 0.84em !important;
-		font-weight: 700 !important;
-		min-height: 2rem !important;
-		padding: 0 1rem !important;
+	:global(.bf-button) {
+		min-height: 2rem;
+		padding: 0 1rem;
 	}
 
-	:global(.Icon) {
-		font-size: 0.68rem !important;
-		width: 0.68rem !important;
-		height: 0.68rem !important;
+	:global(.bf-button .client) {
+		font-size: 0.84em;
+		font-weight: 700;
+	}
+
+	:global(.bf-button .icon) {
+		font-size: 0.68rem;
+		width: 0.68rem;
+		height: 0.68rem;
 	}
 
 	:global(.bf-button-bg) {
@@ -842,40 +1058,6 @@
 		background: #ffffff !important;
 		border-color: #ffffff !important;
 	}
-
-	&:hover :global(.bf-button),
-	&:hover :global(.bf-button *),
-	&:focus :global(.bf-button),
-	&:focus :global(.bf-button *) {
-		color: #111 !important;
-	}
-}
-
-.secondaryButton {
-	--bf-button-fg: #111111;
-	--bf-button-fg-hover: #111111;
-	--bf-button-fg-active: #111111;
-
-	:global(.bf-button),
-	:global(.bf-button *) {
-		color: #111 !important;
-		font-size: 0.88em !important;
-		font-weight: 700 !important;
-		min-height: 2.2rem !important;
-		padding: 0 1.1rem !important;
-	}
-
-	:global(.bf-button-bg) {
-		background: #ffffff !important;
-		border: none !important;
-		border-radius: 999px !important;
-		box-shadow: 0 0.16667rem 0.5rem rgba(0, 0, 0, 0.35) !important;
-	}
-
-	&:hover :global(.bf-button-bg),
-	&:focus :global(.bf-button-bg) {
-		background: #f1f3f5 !important;
-	}
 }
 
 /* Normalize text margins for headings/body text */
@@ -883,3 +1065,4 @@
 :global(.BodyText) {
 	margin: 0;
 }
+

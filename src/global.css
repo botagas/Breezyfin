@@ -69,21 +69,26 @@ body {
 }
 
 .bf-button,
-.bf-button * {
+.bf-button .client,
+.bf-button .icon {
 	color: var(--bf-button-fg, #ffffff) !important;
 }
 
 .bf-button:hover,
-.bf-button:hover *,
+.bf-button:hover .client,
+.bf-button:hover .icon,
 .bf-button:focus,
-.bf-button:focus *,
+.bf-button:focus .client,
+.bf-button:focus .icon,
 .bf-button[data-webos-voice-focused="true"],
-.bf-button[data-webos-voice-focused="true"] * {
+.bf-button[data-webos-voice-focused="true"] .client,
+.bf-button[data-webos-voice-focused="true"] .icon {
 	color: var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff)) !important;
 }
 
 .bf-button:active,
-.bf-button:active * {
+.bf-button:active .client,
+.bf-button:active .icon {
 	color: var(--bf-button-fg-active, var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff))) !important;
 }
 

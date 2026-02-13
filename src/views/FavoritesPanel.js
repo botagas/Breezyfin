@@ -133,71 +133,66 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 					onExit={onExit}
 				/>
 			<div className={css.favoritesContainer}>
-					<div className={css.filters}>
-						{FILTERS.map(filter => (
-							<Button
-								key={filter.id}
-								data-filter-id={filter.id}
-								className={css.filterButton}
-								selected={activeFilter === filter.id}
-								onClick={handleFilterButtonClick}
-								size="small"
-							>
-							{filter.label}
-						</Button>
-					))}
-					<Button
-						className={css.refreshButton}
-						onClick={loadFavorites}
-						size="small"
-						icon="refresh"
-					/>
-				</div>
+				<Scroller className={css.favoritesScroller}>
+					<div className={css.favoritesContent}>
+						<div className={css.filters}>
+							{FILTERS.map(filter => (
+								<Button
+									key={filter.id}
+									data-filter-id={filter.id}
+									className={css.filterButton}
+									selected={activeFilter === filter.id}
+									onClick={handleFilterButtonClick}
+									size="small"
+								>
+									{filter.label}
+								</Button>
+							))}
+						</div>
 
-				{loading ? (
-					<div className={css.loadingState}>
-						<Spinner />
-					</div>
-				) : favorites.length === 0 ? (
-					<div className={css.emptyState}>
-						<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
-						<BodyText className={css.emptyMessage}>
-							Mark items as favorites from the detail view to see them here
-						</BodyText>
-					</div>
-				) : (
-					<Scroller className={css.favoritesScroller}>
+						{loading ? (
+							<div className={css.loadingState}>
+								<Spinner />
+							</div>
+						) : favorites.length === 0 ? (
+							<div className={css.emptyState}>
+								<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
+								<BodyText className={css.emptyMessage}>
+									Mark items as favorites from the detail view to see them here
+								</BodyText>
+							</div>
+						) : (
 						<div className={css.favoritesGrid}>
-								{favorites.map(item => (
-									<SpottableDiv
-										key={item.Id}
-										data-item-id={item.Id}
-										className={css.favoriteCard}
-										onClick={handleFavoriteCardClick}
-									>
+							{favorites.map(item => (
+								<SpottableDiv
+									key={item.Id}
+									data-item-id={item.Id}
+									className={css.favoriteCard}
+									onClick={handleFavoriteCardClick}
+								>
 									<div className={css.cardImage}>
 										{getImageUrl(item) ? (
-												<img
-													src={getImageUrl(item)}
-													alt={item.Name}
-													onError={handleCardImageError}
-													loading="lazy"
-													decoding="async"
-													draggable={false}
-												/>
+											<img
+												src={getImageUrl(item)}
+												alt={item.Name}
+												onError={handleCardImageError}
+												loading="lazy"
+												decoding="async"
+												draggable={false}
+											/>
 										) : (
 											<div className={css.placeholderInner}>
 												<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
 											</div>
 										)}
-											<Button
-												className={css.unfavoriteButton}
-												icon="hearthollow"
-												size="small"
-												data-item-id={item.Id}
-												onClick={handleUnfavoriteClick}
-												title="Remove from favorites"
-											/>
+										<Button
+											className={css.unfavoriteButton}
+											icon="hearthollow"
+											size="small"
+											data-item-id={item.Id}
+											onClick={handleUnfavoriteClick}
+											title="Remove from favorites"
+										/>
 										{item.UserData?.Played && (
 											<div className={css.watchedBadge}>{'\u2713'}</div>
 										)}
@@ -217,8 +212,9 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 								</SpottableDiv>
 							))}
 						</div>
-					</Scroller>
-				)}
+						)}
+					</div>
+				</Scroller>
 			</div>
 		</Panel>
 	);

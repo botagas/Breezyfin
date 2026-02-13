@@ -1,3 +1,5 @@
+@import (reference) '../styles/cardStyles.less';
+
 .row {
 	margin-bottom: 64px;
 	margin-top: 24px;
@@ -37,72 +39,21 @@
 	flex-shrink: 0;
 	width: 25rem;
 	cursor: pointer;
-	border-radius: 1.1rem;
-	transition: transform 180ms ease, filter 180ms ease;
-	outline: none;
+	.card-shell();
 
 	&:hover,
 	&:global(.spottable):focus {
-		transform: translateY(-6px) scale(1.025);
-		z-index: 12;
-		filter: saturate(1.06);
+		.card-focus-lift();
 
 		.cardImage {
-			border-color: rgba(212, 226, 255, 0.9);
-			box-shadow: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
-		}
-
-		.cardImage::before {
-			opacity: 1;
-		}
-
-		img {
-			transform: scale(1.04);
-			filter: saturate(1.06);
+			.card-image-focus();
 		}
 	}
 }
 
 .cardImage {
-	width: 100%;
-	aspect-ratio: 16/9;
-	background: linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%);
-	border-radius: 1rem;
-	overflow: hidden;
-	position: relative;
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
-	transition: box-shadow 180ms ease, border-color 180ms ease;
-
-	&::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
-		opacity: 0;
-		transition: opacity 220ms ease;
-		pointer-events: none;
-		z-index: 2;
-	}
-
-	&::after {
-		content: '';
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: 45%;
-		background: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
-		pointer-events: none;
-		z-index: 1;
-	}
-
-	img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transition: transform 340ms ease, filter 340ms ease;
-	}
+	.card-image-shell(16/9);
+	.card-image-overlays();
 }
 
 .placeholder {
@@ -113,7 +64,7 @@
 	justify-content: center;
 	padding: 12px;
 	text-align: center;
-	background: linear-gradient(145deg, rgba(42, 54, 72, 0.85), rgba(24, 32, 47, 0.85));
+	.card-placeholder-surface();
 	color: rgba(233, 238, 244, 0.92);
 }
 
@@ -135,46 +86,21 @@
 
 .episodeBadge {
 	position: absolute;
-	top: 8px;
-	right: 8px;
-	background: rgba(37, 108, 186, 0.92);
-	color: #ffffff;
-	padding: 4px 8px;
-	border-radius: 999px;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-pill();
 	font-weight: 700;
 	font-size: 0.85em;
-	backdrop-filter: blur(8px);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-	border: 1px solid rgba(198, 226, 255, 0.44);
 	text-align: center;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 5;
-	line-height: 1.2;
-	min-height: 22px;
+	padding: 0.35rem 0.5rem;
 }
 
 .progressBadge {
 	position: absolute;
-	top: 8px;
-	right: 8px;
-	background: rgba(37, 108, 186, 0.92);
-	color: #ffffff;
-	padding: 4px 8px;
-	border-radius: 999px;
-	font-weight: 700;
-	font-size: 0.78em;
-	backdrop-filter: blur(8px);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-	border: 1px solid rgba(198, 226, 255, 0.44);
-	text-align: center;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 5;
-	line-height: 1.2;
-	min-height: 22px;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-pill();
+	padding: 0.35rem 0.5rem;
 }
 
 .cardInfo {
