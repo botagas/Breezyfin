@@ -108,6 +108,9 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 							src={getImageUrl()}
 							alt={item.Name}
 							onError={handleImageError}
+							loading="lazy"
+							decoding="async"
+							draggable={false}
 						/>
 				) : (
 					<div className={css.placeholder}>

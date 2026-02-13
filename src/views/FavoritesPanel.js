@@ -181,6 +181,9 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 													src={getImageUrl(item)}
 													alt={item.Name}
 													onError={handleCardImageError}
+													loading="lazy"
+													decoding="async"
+													draggable={false}
 												/>
 										) : (
 											<div className={css.placeholderInner}>
@@ -196,7 +199,7 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 												title="Remove from favorites"
 											/>
 										{item.UserData?.Played && (
-											<div className={css.watchedBadge}>✓</div>
+											<div className={css.watchedBadge}>{'\u2713'}</div>
 										)}
 										{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
 											<div className={css.progressBar}>

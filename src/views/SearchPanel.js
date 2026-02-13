@@ -253,6 +253,9 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 													src={getImageUrl(item)}
 													alt={item.Name}
 													onError={handleResultImageError}
+													loading="lazy"
+													decoding="async"
+													draggable={false}
 												/>
 										) : (
 											<div className={css.placeholderInner}>
@@ -260,7 +263,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 											</div>
 										)}
 										{item.UserData?.Played && (
-											<div className={css.watchedBadge}>✓</div>
+											<div className={css.watchedBadge}>{'\u2713'}</div>
 										)}
 										{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
 											<div className={css.progressBar}>

@@ -155,6 +155,9 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 										src={getImageUrl(item.Id, item)}
 										alt={item.Name}
 										onError={handleGridImageError}
+										loading="lazy"
+										decoding="async"
+										draggable={false}
 									/>
 								{getUnwatchedCount(item) !== null && (
 									<div className={css.progressBadge}>

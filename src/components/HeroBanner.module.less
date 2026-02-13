@@ -12,13 +12,45 @@
 	left: 0;
 	right: 0;
 	bottom: 0;
-	
+}
+
+.backdropLayer {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	opacity: 0;
+
 	img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 		animation: kenBurns 20s ease-in-out infinite alternate;
 	}
+}
+
+.backdropLayerCurrent {
+	opacity: 1;
+}
+
+.backdropLayerIncoming {
+	animation: heroBackdropIn 420ms ease-out forwards;
+}
+
+.backdropLayerOutgoing {
+	opacity: 1;
+	animation: heroBackdropOut 420ms ease-out forwards;
+}
+
+.backdropFallback {
+	width: 100%;
+	height: 100%;
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
 }
 
 .gradient {
@@ -37,20 +69,6 @@
 	);
 }
 
-.gradientExtension {
-	position: absolute;
-	top: 100%;
-	left: 0;
-	right: 0;
-	height: 260px;
-	background: linear-gradient(
-		to bottom,
-		#121212 0%,
-		#121212 100%
-	);
-	z-index: 1;
-}
-
 .content {
 	position: relative;
 	height: 100%;
@@ -63,6 +81,10 @@
 
 .info {
 	max-width: 100vw;
+}
+
+.infoTransition {
+	animation: heroTextIn 420ms ease-out;
 }
 
 .logoWrapper {
@@ -82,11 +104,19 @@
 	filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.7));
 }
 
+.logoTransition {
+	animation: heroTextIn 480ms ease-out;
+}
+
 .title {
 	font-size: 2.5em;
 	font-weight: 700;
 	margin-bottom: 12px;
 	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.textTransition {
+	animation: heroTextIn 480ms ease-out;
 }
 
 .overview {
@@ -200,15 +230,53 @@
 	background: rgba(255, 255, 255, 0.4);
 	cursor: pointer;
 	transition: all 0.3s ease;
-	
+
 	&:hover {
 		background: rgba(255, 255, 255, 0.7);
 		transform: scale(1.2);
 	}
-	
+
 	&.active {
 		background: rgba(255, 255, 255, 1);
 		width: 24px;
 		border-radius: 4px;
+	}
+}
+
+@keyframes heroBackdropIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes heroBackdropOut {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes heroTextIn {
+	from {
+		opacity: 0;
+		transform: translateY(18px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes kenBurns {
+	from {
+		transform: scale(1.02);
+	}
+	to {
+		transform: scale(1.08);
 	}
 }

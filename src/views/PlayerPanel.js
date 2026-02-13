@@ -1323,9 +1323,16 @@ const PlayerPanel = ({
 		onBack();
 	}, [handleStop, onBack]);
 
-	const toggleControls = useCallback(() => {
-		setShowControls(prev => !prev);
-	}, []);
+	const handleVideoSurfaceClick = useCallback(() => {
+		if (loading || error || showAudioPopup || showSubtitlePopup) return;
+		lastInteractionRef.current = Date.now();
+		const keepHidden = !showControls;
+		if (playing) {
+			handlePause({keepHidden});
+		} else {
+			handlePlay({keepHidden});
+		}
+	}, [error, handlePause, handlePlay, loading, playing, showAudioPopup, showControls, showSubtitlePopup]);
 
 	// Only allow seek shortcuts when focus isn't on another UI element
 	const isSeekContext = useCallback((target) => {
@@ -1730,7 +1737,7 @@ useEffect(() => {
 						onPlaying={handleVideoPlaying}
 						onPause={handleVideoPause}
 						onStalled={handleVideoStalled}
-						onClick={toggleControls}
+						onClick={handleVideoSurfaceClick}
 						autoPlay
 					playsInline
 					preload="auto"

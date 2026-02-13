@@ -1,8 +1,42 @@
 /* Global styles for stable Breezy wrapper classes (prod-safe). */
+html,
+body,
+#root {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+body {
+	overscroll-behavior: none;
+}
+
 /* Remove Panel body horizontal padding app-wide */
 .bf-panel-body {
 	padding-left: 0 !important;
 	padding-right: 0 !important;
+	overflow: hidden !important;
+}
+
+.bf-panel,
+.bf-panel-body {
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+/* Hide native scrollbar paint on Sandstone scrollers while keeping scroll behavior */
+[data-webos-voice-intent="Scroll"] {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+	overscroll-behavior: contain;
+}
+
+[data-webos-voice-intent="Scroll"]::-webkit-scrollbar {
+	width: 0 !important;
+	height: 0 !important;
+	display: none !important;
 }
 
 /* Make panel headers transparent so backdrop imagery remains visible */

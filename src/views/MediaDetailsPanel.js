@@ -17,6 +17,42 @@ import css from './MediaDetailsPanel.module.less';
 
 const SpottableDiv = Spottable('div');
 
+const LANGUAGE_NAME_MAP = {
+	eng: 'English',
+	en: 'English',
+	spa: 'Spanish',
+	es: 'Spanish',
+	fra: 'French',
+	fr: 'French',
+	deu: 'German',
+	de: 'German',
+	ita: 'Italian',
+	it: 'Italian',
+	jpn: 'Japanese',
+	ja: 'Japanese',
+	kor: 'Korean',
+	ko: 'Korean',
+	por: 'Portuguese',
+	pt: 'Portuguese',
+	rus: 'Russian',
+	ru: 'Russian',
+	ara: 'Arabic',
+	ar: 'Arabic',
+	zho: 'Chinese',
+	zh: 'Chinese'
+};
+
+const toLanguageDisplayName = (language) => {
+	if (!language) return 'Unknown';
+	const normalized = String(language).trim().toLowerCase();
+	if (!normalized) return 'Unknown';
+	if (LANGUAGE_NAME_MAP[normalized]) return LANGUAGE_NAME_MAP[normalized];
+	if (normalized.length === 2 || normalized.length === 3) {
+		return normalized.toUpperCase();
+	}
+	return String(language);
+};
+
 const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [playbackInfo, setPlaybackInfo] = useState(null);
@@ -31,6 +67,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [showEpisodePicker, setShowEpisodePicker] = useState(false);
 	const [headerLogoUnavailable, setHeaderLogoUnavailable] = useState(false);
 	const [episodeNavList, setEpisodeNavList] = useState([]);
+	const [detailMetadata, setDetailMetadata] = useState(null);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
 	const [toastMessage, setToastMessage] = useState('');
@@ -96,6 +133,33 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	useEffect(() => {
 		setHeaderLogoUnavailable(false);
 	}, [item?.Id, item?.SeriesId, item?.Type]);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		const loadDetailMetadata = async () => {
+			if (!item?.Id) {
+				setDetailMetadata(null);
+				return;
+			}
+			try {
+				const detailed = await jellyfinService.getItem(item.Id);
+				if (!cancelled) {
+					setDetailMetadata(detailed || null);
+				}
+			} catch (error) {
+				console.error('Failed to load item metadata:', error);
+				if (!cancelled) {
+					setDetailMetadata(null);
+				}
+			}
+		};
+
+		loadDetailMetadata();
+		return () => {
+			cancelled = true;
+		};
+	}, [item?.Id]);
 
 	// Pick sensible defaults based on the media streams we got back
 	const applyDefaultTracks = useCallback((mediaStreams) => {
@@ -390,23 +454,26 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const audioTracks = playbackInfo?.MediaSources?.[0]?.MediaStreams
 		.filter(s => s.Type === 'Audio')
 		.map((track) => ({
-			children: `${track.Language || 'Unknown'} - ${track.DisplayTitle || track.Codec}`,
+			children: `${toLanguageDisplayName(track.Language)} - ${track.DisplayTitle || track.Codec}`,
+			summary: toLanguageDisplayName(track.Language),
 			key: track.Index
 		})) || [];
 
 	const subtitleTracks = [
-		{ children: 'None', key: -1 },
+		{ children: 'None', summary: 'None', key: -1 },
 		...(playbackInfo?.MediaSources?.[0]?.MediaStreams
 			.filter(s => s.Type === 'Subtitle')
 			.map((track) => ({
-				children: `${track.Language || 'Unknown'} - ${track.DisplayTitle || 'Subtitle'}`,
+				children: `${toLanguageDisplayName(track.Language)} - ${track.DisplayTitle || 'Subtitle'}`,
+				summary: toLanguageDisplayName(track.Language),
 				key: track.Index
 			})) || [])
 	];
 
-	const cast = item?.People?.filter(p => p.Type === 'Actor') || [];
-	const directors = (item?.People || []).filter(p => p.Type === 'Director');
-	const writers = (item?.People || []).filter(p => p.Type === 'Writer');
+	const people = detailMetadata?.People || item?.People || [];
+	const cast = people.filter(p => p.Type === 'Actor');
+	const directors = people.filter(p => p.Type === 'Director');
+	const writers = people.filter(p => p.Type === 'Writer');
 	const focusSeasonWatchedButton = (seasonCard) => {
 		const watchedTarget = seasonCard?.querySelector(
 			`.${css.seasonWatchedButton} .spottable, .${css.seasonWatchedButton} [tabindex], .${css.seasonWatchedButton} button`
@@ -536,10 +603,21 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		return track?.children || 'Default';
 	};
 
+	const getAudioSummary = () => {
+		const track = audioTracks.find(t => t.key === selectedAudioTrack);
+		return track?.summary || 'Default';
+	};
+
 	const getSubtitleLabel = () => {
 		if (selectedSubtitleTrack === -1) return 'None';
 		const track = subtitleTracks.find(t => t.key === selectedSubtitleTrack);
 		return track?.children || 'Default';
+	};
+
+	const getSubtitleSummary = () => {
+		if (selectedSubtitleTrack === -1) return 'None';
+		const track = subtitleTracks.find(t => t.key === selectedSubtitleTrack);
+		return track?.summary || 'Default';
 	};
 
 	const renderToast = () => {
@@ -553,18 +631,18 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	const getSeasonImageUrl = (season) => {
 		if (season?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(season.Id, 'Primary', 500);
+			return jellyfinService.getImageUrl(season.Id, 'Primary', 360);
 		}
 		if (season?.ImageTags?.Thumb) {
-			return jellyfinService.getImageUrl(season.Id, 'Thumb', 500);
+			return jellyfinService.getImageUrl(season.Id, 'Thumb', 360);
 		}
 		// Fallback to series backdrop if available
 		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 800);
+			return jellyfinService.getBackdropUrl(item.Id, 0, 640);
 		}
 		// Fallback to series primary
 		if (item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 500);
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 360);
 		}
 		return '';
 	};
@@ -1014,6 +1092,8 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																		src={jellyfinService.getImageUrl(person.Id, 'Primary', 240)}
 																		alt={person.Name}
 																		onError={handleCastImageError}
+																		loading="lazy"
+																		decoding="async"
 																	/>
 															) : (
 																<div className={css.castInitial}>{person.Name?.charAt(0) || '?'}</div>
@@ -1056,12 +1136,16 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																onKeyDown={handleSeasonWatchedButtonKeyDown}
 															/>
 														</div>
-															<img
-																src={getSeasonImageUrl(season)}
-																alt={season.Name}
-																className={css.seasonPoster}
-																onError={handleSeasonImageError}
-															/>
+															<div className={css.seasonPosterWrap}>
+																<img
+																	src={getSeasonImageUrl(season)}
+																	alt={season.Name}
+																	className={css.seasonPoster}
+																	onError={handleSeasonImageError}
+																	loading="lazy"
+																	decoding="async"
+																/>
+															</div>
 														<BodyText className={css.seasonName}>{season.Name}</BodyText>
 														{season.ChildCount && (
 															<BodyText className={css.episodeCount}>{season.ChildCount} Episodes</BodyText>
@@ -1073,55 +1157,49 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 										{episodes.length > 0 && selectedEpisode && (
 											<div className={css.stickyControls}>
-												<div className={css.controlsTitle}>
-														<Button
-															size="large"
-															onClick={openEpisodePicker}
-															className={css.dropdown}
-															componentRef={episodeSelectorButtonRef}
-															spotlightId="episode-selector-button"
-															onKeyDown={handleEpisodeSelectorKeyDown}
-														>
+												<div className={css.controlsMain}>
+													<Button
+														size="large"
+														onClick={openEpisodePicker}
+														className={`${css.dropdown} ${css.episodeSelectorButton}`}
+														componentRef={episodeSelectorButtonRef}
+														spotlightId="episode-selector-button"
+														onKeyDown={handleEpisodeSelectorKeyDown}
+													>
 														Episode {selectedEpisode.IndexNumber}: {selectedEpisode.Name}
 													</Button>
 												</div>
 
-												<div className={css.trackSelectors}>
+												<div className={css.controlsActions}>
 													{audioTracks.length > 0 && (
-														<div className={css.trackSection}>
-															<BodyText className={css.trackLabel}>Audio Track</BodyText>
-																<Button
-																	size="large"
-																	onClick={openAudioPicker}
-																	className={css.dropdown}
-																>
-																{getAudioLabel()}
-															</Button>
-														</div>
+														<Button
+															size="small"
+															onClick={openAudioPicker}
+															className={css.compactSelectorButton}
+														>
+															Audio: {getAudioSummary()}
+														</Button>
 													)}
 
 													{subtitleTracks.length > 1 && (
-														<div className={css.trackSection}>
-															<BodyText className={css.trackLabel}>Subtitle Track</BodyText>
-																<Button
-																	size="large"
-																	onClick={openSubtitlePicker}
-																	className={css.dropdown}
-																>
-																{getSubtitleLabel()}
-															</Button>
-														</div>
+														<Button
+															size="small"
+															onClick={openSubtitlePicker}
+															className={css.compactSelectorButton}
+														>
+															Subtitles: {getSubtitleSummary()}
+														</Button>
 													)}
 												</div>
 
-													<Button
-														size="small"
-														icon="play"
-														className={css.primaryButton}
-														onClick={handlePlay}
-													>
-														Play
-													</Button>
+												<Button
+													size="small"
+													icon="play"
+													className={css.primaryButton}
+													onClick={handlePlay}
+												>
+													Play
+												</Button>
 											</div>
 										)}
 
@@ -1143,6 +1221,8 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																	src={jellyfinService.getImageUrl(episode.Id, 'Primary', 400)}
 																	alt={episode.Name}
 																	className={css.episodeImage}
+																	loading="lazy"
+																	decoding="async"
 																/>
 															</div>
 															<div className={css.episodeInfo}>
