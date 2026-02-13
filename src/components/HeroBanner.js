@@ -116,7 +116,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 	const previousHasImageError = previousItem ? Boolean(imageErrors[previousItem.Id]) : false;
 
 	return (
-		<div className={css.heroBanner}>
+		<div className={css.heroBanner} data-bf-media-bar="true">
 			<div className={css.backdrop}>
 				{isTransitioning && previousItem && (
 					<div className={`${css.backdropLayer} ${css.backdropLayerOutgoing}`}>

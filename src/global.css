@@ -170,3 +170,30 @@ body {
 	pointer-events: none;
 	font-weight: 600;
 }
+
+/* Performance mode for lower-end TVs: remove expensive motion and blur effects. */
+
+[data-bf-animations='off'] .focusExpand,
+[data-bf-animations='off'] .spottable:focus,
+[data-bf-animations='off'] [data-webos-voice-focused='true'] {
+	transform: none !important;
+	filter: none !important;
+}
+
+[data-bf-animations='off'] .bf-input-trigger:hover,
+[data-bf-animations='off'] .bf-input-trigger:focus,
+[data-bf-animations='off'] .bf-input-trigger:active,
+[data-bf-animations='off'] .bf-input-trigger.spottable:focus {
+	transform: none !important;
+}
+
+[data-bf-animations='off'] .bf-button-bg,
+[data-bf-animations='off'] .bf-header {
+	box-shadow: none !important;
+}
+
+[data-bf-animations='off'] .bf-header,
+[data-bf-animations='off'] .bf-input-trigger > div:first-of-type {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}

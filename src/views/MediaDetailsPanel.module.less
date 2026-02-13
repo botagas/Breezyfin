@@ -803,6 +803,38 @@
 	transition: transform 340ms ease, filter 340ms ease;
 }
 
+:global([data-bf-animations='off']) {
+	.episodeCard {
+		background: rgba(18, 24, 36, 0.34);
+		border-color: rgba(255, 255, 255, 0.14);
+		box-shadow: none;
+
+		&:hover,
+		&:focus,
+		&:global(.spottable):focus {
+			background: rgba(24, 34, 50, 0.5);
+			border-color: rgba(169, 206, 255, 0.48);
+			box-shadow: none;
+		}
+	}
+
+	.episodeImageContainer {
+		box-shadow: none;
+		border-color: rgba(255, 255, 255, 0.14);
+
+		&::before,
+		&::after {
+			content: none;
+			display: none;
+		}
+	}
+
+	.episodeImage {
+		transform: none !important;
+		filter: none !important;
+	}
+}
+
 .episodeInfo {
 	flex: 1;
 	min-width: 0;

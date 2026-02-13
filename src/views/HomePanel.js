@@ -39,6 +39,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 		myRequests: true
 	});
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
+	const [showMediaBar, setShowMediaBar] = useState(true);
 	const homeScrollToRef = useRef(null);
 
 	const loadContent = useCallback(async () => {
@@ -176,12 +177,43 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 					];
 					setHomeRowOrder(resolved);
 				}
+				setShowMediaBar(parsed.showMediaBar !== false);
 			}
 		} catch (err) {
 			console.warn('Failed to load home row settings:', err);
 		}
 		loadContent();
 	}, [loadContent]);
+
+	useEffect(() => {
+		const applyMediaBarSetting = (settingsPayload) => {
+			if (!settingsPayload || typeof settingsPayload !== 'object') return;
+			if (Object.prototype.hasOwnProperty.call(settingsPayload, 'showMediaBar')) {
+				setShowMediaBar(settingsPayload.showMediaBar !== false);
+			}
+		};
+
+		const handleSettingsChanged = (event) => {
+			applyMediaBarSetting(event?.detail);
+		};
+
+		const handleStorage = (event) => {
+			if (event?.key !== 'breezyfinSettings') return;
+			try {
+				const parsed = event.newValue ? JSON.parse(event.newValue) : {};
+				applyMediaBarSetting(parsed);
+			} catch (error) {
+				console.warn('Failed to apply updated settings:', error);
+			}
+		};
+
+		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
+		window.addEventListener('storage', handleStorage);
+		return () => {
+			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
+			window.removeEventListener('storage', handleStorage);
+		};
+	}, []);
 
 	const handleItemClick = useCallback((item) => {
 		onItemSelect(item);
@@ -291,7 +323,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 		.map((key) => ({key, row: rowConfig[key]}))
 		.filter(({key, row}) => row && homeRowSettings[key] && row.items.length > 0);
 	const hasContent = visibleRows.length > 0;
-	const hasHero = heroItems.length > 0;
+	const hasHero = showMediaBar && heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
 
 	if (loading) {

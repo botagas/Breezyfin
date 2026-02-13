@@ -21,6 +21,12 @@
 	transform: translateY(-6px) scale(1.025);
 	z-index: 12;
 	filter: saturate(1.06);
+
+	:global([data-bf-animations='off']) & {
+		transform: none;
+		filter: none;
+		z-index: auto;
+	}
 }
 
 .card-image-shell(@ratio) {
@@ -62,11 +68,22 @@
 		z-index: 1;
 	}
 
+	:global([data-bf-animations='off']) &::before,
+	:global([data-bf-animations='off']) &::after {
+		display: none;
+		opacity: 0 !important;
+	}
+
 	img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 		transition: transform 340ms ease, filter 340ms ease;
+	}
+
+	:global([data-bf-animations='off']) & img {
+		transform: none !important;
+		filter: none !important;
 	}
 }
 
@@ -81,6 +98,19 @@
 	img {
 		transform: scale(1.04);
 		filter: saturate(1.06);
+	}
+
+	:global([data-bf-animations='off']) & {
+		box-shadow: none;
+	}
+
+	:global([data-bf-animations='off']) &::before {
+		opacity: 0 !important;
+	}
+
+	:global([data-bf-animations='off']) & img {
+		transform: none !important;
+		filter: none !important;
 	}
 }
 

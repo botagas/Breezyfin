@@ -23,6 +23,7 @@ const App = (props) => {
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [previousItem, setPreviousItem] = useState(null); // For back navigation from episode to series
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
+	const [animationsDisabled, setAnimationsDisabled] = useState(false);
 	const playerBackHandlerRef = useRef(null);
 	const detailsBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
@@ -35,13 +36,45 @@ const App = (props) => {
 		setPlayerControlsVisible(true);
 	}, []);
 
+	const readDisableAnimationsSetting = useCallback(() => {
+		try {
+			const raw = localStorage.getItem('breezyfinSettings');
+			if (!raw) {
+				setAnimationsDisabled(false);
+				return;
+			}
+			const parsed = JSON.parse(raw);
+			setAnimationsDisabled(parsed?.disableAnimations === true);
+		} catch (error) {
+			console.error('Failed to read animation setting:', error);
+			setAnimationsDisabled(false);
+		}
+	}, []);
+
 	useEffect(() => {
 		// Try to restore session on load
 		const restored = jellyfinService.restoreSession();
 		if (restored) {
 			setCurrentView('home');
 		}
-	}, []);
+		readDisableAnimationsSetting();
+	}, [readDisableAnimationsSetting]);
+
+	useEffect(() => {
+		const handleSettingsChanged = (event) => {
+			setAnimationsDisabled(event?.detail?.disableAnimations === true);
+		};
+		const handleStorage = (event) => {
+			if (event?.key !== 'breezyfinSettings') return;
+			readDisableAnimationsSetting();
+		};
+		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
+		window.addEventListener('storage', handleStorage);
+		return () => {
+			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
+			window.removeEventListener('storage', handleStorage);
+		};
+	}, [readDisableAnimationsSetting]);
 
 	// Handle back button globally
 	const handleBack = useCallback(() => {
@@ -245,7 +278,7 @@ const App = (props) => {
 	};
 
 	return (
-		<div className={css.app} {...props}>
+		<div className={css.app} data-bf-animations={animationsDisabled ? 'off' : 'on'} {...props}>
 			<Panels
 				index={getPanelIndex()}
 				onBack={handleBack}

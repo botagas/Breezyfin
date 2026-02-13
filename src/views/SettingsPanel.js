@@ -32,6 +32,8 @@ const DEFAULT_SETTINGS = {
 	forceTranscodingWithSubtitles: true,
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
+	disableAnimations: false,
+	showMediaBar: true,
 	autoPlayNext: true,
 	showPlayNextPrompt: true,
 	playNextPromptMode: 'segmentsOrLast60',
@@ -86,6 +88,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const [switchingServerId, setSwitchingServerId] = useState(null);
 	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
 	const [appLogs, setAppLogs] = useState([]);
+	const [appLogCount, setAppLogCount] = useState(0);
 	const savedServersByKey = useMemo(() => {
 		const map = new Map();
 		savedServers.forEach((entry) => {
@@ -145,11 +148,16 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		}
 	}, []);
 
+	const refreshAppLogCount = useCallback(() => {
+		setAppLogCount(getAppLogs().length);
+	}, []);
+
 	useEffect(() => {
 		loadSettings();
 		loadServerInfo();
 		refreshSavedServers();
-	}, [loadServerInfo, loadSettings, refreshSavedServers]);
+		refreshAppLogCount();
+	}, [loadServerInfo, loadSettings, refreshSavedServers, refreshAppLogCount]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -168,6 +176,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 			const newSettings = { ...prevSettings, [key]: value };
 			try {
 				localStorage.setItem('breezyfinSettings', JSON.stringify(newSettings));
+				if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+					window.dispatchEvent(new CustomEvent('breezyfin-settings-changed', { detail: newSettings }));
+				}
 			} catch (error) {
 				console.error('Failed to save settings:', error);
 			}
@@ -260,13 +271,16 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	}, [onLogout, onSignOut]);
 
 	const openLogsPopup = useCallback(() => {
-		setAppLogs(getAppLogs().slice().reverse());
+		const logs = getAppLogs();
+		setAppLogs(logs.slice().reverse());
+		setAppLogCount(logs.length);
 		setLogsPopupOpen(true);
 	}, []);
 
 	const handleClearLogs = useCallback(() => {
 		clearAppLogs();
 		setAppLogs([]);
+		setAppLogCount(0);
 	}, []);
 
 	const toggleHomeRowRecentlyAdded = useCallback(() => {
@@ -392,6 +406,14 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const toggleShowBackdrops = useCallback(() => {
 		handleSettingChange('showBackdrops', !settings.showBackdrops);
 	}, [handleSettingChange, settings.showBackdrops]);
+
+	const toggleDisableAnimations = useCallback(() => {
+		handleSettingChange('disableAnimations', !settings.disableAnimations);
+	}, [handleSettingChange, settings.disableAnimations]);
+
+	const toggleShowMediaBar = useCallback(() => {
+		handleSettingChange('showMediaBar', !settings.showMediaBar);
+	}, [handleSettingChange, settings.showMediaBar]);
 
 	const handleBitrateSelect = useCallback((event) => {
 		const bitrate = event.currentTarget.dataset.bitrate;
@@ -717,6 +739,22 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 							>
 							Show Background Images
 						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleDisableAnimations}
+								selected={settings.disableAnimations}
+							>
+							Disable Animations (Performance Mode)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowMediaBar}
+								selected={settings.showMediaBar !== false}
+							>
+							Show Media Bar on Home
+						</SwitchItem>
 					</section>
 
 					<section className={css.section}>
@@ -730,7 +768,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 						<Item
 							className={css.settingItem}
 							label="Logs"
-							slotAfter={`${getAppLogs().length} entries`}
+							slotAfter={`${appLogCount} entries`}
 							onClick={openLogsPopup}
 						/>
 					</section>
