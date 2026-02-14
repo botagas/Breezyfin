@@ -33,7 +33,9 @@ const DEFAULT_SETTINGS = {
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
 	disableAnimations: false,
+	disableAllAnimations: false,
 	showMediaBar: true,
+	navbarTheme: 'classic',
 	autoPlayNext: true,
 	showPlayNextPrompt: true,
 	playNextPromptMode: 'segmentsOrLast60',
@@ -73,6 +75,11 @@ const LANGUAGE_OPTIONS = [
 	{ value: 'rus', label: 'Russian' }
 ];
 
+const NAVBAR_THEME_OPTIONS = [
+	{ value: 'classic', label: 'Classic' },
+	{ value: 'elegant', label: 'Elegant' }
+];
+
 const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, isActive = false, ...rest }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -82,6 +89,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const [bitratePopupOpen, setBitratePopupOpen] = useState(false);
 	const [audioLangPopupOpen, setAudioLangPopupOpen] = useState(false);
 	const [subtitleLangPopupOpen, setSubtitleLangPopupOpen] = useState(false);
+	const [navbarThemePopupOpen, setNavbarThemePopupOpen] = useState(false);
 	const [playNextPromptModePopupOpen, setPlayNextPromptModePopupOpen] = useState(false);
 	const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 	const [savedServers, setSavedServers] = useState([]);
@@ -365,6 +373,14 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		setSubtitleLangPopupOpen(false);
 	}, []);
 
+	const openNavbarThemePopup = useCallback(() => {
+		setNavbarThemePopupOpen(true);
+	}, []);
+
+	const closeNavbarThemePopup = useCallback(() => {
+		setNavbarThemePopupOpen(false);
+	}, []);
+
 	const closePlayNextPromptModePopup = useCallback(() => {
 		setPlayNextPromptModePopupOpen(false);
 	}, []);
@@ -411,9 +427,20 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		handleSettingChange('disableAnimations', !settings.disableAnimations);
 	}, [handleSettingChange, settings.disableAnimations]);
 
+	const toggleDisableAllAnimations = useCallback(() => {
+		handleSettingChange('disableAllAnimations', !settings.disableAllAnimations);
+	}, [handleSettingChange, settings.disableAllAnimations]);
+
 	const toggleShowMediaBar = useCallback(() => {
 		handleSettingChange('showMediaBar', !settings.showMediaBar);
 	}, [handleSettingChange, settings.showMediaBar]);
+
+	const handleNavbarThemeSelect = useCallback((event) => {
+		const themeValue = event.currentTarget.dataset.theme;
+		if (!themeValue) return;
+		handleSettingChange('navbarTheme', themeValue);
+		setNavbarThemePopupOpen(false);
+	}, [handleSettingChange]);
 
 	const handleBitrateSelect = useCallback((event) => {
 		const bitrate = event.currentTarget.dataset.bitrate;
@@ -464,6 +491,11 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 			default:
 				return 'Segments or Last 60s';
 		}
+	};
+
+	const getNavbarThemeLabel = (value) => {
+		const option = NAVBAR_THEME_OPTIONS.find((theme) => theme.value === value);
+		return option ? option.label : 'Classic';
 	};
 
 	// Improve remote back handling so physical back/escape keys always leave settings
@@ -732,6 +764,13 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Display</BodyText>
 
+							<Item
+								className={css.settingItem}
+								label="Navigation Theme"
+								slotAfter={getNavbarThemeLabel(settings.navbarTheme)}
+								onClick={openNavbarThemePopup}
+							/>
+
 							<SwitchItem
 								className={css.switchItem}
 								onToggle={toggleShowBackdrops}
@@ -746,6 +785,14 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 								selected={settings.disableAnimations}
 							>
 							Disable Animations (Performance Mode)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleDisableAllAnimations}
+								selected={settings.disableAllAnimations}
+							>
+							Disable ALL Animations (Performance+ Mode)
 						</SwitchItem>
 
 							<SwitchItem
@@ -834,6 +881,28 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 									className={css.popupOption}
 									selected={settings.preferredSubtitleLanguage === option.value}
 									onClick={handleSubtitleLanguageSelect}
+								>
+								{option.label}
+							</Button>
+						))}
+					</div>
+				</div>
+			</Popup>
+
+				<Popup
+					open={navbarThemePopupOpen}
+					onClose={closeNavbarThemePopup}
+				>
+				<div className={css.nativeThemePopupContent}>
+					<BodyText className={css.popupTitle}>Navigation Theme</BodyText>
+					<div className={css.nativeThemePopupOptions}>
+							{NAVBAR_THEME_OPTIONS.map((option) => (
+								<Button
+									key={option.value}
+									size="small"
+									data-theme={option.value}
+									selected={settings.navbarTheme === option.value}
+									onClick={handleNavbarThemeSelect}
 								>
 								{option.label}
 							</Button>

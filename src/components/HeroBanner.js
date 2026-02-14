@@ -111,6 +111,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 	const logoUrl = currentItem.ImageTags?.Logo
 		? jellyfinService.getImageUrl(currentItem.Id, 'Logo', 600)
 		: null;
+	const showLogo = Boolean(logoUrl);
 
 	const currentHasImageError = Boolean(imageErrors[currentItem.Id]);
 	const previousHasImageError = previousItem ? Boolean(imageErrors[previousItem.Id]) : false;
@@ -148,7 +149,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 			<div className={css.content}>
 				<div className={`${css.info} ${css.infoTransition}`} key={`hero-content-${currentItem.Id}`}>
 					<div className={css.logoWrapper}>
-						{logoUrl ? (
+						{showLogo ? (
 							<img
 								src={logoUrl}
 								alt={currentItem.Name}

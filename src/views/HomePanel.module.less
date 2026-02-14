@@ -6,9 +6,9 @@
 }
 
 .content {
-	padding: 0;
-	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(18, 18, 18, 1) 100px, #121212 100%);
-	min-height: 100vh;
+	padding: var(--bf-home-content-offset, 0rem) 0 0;
+	background: linear-gradient(to bottom, rgba(18, 18, 18, 0.98) 0%, #121212 120px);
+	min-height: 0;
 }
 
 .emptyStateCenter {
@@ -38,7 +38,7 @@
 	height: 100vh;
 	min-height: 0;
 	padding-top: 0;
-	margin-top: -200px;
+	margin-top: calc(-1 * var(--bf-home-scroller-overlap, var(--bf-toolbar-height, 4.5rem)));
 	overscroll-behavior: contain;
 }
 

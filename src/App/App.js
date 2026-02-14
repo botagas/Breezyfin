@@ -24,6 +24,8 @@ const App = (props) => {
 	const [previousItem, setPreviousItem] = useState(null); // For back navigation from episode to series
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
 	const [animationsDisabled, setAnimationsDisabled] = useState(false);
+	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(false);
+	const [navbarTheme, setNavbarTheme] = useState('classic');
 	const playerBackHandlerRef = useRef(null);
 	const detailsBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
@@ -36,20 +38,27 @@ const App = (props) => {
 		setPlayerControlsVisible(true);
 	}, []);
 
-	const readDisableAnimationsSetting = useCallback(() => {
+	const applyVisualSettings = useCallback((settingsPayload) => {
+		const settings = settingsPayload || {};
+		setAnimationsDisabled(settings.disableAnimations === true);
+		setAllAnimationsDisabled(settings.disableAllAnimations === true);
+		setNavbarTheme(settings.navbarTheme === 'elegant' ? 'elegant' : 'classic');
+	}, []);
+
+	const readVisualSettingsFromStorage = useCallback(() => {
 		try {
 			const raw = localStorage.getItem('breezyfinSettings');
 			if (!raw) {
-				setAnimationsDisabled(false);
+				applyVisualSettings({});
 				return;
 			}
 			const parsed = JSON.parse(raw);
-			setAnimationsDisabled(parsed?.disableAnimations === true);
+			applyVisualSettings(parsed);
 		} catch (error) {
 			console.error('Failed to read animation setting:', error);
-			setAnimationsDisabled(false);
+			applyVisualSettings({});
 		}
-	}, []);
+	}, [applyVisualSettings]);
 
 	useEffect(() => {
 		// Try to restore session on load
@@ -57,16 +66,16 @@ const App = (props) => {
 		if (restored) {
 			setCurrentView('home');
 		}
-		readDisableAnimationsSetting();
-	}, [readDisableAnimationsSetting]);
+		readVisualSettingsFromStorage();
+	}, [readVisualSettingsFromStorage]);
 
 	useEffect(() => {
 		const handleSettingsChanged = (event) => {
-			setAnimationsDisabled(event?.detail?.disableAnimations === true);
+			applyVisualSettings(event?.detail);
 		};
 		const handleStorage = (event) => {
 			if (event?.key !== 'breezyfinSettings') return;
-			readDisableAnimationsSetting();
+			readVisualSettingsFromStorage();
 		};
 		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
 		window.addEventListener('storage', handleStorage);
@@ -74,7 +83,7 @@ const App = (props) => {
 			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
 			window.removeEventListener('storage', handleStorage);
 		};
-	}, [readDisableAnimationsSetting]);
+	}, [applyVisualSettings, readVisualSettingsFromStorage]);
 
 	// Handle back button globally
 	const handleBack = useCallback(() => {
@@ -278,7 +287,13 @@ const App = (props) => {
 	};
 
 	return (
-		<div className={css.app} data-bf-animations={animationsDisabled ? 'off' : 'on'} {...props}>
+		<div
+			className={css.app}
+			data-bf-animations={animationsDisabled ? 'off' : 'on'}
+			data-bf-all-animations={allAnimationsDisabled ? 'off' : 'on'}
+			data-bf-nav-theme={navbarTheme}
+			{...props}
+		>
 			<Panels
 				index={getPanelIndex()}
 				onBack={handleBack}

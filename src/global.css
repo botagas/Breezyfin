@@ -8,6 +8,30 @@ body,
 	overscroll-behavior: none;
 }
 
+:root {
+	/* Shared layout tokens so panel offsets track navbar/header height changes */
+	--bf-header-height: 7.5rem;
+	--bf-toolbar-height-classic: 3.5rem;
+	--bf-toolbar-height-elegant: 5.5rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-top-chrome-height: calc(var(--bf-header-height) + var(--bf-toolbar-height));
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: 0rem;
+	--bf-panel-scroller-offset-nudge: 0rem;
+	--bf-home-hero-nudge: 0rem;
+}
+
+/* Explicit classic token reset so switching away from Elegant always restores baseline layout geometry. */
+[data-bf-nav-theme='classic'] {
+	--bf-header-height: 7.5rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: 0rem;
+	/* Non-home panels need a small upward correction to align under classic header+toolbar. */
+	--bf-panel-scroller-offset-nudge: -1rem;
+	--bf-home-hero-nudge: 0rem;
+}
+
 body {
 	overscroll-behavior: none;
 }
@@ -41,13 +65,27 @@ body {
 
 /* Make panel headers transparent so backdrop imagery remains visible */
 .bf-header {
+	--bf-header-fade-color: rgba(0, 0, 0, 0.2);
 	background: rgba(0, 0, 0, 0.22) !important;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+	border-bottom: none !important;
 	backdrop-filter: blur(0.15rem) !important;
 	-webkit-backdrop-filter: blur(0.15rem) !important;
 	box-shadow: none !important;
 	position: relative;
+	isolation: isolate;
 	z-index: 120 !important;
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: -1rem;
+		height: 1rem;
+		background: linear-gradient(to bottom, var(--bf-header-fade-color), transparent);
+		pointer-events: none;
+		z-index: 0;
+	}
 }
 
 /* Strip default Sandstone button chrome from Breezy button wrapper */
@@ -171,7 +209,41 @@ body {
 	font-weight: 600;
 }
 
-/* Performance mode for lower-end TVs: remove expensive motion and blur effects. */
+/* Elegant nav theme: softer typography and stronger frosted chrome. */
+[data-bf-nav-theme='elegant'] .bf-panel-body,
+[data-bf-nav-theme='elegant'] .bf-header {
+	letter-spacing: 0.01em;
+}
+
+[data-bf-nav-theme='elegant'] {
+	--bf-header-height: 0rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-elegant);
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: calc(var(--bf-toolbar-height) + 0.5rem);
+	--bf-panel-scroller-offset-nudge: 0.75rem;
+	--bf-home-hero-nudge: 0.5rem;
+}
+
+[data-bf-nav-theme='elegant'] .bf-button .client {
+	font-weight: 500 !important;
+	letter-spacing: 0.018em !important;
+}
+
+[data-bf-nav-theme='elegant'] .bf-button .icon,
+[data-bf-nav-theme='elegant'] .Icon {
+	font-weight: 400 !important;
+}
+
+[data-bf-nav-theme='elegant'] .bf-header {
+	--bf-header-fade-color: rgba(5, 10, 17, 0.28);
+	background: rgba(5, 10, 17, 0.5) !important;
+	backdrop-filter: blur(1.1rem) saturate(1.1) !important;
+	-webkit-backdrop-filter: blur(1.1rem) saturate(1.1) !important;
+	border-bottom: none !important;
+	display: none !important;
+}
+
+/* Performance mode for lower-end TVs: reduce expensive motion but keep nav/header blur. */
 
 [data-bf-animations='off'] .focusExpand,
 [data-bf-animations='off'] .spottable:focus,
@@ -192,8 +264,78 @@ body {
 	box-shadow: none !important;
 }
 
-[data-bf-animations='off'] .bf-header,
 [data-bf-animations='off'] .bf-input-trigger > div:first-of-type {
 	backdrop-filter: none !important;
 	-webkit-backdrop-filter: none !important;
+}
+
+/* Strict mode: disable every animation/transition for maximum performance. */
+[data-bf-all-animations='off'],
+[data-bf-all-animations='off'] * {
+	scroll-behavior: auto !important;
+}
+
+[data-bf-all-animations='off'] *,
+[data-bf-all-animations='off'] *::before,
+[data-bf-all-animations='off'] *::after {
+	animation: none !important;
+	transition-property: none !important;
+	transition-duration: 0s !important;
+	transition-delay: 0s !important;
+}
+
+[data-bf-all-animations='off'] .focusExpand,
+[data-bf-all-animations='off'] .spottable:focus,
+[data-bf-all-animations='off'] [data-webos-voice-focused='true'] {
+	transform: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] .bf-input-trigger > div:first-of-type {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] .bf-header,
+[data-bf-all-animations='off'] [data-bf-navbar='true'] {
+	background: rgba(9, 13, 19, 0.84) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='filter'] {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='overlay'] {
+	background: rgba(9, 13, 19, 0.84) !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='specular'] {
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+/* Elegant theme in ultra mode: keep a lightweight blur instead of full liquid glass or solid fill. */
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] {
+	background: transparent !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='filter'] {
+	backdrop-filter: blur(0.5rem) !important;
+	-webkit-backdrop-filter: blur(0.5rem) !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='overlay'] {
+	background: rgba(9, 13, 19, 0.42) !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {
+	background: transparent !important;
+	box-shadow: none !important;
 }

@@ -1,13 +1,14 @@
 @import (reference) '../styles/cardStyles.less';
 
 .libraryContainer {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
+	height: calc(100vh + var(--bf-panel-overlap-lift));
 	min-height: 0;
 	background: #121212;
 	overflow: hidden;
-	margin-top: -12rem;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
 }
 
 .scroller {
@@ -26,9 +27,9 @@
 
 .gridContainer {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
 	gap: 2rem;
-	padding: 14rem 4rem 2rem;
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 2rem) 4rem 2rem;
 	background: #121212;
 }
 

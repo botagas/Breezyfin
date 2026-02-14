@@ -1,4 +1,7 @@
 .settingsContainer {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
+	--bf-settings-content-bottom-pad: 4rem;
+	--bf-settings-bottom-spacer: 0rem;
 	--settings-accent: #3fb8ff;
 	--settings-surface: rgba(14, 22, 30, 0.82);
 	--settings-surface-strong: rgba(20, 30, 40, 0.9);
@@ -8,21 +11,30 @@
 		radial-gradient(120rem 50rem at 20% -10%, rgba(63, 184, 255, 0.18), transparent 60%),
 		radial-gradient(100rem 60rem at 100% -20%, rgba(0, 208, 156, 0.14), transparent 58%),
 		#0c1218;
-	height: 100vh;
+	height: calc(100vh + var(--bf-panel-overlap-lift));
 	min-height: 0;
 	padding-top: 0;
-	margin-top: -14rem;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
 	overflow: hidden;
 	overscroll-behavior: contain;
 }
 
 .content {
-	padding: 15rem 4rem 13rem;
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 3rem) 4rem var(--bf-settings-content-bottom-pad);
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
 	gap: 1.25rem;
 	max-width: 100%;
 	margin: 0 auto;
+	position: relative;
+
+	&::after {
+		content: '';
+		display: block;
+		grid-column: 1 / -1;
+		height: var(--bf-settings-bottom-spacer);
+		pointer-events: none;
+	}
 }
 
 .section {
@@ -164,6 +176,17 @@
 		background: rgba(122, 214, 255, 0.22);
 		border-color: rgba(122, 214, 255, 0.5);
 	}
+}
+
+.nativeThemePopupContent {
+	padding: 1rem;
+	min-width: 18rem;
+}
+
+.nativeThemePopupOptions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
 }
 
 .popupActions {
@@ -311,9 +334,16 @@
 	transform: none !important;
 }
 
+:global([data-bf-nav-theme='elegant']) {
+	.settingsContainer {
+		--bf-settings-content-bottom-pad: calc(4rem + var(--bf-toolbar-height, 5.5rem));
+		--bf-settings-bottom-spacer: 1.5rem;
+	}
+}
+
 @media (max-width: 1600px) {
 	.content {
 		grid-template-columns: 1fr;
-		padding: 13.5rem 2.5rem 12rem;
+		padding: calc(var(--bf-top-chrome-height, 12rem) + 1.5rem) 2.5rem var(--bf-settings-content-bottom-pad);
 	}
 }

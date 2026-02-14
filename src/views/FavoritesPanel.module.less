@@ -1,13 +1,14 @@
 @import (reference) '../styles/cardStyles.less';
 
 .favoritesContainer {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
+	height: calc(100vh + var(--bf-panel-overlap-lift));
 	min-height: 0;
 	background: transparent;
 	overflow: hidden;
-	margin-top: -12rem;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
 }
 
 .favoritesContent {
@@ -18,7 +19,7 @@
 .filters {
 	display: flex;
 	gap: 0.75rem;
-	padding: 14rem 4rem 1.5rem;
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 2rem) 4rem 1.5rem;
 	background: transparent;
 	align-items: center;
 	justify-content: center;

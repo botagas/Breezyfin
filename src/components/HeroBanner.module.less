@@ -1,3 +1,5 @@
+@import (reference) '../styles/cardStyles.less';
+
 .heroBanner {
 	position: relative;
 	width: 100%;
@@ -75,7 +77,7 @@
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-start;
-	padding: calc(80px + 4rem) 60px 60px 60px;
+	padding: calc(var(--bf-toolbar-height, 4.5rem) + 4.5rem + var(--bf-home-hero-nudge, 0rem)) 60px 60px 60px;
 	z-index: 10;
 }
 
@@ -229,7 +231,7 @@
 	border-radius: 50%;
 	background: rgba(255, 255, 255, 0.4);
 	cursor: pointer;
-	transition: all 0.3s ease;
+	transition: background-color 0.3s ease, transform 0.3s ease, width 0.3s ease, border-radius 0.3s ease;
 
 	&:hover {
 		background: rgba(255, 255, 255, 0.7);
@@ -279,4 +281,110 @@
 	to {
 		transform: scale(1.08);
 	}
+}
+
+/* Elegant mode: feature-card media bar (full-width row card under navbar) */
+:global([data-bf-nav-theme='elegant']) .heroBanner {
+	width: 100%;
+	height: clamp(22rem, 37vw, 31rem);
+	margin: 0 0 2rem;
+	padding: 0 60px;
+	box-sizing: border-box;
+	overflow: visible;
+}
+
+:global([data-bf-nav-theme='elegant']) .backdrop {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	.card-image-shell(16/6);
+	.card-image-overlays();
+}
+
+:global([data-bf-nav-theme='elegant']) .backdrop::before {
+	opacity: 0.34;
+}
+
+:global([data-bf-nav-theme='elegant']) .backdropLayer img {
+	animation: none !important;
+}
+
+:global([data-bf-nav-theme='elegant']) .gradient {
+	background: linear-gradient(
+		to top,
+		rgba(7, 12, 19, 0.92) 0%,
+		rgba(7, 12, 19, 0.62) 45%,
+		rgba(7, 12, 19, 0.2) 100%
+	);
+}
+
+:global([data-bf-nav-theme='elegant']) .content {
+	position: absolute;
+	inset: 0;
+	height: auto;
+	justify-content: flex-end;
+	padding: 1.45rem 3.1rem 2.05rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .info {
+	width: 100%;
+	max-width: 100%;
+}
+
+:global([data-bf-nav-theme='elegant']) .logoWrapper {
+	max-width: min(54rem, 100%);
+	height: auto;
+	margin: 0 0 2rem 0;
+	padding: 0;
+	align-items: flex-start;
+}
+
+:global([data-bf-nav-theme='elegant']) .logo {
+	max-width: 100%;
+	max-height: 10rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .title {
+	font-size: 2em;
+	margin-bottom: 2rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .metadata {
+	margin: 0.15rem 0 0;
+	gap: 0.75rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .overview {
+	margin: 0.72rem 0 1.35rem;
+	max-width: min(56rem, 100%);
+	flex: none;
+	min-height: 5.35rem;
+	max-height: 6.2rem;
+	-webkit-line-clamp: 4;
+	line-clamp: 4;
+}
+
+:global([data-bf-nav-theme='elegant']) .controls {
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 1rem;
+	flex-wrap: nowrap;
+	width: 100%;
+}
+
+:global([data-bf-nav-theme='elegant']) .buttons {
+	margin-left: 0;
+	order: initial;
+}
+
+:global([data-bf-nav-theme='elegant']) .indicators {
+	order: initial;
+	margin-left: 0;
+	flex-shrink: 0;
+}
+
+:global([data-bf-nav-theme='elegant']) .heroBannerButton {
+	font-size: 0.8em !important;
+	min-height: 1.9rem !important;
+	padding: 0 0.95rem !important;
 }
