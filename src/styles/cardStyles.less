@@ -42,6 +42,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		box-shadow: none;
+	}
 }
 
 .card-image-overlays() {
@@ -135,6 +140,13 @@
 	z-index: 5;
 	line-height: 1.2;
 	min-height: 22px;
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+		box-shadow: none;
+	}
 }
 
 .filter-chip-button() {

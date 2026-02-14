@@ -13,7 +13,14 @@ const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
 const TOOLBAR_THEME_ELEGANT = 'elegant';
 
-const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, onSwitchUser, onLogout, onExit }) => {
+const Toolbar = ({
+	activeSection = 'home',
+	activeLibraryId = null,
+	onNavigate,
+	onSwitchUser,
+	onLogout,
+	onExit
+}) => {
 	const [libraries, setLibraries] = useState([]);
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [userName, setUserName] = useState('User');
@@ -349,10 +356,10 @@ const Toolbar = ({ activeSection = 'home', activeLibraryId = null, onNavigate, o
 								<div className={css.elegantBackArea}>
 									<SpottableDiv
 										onClick={handleElegantBack}
-										className={`${css.iconButton} ${css.elegantBackButton}`}
-										aria-label={`Back to Home from ${elegantPanelTitle}`}
-										spotlightId="toolbar-back"
-									>
+									className={`${css.iconButton} ${css.elegantBackButton}`}
+									aria-label={`Back to Home from ${elegantPanelTitle}`}
+									spotlightId="toolbar-back"
+								>
 										<Icon style={{'--icon-size': '1rem'}}>arrowsmallleft</Icon>
 									</SpottableDiv>
 									<BodyText className={css.elegantPanelTitle}>{elegantPanelTitle}</BodyText>

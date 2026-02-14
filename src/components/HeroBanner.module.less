@@ -245,6 +245,30 @@
 	}
 }
 
+:global([data-bf-animations='off']) .backdropLayer img,
+:global([data-bf-all-animations='off']) .backdropLayer img {
+	animation: none !important;
+	transform: none !important;
+}
+
+:global([data-bf-animations='off']) .backdropLayerIncoming,
+:global([data-bf-all-animations='off']) .backdropLayerIncoming,
+:global([data-bf-animations='off']) .backdropLayerOutgoing,
+:global([data-bf-all-animations='off']) .backdropLayerOutgoing,
+:global([data-bf-animations='off']) .infoTransition,
+:global([data-bf-all-animations='off']) .infoTransition,
+:global([data-bf-animations='off']) .logoTransition,
+:global([data-bf-all-animations='off']) .logoTransition,
+:global([data-bf-animations='off']) .textTransition,
+:global([data-bf-all-animations='off']) .textTransition {
+	animation: none !important;
+}
+
+:global([data-bf-animations='off']) .logo,
+:global([data-bf-all-animations='off']) .logo {
+	filter: none;
+}
+
 @keyframes heroBackdropIn {
 	from {
 		opacity: 0;

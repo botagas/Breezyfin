@@ -195,10 +195,6 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		if (item.ImageTags?.Primary) {
 			return `${base}/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}&api_key=${jellyfinService.accessToken}`;
 		}
-		// Fallback without tag even if ImageTags missing
-		if (item.Id) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
 		if (item.BackdropImageTags?.length) {
 			return `${base}/${item.Id}/Images/Backdrop/0?maxWidth=400&api_key=${jellyfinService.accessToken}`;
 		}
@@ -208,6 +204,10 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 				return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&tag=${item.SeriesPrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
 			}
 			return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
+		}
+		// Fallback without tag even if ImageTags missing
+		if (item.Id) {
+			return `${base}/${item.Id}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
 		}
 		return null;
 	};
@@ -280,47 +280,50 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 							</div>
 						) : (
 							<div className={css.resultsGrid}>
-								{results.map(item => (
-									<SpottableDiv
-										key={item.Id}
-										data-item-id={item.Id}
-										className={css.resultCard}
-										onClick={handleResultCardClick}
-										onKeyDown={handleResultCardKeyDown}
-									>
-										<div className={css.cardImage}>
-											{getImageUrl(item) ? (
-												<img
-													src={getImageUrl(item)}
-													alt={item.Name}
-													onError={handleResultImageError}
-													loading="lazy"
-													decoding="async"
-													draggable={false}
-												/>
-											) : (
-												<div className={css.placeholderInner}>
-													<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-												</div>
-											)}
-											{item.UserData?.Played && (
-												<div className={css.watchedBadge}>{'\u2713'}</div>
-											)}
-											{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-												<div className={css.progressBar}>
-													<div
-														className={css.progress}
-														style={{ width: `${item.UserData.PlayedPercentage}%` }}
+								{results.map(item => {
+									const imageUrl = getImageUrl(item);
+									return (
+										<SpottableDiv
+											key={item.Id}
+											data-item-id={item.Id}
+											className={css.resultCard}
+											onClick={handleResultCardClick}
+											onKeyDown={handleResultCardKeyDown}
+										>
+											<div className={css.cardImage}>
+												{imageUrl ? (
+													<img
+														src={imageUrl}
+														alt={item.Name}
+														onError={handleResultImageError}
+														loading="lazy"
+														decoding="async"
+														draggable={false}
 													/>
-												</div>
-											)}
-										</div>
-										<div className={css.cardInfo}>
-											<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-											<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-										</div>
-									</SpottableDiv>
-								))}
+												) : (
+													<div className={css.placeholderInner}>
+														<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
+													</div>
+												)}
+												{item.UserData?.Played && (
+													<div className={css.watchedBadge}>{'\u2713'}</div>
+												)}
+												{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
+													<div className={css.progressBar}>
+														<div
+															className={css.progress}
+															style={{ width: `${item.UserData.PlayedPercentage}%` }}
+														/>
+													</div>
+												)}
+											</div>
+											<div className={css.cardInfo}>
+												<BodyText className={css.cardTitle}>{item.Name}</BodyText>
+												<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
+											</div>
+										</SpottableDiv>
+									);
+								})}
 							</div>
 						)}
 					</div>
