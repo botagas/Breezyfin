@@ -1,4 +1,5 @@
 const LOG_STORAGE_KEY = 'breezyfinAppLogs';
+const VERBOSE_LOG_STORAGE_KEY = 'breezyfinVerboseLogs';
 const MAX_LOG_ENTRIES = 400;
 let loggerInitialized = false;
 let logListenersInitialized = false;
@@ -42,6 +43,36 @@ const trimMessage = (message) => {
 	return `${normalized.slice(0, 1197)}...`;
 };
 
+export const isVerboseLoggingEnabled = () => {
+	try {
+		return localStorage.getItem(VERBOSE_LOG_STORAGE_KEY) === '1';
+	} catch (_) {
+		return false;
+	}
+};
+
+export const setVerboseLoggingEnabled = (enabled) => {
+	try {
+		if (enabled) {
+			localStorage.setItem(VERBOSE_LOG_STORAGE_KEY, '1');
+			return;
+		}
+		localStorage.removeItem(VERBOSE_LOG_STORAGE_KEY);
+	} catch (_) {
+		// Ignore storage write failures.
+	}
+};
+
+const shouldCaptureLevel = (level) => {
+	if (level === 'warn' || level === 'error') return true;
+	return isVerboseLoggingEnabled();
+};
+
+const shouldOutputLevel = (level) => {
+	if (level === 'warn' || level === 'error') return true;
+	return isVerboseLoggingEnabled();
+};
+
 export const appendAppLog = (level, ...args) => {
 	const message = trimMessage(args.map(stringifyArg).join(' '));
 	const logs = safeReadLogs();
@@ -74,8 +105,12 @@ export const initAppLogger = () => {
 		['log', 'info', 'warn', 'error'].forEach((level) => {
 			nativeConsole[level] = console[level] ? console[level].bind(console) : () => {};
 			console[level] = (...args) => {
-				nativeConsole[level](...args);
-				appendAppLog(level, ...args);
+				if (shouldOutputLevel(level)) {
+					nativeConsole[level](...args);
+				}
+				if (shouldCaptureLevel(level)) {
+					appendAppLog(level, ...args);
+				}
 			};
 		});
 		patchedConsole = true;
@@ -91,4 +126,3 @@ export const initAppLogger = () => {
 		logListenersInitialized = true;
 	}
 };
-

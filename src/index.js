@@ -1,6 +1,8 @@
 /* global ENACT_PACK_ISOMORPHIC */
 import {createRoot, hydrateRoot} from 'react-dom/client';
 
+import './styles/themes/classic.css';
+import './styles/themes/elegant.css';
 import './global.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';

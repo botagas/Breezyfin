@@ -18,7 +18,7 @@ const FILTERS = [
 	{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
 ];
 
-const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
+const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
@@ -131,6 +131,7 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}
 					onExit={onExit}
+					registerBackHandler={registerBackHandler}
 				/>
 			<div className={css.favoritesContainer}>
 				<Scroller className={css.favoritesScroller}>
@@ -150,69 +151,71 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 							))}
 						</div>
 
-						{loading ? (
-							<div className={css.loadingState}>
-								<Spinner />
-							</div>
-						) : favorites.length === 0 ? (
-							<div className={css.emptyState}>
-								<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
-								<BodyText className={css.emptyMessage}>
-									Mark items as favorites from the detail view to see them here
-								</BodyText>
-							</div>
-						) : (
-						<div className={css.favoritesGrid}>
-							{favorites.map(item => (
-								<SpottableDiv
-									key={item.Id}
-									data-item-id={item.Id}
-									className={css.favoriteCard}
-									onClick={handleFavoriteCardClick}
-								>
-									<div className={css.cardImage}>
-										{getImageUrl(item) ? (
-											<img
-												src={getImageUrl(item)}
-												alt={item.Name}
-												onError={handleCardImageError}
-												loading="lazy"
-												decoding="async"
-												draggable={false}
-											/>
-										) : (
-											<div className={css.placeholderInner}>
-												<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-											</div>
-										)}
-										<Button
-											className={css.unfavoriteButton}
-											icon="hearthollow"
-											size="small"
+						<div className={css.favoritesBody}>
+							{loading ? (
+								<div className={css.loadingState}>
+									<Spinner />
+								</div>
+							) : favorites.length === 0 ? (
+								<div className={css.emptyState}>
+									<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
+									<BodyText className={css.emptyMessage}>
+										Mark items as favorites from the detail view to see them here
+									</BodyText>
+								</div>
+							) : (
+								<div className={css.favoritesGrid}>
+									{favorites.map(item => (
+										<SpottableDiv
+											key={item.Id}
 											data-item-id={item.Id}
-											onClick={handleUnfavoriteClick}
-											title="Remove from favorites"
-										/>
-										{item.UserData?.Played && (
-											<div className={css.watchedBadge}>{'\u2713'}</div>
-										)}
-										{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-											<div className={css.progressBar}>
-												<div
-													className={css.progress}
-													style={{ width: `${item.UserData.PlayedPercentage}%` }}
+											className={css.favoriteCard}
+											onClick={handleFavoriteCardClick}
+										>
+											<div className={css.cardImage}>
+												{getImageUrl(item) ? (
+													<img
+														src={getImageUrl(item)}
+														alt={item.Name}
+														onError={handleCardImageError}
+														loading="lazy"
+														decoding="async"
+														draggable={false}
+													/>
+												) : (
+													<div className={css.placeholderInner}>
+														<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
+													</div>
+												)}
+												<Button
+													className={css.unfavoriteButton}
+													icon="hearthollow"
+													size="small"
+													data-item-id={item.Id}
+													onClick={handleUnfavoriteClick}
+													title="Remove from favorites"
 												/>
+												{item.UserData?.Played && (
+													<div className={css.watchedBadge}>{'\u2713'}</div>
+												)}
+												{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
+													<div className={css.progressBar}>
+														<div
+															className={css.progress}
+															style={{ width: `${item.UserData.PlayedPercentage}%` }}
+														/>
+													</div>
+												)}
 											</div>
-										)}
-									</div>
-									<div className={css.cardInfo}>
-										<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-										<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-									</div>
-								</SpottableDiv>
-							))}
+											<div className={css.cardInfo}>
+												<BodyText className={css.cardTitle}>{item.Name}</BodyText>
+												<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
+											</div>
+										</SpottableDiv>
+									))}
+								</div>
+							)}
 						</div>
-						)}
 					</div>
 				</Scroller>
 			</div>

@@ -8,6 +8,8 @@ import jellyfinService from '../services/jellyfinService';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 
 import css from './Toolbar.module.less';
+import popupStyles from '../styles/popupStyles.module.less';
+import {popupShellCss} from '../styles/popupStyles';
 
 const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
@@ -16,6 +18,7 @@ const TOOLBAR_THEME_ELEGANT = 'elegant';
 const Toolbar = ({
 	activeSection = 'home',
 	activeLibraryId = null,
+	registerBackHandler,
 	onNavigate,
 	onSwitchUser,
 	onLogout,
@@ -30,6 +33,7 @@ const Toolbar = ({
 	const [toolbarTheme, setToolbarTheme] = useState(TOOLBAR_THEME_CLASSIC);
 	const glassFilterId = useId();
 	const centerRef = useRef(null);
+	const userMenuScopeRef = useRef(null);
 	const userMenuCloseTimerRef = useRef(null);
 	const suppressUserMenuUntilRef = useRef(0);
 	const librariesById = useMemo(() => {
@@ -134,6 +138,36 @@ const Toolbar = ({
 			}
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!showUserMenu) return undefined;
+
+		const closeMenuIfOutside = (target) => {
+			if (!target || typeof target.nodeType !== 'number') return;
+			const scope = userMenuScopeRef.current;
+			if (!scope) return;
+			if (scope.contains(target)) return;
+			setShowUserMenu(false);
+		};
+
+		const handleFocusIn = (event) => {
+			closeMenuIfOutside(event.target);
+		};
+		const handlePointerDown = (event) => {
+			closeMenuIfOutside(event.target);
+		};
+
+		document.addEventListener('focusin', handleFocusIn, true);
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		document.addEventListener('mousedown', handlePointerDown, true);
+		document.addEventListener('touchstart', handlePointerDown, true);
+		return () => {
+			document.removeEventListener('focusin', handleFocusIn, true);
+			document.removeEventListener('pointerdown', handlePointerDown, true);
+			document.removeEventListener('mousedown', handlePointerDown, true);
+			document.removeEventListener('touchstart', handlePointerDown, true);
+		};
+	}, [showUserMenu]);
 
 	const formatTime = () => {
 		return currentTime.toLocaleTimeString('en-US', {
@@ -297,6 +331,28 @@ const Toolbar = ({
 		}
 	}, [onExit]);
 
+	const handleInternalBack = useCallback(() => {
+		if (showLibrariesPopup) {
+			setShowLibrariesPopup(false);
+			return true;
+		}
+		if (showUserMenu) {
+			if (userMenuCloseTimerRef.current) {
+				clearTimeout(userMenuCloseTimerRef.current);
+				userMenuCloseTimerRef.current = null;
+			}
+			setShowUserMenu(false);
+			return true;
+		}
+		return false;
+	}, [showLibrariesPopup, showUserMenu]);
+
+	useEffect(() => {
+		if (typeof registerBackHandler !== 'function') return undefined;
+		registerBackHandler(handleInternalBack);
+		return () => registerBackHandler(null);
+	}, [handleInternalBack, registerBackHandler]);
+
 	const renderUserMenu = () => (
 		showUserMenu && (
 			<div className={`${css.userMenu} ${isElegantTheme ? css.userMenuElegant : ''}`}>
@@ -322,9 +378,7 @@ const Toolbar = ({
 	const toolbarStyle = isElegantTheme
 		? {'--bf-glass-distortion-filter': `url(#${glassFilterId})`}
 		: undefined;
-	const libraryPopupCss = isElegantTheme
-		? {popup: css.libraryGlassPopup, body: css.libraryGlassPopupBody}
-		: undefined;
+	const libraryPopupCss = popupShellCss;
 
 	return (
 		<div
@@ -417,7 +471,7 @@ const Toolbar = ({
 								>
 									<Icon size="small">folder</Icon>
 								</SpottableDiv>
-								<div className={css.userContainer} {...elegantUserContainerProps}>
+								<div ref={userMenuScopeRef} className={css.userContainer} {...elegantUserContainerProps}>
 									<SpottableDiv
 										onClick={handleUserButtonClick}
 										className={`${css.iconButton} ${css.userIconButton} ${showUserMenu ? css.selected : ''}`}
@@ -444,7 +498,7 @@ const Toolbar = ({
 			) : (
 				<>
 					<div className={css.start}>
-						<div className={css.userContainer} {...classicUserContainerProps}>
+						<div ref={userMenuScopeRef} className={css.userContainer} {...classicUserContainerProps}>
 							<Button
 								size="small"
 								className={css.userButton}
@@ -526,7 +580,7 @@ const Toolbar = ({
 			)}
 
 			<Popup open={showLibrariesPopup} onClose={handleCloseLibrariesPopup} style={toolbarStyle} css={libraryPopupCss}>
-				<div className={`${css.libraryNativeContent} ${isElegantTheme ? css.libraryNativeContentGlass : ''}`}>
+				<div className={`${popupStyles.popupSurface} ${css.libraryNativeContent} ${isElegantTheme ? css.libraryNativeContentGlass : ''}`}>
 					{isElegantTheme && (
 						<>
 							<div className={`${css.liquidLayerFilter} ${css.liquidLayerFilterMuted}`} />

@@ -14,6 +14,8 @@ import {KeyCodes} from '../utils/keyCodes';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../utils/errorMessages';
 
 import css from './PlayerPanel.module.less';
+import popupStyles from '../styles/popupStyles.module.less';
+import {popupShellCss} from '../styles/popupStyles';
 
 const PlayerPanel = ({
 	item,
@@ -401,7 +403,6 @@ const PlayerPanel = ({
 
 		// Wait for video element to be available
 		if (!videoRef.current) {
-			console.log('Video element not ready, waiting...');
 			setTimeout(() => loadVideo(forceTranscodeOverride), 100);
 			return;
 		}
@@ -423,8 +424,6 @@ const PlayerPanel = ({
 		loadVideoRef.current = loadVideo;
 
 		try {
-			console.log('=== Loading video ===');
-			console.log('Item:', item.Name, item.Id);
 
 			// Load user settings to check for force transcoding
 			const settingsJson = localStorage.getItem('breezyfinSettings');
@@ -438,10 +437,8 @@ const PlayerPanel = ({
 			const hasSubtitles = playbackOptions?.subtitleStreamIndex !== undefined && playbackOptions?.subtitleStreamIndex >= 0;
 			if (!forceTranscoding && hasSubtitles && settings.forceTranscodingWithSubtitles !== false) {
 				forceTranscoding = true;
-				console.log('Force Transcoding enabled due to subtitle selection');
 			}
 
-			console.log('Force Transcoding:', forceTranscoding);
 			playbackSettingsRef.current = { forceTranscoding, enableTranscoding, maxBitrate, autoPlayNext };
 
 			// Get playback info from Jellyfin
@@ -452,7 +449,6 @@ const PlayerPanel = ({
 					...playbackSettingsRef.current
 				};
 				playbackInfo = await jellyfinService.getPlaybackInfo(item.Id, options);
-				console.log('Playback info received:', playbackInfo);
 			} catch (infoError) {
 				console.error('Failed to get playback info:', infoError);
 			}
@@ -467,16 +463,6 @@ const PlayerPanel = ({
 				throw new Error('Transcoding was forced, but the server did not return a transcoding URL.');
 			}
 
-			console.log('Media source:', {
-				Id: mediaSource.Id,
-				Container: mediaSource.Container,
-				SupportsDirectPlay: mediaSource.SupportsDirectPlay,
-				SupportsDirectStream: mediaSource.SupportsDirectStream,
-				SupportsTranscoding: mediaSource.SupportsTranscoding,
-				TranscodingUrl: mediaSource.TranscodingUrl,
-				TranscodingContainer: mediaSource.TranscodingContainer,
-				RunTimeTicks: mediaSource.RunTimeTicks
-			});
 
 			// Store media source and session for track switching
 			setMediaSourceData(mediaSource);
@@ -485,11 +471,9 @@ const PlayerPanel = ({
 			// This is the actual duration, not from the video element which may report incorrect values during transcoding
 			if (mediaSource.RunTimeTicks) {
 				const totalDuration = mediaSource.RunTimeTicks / 10000000;
-				console.log('Setting duration from media source:', totalDuration, 'seconds');
 				setDuration(totalDuration);
 			} else if (item.RunTimeTicks) {
 				const totalDuration = item.RunTimeTicks / 10000000;
-				console.log('Setting duration from item:', totalDuration, 'seconds');
 				setDuration(totalDuration);
 			}
 
@@ -528,10 +512,7 @@ const PlayerPanel = ({
 
 			setCurrentAudioTrack(selectedAudio);
 			setCurrentSubtitleTrack(selectedSubtitle);
-			console.log('Initial tracks set to:', { audio: selectedAudio, subtitle: selectedSubtitle });
 
-			console.log('Audio tracks:', audioStreams.map(s => ({ index: s.Index, language: s.Language, title: s.Title })));
-			console.log('Subtitle tracks:', subtitleStreams.map(s => ({ index: s.Index, language: s.Language, title: s.Title })));
 
 			// Determine video URL and playback method
 			let videoUrl;
@@ -543,8 +524,6 @@ const PlayerPanel = ({
 				isHls = mediaSource.TranscodingUrl.includes('.m3u8') ||
 				        mediaSource.TranscodingUrl.includes('/hls/') ||
 				        mediaSource.TranscodingContainer?.toLowerCase() === 'ts';
-				console.log('✅ TRANSCODING - Server is transcoding the video');
-				console.log('Transcoding container:', mediaSource.TranscodingContainer);
 			} else if (!playbackSettingsRef.current.forceTranscoding && mediaSource.SupportsDirectStream) {
 				// Direct stream - server remuxes without transcoding
 				videoUrl = jellyfinService.getPlaybackUrl(
@@ -555,11 +534,9 @@ const PlayerPanel = ({
 					mediaSource.Container,
 					mediaSource.LiveStreamId
 				);
-				console.log('⚠️ DIRECT STREAM - Server is remuxing (not transcoding)');
 			} else if (!playbackSettingsRef.current.forceTranscoding && mediaSource.SupportsDirectPlay) {
 				// Direct play - play file as-is
 				videoUrl = `${jellyfinService.serverUrl}/Videos/${item.Id}/stream?static=true&mediaSourceId=${mediaSource.Id}&api_key=${jellyfinService.accessToken}`;
-				console.log('⚠️ DIRECT PLAY - Playing original file (may cause black video)');
 			} else {
 				throw new Error('No supported playback method available');
 			}
@@ -583,7 +560,6 @@ const PlayerPanel = ({
 				if (playbackOverrideRef.current?.forceNewSession) {
 					const newSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 					url.searchParams.set('PlaySessionId', newSessionId);
-					console.log('[Player] Forcing new PlaySessionId for track override:', newSessionId);
 				}
 				videoUrl = url.toString();
 			}
@@ -591,8 +567,6 @@ const PlayerPanel = ({
 			// Mark overrides to clear once playback has actually started
 			pendingOverrideClearRef.current = !!playbackOverrideRef.current;
 
-			console.log('Video URL:', videoUrl);
-			console.log('Is HLS:', isHls);
 
 			const video = videoRef.current;
 			if (!video) {
@@ -611,13 +585,6 @@ const PlayerPanel = ({
 			}
 
 			// Log browser codec support
-			console.log('Browser codec support:', {
-				'video/mp4': video.canPlayType('video/mp4'),
-				'video/mp4; codecs="avc1.42E01E"': video.canPlayType('video/mp4; codecs="avc1.42E01E"'),
-				'video/webm': video.canPlayType('video/webm'),
-				'application/x-mpegURL': video.canPlayType('application/x-mpegURL'),
-				'video/mp2t': video.canPlayType('video/mp2t')
-			});
 
 			if (isHls) {
 				// Handle HLS playback
@@ -627,14 +594,12 @@ const PlayerPanel = ({
 
 				// Try native HLS first on webOS, fallback to HLS.js if it fails
 				if (nativeHls) {
-					console.log('Attempting native HLS playback');
 					let fallbackTriggered = false;
 
 					const tryHlsJsFallback = () => {
 						if (fallbackTriggered || !Hls.isSupported()) return;
 						fallbackTriggered = true;
 
-						console.log('Native HLS failed, falling back to HLS.js');
 						video.src = '';
 						video.removeAttribute('src');
 
@@ -656,17 +621,14 @@ const PlayerPanel = ({
 						hls.attachMedia(video);
 
 						hls.on(Hls.Events.MANIFEST_PARSED, () => {
-							console.log('HLS.js manifest parsed, starting playback');
 						});
 
 						hls.on(Hls.Events.ERROR, (event, data) => {
 							console.error('HLS.js error:', data);
 							if (data.fatal) {
 								if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-									console.log('Attempting HLS.js recovery (network)...');
 									hls.startLoad();
 								} else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-									console.log('Attempting HLS.js recovery (media)...');
 									hls.recoverMediaError();
 								} else {
 									showPlaybackError(`HLS playback error: ${data.details}`);
@@ -692,14 +654,12 @@ const PlayerPanel = ({
 
 					// Clear timer if video starts loading successfully
 				video.addEventListener('loadstart', () => {
-					console.log('Native HLS loadstart event fired');
 					clearTimeout(fallbackTimer);
 					video.removeEventListener('error', errorHandler);
 				}, { once: true });
 
 				video.src = videoUrl;
 			} else if (Hls.isSupported()) {
-				console.log('Using HLS.js library');
 				const hls = new Hls({
 					enableWorker: true,
 					lowLatencyMode: false,
@@ -718,17 +678,14 @@ const PlayerPanel = ({
 					hls.attachMedia(video);
 
 					hls.on(Hls.Events.MANIFEST_PARSED, () => {
-						console.log('HLS manifest parsed, starting playback');
 					});
 
 					hls.on(Hls.Events.ERROR, (event, data) => {
 						console.error('HLS error:', data);
 						if (data.fatal) {
 							if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-								console.log('Attempting HLS recovery (network)...');
 								hls.startLoad();
 							} else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-								console.log('Attempting HLS recovery (media)...');
 								hls.recoverMediaError();
 							} else {
 								showPlaybackError(`HLS playback error: ${data.details}`);
@@ -740,13 +697,11 @@ const PlayerPanel = ({
 				}
 			} else {
 				// Direct MP4/WebM playback
-				console.log('Setting video source directly');
 				video.src = videoUrl;
 			}
 
 			// Load the video
 			video.load();
-			console.log('video.load() called');
 			try {
 				await video.play();
 			} catch (playError) {
@@ -767,7 +722,6 @@ const PlayerPanel = ({
 			if (startWatchTimerRef.current) {
 				clearTimeout(startWatchTimerRef.current);
 			}
-			console.log('[Player] Scheduling startup stall watchdog');
 			startWatchTimerRef.current = setTimeout(() => {
 				if (!videoRef.current) return;
 				// Consider it stalled if not playing OR if currentTime hasn't advanced recently
@@ -826,21 +780,17 @@ const PlayerPanel = ({
 
 	// Video event handlers
 	const handleLoadedMetadata = useCallback(() => {
-		console.log('Video metadata loaded');
 		if (videoRef.current) {
 			// Note: For transcoded streams, video.duration may be inaccurate (only shows buffered duration)
 			// We use the duration from media source RunTimeTicks instead, set in loadVideo
-			console.log('Video element duration:', videoRef.current.duration, 'seconds (may be inaccurate for transcoding)');
 
 			// Set start position after metadata is loaded
 			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
 			if (typeof overrideSeek === 'number') {
-				console.log('Setting override resume position:', overrideSeek, 'seconds');
 				videoRef.current.currentTime = overrideSeek;
 				setCurrentTime(overrideSeek);
 			} else if (item.UserData?.PlaybackPositionTicks) {
 				const startPosition = item.UserData.PlaybackPositionTicks / 10000000;
-				console.log('Setting resume position:', startPosition, 'seconds');
 				videoRef.current.currentTime = startPosition;
 				setCurrentTime(startPosition);
 			}
@@ -848,7 +798,6 @@ const PlayerPanel = ({
 	}, [item]);
 
 	const handleLoadedData = useCallback(async () => {
-		console.log('Video loadeddata');
 		// If we got data but loading is still true, try to kick off playback
 		if (loading && videoRef.current) {
 			setLoading(false);
@@ -864,16 +813,13 @@ const PlayerPanel = ({
 	}, [loading, showPlaybackError]);
 
 	const handleCanPlay = useCallback(async () => {
-		console.log('Video can play');
 		if (!videoRef.current || !loading) return;
 
 		setLoading(false);
 
 		try {
-			console.log('Attempting to start playback...');
 			await videoRef.current.play();
 			setPlaying(true);
-			console.log('Playback started successfully');
 			if (pendingOverrideClearRef.current) {
 				playbackOverrideRef.current = null;
 				pendingOverrideClearRef.current = false;
@@ -1059,7 +1005,6 @@ const PlayerPanel = ({
 	}, [attemptTranscodeFallback, handleStop, mediaSourceData, showPlaybackError]);
 
 	const handleEnded = useCallback(async () => {
-		console.log('Video ended');
 		await handleStop();
 
 		// Auto-play next episode if enabled
@@ -1067,7 +1012,6 @@ const PlayerPanel = ({
 			try {
 				const nextEpisode = hasNextEpisode ? await getNextEpisode(item) : null;
 				if (nextEpisode) {
-					console.log('Auto-playing next episode:', nextEpisode.Name);
 					onPlay(nextEpisode, buildPlaybackOptions());
 					return;
 				}
@@ -1137,7 +1081,6 @@ const PlayerPanel = ({
 
 		if (isHls) {
 			// HLS supports native seeking via currentTime
-			console.log('Seeking HLS stream to:', seekTime);
 			videoRef.current.currentTime = seekTime;
 
 			// Report seek to Jellyfin
@@ -1147,7 +1090,6 @@ const PlayerPanel = ({
 			// For transcoding, rebuild the session at the target timestamp.
 			try {
 				const seekTicks = Math.floor(seekTime * 10000000);
-				console.log('Seeking transcoded stream to:', seekTime, 'seconds (', seekTicks, 'ticks)');
 				setLoading(true);
 				playbackOverrideRef.current = {
 					...(playbackOptions || {}),
@@ -1199,7 +1141,6 @@ const PlayerPanel = ({
 			seekSeconds: currentPosition,
 			forceNewSession: true
 		};
-		console.log('[Player] Reloading with track override', playbackOverrideRef.current);
 		setLoading(true);
 		// Stop current playback cleanly so the next request starts fresh (important for HLS/transcode)
 		await handleStop();
@@ -1223,7 +1164,6 @@ const PlayerPanel = ({
 
 		// For HLS streams using HLS.js, use native audio track switching
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
-			console.log('Switching HLS audio track to index:', trackIndex);
 			// HLS.js audio tracks are 0-based, find matching track by stream index
 			const hlsTrackIndex = hlsRef.current.audioTracks.findIndex(t => {
 				// Try to match by language or other properties
@@ -1265,12 +1205,10 @@ const PlayerPanel = ({
 					return mediaTrack && (t.lang === mediaTrack.Language || t.name === mediaTrack.Title);
 				});
 				if (hlsTrackIndex >= 0) {
-					console.log('Switching HLS subtitle track to', hlsTrackIndex);
 					hlsRef.current.subtitleTrack = hlsTrackIndex;
 					return;
 				}
 			}
-			console.log('Subtitle switching not yet supported for this HLS stream');
 			setToastMessage('Subtitle change may require retry/reload on this stream');
 		}
 
@@ -1389,6 +1327,21 @@ const PlayerPanel = ({
 		}
 	};
 
+	const errorBackdropUrl = (() => {
+		if (!item) return '';
+		if (item?.BackdropImageTags?.length > 0) {
+			return jellyfinService.getBackdropUrl(item.Id, 0, 1920);
+		}
+		if (item?.SeriesId) {
+			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 1920);
+		}
+		if (item?.ImageTags?.Primary) {
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 1920);
+		}
+		return '';
+	})();
+	const hasErrorBackdrop = Boolean(errorBackdropUrl);
+
 	const handleSkipSegment = useCallback(() => {
 		if (showNextEpisodePrompt && nextEpisodeData) {
 			handlePlayNextEpisode();
@@ -1414,30 +1367,12 @@ const PlayerPanel = ({
 		nextEpisodePromptStartTicksRef.current = null;
 	}, [currentSkipSegment, handlePlayNextEpisode, nextEpisodeData, showNextEpisodePrompt]);
 
-	const handleVideoLoadStart = useCallback(() => {
-		console.log('Event: loadstart');
-	}, []);
-
-	const handleVideoCanPlayThrough = useCallback(() => {
-		console.log('Event: canplaythrough');
-	}, []);
-
-	const handleVideoWaiting = useCallback(() => {
-		console.log('Event: waiting (buffering)');
-	}, []);
-
 	const handleVideoPlaying = useCallback(() => {
-		console.log('Event: playing');
 		setPlaying(true);
 	}, []);
 
 	const handleVideoPause = useCallback(() => {
-		console.log('Event: pause');
 		setPlaying(false);
-	}, []);
-
-	const handleVideoStalled = useCallback(() => {
-		console.log('Event: stalled');
 	}, []);
 
 	const clearError = useCallback(() => {
@@ -1724,24 +1659,26 @@ useEffect(() => {
 				<div className={css.playerContainer}>
 					<video
 						ref={videoRef}
-						className={css.video}
-						onLoadStart={handleVideoLoadStart}
+						className={`${css.video} ${error ? css.videoHidden : ''}`}
 						onLoadedData={handleLoadedData}
 						onLoadedMetadata={handleLoadedMetadata}
 						onCanPlay={handleCanPlay}
-						onCanPlayThrough={handleVideoCanPlayThrough}
 						onTimeUpdate={handleTimeUpdate}
 						onEnded={handleEnded}
 						onError={handleVideoError}
-						onWaiting={handleVideoWaiting}
 						onPlaying={handleVideoPlaying}
 						onPause={handleVideoPause}
-						onStalled={handleVideoStalled}
 						onClick={handleVideoSurfaceClick}
 						autoPlay
 					playsInline
 					preload="auto"
 				/>
+				{error && (
+					<div className={`${css.errorBackdrop} ${hasErrorBackdrop ? '' : css.errorBackdropFallback}`}>
+						{hasErrorBackdrop && <img src={errorBackdropUrl} alt={item?.Name || 'Playback error'} />}
+						<div className={css.errorBackdropGradient} />
+					</div>
+				)}
 
 				{loading && (
 					<div className={css.loading}>
@@ -1760,16 +1697,18 @@ useEffect(() => {
 						open={!!error}
 						onClose={clearError}
 						noAutoDismiss
-						className={css.errorPopup}
+						css={{popup: popupStyles.popupShell, body: css.errorPopupBody}}
 				>
-					<div className={css.errorPopupContent}>
+					<div
+						className={`${popupStyles.popupSurface} ${css.errorPopupContent}`}
+					>
 						<BodyText className={css.popupTitle}>Playback Error</BodyText>
 						<BodyText className={css.errorMessage}>{error}</BodyText>
 						<div className={css.errorActions}>
-							<Button onClick={handleRetryPlayback} autoFocus>
+							<Button onClick={handleRetryPlayback} autoFocus className={css.errorActionButton}>
 								Retry
 							</Button>
-							<Button onClick={handleBackButton}>
+							<Button onClick={handleBackButton} className={css.errorActionButton}>
 								Go Back
 							</Button>
 						</div>
@@ -1902,13 +1841,15 @@ useEffect(() => {
 						open={showAudioPopup}
 						onClose={closeAudioPopup}
 						position="center"
+						css={popupShellCss}
 					>
-					<div className={css.trackPopup}>
+					<div className={`${popupStyles.popupSurface} ${css.trackPopup}`}>
 						<BodyText className={css.popupTitle}>Audio Track</BodyText>
 						<Scroller className={css.trackList}>
 								{audioTracks.map((track) => (
 									<Item
 										key={track.Index}
+										className={css.trackOption}
 										data-track-index={track.Index}
 										selected={currentAudioTrack === track.Index}
 										onClick={handleAudioTrackItemClick}
@@ -1924,11 +1865,13 @@ useEffect(() => {
 						open={showSubtitlePopup}
 						onClose={closeSubtitlePopup}
 						position="center"
+						css={popupShellCss}
 					>
-					<div className={css.trackPopup}>
+					<div className={`${popupStyles.popupSurface} ${css.trackPopup}`}>
 						<BodyText className={css.popupTitle}>Subtitles</BodyText>
 						<Scroller className={css.trackList}>
 								<Item
+									className={css.trackOption}
 									data-track-index={-1}
 									selected={currentSubtitleTrack === -1}
 									onClick={handleSubtitleTrackItemClick}
@@ -1938,6 +1881,7 @@ useEffect(() => {
 								{subtitleTracks.map((track) => (
 									<Item
 										key={track.Index}
+										className={css.trackOption}
 										data-track-index={track.Index}
 										selected={currentSubtitleTrack === track.Index}
 										onClick={handleSubtitleTrackItemClick}

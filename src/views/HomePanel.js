@@ -21,7 +21,7 @@ const HOME_ROW_ORDER = [
 	'latestShows'
 ];
 
-const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
+const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [heroItems, setHeroItems] = useState([]);
 	const [recentlyAdded, setRecentlyAdded] = useState([]);
@@ -45,7 +45,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 	const loadContent = useCallback(async () => {
 		setLoading(true);
 		try {
-			console.log('Loading content...');
 			// Load multiple content sections in parallel
 			const [recently, resume, next, movies, shows, taggedLatest] = await Promise.all([
 				jellyfinService.getRecentlyAdded(20).catch(err => {
@@ -90,11 +89,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 			};
 
 			const requestItems = (taggedLatest || []).filter(tagMatchesUser);
-			console.log('[Home] My Requests match:', {
-				userName,
-				taggedLatest: taggedLatest.length,
-				matched: requestItems.length
-			});
 
 			// For episodes in resume/next, fetch series data to get unwatched count
 			const enhanceEpisodes = async (episodes) => {
@@ -122,17 +116,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 
 			const enhancedResume = await enhanceEpisodes(resume);
 			const enhancedNext = await enhanceEpisodes(next);
-
-			console.log('Loaded data:', {
-				recently: recently.length,
-				resume: resume.length,
-				next: next.length,
-				movies: movies.length,
-				shows: shows.length
-			});
-			console.log('Recently added items:', recently);
-			console.log('Resume items:', enhancedResume);
-			console.log('Next up items:', enhancedNext);
 
 			// Use recently added for hero banner (movies/shows with backdrops)
 			const heroContent = recently.filter(item =>
@@ -252,7 +235,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 	}, [getCardImageUrl]);
 
 	const handleNavigation = useCallback((section, data) => {
-		console.log('Navigate to:', section, data);
 		if (onNavigate) {
 			onNavigate(section, data);
 		}
@@ -335,6 +317,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 						onSwitchUser={onSwitchUser}
 						onLogout={onLogout}
 						onExit={onExit}
+						registerBackHandler={registerBackHandler}
 					/>
 				<div className={css.loading}>
 					<Spinner />
@@ -351,6 +334,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, .
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}
 					onExit={onExit}
+					registerBackHandler={registerBackHandler}
 				/>
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>

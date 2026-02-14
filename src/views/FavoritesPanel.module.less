@@ -14,6 +14,15 @@
 .favoritesContent {
 	min-height: 100%;
 	background: #121212;
+	display: flex;
+	flex-direction: column;
+}
+
+.favoritesBody {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
 }
 
 .filters {
@@ -34,7 +43,8 @@
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	height: 50vh;
+	flex: 1;
+	min-height: 0;
 }
 
 .emptyState {
@@ -42,13 +52,13 @@
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
-	height: 50vh;
+	flex: 1;
+	min-height: 0;
 	text-align: center;
-	padding: 2rem;
-	width: 80vw;
-	max-width: 1200px;
+	padding: 2rem 4rem;
+	width: 100%;
+	max-width: none;
 	box-sizing: border-box;
-	align-self: center;
 }
 
 .emptyTitle {

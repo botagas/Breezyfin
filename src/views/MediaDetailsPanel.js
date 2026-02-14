@@ -14,6 +14,8 @@ import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import {KeyCodes} from '../utils/keyCodes';
 
 import css from './MediaDetailsPanel.module.less';
+import popupStyles from '../styles/popupStyles.module.less';
+import {popupShellCss} from '../styles/popupStyles';
 
 const SpottableDiv = Spottable('div');
 
@@ -81,6 +83,68 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const detailsScrollToRef = useRef(null);
 	const favoriteActionButtonRef = useRef(null);
 	const watchedActionButtonRef = useRef(null);
+	const audioSelectorButtonRef = useRef(null);
+	const subtitleSelectorButtonRef = useRef(null);
+	const playPrimaryButtonRef = useRef(null);
+	const debugLastScrollTopRef = useRef(null);
+	const debugLastScrollTimeRef = useRef(0);
+	const getDetailsScrollElement = useCallback(() => {
+		const container = detailsContainerRef.current;
+		if (!container) return null;
+		const contentNode = container.closest?.('[id$="_content"]');
+		if (contentNode && typeof contentNode.scrollTop === 'number') return contentNode;
+		return container.closest?.('[data-webos-voice-intent="Scroll"]') || null;
+	}, []);
+	const getScrollSnapshot = useCallback(() => {
+		const scrollEl = getDetailsScrollElement();
+		if (!scrollEl) return null;
+		return {
+			top: scrollEl.scrollTop,
+			clientHeight: scrollEl.clientHeight,
+			scrollHeight: scrollEl.scrollHeight
+		};
+	}, [getDetailsScrollElement]);
+	// Opt-in debug tracing for focus/scroll issues. Enable via `?bfFocusDebug=1`
+	// or `localStorage.setItem('breezyfinFocusDebug', '1')`.
+	const detailsDebugEnabled = useMemo(() => {
+		if (typeof window === 'undefined') return false;
+		try {
+			const params = new URLSearchParams(window.location.search);
+			if (params.get('bfFocusDebug') === '1') return true;
+			return localStorage.getItem('breezyfinFocusDebug') === '1';
+		} catch (_) {
+			return false;
+		}
+	}, []);
+	const describeNode = useCallback((node) => {
+		if (!node || typeof node !== 'object') return '(none)';
+		const element = node;
+		const tag = element.tagName ? element.tagName.toLowerCase() : 'node';
+		const idPart = element.id ? `#${element.id}` : '';
+		const className = typeof element.className === 'string' ? element.className.trim() : '';
+		const classPart = className ? `.${className.split(/\s+/).slice(0, 2).join('.')}` : '';
+		const spotlightId = element.getAttribute?.('data-spotlight-id');
+		const role = element.getAttribute?.('role');
+		const spotlightPart = spotlightId ? ` [spotlight=${spotlightId}]` : '';
+		const rolePart = role ? ` [role=${role}]` : '';
+		return `${tag}${idPart}${classPart}${spotlightPart}${rolePart}`;
+	}, []);
+	const logDetailsDebug = useCallback((message, payload = null) => {
+		if (!detailsDebugEnabled) return;
+		if (payload) {
+			console.log('[MediaDetailsFocusDebug]', message, payload);
+			return;
+		}
+		console.log('[MediaDetailsFocusDebug]', message);
+	}, [detailsDebugEnabled]);
+	const focusNodeWithoutScroll = useCallback((node) => {
+		if (!node?.focus) return;
+		try {
+			node.focus({preventScroll: true});
+		} catch (error) {
+			node.focus();
+		}
+	}, []);
 	const seasonsById = useMemo(() => {
 		const map = new Map();
 		seasons.forEach((season) => {
@@ -381,8 +445,22 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			const code = e.keyCode || e.which;
 			const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
 			const PLAY_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE, KeyCodes.PLAY, 179];
+			const isBack = BACK_KEYS.includes(code);
+			const isPlay = PLAY_KEYS.includes(code);
 
-			if (BACK_KEYS.includes(code)) {
+			if ((isBack || isPlay) && detailsDebugEnabled) {
+				logDetailsDebug('keydown', {
+					code,
+					isBack,
+					isPlay,
+					target: describeNode(e.target),
+					active: describeNode(document.activeElement),
+					pointerMode: Spotlight?.getPointerMode?.(),
+					scroll: getScrollSnapshot()
+				});
+			}
+
+			if (isBack) {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation?.();
@@ -390,7 +468,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				return;
 			}
 
-			if (PLAY_KEYS.includes(code)) {
+			if (isPlay) {
+				// In pointer mode, let native click/spotlight handling route ENTER/OK.
+				if (Spotlight?.getPointerMode?.()) {
+					logDetailsDebug('play-key-skipped-pointer-mode', {
+						target: describeNode(e.target),
+						active: describeNode(document.activeElement),
+						scroll: getScrollSnapshot()
+					});
+					return;
+				}
+
 				// Avoid triggering play when user is interacting with another control
 				const target = e.target;
 				const interactiveTarget = target?.closest?.(
@@ -398,16 +486,26 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				);
 				const isInteractive = !!interactiveTarget;
 				if (isInteractive) {
+					logDetailsDebug('play-key-ignored-interactive-target', {
+						target: describeNode(target),
+						interactiveTarget: describeNode(interactiveTarget),
+						active: describeNode(document.activeElement)
+					});
 					return;
 				}
 				e.preventDefault();
+				logDetailsDebug('play-key-trigger-handlePlay', {
+					target: describeNode(target),
+					active: describeNode(document.activeElement),
+					scroll: getScrollSnapshot()
+				});
 				handlePlay();
 			}
 		};
 
 		document.addEventListener('keydown', handleKeyDown);
 		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [handleInternalBack, handlePlay, isActive]);
+	}, [describeNode, detailsDebugEnabled, getScrollSnapshot, handleInternalBack, handlePlay, isActive, logDetailsDebug]);
 
 	useEffect(() => {
 		if (typeof registerBackHandler !== 'function') return undefined;
@@ -513,13 +611,65 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		return false;
 	};
 
-	const getDetailsScrollElement = useCallback(() => {
-		const container = detailsContainerRef.current;
-		if (!container) return null;
-		const contentNode = container.closest?.('[id$="_content"]');
-		if (contentNode && typeof contentNode.scrollTop === 'number') return contentNode;
-		return container.closest?.('[data-webos-voice-intent="Scroll"]') || null;
-	}, []);
+	useEffect(() => {
+		if (!isActive || !detailsDebugEnabled) return undefined;
+
+		const handleFocusIn = (event) => {
+			logDetailsDebug('focusin', {
+				target: describeNode(event.target),
+				active: describeNode(document.activeElement),
+				pointerMode: Spotlight?.getPointerMode?.(),
+				scroll: getScrollSnapshot()
+			});
+		};
+
+		const scrollEl = getDetailsScrollElement();
+		if (scrollEl) {
+			debugLastScrollTopRef.current = scrollEl.scrollTop;
+		}
+
+		const handleScroll = () => {
+			if (!scrollEl) return;
+			const top = scrollEl.scrollTop;
+			const previous = debugLastScrollTopRef.current;
+			if (previous !== null && Math.abs(top - previous) < 4) return;
+			const now = Date.now();
+			if (now - debugLastScrollTimeRef.current < 80) return;
+			debugLastScrollTimeRef.current = now;
+			debugLastScrollTopRef.current = top;
+			logDetailsDebug('scroll', {
+				top,
+				clientHeight: scrollEl.clientHeight,
+				scrollHeight: scrollEl.scrollHeight,
+				active: describeNode(document.activeElement)
+			});
+		};
+
+		document.addEventListener('focusin', handleFocusIn, true);
+		scrollEl?.addEventListener('scroll', handleScroll, {passive: true});
+		logDetailsDebug('debug-attached', {
+			itemId: item?.Id,
+			itemType: item?.Type,
+			pointerMode: Spotlight?.getPointerMode?.(),
+			active: describeNode(document.activeElement),
+			scroll: getScrollSnapshot()
+		});
+
+		return () => {
+			document.removeEventListener('focusin', handleFocusIn, true);
+			scrollEl?.removeEventListener('scroll', handleScroll);
+			logDetailsDebug('debug-detached', {itemId: item?.Id});
+		};
+	}, [
+		describeNode,
+		detailsDebugEnabled,
+		getDetailsScrollElement,
+		getScrollSnapshot,
+		isActive,
+		item?.Id,
+		item?.Type,
+		logDetailsDebug
+	]);
 
 	const alignElementBelowPanelHeader = useCallback((element, behavior = 'smooth') => {
 		const scrollEl = getDetailsScrollElement();
@@ -608,6 +758,205 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		if (focusEpisodeSelector()) return;
 		focusEpisodeCardByIndex(0);
 	}, [focusEpisodeCardByIndex, focusEpisodeSelector]);
+
+	const focusNonSeriesAudioSelector = useCallback(() => {
+		const target = audioSelectorButtonRef.current?.nodeRef?.current || audioSelectorButtonRef.current;
+		if (target?.focus) {
+			target.focus({preventScroll: true});
+			return true;
+		}
+		return false;
+	}, []);
+
+	const focusNonSeriesSubtitleSelector = useCallback(() => {
+		const target = subtitleSelectorButtonRef.current?.nodeRef?.current || subtitleSelectorButtonRef.current;
+		if (target?.focus) {
+			target.focus({preventScroll: true});
+			return true;
+		}
+		return false;
+	}, []);
+
+	const focusNonSeriesPrimaryPlay = useCallback(() => {
+		const target = playPrimaryButtonRef.current?.nodeRef?.current || playPrimaryButtonRef.current;
+		if (target?.focus) {
+			focusNodeWithoutScroll(target);
+			return true;
+		}
+		return false;
+	}, [focusNodeWithoutScroll]);
+
+	const focusHeaderActionNoScroll = useCallback(() => {
+		const favoriteTarget = document.querySelector('[data-spotlight-id="details-favorite-action"]') ||
+			favoriteActionButtonRef.current?.nodeRef?.current ||
+			favoriteActionButtonRef.current;
+		const watchedTarget = document.querySelector('[data-spotlight-id="details-watched-action"]') ||
+			watchedActionButtonRef.current?.nodeRef?.current ||
+			watchedActionButtonRef.current;
+
+		if (favoriteTarget?.focus) {
+			focusNodeWithoutScroll(favoriteTarget);
+			return true;
+		}
+		if (watchedTarget?.focus) {
+			focusNodeWithoutScroll(watchedTarget);
+			return true;
+		}
+		return false;
+	}, [focusNodeWithoutScroll]);
+
+	const focusInitialDetailsControl = useCallback(() => {
+		const container = detailsContainerRef.current;
+		const activeElement = document.activeElement;
+		if (container && activeElement && container.contains(activeElement)) {
+			logDetailsDebug('focus-seed-skip-already-inside', {
+				active: describeNode(activeElement),
+				scroll: getScrollSnapshot()
+			});
+			return true;
+		}
+
+		if (item?.Type === 'Series') {
+			if (focusHeaderActionNoScroll()) {
+				logDetailsDebug('focus-seed-series-header-action', {
+					active: describeNode(document.activeElement),
+					scroll: getScrollSnapshot()
+				});
+				return true;
+			}
+			if (focusEpisodeSelector()) {
+				logDetailsDebug('focus-seed-series-episode-selector', {
+					active: describeNode(document.activeElement),
+					scroll: getScrollSnapshot()
+				});
+				return true;
+			}
+			focusEpisodeCardByIndex(0);
+			logDetailsDebug('focus-seed-series-first-episode-card', {
+				active: describeNode(document.activeElement),
+				scroll: getScrollSnapshot()
+			});
+			return true;
+		}
+
+		if (focusNonSeriesPrimaryPlay()) {
+			logDetailsDebug('focus-seed-primary-play', {
+				active: describeNode(document.activeElement),
+				scroll: getScrollSnapshot()
+			});
+			return true;
+		}
+		if (focusNonSeriesAudioSelector()) {
+			logDetailsDebug('focus-seed-audio-selector', {
+				active: describeNode(document.activeElement),
+				scroll: getScrollSnapshot()
+			});
+			return true;
+		}
+		const subtitleFocused = focusNonSeriesSubtitleSelector();
+		logDetailsDebug('focus-seed-subtitle-selector', {
+			focused: subtitleFocused,
+			active: describeNode(document.activeElement),
+			scroll: getScrollSnapshot()
+		});
+		return subtitleFocused;
+	}, [
+		describeNode,
+		focusEpisodeCardByIndex,
+		focusEpisodeSelector,
+		focusHeaderActionNoScroll,
+		focusNonSeriesAudioSelector,
+		focusNonSeriesPrimaryPlay,
+		focusNonSeriesSubtitleSelector,
+		getScrollSnapshot,
+		item?.Type,
+		logDetailsDebug
+	]);
+
+	const syncPointerFocusToTarget = useCallback((event) => {
+		if (!isActive || showEpisodePicker || showAudioPicker || showSubtitlePicker) return;
+		if (!Spotlight?.getPointerMode?.()) return;
+		const target = event.target;
+		if (!target || target.nodeType !== 1) return;
+		const targetElement = target;
+		const beforeScroll = getScrollSnapshot();
+
+		const focusTarget = targetElement.closest(
+			'[data-spotlight-id], .spottable, .bf-button, button, [role="button"]'
+		);
+		if (!focusTarget || !detailsContainerRef.current?.contains(focusTarget)) {
+			logDetailsDebug('pointer-no-focus-target', {
+				eventType: event.type,
+				target: describeNode(targetElement),
+				active: describeNode(document.activeElement),
+				scroll: beforeScroll
+			});
+			// Prevent Spotlight from selecting an arbitrary fallback control (which can scroll the page).
+			if (event.cancelable) {
+				event.preventDefault();
+			}
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			if (document.activeElement === document.body && detailsContainerRef.current?.focus) {
+				focusNodeWithoutScroll(detailsContainerRef.current);
+				logDetailsDebug('pointer-anchor-focused-details-container', {
+					eventType: event.type,
+					activeAfter: describeNode(document.activeElement),
+					scrollAfter: getScrollSnapshot()
+				});
+			}
+			return;
+		}
+		if (document.activeElement === focusTarget) {
+			logDetailsDebug('pointer-target-already-active', {
+				eventType: event.type,
+				target: describeNode(targetElement),
+				focusTarget: describeNode(focusTarget),
+				scroll: beforeScroll
+			});
+			return;
+		}
+
+		logDetailsDebug('pointer-focus-target', {
+			eventType: event.type,
+			target: describeNode(targetElement),
+			focusTarget: describeNode(focusTarget),
+			activeBefore: describeNode(document.activeElement),
+			scrollBefore: beforeScroll
+		});
+
+		focusNodeWithoutScroll(focusTarget);
+		window.requestAnimationFrame(() => {
+			const afterScroll = getScrollSnapshot();
+			if (!beforeScroll || !afterScroll) return;
+			const delta = afterScroll.top - beforeScroll.top;
+			if (Math.abs(delta) < 1) return;
+			logDetailsDebug('pointer-scroll-delta-after-focus', {
+				eventType: event.type,
+				delta,
+				scrollBefore: beforeScroll,
+				scrollAfter: afterScroll,
+				activeAfter: describeNode(document.activeElement)
+			});
+		});
+	}, [
+		describeNode,
+		focusNodeWithoutScroll,
+		getScrollSnapshot,
+		isActive,
+		logDetailsDebug,
+		showAudioPicker,
+		showEpisodePicker,
+		showSubtitlePicker
+	]);
+
+	const handleDetailsPointerDownCapture = useCallback((event) => {
+		syncPointerFocusToTarget(event);
+	}, [syncPointerFocusToTarget]);
+
+	const handleDetailsPointerClickCapture = useCallback((event) => {
+		syncPointerFocusToTarget(event);
+	}, [syncPointerFocusToTarget]);
 
 	const getAudioLabel = () => {
 		const track = audioTracks.find(t => t.key === selectedAudioTrack);
@@ -887,6 +1236,77 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		}
 	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector]);
 
+	const handleAudioSelectorKeyDown = useCallback((e) => {
+		if (e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!focusNonSeriesSubtitleSelector()) {
+				focusNonSeriesPrimaryPlay();
+			}
+		} else if (e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusTopHeaderAction();
+		}
+	}, [focusNonSeriesPrimaryPlay, focusNonSeriesSubtitleSelector, focusTopHeaderAction]);
+
+	const handleSubtitleSelectorKeyDown = useCallback((e) => {
+		if (e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusNonSeriesPrimaryPlay();
+		} else if (e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!focusNonSeriesAudioSelector()) {
+				focusTopHeaderAction();
+			}
+		}
+	}, [focusNonSeriesAudioSelector, focusNonSeriesPrimaryPlay, focusTopHeaderAction]);
+
+	const handleNonSeriesPlayKeyDown = useCallback((e) => {
+		if (e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusNonSeriesPrimaryPlay();
+		} else if (e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!focusNonSeriesSubtitleSelector()) {
+				focusNonSeriesAudioSelector();
+			}
+		}
+	}, [focusNonSeriesAudioSelector, focusNonSeriesPrimaryPlay, focusNonSeriesSubtitleSelector]);
+
+	useEffect(() => {
+		if (!isActive || loading) return undefined;
+		if (showEpisodePicker || showAudioPicker || showSubtitlePicker) return undefined;
+
+		logDetailsDebug('focus-seed-scheduled', {
+			itemId: item?.Id,
+			itemType: item?.Type,
+			active: describeNode(document.activeElement),
+			scroll: getScrollSnapshot()
+		});
+
+		const frame = window.requestAnimationFrame(() => {
+			focusInitialDetailsControl();
+		});
+		return () => window.cancelAnimationFrame(frame);
+	}, [
+		describeNode,
+		focusInitialDetailsControl,
+		getScrollSnapshot,
+		isActive,
+		item?.Id,
+		item?.Type,
+		loading,
+		logDetailsDebug,
+		showAudioPicker,
+		showEpisodePicker,
+		showSubtitlePicker
+	]);
+
 	const renderTrackPopup = (type) => {
 		const isAudio = type === 'audio';
 		const tracks = isAudio ? audioTracks : subtitleTracks;
@@ -897,27 +1317,30 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				open={isAudio ? showAudioPicker : showSubtitlePicker}
 				onClose={isAudio ? closeAudioPicker : closeSubtitlePicker}
 				noAutoDismiss
+				css={popupShellCss}
 			>
-				<Heading size="medium" spacing="none" className={css.popupHeading}>
-					Select {isAudio ? 'Audio' : 'Subtitle'} Track
-				</Heading>
-				<Scroller className={css.popupScroller}>
-					<div className={css.popupList}>
-							{tracks.map(track => (
-								<Button
-									key={track.key}
-									data-track-key={track.key}
-									data-track-type={type}
-									size="large"
-									selected={track.key === selectedKey}
-									onClick={handleTrackSelect}
-									className={css.popupButton}
-								>
-								{track.children}
-							</Button>
-						))}
-					</div>
-				</Scroller>
+				<div className={`${popupStyles.popupSurface} ${css.popupSurface}`}>
+					<Heading size="medium" spacing="none" className={css.popupHeading}>
+						Select {isAudio ? 'Audio' : 'Subtitle'} Track
+					</Heading>
+					<Scroller className={css.popupScroller}>
+						<div className={css.popupList}>
+								{tracks.map(track => (
+									<Button
+										key={track.key}
+										data-track-key={track.key}
+										data-track-type={type}
+										size="large"
+										selected={track.key === selectedKey}
+										onClick={handleTrackSelect}
+										className={css.popupButton}
+									>
+									{track.children}
+								</Button>
+							))}
+						</div>
+					</Scroller>
+				</div>
 			</Popup>
 		);
 	};
@@ -927,27 +1350,29 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		const popupEpisodes = isSeriesMode ? episodes : episodeNavList;
 		if (!popupEpisodes?.length) return null;
 		return (
-			<Popup open={showEpisodePicker} onClose={closeEpisodePicker} noAutoDismiss>
-				<Heading size="medium" spacing="none" className={css.popupHeading}>
-					Select Episode
-				</Heading>
-				<Scroller className={css.popupScroller}>
-					<div className={css.popupList}>
-							{popupEpisodes.map(ep => (
-								<Button
-									key={ep.Id}
-									data-episode-id={ep.Id}
-									data-series-mode={isSeriesMode ? '1' : '0'}
-									size="large"
-									selected={isSeriesMode ? selectedEpisode?.Id === ep.Id : item?.Id === ep.Id}
-									onClick={handleEpisodePopupSelect}
-									className={css.popupButton}
-								>
-								Episode {ep.IndexNumber}: {ep.Name}
-							</Button>
-						))}
-					</div>
-				</Scroller>
+			<Popup open={showEpisodePicker} onClose={closeEpisodePicker} noAutoDismiss css={popupShellCss}>
+				<div className={`${popupStyles.popupSurface} ${css.popupSurface}`}>
+					<Heading size="medium" spacing="none" className={css.popupHeading}>
+						Select Episode
+					</Heading>
+					<Scroller className={css.popupScroller}>
+						<div className={css.popupList}>
+								{popupEpisodes.map(ep => (
+									<Button
+										key={ep.Id}
+										data-episode-id={ep.Id}
+										data-series-mode={isSeriesMode ? '1' : '0'}
+										size="large"
+										selected={isSeriesMode ? selectedEpisode?.Id === ep.Id : item?.Id === ep.Id}
+										onClick={handleEpisodePopupSelect}
+										className={css.popupButton}
+									>
+									Episode {ep.IndexNumber}: {ep.Name}
+								</Button>
+							))}
+						</div>
+					</Scroller>
+				</div>
 			</Popup>
 		);
 	};
@@ -967,7 +1392,13 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 					className={css.scroller}
 					cbScrollTo={captureDetailsScrollTo}
 				>
-				<div className={css.detailsContainer} ref={detailsContainerRef}>
+				<div
+					className={css.detailsContainer}
+					ref={detailsContainerRef}
+					tabIndex={-1}
+					onMouseDownCapture={handleDetailsPointerDownCapture}
+					onClickCapture={handleDetailsPointerClickCapture}
+				>
 					{loading ? (
 						<div className={css.loading}>
 							<Spinner />
@@ -1287,26 +1718,30 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 											{audioTracks.length > 0 && (
 												<div className={css.trackSection}>
 													<BodyText className={css.trackLabel}>Audio Track</BodyText>
-														<Button
-															size="large"
-															onClick={openAudioPicker}
-															className={css.dropdown}
-														>
-														{getAudioLabel()}
-													</Button>
+												<Button
+													size="large"
+													onClick={openAudioPicker}
+													className={css.dropdown}
+													componentRef={audioSelectorButtonRef}
+													onKeyDown={handleAudioSelectorKeyDown}
+												>
+													{getAudioLabel()}
+												</Button>
 												</div>
 											)}
 
 											{subtitleTracks.length > 1 && (
 												<div className={css.trackSection}>
 													<BodyText className={css.trackLabel}>Subtitle Track</BodyText>
-														<Button
-															size="large"
-															onClick={openSubtitlePicker}
-															className={css.dropdown}
-														>
-														{getSubtitleLabel()}
-													</Button>
+												<Button
+													size="large"
+													onClick={openSubtitlePicker}
+													className={css.dropdown}
+													componentRef={subtitleSelectorButtonRef}
+													onKeyDown={handleSubtitleSelectorKeyDown}
+												>
+													{getSubtitleLabel()}
+												</Button>
 												</div>
 											)}
 										</div>
@@ -1317,6 +1752,8 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												icon="play"
 												className={css.primaryButton}
 												onClick={handlePlay}
+												componentRef={playPrimaryButtonRef}
+												onKeyDown={handleNonSeriesPlayKeyDown}
 											>
 												Play
 											</Button>

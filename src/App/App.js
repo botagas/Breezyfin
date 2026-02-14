@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
+import Spotlight from '@enact/spotlight';
 import { Panels } from '../components/BreezyPanels';
 
 import LoginPanel from '../views/LoginPanel';
@@ -26,8 +27,16 @@ const App = (props) => {
 	const [animationsDisabled, setAnimationsDisabled] = useState(false);
 	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(false);
 	const [navbarTheme, setNavbarTheme] = useState('classic');
+	const [inputMode, setInputMode] = useState(() => (
+		Spotlight?.getPointerMode?.() ? 'pointer' : '5way'
+	));
 	const playerBackHandlerRef = useRef(null);
 	const detailsBackHandlerRef = useRef(null);
+	const homeBackHandlerRef = useRef(null);
+	const libraryBackHandlerRef = useRef(null);
+	const searchBackHandlerRef = useRef(null);
+	const favoritesBackHandlerRef = useRef(null);
+	const settingsBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
 
 	const resetSessionState = useCallback(() => {
@@ -85,14 +94,98 @@ const App = (props) => {
 		};
 	}, [applyVisualSettings, readVisualSettingsFromStorage]);
 
+	useEffect(() => {
+		const setMode = (nextMode) => {
+			setInputMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
+		};
+		const handlePointerInput = () => setMode('pointer');
+		const handleFiveWayInput = (event) => {
+			const code = event.keyCode || event.which;
+			const key = event.key;
+			const isFiveWayKey =
+				code === 37 ||
+				code === 38 ||
+				code === 39 ||
+				code === 40 ||
+				code === 13 ||
+				code === 8 ||
+				code === 27 ||
+				code === 461 ||
+				key === 'ArrowLeft' ||
+				key === 'ArrowRight' ||
+				key === 'ArrowUp' ||
+				key === 'ArrowDown' ||
+				key === 'Enter' ||
+				key === 'Backspace' ||
+				key === 'Escape';
+			if (isFiveWayKey) {
+				setMode('5way');
+			}
+		};
+
+		document.addEventListener('mousemove', handlePointerInput, true);
+		document.addEventListener('mousedown', handlePointerInput, true);
+		document.addEventListener('touchstart', handlePointerInput, true);
+		document.addEventListener('keydown', handleFiveWayInput, true);
+		return () => {
+			document.removeEventListener('mousemove', handlePointerInput, true);
+			document.removeEventListener('mousedown', handlePointerInput, true);
+			document.removeEventListener('touchstart', handlePointerInput, true);
+			document.removeEventListener('keydown', handleFiveWayInput, true);
+		};
+	}, []);
+
+	// Keep theme/performance attributes on document roots so floating-layer UI (Popup, etc.)
+	// receives the same styling tokens as in-panel content.
+	useEffect(() => {
+		if (typeof document === 'undefined') return undefined;
+		const roots = [document.documentElement, document.body].filter(Boolean);
+		roots.forEach((root) => {
+			root.setAttribute('data-bf-nav-theme', navbarTheme);
+			root.setAttribute('data-bf-animations', animationsDisabled ? 'off' : 'on');
+			root.setAttribute('data-bf-all-animations', allAnimationsDisabled ? 'off' : 'on');
+			root.setAttribute('data-bf-input-mode', inputMode);
+		});
+		return () => {
+			roots.forEach((root) => {
+				root.removeAttribute('data-bf-nav-theme');
+				root.removeAttribute('data-bf-animations');
+				root.removeAttribute('data-bf-all-animations');
+				root.removeAttribute('data-bf-input-mode');
+			});
+		};
+	}, [allAnimationsDisabled, animationsDisabled, inputMode, navbarTheme]);
+
 	// Handle back button globally
 	const handleBack = useCallback(() => {
-		console.log('handleBack called, currentView:', currentView, 'previousItem:', previousItem);
+		const runBackHandler = (handlerRef) => {
+			if (typeof handlerRef?.current !== 'function') return false;
+			return handlerRef.current() === true;
+		};
 		switch (currentView) {
 			case 'library':
+				if (runBackHandler(libraryBackHandlerRef)) return true;
+				setCurrentView('home');
+				setSelectedItem(null);
+				setSelectedLibrary(null);
+				setPlaybackOptions(null);
+				return true;
 			case 'search':
+				if (runBackHandler(searchBackHandlerRef)) return true;
+				setCurrentView('home');
+				setSelectedItem(null);
+				setSelectedLibrary(null);
+				setPlaybackOptions(null);
+				return true;
 			case 'favorites':
+				if (runBackHandler(favoritesBackHandlerRef)) return true;
+				setCurrentView('home');
+				setSelectedItem(null);
+				setSelectedLibrary(null);
+				setPlaybackOptions(null);
+				return true;
 			case 'settings':
+				if (runBackHandler(settingsBackHandlerRef)) return true;
 				setCurrentView('home');
 				setSelectedItem(null);
 				setSelectedLibrary(null);
@@ -129,6 +222,8 @@ const App = (props) => {
 				setCurrentView('details');
 				return true;
 			case 'home':
+				if (runBackHandler(homeBackHandlerRef)) return true;
+				return false; // Allow default behavior (exit prompt)
 			case 'login':
 			default:
 				return false; // Allow default behavior (exit prompt)
@@ -214,7 +309,6 @@ const App = (props) => {
 	}, [selectedItem]);
 
 	const handleNavigate = useCallback((section, data) => {
-		console.log('Navigate to:', section, data);
 		switch (section) {
 			case 'home':
 				setCurrentView('home');
@@ -274,6 +368,26 @@ const App = (props) => {
 		playerBackHandlerRef.current = handler;
 	}, []);
 
+	const registerHomeBackHandler = useCallback((handler) => {
+		homeBackHandlerRef.current = handler;
+	}, []);
+
+	const registerLibraryBackHandler = useCallback((handler) => {
+		libraryBackHandlerRef.current = handler;
+	}, []);
+
+	const registerSearchBackHandler = useCallback((handler) => {
+		searchBackHandlerRef.current = handler;
+	}, []);
+
+	const registerFavoritesBackHandler = useCallback((handler) => {
+		favoritesBackHandlerRef.current = handler;
+	}, []);
+
+	const registerSettingsBackHandler = useCallback((handler) => {
+		settingsBackHandlerRef.current = handler;
+	}, []);
+
 	const getPanelIndex = () => {
 		if (currentView === 'login') return 0;
 		if (currentView === 'home') return 1;
@@ -292,6 +406,7 @@ const App = (props) => {
 			data-bf-animations={animationsDisabled ? 'off' : 'on'}
 			data-bf-all-animations={allAnimationsDisabled ? 'off' : 'on'}
 			data-bf-nav-theme={navbarTheme}
+			data-bf-input-mode={inputMode}
 			{...props}
 		>
 			<Panels
@@ -305,6 +420,7 @@ const App = (props) => {
 						onSwitchUser={handleSwitchUser}
 						onLogout={handleLogout}
 						onExit={handleExit}
+						registerBackHandler={registerHomeBackHandler}
 						noCloseButton
 					/>
 					<LibraryPanel
@@ -315,6 +431,7 @@ const App = (props) => {
 						onLogout={handleLogout}
 						onExit={handleExit}
 						onBack={handleBackToHome}
+						registerBackHandler={registerLibraryBackHandler}
 						noCloseButton
 					/>
 					<SearchPanel
@@ -323,6 +440,7 @@ const App = (props) => {
 						onSwitchUser={handleSwitchUser}
 						onLogout={handleLogout}
 						onExit={handleExit}
+						registerBackHandler={registerSearchBackHandler}
 						noCloseButton
 					/>
 					<FavoritesPanel
@@ -331,15 +449,16 @@ const App = (props) => {
 						onSwitchUser={handleSwitchUser}
 						onLogout={handleLogout}
 						onExit={handleExit}
+						registerBackHandler={registerFavoritesBackHandler}
 						noCloseButton
 					/>
 						<SettingsPanel
-							isActive={currentView === 'settings'}
 							onNavigate={handleNavigate}
 							onSwitchUser={handleSwitchUser}
 							onLogout={handleLogout}
 							onSignOut={handleSignOut}
 							onExit={handleExit}
+							registerBackHandler={registerSettingsBackHandler}
 							noCloseButton
 						/>
 					<MediaDetailsPanel

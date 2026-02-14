@@ -1,0 +1,92 @@
+.popupShell {
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+
+	:global(.popup),
+	:global(.bg),
+	:global(.container),
+	:global(.window) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.popupBody {
+	padding: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+}
+
+.popupSurface {
+	min-width: min(24rem, 92vw);
+	max-width: 92vw;
+	max-height: 82vh;
+	padding: 1rem 1.1rem;
+	border-radius: var(--bf-theme-popup-radius, 1rem);
+	background: var(--bf-theme-popup-bg, var(--bf-theme-surface-bg, rgba(18, 18, 18, 0.95)));
+	border: 1px solid var(--bf-theme-popup-border, var(--bf-theme-surface-border, rgba(255, 255, 255, 0.2)));
+	box-shadow: var(--bf-theme-popup-shadow, var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(0, 0, 0, 0.35)));
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.65rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.65rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	overflow: hidden;
+	position: relative;
+	isolation: isolate;
+}
+
+.popupSurface > * {
+	position: relative;
+	z-index: 3;
+}
+
+:global([data-bf-nav-theme='elegant']) .popupSurface {
+	background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
+	border-color: var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
+	box-shadow: var(--bf-theme-popup-shadow, 0 0.95rem 2.3rem rgba(4, 10, 17, 0.42));
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2));
+}
+
+:global([data-bf-nav-theme='elegant']) .popupSurface::before,
+:global([data-bf-nav-theme='elegant']) .popupSurface::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+:global([data-bf-nav-theme='elegant']) .popupSurface::before {
+	z-index: 1;
+	background: var(--bf-theme-liquid-overlay-bg, rgba(168, 188, 213, 0.08));
+}
+
+:global([data-bf-nav-theme='elegant']) .popupSurface::after {
+	z-index: 2;
+	background:
+		radial-gradient(170% 130% at 15% -65%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 58%),
+		radial-gradient(130% 120% at 88% -55%, rgba(232, 245, 255, 0.14), rgba(232, 245, 255, 0) 54%),
+		linear-gradient(180deg, rgba(12, 18, 28, 0.24), rgba(10, 16, 24, 0.34));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.2),
+		inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+
+:global([data-bf-all-animations='off']) .popupSurface {
+	--bf-theme-popup-blur: 0.5rem;
+	--bf-theme-popup-saturate: 1.04;
+	background: var(--bf-theme-popup-ultra-bg, var(--bf-theme-ultra-surface-bg, rgba(9, 13, 19, 0.62)));
+	backdrop-filter: blur(0.5rem) !important;
+	-webkit-backdrop-filter: blur(0.5rem) !important;
+	box-shadow: none !important;
+}
+
+:global([data-bf-all-animations='off']) .popupSurface::before,
+:global([data-bf-all-animations='off']) .popupSurface::after {
+	background: transparent !important;
+	box-shadow: none !important;
+}

@@ -24,16 +24,16 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	background: rgba(18, 24, 36, 0.86);
-	border: 1px solid rgba(255, 255, 255, 0.22);
+	background: var(--bf-theme-message-bg, rgba(18, 24, 36, 0.86));
+	border: 1px solid var(--bf-theme-message-border, rgba(255, 255, 255, 0.22));
 	border-radius: 0.8rem;
-	color: rgba(245, 250, 255, 0.96);
+	color: var(--bf-theme-message-color, rgba(245, 250, 255, 0.96));
 	font-size: 0.88em;
 	font-weight: 600;
 	letter-spacing: 0.01em;
 	line-height: 1.2;
 	backdrop-filter: blur(12px);
-	box-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4);
+	box-shadow: var(--bf-theme-message-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
 	pointer-events: none;
 	z-index: 30;
 	transition: opacity 220ms ease, transform 220ms ease;
@@ -98,11 +98,7 @@
 }
 
 .backdropFallback {
-	background:
-		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
-		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
-		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
-		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+	background: var(--bf-theme-backdrop-fallback);
 }
 
 .headerLogoWrap {
@@ -306,6 +302,7 @@
 	width: 2.35rem !important;
 	height: 2.35rem !important;
 	padding: 0 !important;
+	transition: transform 170ms ease;
 
 	:global(.bf-button) {
 		min-width: 2.35rem !important;
@@ -338,7 +335,10 @@
 	}
 
 	&:hover,
-	&:focus {
+	&:focus,
+	&:global(.spottable):focus {
+		transform: translateY(-1px);
+
 		:global(.bf-button-bg) {
 			background: rgba(255, 255, 255, 0.14) !important;
 			border-color: rgba(255, 255, 255, 0.4) !important;
@@ -368,12 +368,14 @@
 		}
 
 		&:hover .actionIcon,
-		&:active .actionIcon {
+		&:active .actionIcon,
+		&:global(.spottable):focus .actionIcon {
 			color: #ffffff !important;
 		}
 
 		&:hover :global(.bf-button-bg),
-		&:focus :global(.bf-button-bg) {
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg) {
 			background: rgba(255, 107, 127, 0.28) !important;
 			border-color: rgba(255, 167, 181, 0.95) !important;
 		}
@@ -392,12 +394,14 @@
 		}
 
 		&:hover .actionIcon,
-		&:active .actionIcon {
+		&:active .actionIcon,
+		&:global(.spottable):focus .actionIcon {
 			color: #ffffff !important;
 		}
 
 		&:hover :global(.bf-button-bg),
-		&:focus :global(.bf-button-bg) {
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg) {
 			background: rgba(109, 220, 154, 0.28) !important;
 			border-color: rgba(173, 242, 201, 0.95) !important;
 		}
@@ -733,7 +737,8 @@
 	overflow: hidden;
 
 	&:hover,
-	&:focus {
+	&:focus,
+	&:global(.spottable):focus {
 		background: rgba(24, 34, 50, 0.62);
 		transform: translateX(8px);
 		border-color: rgba(212, 226, 255, 0.42);
@@ -979,6 +984,24 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 0.9rem !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(255, 255, 255, 0.16) !important;
+		border: none !important;
+	}
 }
 
 .controlsActions {
@@ -992,10 +1015,17 @@
 	max-width: 24rem;
 	min-width: 0 !important;
 	text-align: left !important;
+	border-radius: 0.9rem !important;
+	background: transparent !important;
+	border: none !important;
 
-	:global(.bf-button-bg) {
-		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.24) !important;
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		border-radius: 0.9rem !important;
+		box-shadow: none !important;
+		transition: background 180ms ease !important;
 	}
 
 	:global(.client) {
@@ -1006,9 +1036,13 @@
 	}
 
 	&:hover :global(.bf-button-bg),
-	&:focus :global(.bf-button-bg) {
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
 		background: rgba(255, 255, 255, 0.16) !important;
-		border-color: rgba(255, 255, 255, 0.4) !important;
+		border: none !important;
 	}
 }
 
@@ -1019,6 +1053,11 @@
 }
 
 /* Popup track picker */
+.popupSurface {
+	min-width: min(44rem, 92vw);
+	padding: 0.4rem;
+}
+
 .popupHeading {
 	margin: 0 0 12px 0;
 }
@@ -1037,22 +1076,80 @@
 .popupButton {
 	width: 100%;
 	text-align: left;
+	border-radius: 0.8rem !important;
+	background: transparent !important;
+	border: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 0.8rem !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+		border: none !important;
+	}
+
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
+		background: rgba(63, 184, 255, 0.2) !important;
+		border: 1px solid rgba(143, 213, 255, 0.52) !important;
+	}
 }
 
 .dropdown {
 	text-align: left !important;
 	margin: 0 !important;
 	font-size: 1em !important;
+	width: 100% !important;
+	max-width: 100% !important;
+	min-width: 0 !important;
+	border-radius: 0.9rem !important;
+	background: transparent !important;
+	border: none !important;
 
-	:global(.bf-button-bg) {
+	&:global(.focusExpand),
+	:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+
+	:global(.bf-button),
+	:global(.client) {
+		width: 100% !important;
+		max-width: 100% !important;
+		min-width: 0 !important;
+		transform: none !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
 		background: transparent !important;
 		border: none !important;
+		border-radius: 0.9rem !important;
 		box-shadow: none !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		min-width: 0 !important;
+		transform: none !important;
+		transition: background 180ms ease !important;
 	}
 
 	&:hover :global(.bf-button-bg),
-	&:focus :global(.bf-button-bg) {
-		background: rgba(255, 255, 255, 0.1) !important;
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(255, 255, 255, 0.17) !important;
 		border: none !important;
 	}
 }
@@ -1085,8 +1182,15 @@
 		box-shadow: none !important;
 	}
 
+	&:global(.focusExpand),
+	:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+
 	&:hover :global(.bf-button-bg),
-	&:focus :global(.bf-button-bg) {
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
 		background: #ffffff !important;
 		border-color: #ffffff !important;
 	}
@@ -1094,19 +1198,19 @@
 
 :global([data-bf-nav-theme='elegant']) {
 	.stickyControls {
-		--bf-md-elegant-accent: rgba(157, 207, 255, 0.98);
-		--bf-md-elegant-hover-bg: rgba(255, 255, 255, 0.12);
-		background: rgba(8, 13, 20, 0.42);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		--bf-md-elegant-accent: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
+		--bf-md-elegant-hover-bg: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
+		background: var(--bf-theme-surface-bg, rgba(8, 13, 20, 0.42));
+		border: 1px solid var(--bf-theme-surface-border, rgba(255, 255, 255, 0.1));
 		backdrop-filter: blur(0.65rem);
 		-webkit-backdrop-filter: blur(0.65rem);
-		box-shadow: 0 0.6rem 1.55rem rgba(4, 10, 17, 0.34);
+		box-shadow: var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(4, 10, 17, 0.34));
 	}
 
 	.episodeSelectorButton,
 	.compactSelectorButton,
 	.dropdown {
-		--bf-button-fg: rgba(244, 249, 255, 0.95);
+		--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
 		--bf-button-fg-hover: var(--bf-md-elegant-accent);
 		--bf-button-fg-active: var(--bf-md-elegant-accent);
 		font-family: 'Noto Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
@@ -1116,7 +1220,10 @@
 
 	.episodeSelectorButton :global(.bf-button-bg),
 	.compactSelectorButton :global(.bf-button-bg),
-	.dropdown :global(.bf-button-bg) {
+	.dropdown :global(.bf-button-bg),
+	.episodeSelectorButton :global(.bg),
+	.compactSelectorButton :global(.bg),
+	.dropdown :global(.bg) {
 		background: transparent !important;
 		border: none !important;
 		box-shadow: none !important;
@@ -1138,7 +1245,7 @@
 
 :global([data-bf-all-animations='off']) {
 	.stickyControls {
-		background: rgba(9, 13, 19, 0.62) !important;
+		background: var(--bf-theme-ultra-surface-bg, rgba(9, 13, 19, 0.62)) !important;
 		backdrop-filter: blur(0.5rem) !important;
 		-webkit-backdrop-filter: blur(0.5rem) !important;
 		box-shadow: none !important;

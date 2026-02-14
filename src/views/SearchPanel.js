@@ -12,6 +12,8 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 
 import css from './SearchPanel.module.less';
+import popupStyles from '../styles/popupStyles.module.less';
+import {popupShellCss} from '../styles/popupStyles';
 
 const SpottableDiv = Spottable('div');
 const FILTER_OPTIONS = [
@@ -22,7 +24,7 @@ const FILTER_OPTIONS = [
 ];
 const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
 
-const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
+const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
@@ -30,6 +32,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 	const [filterPopupOpen, setFilterPopupOpen] = useState(false);
 	const [selectedFilterIds, setSelectedFilterIds] = useState(ALL_FILTER_IDS);
 	const searchDebounceRef = useRef(null);
+	const toolbarBackHandlerRef = useRef(null);
 	const filtersById = useMemo(() => {
 		const map = new Map();
 		FILTER_OPTIONS.forEach((filter) => {
@@ -113,7 +116,6 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 	const handleItemClick = useCallback((item) => {
 		if (item.Type === 'Person') {
 			// Could navigate to person detail view in the future
-			console.log('Person clicked:', item);
 			return;
 		}
 		onItemSelect(item);
@@ -126,6 +128,27 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 	const closeFilterPopup = useCallback(() => {
 		setFilterPopupOpen(false);
 	}, []);
+
+	const registerToolbarBackHandler = useCallback((handler) => {
+		toolbarBackHandlerRef.current = handler;
+	}, []);
+
+	const handleInternalBack = useCallback(() => {
+		if (filterPopupOpen) {
+			setFilterPopupOpen(false);
+			return true;
+		}
+		if (typeof toolbarBackHandlerRef.current === 'function') {
+			return toolbarBackHandlerRef.current() === true;
+		}
+		return false;
+	}, [filterPopupOpen]);
+
+	useEffect(() => {
+		if (typeof registerBackHandler !== 'function') return undefined;
+		registerBackHandler(handleInternalBack);
+		return () => registerBackHandler(null);
+	}, [handleInternalBack, registerBackHandler]);
 
 	const handleFilterToggleClick = useCallback((event) => {
 		const filterId = event.currentTarget.dataset.filterId;
@@ -236,6 +259,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}
 					onExit={onExit}
+					registerBackHandler={registerToolbarBackHandler}
 				/>
 			<div className={css.searchContainer}>
 				<Scroller className={css.resultsScroller}>
@@ -266,81 +290,83 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 							</div>
 						</div>
 
-						{loading ? (
-							<div className={css.loadingState}>
-								<Spinner />
-							</div>
-						) : hasSearched && results.length === 0 ? (
-							<div className={css.emptyState}>
-								<BodyText>No results found for {searchTerm}</BodyText>
-							</div>
-						) : !hasSearched ? (
-							<div className={css.emptyState}>
-								<BodyText>Enter a search term to find movies, shows, and more</BodyText>
-							</div>
-						) : (
-							<div className={css.resultsGrid}>
-								{results.map(item => {
-									const imageUrl = getImageUrl(item);
-									return (
-										<SpottableDiv
-											key={item.Id}
-											data-item-id={item.Id}
-											className={css.resultCard}
-											onClick={handleResultCardClick}
-											onKeyDown={handleResultCardKeyDown}
-										>
-											<div className={css.cardImage}>
-												{imageUrl ? (
-													<img
-														src={imageUrl}
-														alt={item.Name}
-														onError={handleResultImageError}
-														loading="lazy"
-														decoding="async"
-														draggable={false}
-													/>
-												) : (
-													<div className={css.placeholderInner}>
-														<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-													</div>
-												)}
-												{item.UserData?.Played && (
-													<div className={css.watchedBadge}>{'\u2713'}</div>
-												)}
-												{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-													<div className={css.progressBar}>
-														<div
-															className={css.progress}
-															style={{ width: `${item.UserData.PlayedPercentage}%` }}
+						<div className={css.resultsBody}>
+							{loading ? (
+								<div className={css.loadingState}>
+									<Spinner />
+								</div>
+							) : hasSearched && results.length === 0 ? (
+								<div className={css.emptyState}>
+									<BodyText>No results found for {searchTerm}</BodyText>
+								</div>
+							) : !hasSearched ? (
+								<div className={css.emptyState}>
+									<BodyText>Enter a search term to find movies, shows, and more</BodyText>
+								</div>
+							) : (
+								<div className={css.resultsGrid}>
+									{results.map(item => {
+										const imageUrl = getImageUrl(item);
+										return (
+											<SpottableDiv
+												key={item.Id}
+												data-item-id={item.Id}
+												className={css.resultCard}
+												onClick={handleResultCardClick}
+												onKeyDown={handleResultCardKeyDown}
+											>
+												<div className={css.cardImage}>
+													{imageUrl ? (
+														<img
+															src={imageUrl}
+															alt={item.Name}
+															onError={handleResultImageError}
+															loading="lazy"
+															decoding="async"
+															draggable={false}
 														/>
-													</div>
-												)}
-											</div>
-											<div className={css.cardInfo}>
-												<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-												<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-											</div>
-										</SpottableDiv>
-									);
-								})}
+													) : (
+														<div className={css.placeholderInner}>
+															<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
+														</div>
+													)}
+													{item.UserData?.Played && (
+														<div className={css.watchedBadge}>{'\u2713'}</div>
+													)}
+													{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
+														<div className={css.progressBar}>
+															<div
+																className={css.progress}
+																style={{ width: `${item.UserData.PlayedPercentage}%` }}
+															/>
+														</div>
+													)}
+												</div>
+												<div className={css.cardInfo}>
+													<BodyText className={css.cardTitle}>{item.Name}</BodyText>
+													<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
+												</div>
+											</SpottableDiv>
+										);
+									})}
+								</div>
+							)}
 							</div>
-						)}
 					</div>
 				</Scroller>
 
-				<Popup open={filterPopupOpen} onClose={closeFilterPopup}>
-					<div>
-						<BodyText>Search Filters</BodyText>
-						<div>
-							<SandstoneButton size="small" onClick={handleSelectAllFilters}>
+				<Popup open={filterPopupOpen} onClose={closeFilterPopup} css={popupShellCss}>
+					<div className={`${popupStyles.popupSurface} ${css.filterPopupContent}`}>
+						<BodyText className={css.filterPopupTitle}>Search Filters</BodyText>
+						<div className={css.filterPopupActions}>
+							<SandstoneButton size="small" onClick={handleSelectAllFilters} className={css.filterPopupActionButton}>
 								Select All
 							</SandstoneButton>
-							<SandstoneButton size="small" onClick={closeFilterPopup}>
+							<SandstoneButton size="small" onClick={closeFilterPopup} className={css.filterPopupActionButton}>
 								Done
 							</SandstoneButton>
 						</div>
-						<div>
+						<div className={css.filterPopupOptions}>
 							{FILTER_OPTIONS.map((filter) => (
 								<SandstoneButton
 									key={filter.id}
@@ -348,6 +374,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 									selected={selectedFilterIds.includes(filter.id)}
 									onClick={handleFilterToggleClick}
 									size="small"
+									className={css.filterPopupOptionButton}
 								>
 									{filter.label}
 								</SandstoneButton>

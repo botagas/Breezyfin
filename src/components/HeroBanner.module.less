@@ -336,9 +336,9 @@
 :global([data-bf-nav-theme='elegant']) .gradient {
 	background: linear-gradient(
 		to top,
-		rgba(7, 12, 19, 0.92) 0%,
-		rgba(7, 12, 19, 0.62) 45%,
-		rgba(7, 12, 19, 0.2) 100%
+		var(--bf-theme-hero-elegant-gradient-top, rgba(7, 12, 19, 0.92)) 0%,
+		var(--bf-theme-hero-elegant-gradient-mid, rgba(7, 12, 19, 0.62)) 45%,
+		var(--bf-theme-hero-elegant-gradient-end, rgba(7, 12, 19, 0.2)) 100%
 	);
 }
 

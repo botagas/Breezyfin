@@ -177,9 +177,12 @@
 	margin-top: 12px;
 	padding: 14px 18px;
 	border-radius: 10px;
-	background: rgba(255, 87, 87, 0.12);
-	border: 1px solid rgba(255, 87, 87, 0.4);
-	color: #ffdede;
+	background: var(--bf-theme-error-bg, rgba(255, 87, 87, 0.12));
+	border: 1px solid var(--bf-theme-error-border, rgba(255, 87, 87, 0.4));
+	color: var(--bf-theme-error-color, #ffdede);
+	box-shadow: var(--bf-theme-message-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
+	backdrop-filter: blur(0.6rem);
+	-webkit-backdrop-filter: blur(0.6rem);
 	line-height: 1.5;
 }
 

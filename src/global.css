@@ -19,6 +19,19 @@ body,
 	--bf-home-content-offset: 0rem;
 	--bf-panel-scroller-offset-nudge: 0rem;
 	--bf-home-hero-nudge: 0rem;
+
+	/* Shared theme tokens used by both Classic and Elegant */
+	--bf-theme-text-primary: rgba(244, 249, 255, 0.95);
+	--bf-theme-tab-bg: transparent;
+	--bf-theme-tab-hover-bg: rgba(255, 255, 255, 0.12);
+	--bf-theme-overlay-ultra-bg: rgba(9, 13, 19, 0.84);
+	--bf-theme-overlay-ultra-soft-bg: rgba(9, 13, 19, 0.42);
+	--bf-theme-liquid-overlay-bg: rgba(168, 188, 213, 0.08);
+	--bf-theme-backdrop-fallback:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
 }
 
 /* Explicit classic token reset so switching away from Elegant always restores baseline layout geometry. */
@@ -30,10 +43,6 @@ body,
 	/* Non-home panels need a small upward correction to align under classic header+toolbar. */
 	--bf-panel-scroller-offset-nudge: -1rem;
 	--bf-home-hero-nudge: 0rem;
-}
-
-body {
-	overscroll-behavior: none;
 }
 
 /* Remove Panel body horizontal padding app-wide */
@@ -65,8 +74,8 @@ body {
 
 /* Make panel headers transparent so backdrop imagery remains visible */
 .bf-header {
-	--bf-header-fade-color: rgba(0, 0, 0, 0.2);
-	background: rgba(0, 0, 0, 0.22) !important;
+	--bf-header-fade-color: var(--bf-theme-header-fade-color, rgba(0, 0, 0, 0.2));
+	background: var(--bf-theme-header-bg, rgba(0, 0, 0, 0.22)) !important;
 	border-bottom: none !important;
 	backdrop-filter: blur(0.15rem) !important;
 	-webkit-backdrop-filter: blur(0.15rem) !important;
@@ -130,6 +139,13 @@ body {
 	color: var(--bf-button-fg-active, var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff))) !important;
 }
 
+/* In 5-way mode, ignore stale mouse-hover paint so only Spotlight focus is visually active. */
+[data-bf-input-mode='5way'] .bf-button:hover,
+[data-bf-input-mode='5way'] .bf-button:hover .client,
+[data-bf-input-mode='5way'] .bf-button:hover .icon {
+	color: var(--bf-button-fg, #ffffff) !important;
+}
+
 /* Sandstone Input trigger (used in Login/Search panels) */
 .bf-input-trigger {
 	background: transparent !important;
@@ -187,6 +203,15 @@ body {
 	transform: scale(1.01) !important;
 }
 
+[data-bf-input-mode='5way'] .bf-input-trigger:hover > div:first-of-type {
+	background: rgba(255, 255, 255, 0.015) !important;
+	border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+[data-bf-input-mode='5way'] .bf-input-trigger:hover {
+	transform: none !important;
+}
+
 .bf-input-trigger * {
 	color: #ffffff !important;
 }
@@ -207,40 +232,6 @@ body {
 	z-index: 200;
 	pointer-events: none;
 	font-weight: 600;
-}
-
-/* Elegant nav theme: softer typography and stronger frosted chrome. */
-[data-bf-nav-theme='elegant'] .bf-panel-body,
-[data-bf-nav-theme='elegant'] .bf-header {
-	letter-spacing: 0.01em;
-}
-
-[data-bf-nav-theme='elegant'] {
-	--bf-header-height: 0rem;
-	--bf-toolbar-height: var(--bf-toolbar-height-elegant);
-	--bf-home-scroller-overlap: var(--bf-toolbar-height);
-	--bf-home-content-offset: calc(var(--bf-toolbar-height) + 0.5rem);
-	--bf-panel-scroller-offset-nudge: 0.75rem;
-	--bf-home-hero-nudge: 0.5rem;
-}
-
-[data-bf-nav-theme='elegant'] .bf-button .client {
-	font-weight: 500 !important;
-	letter-spacing: 0.018em !important;
-}
-
-[data-bf-nav-theme='elegant'] .bf-button .icon,
-[data-bf-nav-theme='elegant'] .Icon {
-	font-weight: 400 !important;
-}
-
-[data-bf-nav-theme='elegant'] .bf-header {
-	--bf-header-fade-color: rgba(5, 10, 17, 0.28);
-	background: rgba(5, 10, 17, 0.5) !important;
-	backdrop-filter: blur(1.1rem) saturate(1.1) !important;
-	-webkit-backdrop-filter: blur(1.1rem) saturate(1.1) !important;
-	border-bottom: none !important;
-	display: none !important;
 }
 
 /* Performance mode for lower-end TVs: reduce expensive motion but keep nav/header blur. */
@@ -298,7 +289,7 @@ body {
 
 [data-bf-all-animations='off'] .bf-header,
 [data-bf-all-animations='off'] [data-bf-navbar='true'] {
-	background: rgba(9, 13, 19, 0.84) !important;
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
 	backdrop-filter: none !important;
 	-webkit-backdrop-filter: none !important;
 }
@@ -310,7 +301,7 @@ body {
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='overlay'] {
-	background: rgba(9, 13, 19, 0.84) !important;
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='specular'] {
@@ -332,7 +323,7 @@ body {
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='overlay'] {
-	background: rgba(9, 13, 19, 0.42) !important;
+	background: var(--bf-theme-overlay-ultra-soft-bg, rgba(9, 13, 19, 0.42)) !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {

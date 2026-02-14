@@ -238,7 +238,6 @@ class JellyfinService {
 				}
 			);
 			const data = await response.json();
-			console.log(`Latest ${types} response:`, data);
 			return data.Items || [];
 		} catch (error) {
 			console.error(`getLatestMedia ${includeItemTypes} error:`, error);
@@ -258,7 +257,6 @@ class JellyfinService {
 				}
 			);
 			const data = await response.json();
-			console.log('Recently added response:', data);
 			return data.Items || [];
 		} catch (error) {
 			console.error('getRecentlyAdded error:', error);
@@ -297,7 +295,6 @@ class JellyfinService {
 				}
 			);
 			const data = await response.json();
-			console.log('Resume items response:', data);
 			return data.Items || [];
 		} catch (error) {
 			console.error('getResumeItems error:', error);
@@ -342,7 +339,6 @@ class JellyfinService {
 				}
 			);
 			const data = await response.json();
-			console.log('Library views response:', data);
 			return data.Items || [];
 		} catch (error) {
 			console.error('getLibraryViews error:', error);
@@ -496,7 +492,6 @@ class JellyfinService {
 			const forceTranscoding = options.forceTranscoding === true;
 			const enableTranscoding = options.enableTranscoding !== false; // default on
 			const maxBitrateSetting = options.maxBitrate ? parseInt(options.maxBitrate, 10) : null;
-			console.log('Force Transcoding Enabled:', forceTranscoding);
 
 			// webOS-optimized device profile
 			payload.EnableDirectPlay = !forceTranscoding;
@@ -612,17 +607,6 @@ class JellyfinService {
 				]
 			};
 
-			// Log the full payload for debugging
-			console.log('PlaybackInfo request payload:', {
-				EnableDirectPlay: payload.EnableDirectPlay,
-				EnableDirectStream: payload.EnableDirectStream,
-				EnableTranscoding: payload.EnableTranscoding,
-				AllowVideoStreamCopy: payload.AllowVideoStreamCopy,
-				AllowAudioStreamCopy: payload.AllowAudioStreamCopy,
-				DirectPlayProfiles: payload.DeviceProfile.DirectPlayProfiles.length,
-				CodecProfiles: payload.DeviceProfile.CodecProfiles.length
-			});
-
 			// Use POST with populated profile
 			const response = await fetch(`${this.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${this.userId}`, {
 				method: 'POST',
@@ -640,7 +624,6 @@ class JellyfinService {
 			}
 
 			const data = await response.json();
-			console.log('Playback info:', data);
 			return data;
 		} catch (error) {
 			console.error('Failed to get playback info:', error);

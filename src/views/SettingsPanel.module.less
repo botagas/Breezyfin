@@ -2,11 +2,11 @@
 	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
 	--bf-settings-content-bottom-pad: 4rem;
 	--bf-settings-bottom-spacer: 0rem;
-	--settings-accent: #3fb8ff;
-	--settings-surface: rgba(14, 22, 30, 0.82);
-	--settings-surface-strong: rgba(20, 30, 40, 0.9);
-	--settings-border: rgba(138, 196, 255, 0.2);
-	--settings-focus: rgba(63, 184, 255, 0.28);
+	--settings-accent: var(--bf-theme-accent, #3fb8ff);
+	--settings-surface: var(--bf-theme-settings-surface, rgba(14, 22, 30, 0.82));
+	--settings-surface-strong: var(--bf-theme-settings-surface-strong, rgba(20, 30, 40, 0.9));
+	--settings-border: var(--bf-theme-settings-border, rgba(138, 196, 255, 0.2));
+	--settings-focus: var(--bf-theme-settings-focus, rgba(63, 184, 255, 0.28));
 	background:
 		radial-gradient(120rem 50rem at 20% -10%, rgba(63, 184, 255, 0.18), transparent 60%),
 		radial-gradient(100rem 60rem at 100% -20%, rgba(0, 208, 156, 0.14), transparent 58%),
@@ -120,27 +120,15 @@
 	}
 }
 
-.popup {
-	z-index: 1000;
-}
-
 .popupContent {
-	padding: 1.5rem;
+	padding: 0.5rem;
 	min-width: 300px;
-	border-radius: 14px;
-	background: linear-gradient(150deg, rgba(10, 22, 30, 0.96), rgba(12, 14, 24, 0.96));
-	border: 1px solid rgba(122, 214, 255, 0.32);
-	box-shadow: 0 18px 36px rgba(0, 0, 0, 0.52);
 }
 
 .logPopupContent {
-	padding: 1.5rem;
+	padding: 0.5rem;
 	min-width: 980px;
 	max-width: 92vw;
-	border-radius: 14px;
-	background: linear-gradient(150deg, rgba(10, 22, 30, 0.96), rgba(12, 14, 24, 0.96));
-	border: 1px solid rgba(122, 214, 255, 0.32);
-	box-shadow: 0 18px 36px rgba(0, 0, 0, 0.52);
 }
 
 .popupTitle {
@@ -163,18 +151,41 @@
 }
 
 .popupOption {
+	--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+	--bf-button-fg-hover: var(--settings-popup-option-fg-hover, var(--bf-theme-text-primary, rgba(244, 249, 255, 0.98)));
+	--bf-button-fg-active: var(--settings-popup-option-fg-hover, var(--bf-theme-text-primary, rgba(244, 249, 255, 0.98)));
 	justify-content: center;
 	padding: 0.52rem 0.75rem;
 	min-height: auto;
 	font-size: 0.9em;
-	border-radius: 999px;
-	border: 1px solid rgba(122, 214, 255, 0.2);
-	background: rgba(255, 255, 255, 0.04);
+	border-radius: 999px !important;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
 	transition: background 0.14s ease, border-color 0.14s ease;
 
-	&:global(.spottable):focus {
-		background: rgba(122, 214, 255, 0.22);
-		border-color: rgba(122, 214, 255, 0.5);
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+		border: none !important;
+	}
+
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+		border: none !important;
 	}
 }
 
@@ -201,12 +212,23 @@
 }
 
 .dangerButton {
-	background: rgba(244, 67, 54, 0.6);
-	border: 1px solid rgba(255, 130, 120, 0.45);
-	
-	&:hover,
-	&:focus {
-		background: rgba(244, 67, 54, 0.8);
+	--bf-button-fg: rgba(255, 188, 179, 0.98);
+	--bf-button-fg-hover: #ffffff;
+	--bf-button-fg-active: #ffffff;
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(244, 67, 54, 0.42) !important;
+	}
+}
+
+:global([data-bf-nav-theme='elegant']) {
+	.popupOption {
+		--settings-popup-option-fg-hover: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
 	}
 }
 

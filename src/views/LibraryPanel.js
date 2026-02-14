@@ -15,7 +15,7 @@ const SpottableDiv = Spottable('div');
 const LIBRARY_PAGE_SIZE = 60;
 const FOCUS_PREFETCH_THRESHOLD = 12;
 
-const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, ...rest }) => {
+const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(false);
@@ -94,7 +94,6 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 		setItems([]);
 		setHasMore(false);
 		try {
-			console.log('Loading library items for:', library);
 			const firstBatch = await jellyfinService.getLibraryItems(
 				library.Id,
 				itemTypes,
@@ -219,6 +218,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 						onSwitchUser={onSwitchUser}
 						onLogout={onLogout}
 						onExit={onExit}
+						registerBackHandler={registerBackHandler}
 					/>
 				<div className={css.loading}>
 					<Spinner />
@@ -237,6 +237,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}
 					onExit={onExit}
+					registerBackHandler={registerBackHandler}
 				/>
 			<div className={css.libraryContainer}>
 				<Scroller

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
@@ -9,11 +9,12 @@ import SwitchItem from '@enact/sandstone/SwitchItem';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
-import {isBackKey} from '../utils/keyCodes';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 
 import css from './SettingsPanel.module.less';
+import popupStyles from '../styles/popupStyles.module.less';
+import {popupShellCss} from '../styles/popupStyles';
 
 const HOME_ROW_ORDER = [
 	'myRequests',
@@ -80,7 +81,7 @@ const NAVBAR_THEME_OPTIONS = [
 	{ value: 'elegant', label: 'Elegant' }
 ];
 
-const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, isActive = false, ...rest }) => {
+const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, registerBackHandler, isActive = false, ...rest }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
@@ -97,6 +98,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
 	const [appLogs, setAppLogs] = useState([]);
 	const [appLogCount, setAppLogCount] = useState(0);
+	const toolbarBackHandlerRef = useRef(null);
 	const savedServersByKey = useMemo(() => {
 		const map = new Map();
 		savedServers.forEach((entry) => {
@@ -389,6 +391,10 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		setLogsPopupOpen(false);
 	}, []);
 
+	const registerToolbarBackHandler = useCallback((handler) => {
+		toolbarBackHandlerRef.current = handler;
+	}, []);
+
 	const toggleEnableTranscoding = useCallback(() => {
 		handleSettingChange('enableTranscoding', !settings.enableTranscoding);
 	}, [handleSettingChange, settings.enableTranscoding]);
@@ -498,19 +504,55 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		return option ? option.label : 'Classic';
 	};
 
-	// Improve remote back handling so physical back/escape keys always leave settings
+	const handleInternalBack = useCallback(() => {
+		if (logsPopupOpen) {
+			setLogsPopupOpen(false);
+			return true;
+		}
+		if (logoutConfirmOpen) {
+			setLogoutConfirmOpen(false);
+			return true;
+		}
+		if (playNextPromptModePopupOpen) {
+			setPlayNextPromptModePopupOpen(false);
+			return true;
+		}
+		if (navbarThemePopupOpen) {
+			setNavbarThemePopupOpen(false);
+			return true;
+		}
+		if (subtitleLangPopupOpen) {
+			setSubtitleLangPopupOpen(false);
+			return true;
+		}
+		if (audioLangPopupOpen) {
+			setAudioLangPopupOpen(false);
+			return true;
+		}
+		if (bitratePopupOpen) {
+			setBitratePopupOpen(false);
+			return true;
+		}
+		if (typeof toolbarBackHandlerRef.current === 'function') {
+			return toolbarBackHandlerRef.current() === true;
+		}
+		return false;
+	}, [
+		audioLangPopupOpen,
+		bitratePopupOpen,
+		logoutConfirmOpen,
+		logsPopupOpen,
+		navbarThemePopupOpen,
+		playNextPromptModePopupOpen,
+		subtitleLangPopupOpen
+	]);
+
 	useEffect(() => {
 		if (!isActive) return undefined;
-		const handleKeyDown = (e) => {
-			const code = e.keyCode || e.which;
-			if (isBackKey(code)) {
-				e.preventDefault();
-				onNavigate('home');
-			}
-		};
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [isActive, onNavigate]);
+		if (typeof registerBackHandler !== 'function') return undefined;
+		registerBackHandler(handleInternalBack);
+		return () => registerBackHandler(null);
+	}, [handleInternalBack, isActive, registerBackHandler]);
 
 	return (
 		<Panel {...rest}>
@@ -521,6 +563,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}
 				onExit={onExit}
+				registerBackHandler={registerToolbarBackHandler}
 			/>
 			<Scroller className={css.settingsContainer}>
 				<div className={css.content}>
@@ -825,9 +868,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={bitratePopupOpen}
 					onClose={closeBitratePopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Select Maximum Bitrate</BodyText>
 						{BITRATE_OPTIONS.map(option => (
 							<Button
@@ -846,9 +889,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={audioLangPopupOpen}
 					onClose={closeAudioLangPopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Audio Language</BodyText>
 					<div className={css.popupOptions}>
 							{LANGUAGE_OPTIONS.map(option => (
@@ -869,9 +912,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={subtitleLangPopupOpen}
 					onClose={closeSubtitleLangPopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Subtitle Language</BodyText>
 					<div className={css.popupOptions}>
 							{LANGUAGE_OPTIONS.map(option => (
@@ -892,8 +935,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={navbarThemePopupOpen}
 					onClose={closeNavbarThemePopup}
+					css={popupShellCss}
 				>
-				<div className={css.nativeThemePopupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.nativeThemePopupContent}`}>
 					<BodyText className={css.popupTitle}>Navigation Theme</BodyText>
 					<div className={css.nativeThemePopupOptions}>
 							{NAVBAR_THEME_OPTIONS.map((option) => (
@@ -903,6 +947,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 									data-theme={option.value}
 									selected={settings.navbarTheme === option.value}
 									onClick={handleNavbarThemeSelect}
+									className={css.popupOption}
 								>
 								{option.label}
 							</Button>
@@ -914,9 +959,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={playNextPromptModePopupOpen}
 					onClose={closePlayNextPromptModePopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Play Next Prompt Mode</BodyText>
 						<Button
 							className={css.popupOption}
@@ -938,16 +983,16 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={logoutConfirmOpen}
 					onClose={closeLogoutConfirm}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Sign Out</BodyText>
 						<BodyText className={css.popupMessage}>
 							Are you sure you want to sign out from {serverInfo?.ServerName || 'this server'}?
 						</BodyText>
 						<div className={css.popupActions}>
-							<Button onClick={closeLogoutConfirm}>Cancel</Button>
-							<Button onClick={handleLogoutConfirm} className={css.dangerButton}>Sign Out</Button>
+							<Button onClick={closeLogoutConfirm} className={css.popupOption}>Cancel</Button>
+							<Button onClick={handleLogoutConfirm} className={`${css.popupOption} ${css.dangerButton}`}>Sign Out</Button>
 						</div>
 					</div>
 				</Popup>
@@ -955,13 +1000,13 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				<Popup
 					open={logsPopupOpen}
 					onClose={closeLogsPopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.logPopupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.logPopupContent}`}>
 					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
 						<div className={css.logActions}>
-							<Button size="small" onClick={handleClearLogs}>Clear Logs</Button>
-							<Button size="small" onClick={closeLogsPopup}>Close</Button>
+							<Button size="small" onClick={handleClearLogs} className={css.popupOption}>Clear Logs</Button>
+							<Button size="small" onClick={closeLogsPopup} className={css.popupOption}>Close</Button>
 						</div>
 					<Scroller className={css.logScroller}>
 						{appLogs.length === 0 && (
