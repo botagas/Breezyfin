@@ -55,6 +55,7 @@
 	--bf-home-content-offset: calc(var(--bf-toolbar-height) + 0.5rem);
 	--bf-panel-scroller-offset-nudge: 0.75rem;
 	--bf-home-hero-nudge: 0.5rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-elegant);
 }
 
 [data-bf-nav-theme='elegant'] .bf-button .client {

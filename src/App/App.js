@@ -17,12 +17,15 @@ import AppCrashBoundary from './AppCrashBoundary';
 
 import css from './App.module.less';
 
+const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
+
 const App = (props) => {
 	const [currentView, setCurrentView] = useState('login'); // 'login', 'home', 'library', 'search', 'favorites', 'settings', 'details', 'player'
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [previousItem, setPreviousItem] = useState(null); // For back navigation from episode to series
+	const [detailsReturnView, setDetailsReturnView] = useState('home');
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
 	const [animationsDisabled, setAnimationsDisabled] = useState(false);
 	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(false);
@@ -38,14 +41,85 @@ const App = (props) => {
 	const favoritesBackHandlerRef = useRef(null);
 	const settingsBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
+	const panelHistoryRef = useRef([]);
+
+	const createPanelSnapshot = useCallback(() => ({
+		view: currentView,
+		selectedItem,
+		selectedLibrary,
+		playbackOptions,
+		previousItem,
+		detailsReturnView,
+		playerControlsVisible
+	}), [
+		currentView,
+		detailsReturnView,
+		playbackOptions,
+		playerControlsVisible,
+		previousItem,
+		selectedItem,
+		selectedLibrary
+	]);
+
+	const pushPanelHistory = useCallback(() => {
+		panelHistoryRef.current = [...panelHistoryRef.current, createPanelSnapshot()];
+	}, [createPanelSnapshot]);
+
+	const clearPanelHistory = useCallback(() => {
+		panelHistoryRef.current = [];
+	}, []);
+
+	const restorePanelSnapshot = useCallback((snapshot) => {
+		if (!snapshot) return false;
+		setCurrentView(snapshot.view || 'home');
+		setSelectedItem(snapshot.selectedItem || null);
+		setSelectedLibrary(snapshot.selectedLibrary || null);
+		setPlaybackOptions(snapshot.playbackOptions || null);
+		setPreviousItem(snapshot.previousItem || null);
+		setDetailsReturnView(snapshot.detailsReturnView || 'home');
+		setPlayerControlsVisible(snapshot.playerControlsVisible !== false);
+		return true;
+	}, []);
+
+	const navigateBackInHistory = useCallback(() => {
+		const history = panelHistoryRef.current;
+		if (!history.length) return false;
+		const previousSnapshot = history[history.length - 1];
+		panelHistoryRef.current = history.slice(0, -1);
+		return restorePanelSnapshot(previousSnapshot);
+	}, [restorePanelSnapshot]);
 
 	const resetSessionState = useCallback(() => {
 		setSelectedItem(null);
 		setSelectedLibrary(null);
 		setPlaybackOptions(null);
 		setPreviousItem(null);
+		setDetailsReturnView('home');
 		setPlayerControlsVisible(true);
-	}, []);
+		clearPanelHistory();
+	}, [clearPanelHistory]);
+
+	const resolveDetailsReturnView = useCallback(() => {
+		if (detailsReturnView === 'library') {
+			return selectedLibrary ? 'library' : 'home';
+		}
+		return DETAIL_RETURN_VIEWS.has(detailsReturnView) ? detailsReturnView : 'home';
+	}, [detailsReturnView, selectedLibrary]);
+
+	const navigateBackFromDetails = useCallback(() => {
+		if (navigateBackInHistory()) {
+			return true;
+		}
+
+		const targetView = resolveDetailsReturnView();
+		setCurrentView(targetView);
+		if (targetView === 'home') {
+			setSelectedLibrary(null);
+		}
+		setSelectedItem(null);
+		setPlaybackOptions(null);
+		return true;
+	}, [navigateBackInHistory, resolveDetailsReturnView]);
 
 	const applyVisualSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -165,6 +239,7 @@ const App = (props) => {
 		switch (currentView) {
 			case 'library':
 				if (runBackHandler(libraryBackHandlerRef)) return true;
+				if (navigateBackInHistory()) return true;
 				setCurrentView('home');
 				setSelectedItem(null);
 				setSelectedLibrary(null);
@@ -172,6 +247,7 @@ const App = (props) => {
 				return true;
 			case 'search':
 				if (runBackHandler(searchBackHandlerRef)) return true;
+				if (navigateBackInHistory()) return true;
 				setCurrentView('home');
 				setSelectedItem(null);
 				setSelectedLibrary(null);
@@ -179,6 +255,7 @@ const App = (props) => {
 				return true;
 			case 'favorites':
 				if (runBackHandler(favoritesBackHandlerRef)) return true;
+				if (navigateBackInHistory()) return true;
 				setCurrentView('home');
 				setSelectedItem(null);
 				setSelectedLibrary(null);
@@ -186,6 +263,7 @@ const App = (props) => {
 				return true;
 			case 'settings':
 				if (runBackHandler(settingsBackHandlerRef)) return true;
+				if (navigateBackInHistory()) return true;
 				setCurrentView('home');
 				setSelectedItem(null);
 				setSelectedLibrary(null);
@@ -198,16 +276,7 @@ const App = (props) => {
 						return true;
 					}
 				}
-				// If we have a previous item (series), go back to it
-				if (previousItem) {
-					setSelectedItem(previousItem);
-					setPreviousItem(null);
-					return true;
-				}
-				setCurrentView('home');
-				setSelectedItem(null);
-				setPlaybackOptions(null);
-				return true;
+				return navigateBackFromDetails();
 			case 'player':
 				if (typeof playerBackHandlerRef.current === 'function') {
 					const handledInPlayer = playerBackHandlerRef.current();
@@ -219,6 +288,7 @@ const App = (props) => {
 					setPlayerControlsVisible(false);
 					return true;
 				}
+				if (navigateBackInHistory()) return true;
 				setCurrentView('details');
 				return true;
 			case 'home':
@@ -228,7 +298,7 @@ const App = (props) => {
 			default:
 				return false; // Allow default behavior (exit prompt)
 		}
-	}, [currentView, playerControlsVisible, previousItem]);
+	}, [currentView, navigateBackFromDetails, navigateBackInHistory, playerControlsVisible]);
 
 	useEffect(() => {
 		handleBackRef.current = handleBack;
@@ -271,8 +341,9 @@ const App = (props) => {
 	}, []);
 
 	const handleLogin = useCallback(() => {
+		clearPanelHistory();
 		setCurrentView('home');
-	}, []);
+	}, [clearPanelHistory]);
 
 	const handleLogout = useCallback(() => {
 		jellyfinService.logout();
@@ -293,6 +364,10 @@ const App = (props) => {
 	}, [resetSessionState]);
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
+		if (DETAIL_RETURN_VIEWS.has(currentView) && currentView !== 'details') {
+			setDetailsReturnView(currentView);
+			pushPanelHistory();
+		}
 		// Track the previous item for back navigation (e.g., series -> episode)
 		if (fromItem) {
 			setPreviousItem(fromItem);
@@ -306,9 +381,23 @@ const App = (props) => {
 		setSelectedItem(item);
 		setPlaybackOptions(null);
 		setCurrentView('details');
-	}, [selectedItem]);
+	}, [currentView, pushPanelHistory, selectedItem]);
 
 	const handleNavigate = useCallback((section, data) => {
+		const targetView = section;
+		const nextLibraryId = targetView === 'library' ? data?.Id : null;
+		const currentLibraryId = selectedLibrary?.Id || null;
+		const shouldTrackHistory =
+			targetView === 'home' ||
+			targetView === 'library' ||
+			targetView === 'search' ||
+			targetView === 'favorites' ||
+			targetView === 'settings'
+				? (targetView !== currentView || nextLibraryId !== currentLibraryId)
+				: false;
+		if (shouldTrackHistory) {
+			pushPanelHistory();
+		}
 		switch (section) {
 			case 'home':
 				setCurrentView('home');
@@ -333,26 +422,31 @@ const App = (props) => {
 			default:
 				break;
 		}
-	}, []);
+	}, [currentView, pushPanelHistory, selectedLibrary?.Id]);
 
 	const handlePlay = useCallback((item, options = null) => {
+		if (currentView !== 'player') {
+			pushPanelHistory();
+		}
 		setSelectedItem(item);
 		setPlaybackOptions(options);
 		setPlayerControlsVisible(true);
 		setCurrentView('player');
-	}, []);
+	}, [currentView, pushPanelHistory]);
 
 	const handleBackToHome = useCallback(() => {
+		if (navigateBackInHistory()) return;
 		setCurrentView('home');
 		setSelectedItem(null);
 		setSelectedLibrary(null);
 		setPlaybackOptions(null);
-	}, []);
+	}, [navigateBackInHistory]);
 
 	const handleBackToDetails = useCallback(() => {
+		if (navigateBackInHistory()) return;
 		setPlayerControlsVisible(true);
 		setCurrentView('details');
-	}, []);
+	}, [navigateBackInHistory]);
 
 	const handleExit = useCallback(() => {
 		if (typeof window !== 'undefined' && window.close) {
@@ -464,7 +558,7 @@ const App = (props) => {
 					<MediaDetailsPanel
 						isActive={currentView === 'details'}
 						item={selectedItem}
-						onBack={handleBackToHome}
+						onBack={navigateBackFromDetails}
 						onPlay={handlePlay}
 						onItemSelect={handleItemSelect}
 						registerBackHandler={registerDetailsBackHandler}

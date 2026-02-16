@@ -19,6 +19,9 @@ body,
 	--bf-home-content-offset: 0rem;
 	--bf-panel-scroller-offset-nudge: 0rem;
 	--bf-home-hero-nudge: 0rem;
+	--bf-panel-content-bottom-padding-classic: 7rem;
+	--bf-panel-content-bottom-padding-elegant: 3.75rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
 
 	/* Shared theme tokens used by both Classic and Elegant */
 	--bf-theme-text-primary: rgba(244, 249, 255, 0.95);
@@ -43,6 +46,7 @@ body,
 	/* Non-home panels need a small upward correction to align under classic header+toolbar. */
 	--bf-panel-scroller-offset-nudge: -1rem;
 	--bf-home-hero-nudge: 0rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
 }
 
 /* Remove Panel body horizontal padding app-wide */

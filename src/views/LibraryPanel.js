@@ -214,6 +214,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 					<Toolbar
 						activeSection="library"
 						activeLibraryId={library?.Id}
+						aboveNativeHeader
 						onNavigate={onNavigate}
 						onSwitchUser={onSwitchUser}
 						onLogout={onLogout}
@@ -233,6 +234,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 				<Toolbar
 					activeSection="library"
 					activeLibraryId={library?.Id}
+					aboveNativeHeader
 					onNavigate={onNavigate}
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}
@@ -298,4 +300,3 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 };
 
 export default LibraryPanel;
-

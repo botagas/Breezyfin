@@ -255,6 +255,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 			<Header title="Search" />
 				<Toolbar
 					activeSection="search"
+					aboveNativeHeader
 					onNavigate={onNavigate}
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}

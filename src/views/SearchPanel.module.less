@@ -314,7 +314,7 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 	gap: 1.5rem;
-	padding: 0.75rem 4rem 4rem;
+	padding: 0.75rem 4rem calc(4rem + var(--bf-panel-content-bottom-padding, 4rem));
 }
 
 .resultCard {

@@ -18,6 +18,7 @@ const TOOLBAR_THEME_ELEGANT = 'elegant';
 const Toolbar = ({
 	activeSection = 'home',
 	activeLibraryId = null,
+	aboveNativeHeader = false,
 	registerBackHandler,
 	onNavigate,
 	onSwitchUser,
@@ -34,6 +35,7 @@ const Toolbar = ({
 	const glassFilterId = useId();
 	const centerRef = useRef(null);
 	const userMenuScopeRef = useRef(null);
+	const libraryMenuScopeRef = useRef(null);
 	const userMenuCloseTimerRef = useRef(null);
 	const suppressUserMenuUntilRef = useRef(0);
 	const librariesById = useMemo(() => {
@@ -131,6 +133,12 @@ const Toolbar = ({
 	}, [applyToolbarThemeFromSettings, readToolbarThemeFromStorage]);
 
 	useEffect(() => {
+		if (!isElegantTheme && showLibrariesPopup) {
+			setShowLibrariesPopup(false);
+		}
+	}, [isElegantTheme, showLibrariesPopup]);
+
+	useEffect(() => {
 		return () => {
 			if (userMenuCloseTimerRef.current) {
 				clearTimeout(userMenuCloseTimerRef.current);
@@ -168,6 +176,34 @@ const Toolbar = ({
 			document.removeEventListener('touchstart', handlePointerDown, true);
 		};
 	}, [showUserMenu]);
+
+	useEffect(() => {
+		if (!showLibrariesPopup || !isElegantTheme) return undefined;
+		const closeMenuIfOutside = (target) => {
+			if (!target || typeof target.nodeType !== 'number') return;
+			const scope = libraryMenuScopeRef.current;
+			if (!scope) return;
+			if (scope.contains(target)) return;
+			setShowLibrariesPopup(false);
+		};
+		const handleFocusIn = (event) => {
+			closeMenuIfOutside(event.target);
+		};
+		const handlePointerDown = (event) => {
+			closeMenuIfOutside(event.target);
+		};
+
+		document.addEventListener('focusin', handleFocusIn, true);
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		document.addEventListener('mousedown', handlePointerDown, true);
+		document.addEventListener('touchstart', handlePointerDown, true);
+		return () => {
+			document.removeEventListener('focusin', handleFocusIn, true);
+			document.removeEventListener('pointerdown', handlePointerDown, true);
+			document.removeEventListener('mousedown', handlePointerDown, true);
+			document.removeEventListener('touchstart', handlePointerDown, true);
+		};
+	}, [isElegantTheme, showLibrariesPopup]);
 
 	const formatTime = () => {
 		return currentTime.toLocaleTimeString('en-US', {
@@ -276,7 +312,7 @@ const Toolbar = ({
 
 	const handleOpenLibrariesPopup = useCallback(() => {
 		setShowUserMenu(false);
-		setShowLibrariesPopup(true);
+		setShowLibrariesPopup((prevOpen) => !prevOpen);
 	}, []);
 
 	const handleCloseLibrariesPopup = useCallback(() => {
@@ -378,11 +414,42 @@ const Toolbar = ({
 	const toolbarStyle = isElegantTheme
 		? {'--bf-glass-distortion-filter': `url(#${glassFilterId})`}
 		: undefined;
-	const libraryPopupCss = popupShellCss;
+	const renderLibraryPicker = (useElegantGlass = false) => (
+		<div className={`${popupStyles.popupSurface} ${css.libraryNativeContent} ${useElegantGlass ? css.libraryNativeContentGlass : ''}`}>
+			{useElegantGlass && (
+				<>
+					<div className={`${css.liquidLayerFilter} ${css.liquidLayerFilterMuted}`} />
+					<div className={css.liquidLayerOverlay} />
+					<div className={css.liquidLayerSpecular} />
+				</>
+			)}
+			<div className={css.libraryNativeInner}>
+				<BodyText className={css.libraryNativeTitle}>Libraries</BodyText>
+				<div className={css.libraryNativeGrid}>
+					{libraries.length === 0 && (
+						<BodyText className={css.libraryNativeEmpty}>No libraries available</BodyText>
+					)}
+					{libraries.map((library) => (
+						<Button
+							key={library.Id}
+							size="small"
+							minWidth={false}
+							data-library-id={library.Id}
+							selected={activeSection === 'library' && activeLibraryId === library.Id}
+							onClick={handleLibraryPopupSelect}
+							className={css.libraryNativeButton}
+						>
+							{library.Name}
+						</Button>
+					))}
+				</div>
+			</div>
+		</div>
+	);
 
 	return (
 		<div
-			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''}`}
+			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''} ${!isElegantTheme && aboveNativeHeader ? css.toolbarClassicAboveHeader : ''}`}
 			data-bf-navbar="true"
 			data-bf-navbar-theme={toolbarTheme}
 			style={toolbarStyle}
@@ -463,14 +530,21 @@ const Toolbar = ({
 								>
 									<Icon size="small">gear</Icon>
 								</SpottableDiv>
-								<SpottableDiv
-									onClick={handleOpenLibrariesPopup}
-									className={`${css.iconButton} ${activeSection === 'library' ? css.selected : ''}`}
-									aria-label="Libraries"
-									spotlightId="toolbar-libraries"
-								>
-									<Icon size="small">folder</Icon>
-								</SpottableDiv>
+								<div ref={libraryMenuScopeRef} className={css.elegantLibraryMenuScope}>
+									<SpottableDiv
+										onClick={handleOpenLibrariesPopup}
+										className={`${css.iconButton} ${activeSection === 'library' ? css.selected : ''}`}
+										aria-label="Libraries"
+										spotlightId="toolbar-libraries"
+									>
+										<Icon size="small">folder</Icon>
+									</SpottableDiv>
+									{showLibrariesPopup && (
+										<div className={css.elegantLibraryPopup}>
+											{renderLibraryPicker(true)}
+										</div>
+									)}
+								</div>
 								<div ref={userMenuScopeRef} className={css.userContainer} {...elegantUserContainerProps}>
 									<SpottableDiv
 										onClick={handleUserButtonClick}
@@ -511,58 +585,61 @@ const Toolbar = ({
 							{renderUserMenu()}
 						</div>
 					</div>
-					<div className={css.center} ref={centerRef} onFocus={handleCenterFocus}>
-						<SpottableDiv
-							onClick={handleNavigateHome}
-							className={`${css.iconButton} ${activeSection === 'home' ? css.selected : ''}`}
-							aria-label="Home"
-							spotlightId="toolbar-home"
-						>
-							<Icon size="small">home</Icon>
-						</SpottableDiv>
-
-						<SpottableDiv
-							onClick={handleNavigateSearch}
-							className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
-							aria-label="Search"
-							spotlightId="toolbar-search"
-						>
-							<Icon size="small">search</Icon>
-						</SpottableDiv>
-
-						<SpottableDiv
-							onClick={handleNavigateShuffle}
-							className={css.iconButton}
-							aria-label="Shuffle"
-							spotlightId="toolbar-shuffle"
-						>
-							<Icon size="small">arrowhookright</Icon>
-						</SpottableDiv>
-
-						<SpottableDiv
-							onClick={handleNavigateFavorites}
-							className={css.iconButton}
-							aria-label="Favorites"
-							spotlightId="toolbar-favorites"
-						>
-							<Icon size="small">star</Icon>
-						</SpottableDiv>
-
-						{libraries.map((library) => (
-							<Button
-								key={library.Id}
-								size="small"
-								backgroundOpacity="transparent"
-								shadowed={false}
-								data-library-id={library.Id}
-								onClick={handleLibraryNavigate}
-								selected={activeSection === 'library' && activeLibraryId === library.Id}
-								className={css.toolbarButton}
-								spotlightId={`toolbar-library-${library.Id}`}
+					<div className={css.center}>
+						<div className={css.centerPinned}>
+							<SpottableDiv
+								onClick={handleNavigateHome}
+								className={`${css.iconButton} ${activeSection === 'home' ? css.selected : ''}`}
+								aria-label="Home"
+								spotlightId="toolbar-home"
 							>
-								{library.Name}
-							</Button>
-						))}
+								<Icon size="small">home</Icon>
+							</SpottableDiv>
+
+							<SpottableDiv
+								onClick={handleNavigateSearch}
+								className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
+								aria-label="Search"
+								spotlightId="toolbar-search"
+							>
+								<Icon size="small">search</Icon>
+							</SpottableDiv>
+
+							<SpottableDiv
+								onClick={handleNavigateShuffle}
+								className={css.iconButton}
+								aria-label="Shuffle"
+								spotlightId="toolbar-shuffle"
+							>
+								<Icon size="small">arrowhookright</Icon>
+							</SpottableDiv>
+
+							<SpottableDiv
+								onClick={handleNavigateFavorites}
+								className={`${css.iconButton} ${activeSection === 'favorites' ? css.selected : ''}`}
+								aria-label="Favorites"
+								spotlightId="toolbar-favorites"
+							>
+								<Icon size="small">star</Icon>
+							</SpottableDiv>
+						</div>
+						<div className={css.centerScroller} ref={centerRef} onFocus={handleCenterFocus}>
+							{libraries.map((library) => (
+								<Button
+									key={library.Id}
+									size="small"
+									backgroundOpacity="transparent"
+									shadowed={false}
+									data-library-id={library.Id}
+									onClick={handleLibraryNavigate}
+									selected={activeSection === 'library' && activeLibraryId === library.Id}
+									className={css.toolbarButton}
+									spotlightId={`toolbar-library-${library.Id}`}
+								>
+									{library.Name}
+								</Button>
+							))}
+						</div>
 					</div>
 
 					<div className={css.end}>
@@ -579,38 +656,11 @@ const Toolbar = ({
 				</>
 			)}
 
-			<Popup open={showLibrariesPopup} onClose={handleCloseLibrariesPopup} style={toolbarStyle} css={libraryPopupCss}>
-				<div className={`${popupStyles.popupSurface} ${css.libraryNativeContent} ${isElegantTheme ? css.libraryNativeContentGlass : ''}`}>
-					{isElegantTheme && (
-						<>
-							<div className={`${css.liquidLayerFilter} ${css.liquidLayerFilterMuted}`} />
-							<div className={css.liquidLayerOverlay} />
-							<div className={css.liquidLayerSpecular} />
-						</>
-					)}
-					<div className={css.libraryNativeInner}>
-						<BodyText className={css.libraryNativeTitle}>Libraries</BodyText>
-						<div className={css.libraryNativeGrid}>
-						{libraries.length === 0 && (
-							<BodyText className={css.libraryNativeEmpty}>No libraries available</BodyText>
-						)}
-						{libraries.map((library) => (
-							<Button
-								key={library.Id}
-								size="small"
-								minWidth={false}
-								data-library-id={library.Id}
-								selected={activeSection === 'library' && activeLibraryId === library.Id}
-								onClick={handleLibraryPopupSelect}
-								className={css.libraryNativeButton}
-							>
-								{library.Name}
-							</Button>
-						))}
-						</div>
-					</div>
-				</div>
-			</Popup>
+			{!isElegantTheme && (
+				<Popup open={showLibrariesPopup} onClose={handleCloseLibrariesPopup} style={toolbarStyle} css={popupShellCss}>
+					{renderLibraryPicker(false)}
+				</Popup>
+			)}
 		</div>
 	);
 };

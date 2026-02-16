@@ -42,6 +42,8 @@ const DEFAULT_SETTINGS = {
 	playNextPromptMode: 'segmentsOrLast60',
 	skipIntro: true,
 	showBackdrops: true,
+	showSeasonImages: false,
+	useSidewaysEpisodeList: true,
 	homeRows: {
 		recentlyAdded: true,
 		continueWatching: true,
@@ -429,6 +431,14 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		handleSettingChange('showBackdrops', !settings.showBackdrops);
 	}, [handleSettingChange, settings.showBackdrops]);
 
+	const toggleShowSeasonImages = useCallback(() => {
+		handleSettingChange('showSeasonImages', !settings.showSeasonImages);
+	}, [handleSettingChange, settings.showSeasonImages]);
+
+	const toggleSidewaysEpisodeList = useCallback(() => {
+		handleSettingChange('useSidewaysEpisodeList', !settings.useSidewaysEpisodeList);
+	}, [handleSettingChange, settings.useSidewaysEpisodeList]);
+
 	const toggleDisableAnimations = useCallback(() => {
 		handleSettingChange('disableAnimations', !settings.disableAnimations);
 	}, [handleSettingChange, settings.disableAnimations]);
@@ -559,6 +569,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 			<Header title="Settings" />
 			<Toolbar
 				activeSection="settings"
+				aboveNativeHeader
 				onNavigate={onNavigate}
 				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}
@@ -820,6 +831,22 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 								selected={settings.showBackdrops}
 							>
 							Show Background Images
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowSeasonImages}
+								selected={settings.showSeasonImages === true}
+							>
+							Show Season Card Images (Elegant)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleSidewaysEpisodeList}
+								selected={settings.useSidewaysEpisodeList !== false}
+							>
+							Sideways Episode List (Elegant)
 						</SwitchItem>
 
 							<SwitchItem

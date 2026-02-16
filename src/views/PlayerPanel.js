@@ -877,7 +877,7 @@ const PlayerPanel = ({
 
 		const positionTicks = positionSeconds * 10000000;
 		const activeSegment = mediaSegments.find(
-			(segment) => positionTicks >= segment.StartTicks && positionTicks <= segment.EndTicks
+			(segment) => positionTicks >= segment.StartTicks && positionTicks < segment.EndTicks
 		);
 
 		if (activeSegment) {
@@ -1358,10 +1358,10 @@ const PlayerPanel = ({
 			videoRef.current.currentTime = skipTo;
 			setCurrentTime(skipTo);
 		}
+		setDismissedSkipSegmentId(currentSkipSegment.Id || null);
 		setSkipOverlayVisible(false);
 		setCurrentSkipSegment(null);
 		setSkipCountdown(null);
-		setDismissedSkipSegmentId(null);
 		setShowNextEpisodePrompt(false);
 		setNextEpisodePromptDismissed(false);
 		nextEpisodePromptStartTicksRef.current = null;

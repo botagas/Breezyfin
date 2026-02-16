@@ -74,10 +74,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [isWatched, setIsWatched] = useState(false);
 	const [toastMessage, setToastMessage] = useState('');
 	const [toastVisible, setToastVisible] = useState(false);
+	const [navbarTheme, setNavbarTheme] = useState('classic');
+	const [showSeasonImages, setShowSeasonImages] = useState(false);
+	const [useSidewaysEpisodeList, setUseSidewaysEpisodeList] = useState(true);
+	const [isCastCollapsed, setIsCastCollapsed] = useState(true);
+	const [overviewExpanded, setOverviewExpanded] = useState(false);
+	const [hasOverviewOverflow, setHasOverviewOverflow] = useState(false);
 	const castRowRef = useRef(null);
 	const castScrollerRef = useRef(null);
 	const seasonScrollerRef = useRef(null);
 	const episodesListRef = useRef(null);
+	const overviewTextRef = useRef(null);
 	const episodeSelectorButtonRef = useRef(null);
 	const detailsContainerRef = useRef(null);
 	const detailsScrollToRef = useRef(null);
@@ -200,6 +207,47 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	}, [item?.Id, item?.SeriesId, item?.Type]);
 
 	useEffect(() => {
+		setOverviewExpanded(false);
+		setIsCastCollapsed(true);
+	}, [item?.Id, item?.SeriesId, item?.Type]);
+
+	useEffect(() => {
+		const applySettings = (settingsPayload) => {
+			const settings = settingsPayload || {};
+			setNavbarTheme(settings.navbarTheme === 'elegant' ? 'elegant' : 'classic');
+			setShowSeasonImages(settings.showSeasonImages === true);
+			setUseSidewaysEpisodeList(settings.useSidewaysEpisodeList !== false);
+		};
+
+		try {
+			const raw = localStorage.getItem('breezyfinSettings');
+			applySettings(raw ? JSON.parse(raw) : {});
+		} catch (error) {
+			console.error('Failed to read media detail settings:', error);
+			applySettings({});
+		}
+
+		const handleSettingsChanged = (event) => {
+			applySettings(event?.detail);
+		};
+		const handleStorage = (event) => {
+			if (event?.key !== 'breezyfinSettings') return;
+			try {
+				applySettings(event.newValue ? JSON.parse(event.newValue) : {});
+			} catch (error) {
+				console.error('Failed to apply media detail settings:', error);
+			}
+		};
+
+		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
+		window.addEventListener('storage', handleStorage);
+		return () => {
+			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
+			window.removeEventListener('storage', handleStorage);
+		};
+	}, []);
+
+	useEffect(() => {
 		let cancelled = false;
 
 		const loadDetailMetadata = async () => {
@@ -264,9 +312,14 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			const episodesData = await jellyfinService.getEpisodes(item.Id, seasonId);
 			setEpisodes(episodesData);
 			if (episodesData.length > 0) {
-				setSelectedEpisode(episodesData[0]);
-				// Load playback info for first episode
-				const info = await jellyfinService.getPlaybackInfo(episodesData[0].Id);
+				const resumeEpisode =
+					episodesData.find((episode) => (episode?.UserData?.PlaybackPositionTicks || 0) > 0) ||
+					episodesData.find((episode) => (episode?.UserData?.PlayedPercentage || 0) > 0 && (episode?.UserData?.PlayedPercentage || 0) < 100) ||
+					episodesData.find((episode) => episode?.UserData?.Played !== true) ||
+					episodesData[0];
+				setSelectedEpisode(resumeEpisode);
+				// Load playback info for selected episode
+				const info = await jellyfinService.getPlaybackInfo(resumeEpisode.Id);
 				setPlaybackInfo(info);
 				applyDefaultTracks(info.MediaSources?.[0]?.MediaStreams);
 			}
@@ -421,8 +474,14 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 			// If it's an episode, refresh the episode list
 			if (itemId && item?.Type === 'Series' && selectedSeason) {
-				const updatedEpisodes = await jellyfinService.getSeasonEpisodes(item.Id, selectedSeason.Id);
+				const updatedEpisodes = await jellyfinService.getEpisodes(item.Id, selectedSeason.Id);
 				setEpisodes(updatedEpisodes);
+				if (selectedEpisode?.Id) {
+					const refreshedSelectedEpisode = (updatedEpisodes || []).find((episode) => episode.Id === selectedEpisode.Id);
+					if (refreshedSelectedEpisode) {
+						setSelectedEpisode(refreshedSelectedEpisode);
+					}
+				}
 			} else {
 				// Refresh main item user data
 				const refreshed = await jellyfinService.getItem(targetId);
@@ -435,7 +494,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			console.error('Error toggling watched status:', error);
 			setToastMessage('Failed to update watched status');
 		}
-	}, [isWatched, item, selectedSeason]);
+	}, [isWatched, item, selectedEpisode?.Id, selectedSeason]);
 
 	// Map remote back/play keys when this panel is active
 	useEffect(() => {
@@ -546,6 +605,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		return '';
 	})();
 	const hasBackdropImage = Boolean(backdropUrl);
+	const isElegantTheme = navbarTheme === 'elegant';
+	const shouldShowSeasonPosters = !isElegantTheme || showSeasonImages;
+	const isSidewaysEpisodeLayout = isElegantTheme && useSidewaysEpisodeList;
 
 	const headerLogoUrl = useMemo(() => {
 		if (!item) return '';
@@ -556,6 +618,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	const useHeaderLogo = Boolean(headerLogoUrl) && !headerLogoUnavailable;
 	const headerTitle = useHeaderLogo ? undefined : (item?.Name || 'Details');
+	const pageTitle = item?.Name || item?.SeriesName || 'Details';
 	const handleHeaderLogoError = useCallback(() => {
 		setHeaderLogoUnavailable(true);
 	}, []);
@@ -734,6 +797,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		const infoButton = cards[index].querySelector(`.${css.episodeInfoButton}`);
 		if (infoButton?.focus) {
 			infoButton.focus();
+			return true;
+		}
+		return false;
+	}, []);
+
+	const focusEpisodeWatchedButtonByIndex = useCallback((index) => {
+		const cards = Array.from(episodesListRef.current?.querySelectorAll(`.${css.episodeCard}`) || []);
+		if (index < 0 || index >= cards.length) return false;
+		const watchedButton = cards[index].querySelector(`.${css.episodeWatchedButton}`);
+		if (watchedButton?.focus) {
+			watchedButton.focus();
 			return true;
 		}
 		return false;
@@ -1010,6 +1084,115 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		}
 		return '';
 	};
+	const getEpisodeImageUrl = (episode) => {
+		if (episode?.ImageTags?.Primary) {
+			return jellyfinService.getImageUrl(episode.Id, 'Primary', 760);
+		}
+		if (episode?.ImageTags?.Thumb) {
+			return jellyfinService.getImageUrl(episode.Id, 'Thumb', 760);
+		}
+		if (episode?.SeriesId) {
+			return jellyfinService.getBackdropUrl(episode.SeriesId, 0, 960);
+		}
+		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
+			return jellyfinService.getBackdropUrl(item.Id, 0, 960);
+		}
+		if (item?.ImageTags?.Primary) {
+			return jellyfinService.getImageUrl(item.Id, 'Primary', 760);
+		}
+		return '';
+	};
+
+	const getEpisodeBadge = (episode) => {
+		const seasonNumber = Number.isInteger(episode?.ParentIndexNumber) ? episode.ParentIndexNumber : '?';
+		const episodeNumber = Number.isInteger(episode?.IndexNumber) ? episode.IndexNumber : '?';
+		return `S${seasonNumber}E${episodeNumber}`;
+	};
+
+	const getEpisodeAirDate = (episode) => {
+		if (!episode?.PremiereDate) return '';
+		const parsed = new Date(episode.PremiereDate);
+		if (Number.isNaN(parsed.getTime())) return '';
+		return parsed.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+	};
+
+	const getEpisodeRuntime = (episode) => {
+		if (!episode?.RunTimeTicks) return '';
+		return `${Math.floor(episode.RunTimeTicks / 600000000)} min`;
+	};
+
+	const hasEpisodeProgress = useCallback((episode) => {
+		if (!episode?.UserData) return false;
+		if ((episode.UserData.PlaybackPositionTicks || 0) > 0) return true;
+		const percentage = episode.UserData.PlayedPercentage || 0;
+		if (percentage > 0 && percentage < 100) return true;
+		return episode.UserData.Played === true;
+	}, []);
+
+	useEffect(() => {
+		if (!isElegantTheme || !item?.Overview) {
+			setHasOverviewOverflow(false);
+			return undefined;
+		}
+
+		let frameId = 0;
+		const measureOverviewOverflow = () => {
+			const overviewElement = overviewTextRef.current;
+			if (!overviewElement) {
+				setHasOverviewOverflow(false);
+				return;
+			}
+			const collapsedClass = css.overviewCollapsed;
+			const hadCollapsedClass = overviewElement.classList.contains(collapsedClass);
+			if (!hadCollapsedClass) {
+				overviewElement.classList.add(collapsedClass);
+			}
+			const hasOverflow = (overviewElement.scrollHeight - overviewElement.clientHeight) > 1;
+			if (!hadCollapsedClass) {
+				overviewElement.classList.remove(collapsedClass);
+			}
+			setHasOverviewOverflow(hasOverflow);
+		};
+		const scheduleOverviewMeasurement = () => {
+			window.cancelAnimationFrame(frameId);
+			frameId = window.requestAnimationFrame(measureOverviewOverflow);
+		};
+
+		scheduleOverviewMeasurement();
+		window.addEventListener('resize', scheduleOverviewMeasurement);
+		return () => {
+			window.cancelAnimationFrame(frameId);
+			window.removeEventListener('resize', scheduleOverviewMeasurement);
+		};
+	}, [isElegantTheme, item?.Id, item?.Overview]);
+
+	const shouldShowContinue = useMemo(() => {
+		if (!item?.UserData && item?.Type !== 'Series') return false;
+		if (item?.Type === 'Series') {
+			if (episodes.some(hasEpisodeProgress)) return true;
+			if ((item?.UserData?.PlaybackPositionTicks || 0) > 0) return true;
+			return item?.UserData?.Played === true;
+		}
+		const playbackPosition = item?.UserData?.PlaybackPositionTicks || 0;
+		if (playbackPosition > 0) return true;
+		const percentage = item?.UserData?.PlayedPercentage || 0;
+		if (percentage > 0 && percentage < 100) return true;
+		return item?.UserData?.Played === true;
+	}, [episodes, hasEpisodeProgress, item]);
+	const continueEpisodeBadge = useMemo(() => {
+		if (item?.Type !== 'Series') return '';
+		const resumeEpisode =
+			(selectedEpisode && hasEpisodeProgress(selectedEpisode) ? selectedEpisode : null) ||
+			episodes.find(hasEpisodeProgress) ||
+			null;
+		const seasonNumber = Number.isInteger(resumeEpisode?.ParentIndexNumber) ? resumeEpisode.ParentIndexNumber : null;
+		const episodeNumber = Number.isInteger(resumeEpisode?.IndexNumber) ? resumeEpisode.IndexNumber : null;
+		if (seasonNumber === null || episodeNumber === null) return '';
+		return `S${seasonNumber}E${episodeNumber}`;
+	}, [episodes, hasEpisodeProgress, item?.Type, selectedEpisode]);
+	const overviewPlayLabel = shouldShowContinue
+		? (continueEpisodeBadge ? `Continue ${continueEpisodeBadge}` : 'Continue')
+		: 'Play';
 
 	const closeAudioPicker = useCallback(() => {
 		setShowAudioPicker(false);
@@ -1046,6 +1229,21 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const handleToggleWatchedMain = useCallback(() => {
 		handleToggleWatched();
 	}, [handleToggleWatched]);
+
+	const toggleCastCollapsed = useCallback(() => {
+		setIsCastCollapsed((currentValue) => !currentValue);
+	}, []);
+	const handleCastToggleKeyDown = useCallback((e) => {
+		if (e.keyCode === KeyCodes.ENTER || e.keyCode === KeyCodes.OK) {
+			e.preventDefault();
+			e.stopPropagation();
+			toggleCastCollapsed();
+		}
+	}, [toggleCastCollapsed]);
+
+	const toggleOverviewExpanded = useCallback(() => {
+		setOverviewExpanded((currentValue) => !currentValue);
+	}, []);
 
 	const handleTrackSelect = useCallback((event) => {
 		const trackKey = Number(event.currentTarget.dataset.trackKey);
@@ -1164,6 +1362,21 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			e.target.style.display = 'none';
 		}
 	}, [item]);
+	const handleEpisodeImageError = useCallback((e) => {
+		const imageElement = e.currentTarget;
+		const fallbackStep = imageElement.dataset.fallbackStep || '0';
+		if (fallbackStep === '0' && item?.BackdropImageTags?.length > 0) {
+			imageElement.dataset.fallbackStep = '1';
+			imageElement.src = jellyfinService.getBackdropUrl(item.Id, 0, 960);
+			return;
+		}
+		if (fallbackStep !== '2' && item?.ImageTags?.Primary) {
+			imageElement.dataset.fallbackStep = '2';
+			imageElement.src = jellyfinService.getImageUrl(item.Id, 'Primary', 760);
+			return;
+		}
+		imageElement.style.display = 'none';
+	}, [item]);
 
 	const handleEpisodeSelectorKeyDown = useCallback((e) => {
 		if (e.keyCode === KeyCodes.DOWN) {
@@ -1180,6 +1393,11 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		handleEpisodeClick(episode);
 	}, [episodesById, handleEpisodeClick]);
 
+	const handleEpisodeCardFocus = useCallback((e) => {
+		if (!isSidewaysEpisodeLayout || !episodesListRef.current) return;
+		scrollElementIntoHorizontalView(episodesListRef.current, e.currentTarget, {minBuffer: 70, edgeRatio: 0.12});
+	}, [isSidewaysEpisodeLayout]);
+
 	const handleEpisodeInfoClick = useCallback((e) => {
 		e.stopPropagation();
 		const episodeId = e.currentTarget.dataset.episodeId;
@@ -1188,9 +1406,37 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		onItemSelect(episode, item);
 	}, [episodesById, item, onItemSelect]);
 
+	const handleEpisodeWatchedClick = useCallback((e) => {
+		e.stopPropagation();
+		const episodeId = e.currentTarget.dataset.episodeId;
+		const episode = episodesById.get(episodeId);
+		if (!episode) return;
+		handleToggleWatched(episode.Id, episode.UserData?.Played);
+	}, [episodesById, handleToggleWatched]);
+
 	const handleEpisodeCardKeyDown = useCallback((e) => {
 		const index = Number(e.currentTarget.dataset.episodeIndex);
 		if (!Number.isInteger(index)) return;
+		if (isSidewaysEpisodeLayout) {
+			if (e.keyCode === KeyCodes.RIGHT) {
+				e.preventDefault();
+				e.stopPropagation();
+				focusEpisodeCardByIndex(index + 1);
+			} else if (e.keyCode === KeyCodes.LEFT) {
+				e.preventDefault();
+				e.stopPropagation();
+				focusEpisodeCardByIndex(index - 1);
+			} else if (e.keyCode === KeyCodes.UP) {
+				e.preventDefault();
+				e.stopPropagation();
+				focusEpisodeSelector();
+			} else if (e.keyCode === KeyCodes.DOWN) {
+				e.preventDefault();
+				e.stopPropagation();
+				focusEpisodeInfoButtonByIndex(index);
+			}
+			return;
+		}
 		if (e.keyCode === KeyCodes.DOWN) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -1208,7 +1454,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			e.stopPropagation();
 			focusEpisodeInfoButtonByIndex(index);
 		}
-	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector]);
+	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector, isSidewaysEpisodeLayout]);
 
 	const handleEpisodeInfoButtonKeyDown = useCallback((e) => {
 		const index = Number(e.currentTarget.dataset.episodeIndex);
@@ -1217,6 +1463,18 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			e.preventDefault();
 			e.stopPropagation();
 			focusEpisodeCardByIndex(index);
+		} else if (e.keyCode === KeyCodes.RIGHT) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeWatchedButtonByIndex(index);
+		} else if (isSidewaysEpisodeLayout && e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeCardByIndex(index);
+		} else if (isSidewaysEpisodeLayout && e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeSelector();
 		} else if (e.keyCode === KeyCodes.DOWN) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -1234,7 +1492,59 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				focusEpisodeCardByIndex(index - 1);
 			}
 		}
-	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector]);
+	}, [
+		focusEpisodeCardByIndex,
+		focusEpisodeInfoButtonByIndex,
+		focusEpisodeSelector,
+		focusEpisodeWatchedButtonByIndex,
+		isSidewaysEpisodeLayout
+	]);
+
+	const handleEpisodeWatchedButtonKeyDown = useCallback((e) => {
+		const index = Number(e.currentTarget.dataset.episodeIndex);
+		if (!Number.isInteger(index)) return;
+		if (e.keyCode === KeyCodes.LEFT) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!focusEpisodeInfoButtonByIndex(index)) {
+				focusEpisodeCardByIndex(index);
+			}
+		} else if (e.keyCode === KeyCodes.RIGHT) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeCardByIndex(index + 1);
+		} else if (isSidewaysEpisodeLayout && e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeCardByIndex(index);
+		} else if (isSidewaysEpisodeLayout && e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			focusEpisodeSelector();
+		} else if (e.keyCode === KeyCodes.DOWN) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!focusEpisodeWatchedButtonByIndex(index + 1)) {
+				focusEpisodeCardByIndex(index + 1);
+			}
+		} else if (e.keyCode === KeyCodes.UP) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (index === 0) {
+				focusEpisodeSelector();
+				return;
+			}
+			if (!focusEpisodeWatchedButtonByIndex(index - 1)) {
+				focusEpisodeCardByIndex(index - 1);
+			}
+		}
+	}, [
+		focusEpisodeCardByIndex,
+		focusEpisodeInfoButtonByIndex,
+		focusEpisodeSelector,
+		focusEpisodeWatchedButtonByIndex,
+		isSidewaysEpisodeLayout
+	]);
 
 	const handleAudioSelectorKeyDown = useCallback((e) => {
 		if (e.keyCode === KeyCodes.DOWN) {
@@ -1383,17 +1693,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		<Panel {...rest}>
 			{renderToast()}
 			{!loading && (
-				<div className={`${css.backdrop} ${hasBackdropImage ? '' : css.backdropFallback}`}>
+				<div className={`${css.backdrop} ${hasBackdropImage ? '' : css.backdropFallback} ${isElegantTheme ? css.backdropElegant : ''}`}>
 					{hasBackdropImage && <img src={backdropUrl} alt={item.Name} />}
-					<div className={css.gradient} />
+					<div className={`${css.gradient} ${isElegantTheme ? css.gradientElegant : ''}`} />
 				</div>
 			)}
 				<Scroller
-					className={css.scroller}
+					className={`${css.scroller} ${isElegantTheme ? css.scrollerElegant : ''}`}
 					cbScrollTo={captureDetailsScrollTo}
 				>
 				<div
-					className={css.detailsContainer}
+					className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''}`}
 					ref={detailsContainerRef}
 					tabIndex={-1}
 					onMouseDownCapture={handleDetailsPointerDownCapture}
@@ -1405,7 +1715,17 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 						</div>
 					) : (
 						<>
-							<div className={css.content}>
+							<div className={`${css.content} ${isElegantTheme ? css.contentElegant : ''}`}>
+								<div className={css.detailsTopBar}>
+									<Button
+										size="small"
+										icon="arrowsmallleft"
+										onClick={handleBack}
+										className={css.detailsBackButton}
+										aria-label="Back"
+									/>
+									<BodyText className={css.detailsTopTitle}>{pageTitle}</BodyText>
+								</div>
 								{item.Type === 'Episode' && (
 									<div className={css.episodeBreadcrumb}>
 										<div className={css.episodeNavActions}>
@@ -1503,10 +1823,36 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 											/>
 										</div>
 									</div>
-									{item.Overview && (
-										<BodyText className={css.overview}>
-											{item.Overview}
-										</BodyText>
+									{(item.Overview || isElegantTheme) && (
+										<div className={css.overviewBlock}>
+											{item.Overview && (
+												<div
+													ref={overviewTextRef}
+													className={`${css.overview} ${isElegantTheme && !overviewExpanded ? css.overviewCollapsed : ''}`}
+												>
+													{item.Overview}
+												</div>
+											)}
+											{isElegantTheme && hasOverviewOverflow && (
+												<Button
+													size="small"
+													onClick={toggleOverviewExpanded}
+													className={css.overviewToggleButton}
+												>
+													{overviewExpanded ? 'Show Less' : 'Show More'}
+												</Button>
+											)}
+											{isElegantTheme && (
+												<Button
+													size="small"
+													icon="play"
+													className={`${css.primaryButton} ${css.overviewPlayButton}`}
+													onClick={handlePlay}
+												>
+													{overviewPlayLabel}
+												</Button>
+											)}
+										</div>
 									)}
 								</div>
 
@@ -1529,42 +1875,55 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 								{cast.length > 0 && (
 									<div className={css.castSection}>
-										<Heading size="medium" className={css.sectionHeading}>Cast</Heading>
-										<div className={css.castScroller} ref={castScrollerRef}>
-											<div className={css.castRow} ref={castRowRef}>
-													{cast.map(person => (
-														<div
-															key={person.Id}
-															className={css.castCard}
-															tabIndex={0}
-															onFocus={handleCastCardFocus}
-															onKeyDown={handleCastCardKeyDown}
-														>
-														<div className={css.castAvatar}>
-															{person.PrimaryImageTag ? (
-																	<img
-																		src={jellyfinService.getImageUrl(person.Id, 'Primary', 240)}
-																		alt={person.Name}
-																		onError={handleCastImageError}
-																		loading="lazy"
-																		decoding="async"
-																	/>
-															) : (
-																<div className={css.castInitial}>{person.Name?.charAt(0) || '?'}</div>
+										<div className={css.sectionHeaderRow}>
+											<Heading size="medium" className={css.sectionHeading}>Cast</Heading>
+											<SpottableDiv
+												role="button"
+												aria-label={isCastCollapsed ? 'Show cast' : 'Hide cast'}
+												className={css.sectionToggleChip}
+												onClick={toggleCastCollapsed}
+												onKeyDown={handleCastToggleKeyDown}
+											>
+												{isCastCollapsed ? 'Show' : 'Hide'}
+											</SpottableDiv>
+										</div>
+										{!isCastCollapsed && (
+											<div className={css.castScroller} ref={castScrollerRef}>
+												<div className={css.castRow} ref={castRowRef}>
+														{cast.map(person => (
+															<div
+																key={person.Id}
+																className={css.castCard}
+																tabIndex={0}
+																onFocus={handleCastCardFocus}
+																onKeyDown={handleCastCardKeyDown}
+															>
+															<div className={css.castAvatar}>
+																{person.PrimaryImageTag ? (
+																		<img
+																			src={jellyfinService.getImageUrl(person.Id, 'Primary', 240)}
+																			alt={person.Name}
+																			onError={handleCastImageError}
+																			loading="lazy"
+																			decoding="async"
+																		/>
+																) : (
+																	<div className={css.castInitial}>{person.Name?.charAt(0) || '?'}</div>
+																)}
+															</div>
+															<BodyText className={css.castName}>{person.Name}</BodyText>
+															{person.Role && (
+																<BodyText className={css.castRole}>{person.Role}</BodyText>
 															)}
 														</div>
-														<BodyText className={css.castName}>{person.Name}</BodyText>
-														{person.Role && (
-															<BodyText className={css.castRole}>{person.Role}</BodyText>
-														)}
-													</div>
-												))}
+													))}
+												</div>
 											</div>
-										</div>
+										)}
 									</div>
 								)}
 										{item.Type === 'Series' && seasons.length > 0 && (
-											<div className={css.seriesContent}>
+											<div className={`${css.seriesContent} ${isElegantTheme ? css.seriesContentElegant : ''}`}>
 											<div className={css.seasonsSection}>
 												<Heading size="medium" className={css.sectionHeading}>Seasons</Heading>
 												<div className={css.seasonCards} ref={seasonScrollerRef}>
@@ -1572,7 +1931,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 														<SpottableDiv
 															key={season.Id}
 															data-season-id={season.Id}
-															className={`${css.seasonCard} ${selectedSeason?.Id === season.Id ? css.selected : ''}`}
+															className={`${css.seasonCard} ${selectedSeason?.Id === season.Id ? css.selected : ''} ${!shouldShowSeasonPosters ? css.seasonCardNoImage : ''}`}
 															onClick={handleSeasonCardClick}
 															onFocus={handleSeasonCardFocus}
 															onKeyDown={handleSeasonCardKeyDown}
@@ -1590,16 +1949,18 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																onKeyDown={handleSeasonWatchedButtonKeyDown}
 															/>
 														</div>
-															<div className={css.seasonPosterWrap}>
-																<img
-																	src={getSeasonImageUrl(season)}
-																	alt={season.Name}
-																	className={css.seasonPoster}
-																	onError={handleSeasonImageError}
-																	loading="lazy"
-																	decoding="async"
-																/>
-															</div>
+															{shouldShowSeasonPosters && (
+																<div className={css.seasonPosterWrap}>
+																	<img
+																		src={getSeasonImageUrl(season)}
+																		alt={season.Name}
+																		className={css.seasonPoster}
+																		onError={handleSeasonImageError}
+																		loading="lazy"
+																		decoding="async"
+																	/>
+																</div>
+															)}
 														<BodyText className={css.seasonName}>{season.Name}</BodyText>
 														{season.ChildCount && (
 															<BodyText className={css.episodeCount}>{season.ChildCount} Episodes</BodyText>
@@ -1610,7 +1971,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 										</div>
 
 										{episodes.length > 0 && selectedEpisode && (
-											<div className={css.stickyControls}>
+											<div className={`${css.stickyControls} ${isSidewaysEpisodeLayout ? css.stickyControlsInline : ''}`}>
 												<div className={css.controlsMain}>
 													<Button
 														size="large"
@@ -1660,39 +2021,73 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 										{episodes.length > 0 && (
 											<div className={css.episodesSection}>
 												<Heading size="medium" className={css.sectionHeading}>Episodes</Heading>
-												<div className={css.episodeCards} ref={episodesListRef}>
+												<div className={`${css.episodeCards} ${isSidewaysEpisodeLayout ? css.episodeCardsSideways : ''}`} ref={episodesListRef}>
 														{episodes.map((episode, index) => (
 															<SpottableDiv
 																key={episode.Id}
 																data-episode-id={episode.Id}
 																data-episode-index={index}
-																className={`${css.episodeCard} ${selectedEpisode?.Id === episode.Id ? css.selected : ''}`}
+																className={`${css.episodeCard} ${selectedEpisode?.Id === episode.Id ? css.selected : ''} ${episode.UserData?.Played ? css.episodePlayed : ''} ${isSidewaysEpisodeLayout ? css.episodeCardSideways : ''}`}
 																onClick={handleEpisodeCardClick}
+																onFocus={handleEpisodeCardFocus}
 																onKeyDown={handleEpisodeCardKeyDown}
 															>
 															<div className={css.episodeImageContainer}>
+																<div className={css.episodeBadge}>{getEpisodeBadge(episode)}</div>
 																<img
-																	src={jellyfinService.getImageUrl(episode.Id, 'Primary', 400)}
+																	src={getEpisodeImageUrl(episode)}
 																	alt={episode.Name}
 																	className={css.episodeImage}
+																	onError={handleEpisodeImageError}
 																	loading="lazy"
 																	decoding="async"
 																/>
+																{episode.UserData?.Played && (
+																	<div className={css.episodeWatchedBadge}>\u2713</div>
+																)}
+																{!isElegantTheme && (
+																	<div className={css.episodeImageMetaBadges}>
+																		{episode.CommunityRating && (
+																			<div className={`${css.episodeImageMetaBadge} ${css.episodeImageMetaBadgeRating}`}>
+																				<Icon size="small" className={css.episodeImageMetaStar}>star</Icon>
+																				{episode.CommunityRating.toFixed(1)}
+																			</div>
+																		)}
+																		{episode.RunTimeTicks && (
+																			<div className={css.episodeImageMetaBadge}>{getEpisodeRuntime(episode)}</div>
+																		)}
+																		{episode.PremiereDate && (
+																			<div className={css.episodeImageMetaBadge}>{getEpisodeAirDate(episode)}</div>
+																		)}
+																	</div>
+																)}
 															</div>
 															<div className={css.episodeInfo}>
-																<BodyText className={css.episodeNumber}>Episode {episode.IndexNumber}</BodyText>
+																<div className={css.episodeMetaTop}>
+																	<BodyText className={css.episodeNumber}>Episode {episode.IndexNumber}</BodyText>
+																	{isElegantTheme && episode.PremiereDate && (
+																		<BodyText className={css.episodeDate}>{getEpisodeAirDate(episode)}</BodyText>
+																	)}
+																</div>
 																<BodyText className={css.episodeName}>{episode.Name}</BodyText>
+																{isElegantTheme && (
+																	<div className={css.episodeStatRow}>
+																		{episode.CommunityRating && (
+																			<BodyText className={css.episodeStat}>
+																				<Icon size="small" className={css.ratingStar}>star</Icon> {episode.CommunityRating.toFixed(1)}
+																			</BodyText>
+																		)}
+																		{episode.RunTimeTicks && (
+																			<BodyText className={css.episodeStat}>{getEpisodeRuntime(episode)}</BodyText>
+																		)}
+																	</div>
+																)}
 																{episode.Overview && (
 																	<BodyText className={css.episodeOverview}>{episode.Overview}</BodyText>
 																)}
-																{episode.RunTimeTicks && (
-																	<BodyText className={css.runtime}>
-																		{Math.floor(episode.RunTimeTicks / 600000000)} min
-																	</BodyText>
-																)}
 															</div>
-															{typeof onItemSelect === 'function' && (
-																<div className={css.episodeActions}>
+															<div className={`${css.episodeActions} ${isSidewaysEpisodeLayout ? css.episodeActionsRow : ''}`}>
+																{typeof onItemSelect === 'function' && (
 																	<Button
 																		size="small"
 																		icon="info"
@@ -1702,8 +2097,18 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 																		onClick={handleEpisodeInfoClick}
 																		onKeyDown={handleEpisodeInfoButtonKeyDown}
 																	/>
-																</div>
-															)}
+																)}
+																<Button
+																	size="small"
+																	icon="check"
+																	data-episode-id={episode.Id}
+																	data-episode-index={index}
+																	selected={episode.UserData?.Played === true}
+																	className={`${css.episodeWatchedButton} ${episode.UserData?.Played ? css.episodeWatchedButtonActive : ''}`}
+																	onClick={handleEpisodeWatchedClick}
+																	onKeyDown={handleEpisodeWatchedButtonKeyDown}
+																/>
+															</div>
 														</SpottableDiv>
 													))}
 												</div>
@@ -1774,4 +2179,3 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 };
 
 export default MediaDetailsPanel;
-
