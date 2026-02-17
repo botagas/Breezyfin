@@ -6,7 +6,7 @@
 	flex-direction: column;
 	height: calc(100vh + var(--bf-panel-overlap-lift));
 	min-height: 0;
-	background: #121212;
+	background: var(--bf-theme-panel-bg, #121212);
 	overflow: hidden;
 	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
 }
@@ -14,7 +14,7 @@
 .scroller {
 	flex: 1;
 	min-height: 0;
-	background: #121212;
+	background: var(--bf-theme-panel-bg, #121212);
 	overscroll-behavior: contain;
 }
 
@@ -30,7 +30,8 @@
 	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
 	gap: 2rem;
 	padding: calc(var(--bf-top-chrome-height, 12rem) + 2rem) 4rem calc(2rem + var(--bf-panel-content-bottom-padding, 4rem));
-	background: #121212;
+	background: var(--bf-theme-panel-bg, #121212);
+	.panel-grid-performance();
 }
 
 .loadingMore {

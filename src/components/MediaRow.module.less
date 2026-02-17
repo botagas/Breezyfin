@@ -3,6 +3,9 @@
 .row {
 	margin-bottom: 64px;
 	margin-top: 24px;
+	contain: layout style;
+	content-visibility: auto;
+	contain-intrinsic-size: 0 28rem;
 }
 
 .rowTitle {
@@ -25,6 +28,9 @@
 	overflow-x: auto;
 	overflow-y: visible;
 	scroll-behavior: smooth;
+	transform: translateZ(0);
+	will-change: scroll-position;
+	contain: layout style;
 
 	/* Hide scrollbar */
 	scrollbar-width: none;
@@ -39,21 +45,77 @@
 	flex-shrink: 0;
 	width: 25rem;
 	cursor: pointer;
-	.card-shell();
+	border-radius: 1.1rem;
+	outline: none;
+	position: relative;
+	background: transparent;
+	transform: translateZ(0);
+	will-change: transform;
+	transition: transform 0.15s ease-out;
 
 	&:hover,
 	&:global(.spottable):focus {
-		.card-focus-lift();
+		transform: scale(1.045) translateZ(0);
+		z-index: 10;
 
 		.cardImage {
-			.card-image-focus();
+			border-color: rgba(212, 226, 255, 0.82);
+			box-shadow: 0 8px 22px rgba(0, 0, 0, 0.52);
 		}
+	}
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		transition: none;
+	}
+
+	:global([data-bf-animations='off']) &:hover,
+	:global([data-bf-animations='off']) &:global(.spottable):focus,
+	:global([data-bf-all-animations='off']) &:hover,
+	:global([data-bf-all-animations='off']) &:global(.spottable):focus {
+		transform: translateZ(0);
 	}
 }
 
 .cardImage {
-	.card-image-shell(16/9);
-	.card-image-overlays();
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	background: linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%);
+	border-radius: 1rem;
+	overflow: hidden;
+	position: relative;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 45%;
+		background: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
+		pointer-events: none;
+		z-index: 1;
+	}
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+		transform: translateZ(0);
+	}
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		transition: none;
+		box-shadow: none;
+	}
 }
 
 .placeholder {

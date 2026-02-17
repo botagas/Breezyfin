@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
@@ -14,16 +14,39 @@ import css from './LoginPanel.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
+const LOGIN_BACKDROP_ITEM_LIMIT = 40;
+const LOGIN_BACKDROP_WIDTH = 1920;
+const LOGIN_BACKDROP_MAX_IMAGES = 24;
+const LOGIN_BACKDROP_ROTATE_INTERVAL_MS = 9000;
+const LOGIN_BACKDROP_TRANSITION_MS = 500;
+
+const shuffle = (values) => {
+	const next = [...values];
+	for (let index = next.length - 1; index > 0; index -= 1) {
+		const randomIndex = Math.floor(Math.random() * (index + 1));
+		[next[index], next[randomIndex]] = [next[randomIndex], next[index]];
+	}
+	return next;
+};
+
+const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
 	const [status, setStatus] = useState('');
+	const [notice, setNotice] = useState('');
 	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'login'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
+	const [loginBackdropUrls, setLoginBackdropUrls] = useState([]);
+	const [activeBackdropIndex, setActiveBackdropIndex] = useState(0);
+	const [previousBackdropIndex, setPreviousBackdropIndex] = useState(null);
+	const [isBackdropTransitioning, setIsBackdropTransitioning] = useState(false);
+	const [backdropImageErrors, setBackdropImageErrors] = useState({});
+	const backdropRotateTimerRef = useRef(null);
+	const backdropTransitionTimerRef = useRef(null);
 	const savedServersByKey = useMemo(() => {
 		const map = new Map();
 		savedServers.forEach((entry) => {
@@ -32,6 +55,22 @@ const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
 		});
 		return map;
 	}, [savedServers]);
+	const currentBackdropUrl = loginBackdropUrls[activeBackdropIndex] || '';
+	const previousBackdropUrl =
+		previousBackdropIndex === null || previousBackdropIndex === activeBackdropIndex
+			? ''
+			: loginBackdropUrls[previousBackdropIndex] || '';
+
+	useEffect(() => () => {
+		if (backdropRotateTimerRef.current) {
+			clearInterval(backdropRotateTimerRef.current);
+			backdropRotateTimerRef.current = null;
+		}
+		if (backdropTransitionTimerRef.current) {
+			clearTimeout(backdropTransitionTimerRef.current);
+			backdropTransitionTimerRef.current = null;
+		}
+	}, []);
 
 	const getInitialStep = useCallback((entries) => {
 		return entries.length > 0 ? 'saved' : 'server';
@@ -69,6 +108,158 @@ const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
 		setResumingKey(null);
 		setLoading(false);
 	}, [getInitialStep, isActive, refreshSavedServers]);
+
+	useEffect(() => {
+		if (!sessionNotice) return undefined;
+		setNotice(sessionNotice);
+		const timer = window.setTimeout(() => {
+			setNotice('');
+		}, 3800);
+		return () => {
+			window.clearTimeout(timer);
+		};
+	}, [sessionNotice, sessionNoticeNonce]);
+
+	const fetchBackdropsForSavedServer = useCallback(async (entry, signal) => {
+		if (!entry?.url || !entry?.userId || !entry?.accessToken) return [];
+		const baseUrl = entry.url.replace(/\/+$/, '');
+		const requestUrl = `${baseUrl}/Users/${entry.userId}/Items?includeItemTypes=Movie,Series&recursive=true&limit=${LOGIN_BACKDROP_ITEM_LIMIT}&sortBy=DateCreated&sortOrder=Descending&fields=BackdropImageTags&imageTypeLimit=1`;
+
+		try {
+			const response = await fetch(requestUrl, {
+				headers: {
+					'X-Emby-Token': entry.accessToken
+				},
+				signal
+			});
+			if (!response.ok) return [];
+			const data = await response.json();
+			const items = Array.isArray(data?.Items) ? data.Items : [];
+			const urls = [];
+			items.forEach((item) => {
+				if (!item?.Id) return;
+				if (Array.isArray(item.BackdropImageTags) && item.BackdropImageTags.length > 0) {
+					const tag = item.BackdropImageTags[0];
+					const params = new URLSearchParams({
+						maxWidth: String(LOGIN_BACKDROP_WIDTH),
+						api_key: entry.accessToken
+					});
+					if (tag) {
+						params.set('tag', tag);
+					}
+					urls.push(`${baseUrl}/Items/${item.Id}/Images/Backdrop/0?${params.toString()}`);
+				}
+			});
+			return urls;
+		} catch (err) {
+			if (err?.name === 'AbortError') return [];
+			return [];
+		}
+	}, []);
+
+	useEffect(() => {
+		if (!isActive) {
+			setLoginBackdropUrls([]);
+			setBackdropImageErrors({});
+			return undefined;
+		}
+
+		const availableServers = (savedServers || [])
+			.filter((entry) => entry?.url && entry?.userId && entry?.accessToken)
+			.slice(0, 4);
+		if (availableServers.length === 0) {
+			setLoginBackdropUrls([]);
+			setBackdropImageErrors({});
+			return undefined;
+		}
+
+		const controller = new AbortController();
+		let isCancelled = false;
+
+		const loadBackdrops = async () => {
+			try {
+				const perServerBackdrops = await Promise.all(
+					availableServers.map((entry) => fetchBackdropsForSavedServer(entry, controller.signal))
+				);
+				if (isCancelled) return;
+				const uniqueBackdrops = [...new Set(perServerBackdrops.flat().filter(Boolean))];
+				const nextBackdrops = shuffle(uniqueBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
+				setLoginBackdropUrls(nextBackdrops);
+				setBackdropImageErrors({});
+			} catch (err) {
+				if (isCancelled || err?.name === 'AbortError') return;
+				setLoginBackdropUrls([]);
+				setBackdropImageErrors({});
+			}
+		};
+
+		loadBackdrops();
+
+		return () => {
+			isCancelled = true;
+			controller.abort();
+		};
+	}, [fetchBackdropsForSavedServer, isActive, savedServers]);
+
+	useEffect(() => {
+		setActiveBackdropIndex(0);
+		setPreviousBackdropIndex(null);
+		setIsBackdropTransitioning(false);
+	}, [loginBackdropUrls]);
+
+	const advanceBackdrop = useCallback(() => {
+		setActiveBackdropIndex((previousIndex) => {
+			if (loginBackdropUrls.length < 2) return previousIndex;
+			const nextIndex = (previousIndex + 1) % loginBackdropUrls.length;
+			if (nextIndex === previousIndex) return previousIndex;
+			setPreviousBackdropIndex(previousIndex);
+			return nextIndex;
+		});
+	}, [loginBackdropUrls.length]);
+
+	useEffect(() => {
+		if (!isActive || loginBackdropUrls.length < 2) return undefined;
+		if (backdropRotateTimerRef.current) {
+			clearInterval(backdropRotateTimerRef.current);
+		}
+		backdropRotateTimerRef.current = setInterval(
+			advanceBackdrop,
+			LOGIN_BACKDROP_ROTATE_INTERVAL_MS
+		);
+		return () => {
+			if (backdropRotateTimerRef.current) {
+				clearInterval(backdropRotateTimerRef.current);
+				backdropRotateTimerRef.current = null;
+			}
+		};
+	}, [advanceBackdrop, isActive, loginBackdropUrls.length]);
+
+	useEffect(() => {
+		if (previousBackdropIndex === null || previousBackdropIndex === activeBackdropIndex) return undefined;
+		setIsBackdropTransitioning(true);
+		if (backdropTransitionTimerRef.current) {
+			clearTimeout(backdropTransitionTimerRef.current);
+		}
+		backdropTransitionTimerRef.current = setTimeout(() => {
+			setIsBackdropTransitioning(false);
+			setPreviousBackdropIndex(null);
+			backdropTransitionTimerRef.current = null;
+		}, LOGIN_BACKDROP_TRANSITION_MS);
+		return () => {
+			if (backdropTransitionTimerRef.current) {
+				clearTimeout(backdropTransitionTimerRef.current);
+				backdropTransitionTimerRef.current = null;
+			}
+		};
+	}, [activeBackdropIndex, previousBackdropIndex]);
+
+	const handleBackdropError = useCallback((event) => {
+		const source = event.currentTarget?.currentSrc || event.currentTarget?.src;
+		if (!source) return;
+		setBackdropImageErrors((previous) => (
+			previous[source] ? previous : { ...previous, [source]: true }
+		));
+	}, []);
 
 	const normalizedServerUrl = useMemo(
 		() => serverUrl.trim().replace(/\/+$/, ''),
@@ -228,6 +419,25 @@ const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
 		<Panel {...rest} noCloseButton>
 			<Scroller>
 				<div className={css.page}>
+					<div className={css.backdropLayer} aria-hidden="true">
+						{isBackdropTransitioning && previousBackdropUrl && !backdropImageErrors[previousBackdropUrl] ? (
+							<img
+								src={previousBackdropUrl}
+								alt=""
+								className={`${css.backdropImage} ${css.backdropImageOutgoing}`}
+								onError={handleBackdropError}
+							/>
+						) : null}
+						{currentBackdropUrl && !backdropImageErrors[currentBackdropUrl] ? (
+							<img
+								src={currentBackdropUrl}
+								alt=""
+								className={`${css.backdropImage} ${isBackdropTransitioning ? css.backdropImageIncoming : css.backdropImageCurrent}`}
+								onError={handleBackdropError}
+							/>
+						) : null}
+						<div className={css.backdropGradient} />
+					</div>
 					<div className={css.loginBox}>
 						<div className={css.header}>
 							<Heading size="large" spacing="medium">
@@ -346,6 +556,12 @@ const LoginPanel = ({ onLogin, isActive = false, ...rest }) => {
 						)}
 
 						{status && <BodyText className={css.status}>{status}</BodyText>}
+
+						{notice && (
+							<div className={css.noticeBanner}>
+								<BodyText>{notice}</BodyText>
+							</div>
+						)}
 
 						{error && (
 							<div className={css.errorBanner}>

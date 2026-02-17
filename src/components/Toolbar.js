@@ -6,6 +6,8 @@ import Icon from '@enact/sandstone/Icon';
 import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
+import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 
 import css from './Toolbar.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -61,20 +63,7 @@ const Toolbar = ({
 		const nextTheme = settingsPayload?.navbarTheme;
 		setToolbarTheme(nextTheme === TOOLBAR_THEME_ELEGANT ? TOOLBAR_THEME_ELEGANT : TOOLBAR_THEME_CLASSIC);
 	}, []);
-
-	const readToolbarThemeFromStorage = useCallback(() => {
-		try {
-			const raw = localStorage.getItem('breezyfinSettings');
-			if (!raw) {
-				setToolbarTheme(TOOLBAR_THEME_CLASSIC);
-				return;
-			}
-			applyToolbarThemeFromSettings(JSON.parse(raw));
-		} catch (error) {
-			console.error('Failed to read toolbar theme setting:', error);
-			setToolbarTheme(TOOLBAR_THEME_CLASSIC);
-		}
-	}, [applyToolbarThemeFromSettings]);
+	useBreezyfinSettingsSync(applyToolbarThemeFromSettings);
 
 	const loadLibraries = useCallback(async () => {
 		const libs = await jellyfinService.getLibraryViews();
@@ -109,27 +98,6 @@ const Toolbar = ({
 
 		return () => clearInterval(timer);
 	}, [loadLibraries, loadUserInfo]);
-
-	useEffect(() => {
-		readToolbarThemeFromStorage();
-		const handleSettingsChanged = (event) => {
-			applyToolbarThemeFromSettings(event?.detail);
-		};
-		const handleStorage = (event) => {
-			if (event?.key !== 'breezyfinSettings') return;
-			try {
-				applyToolbarThemeFromSettings(event.newValue ? JSON.parse(event.newValue) : {});
-			} catch (error) {
-				console.error('Failed to apply toolbar theme setting:', error);
-			}
-		};
-		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
-		window.addEventListener('storage', handleStorage);
-		return () => {
-			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
-			window.removeEventListener('storage', handleStorage);
-		};
-	}, [applyToolbarThemeFromSettings, readToolbarThemeFromStorage]);
 
 	useEffect(() => {
 		if (!isElegantTheme && showLibrariesPopup) {
@@ -382,11 +350,7 @@ const Toolbar = ({
 		return false;
 	}, [showLibrariesPopup, showUserMenu]);
 
-	useEffect(() => {
-		if (typeof registerBackHandler !== 'function') return undefined;
-		registerBackHandler(handleInternalBack);
-		return () => registerBackHandler(null);
-	}, [handleInternalBack, registerBackHandler]);
+	usePanelBackHandler(registerBackHandler, handleInternalBack);
 
 	const renderUserMenu = () => (
 		showUserMenu && (

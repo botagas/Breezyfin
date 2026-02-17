@@ -11,8 +11,11 @@ import FavoritesPanel from '../views/FavoritesPanel';
 import SettingsPanel from '../views/SettingsPanel';
 import PlayerPanel from '../views/PlayerPanel';
 import MediaDetailsPanel from '../views/MediaDetailsPanel';
+import PerformanceOverlay from '../components/PerformanceOverlay';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
+import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import AppCrashBoundary from './AppCrashBoundary';
 
 import css from './App.module.less';
@@ -26,19 +29,22 @@ if (STYLE_DEBUG_ENABLED) {
 }
 
 const App = (props) => {
-	const [currentView, setCurrentView] = useState('login'); // 'login', 'home', 'library', 'search', 'favorites', 'settings', '[styleDebug]', 'details', 'player'
+	const [currentView, setCurrentView] = useState('login');
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
-	const [previousItem, setPreviousItem] = useState(null); // For back navigation from episode to series
+	const [previousItem, setPreviousItem] = useState(null);
 	const [detailsReturnView, setDetailsReturnView] = useState('home');
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
 	const [animationsDisabled, setAnimationsDisabled] = useState(false);
 	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(false);
 	const [navbarTheme, setNavbarTheme] = useState('classic');
+	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(false);
 	const [inputMode, setInputMode] = useState(() => (
 		Spotlight?.getPointerMode?.() ? 'pointer' : '5way'
 	));
+	const [loginNotice, setLoginNotice] = useState('');
+	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
 	const playerBackHandlerRef = useRef(null);
 	const detailsBackHandlerRef = useRef(null);
 	const homeBackHandlerRef = useRef(null);
@@ -150,53 +156,54 @@ const App = (props) => {
 		setAnimationsDisabled(settings.disableAnimations === true);
 		setAllAnimationsDisabled(settings.disableAllAnimations === true);
 		setNavbarTheme(settings.navbarTheme === 'elegant' ? 'elegant' : 'classic');
+		setPerformanceOverlayEnabled(settings.showPerformanceOverlay === true);
 	}, []);
 
-	const readVisualSettingsFromStorage = useCallback(() => {
-		try {
-			const raw = localStorage.getItem('breezyfinSettings');
-			if (!raw) {
-				applyVisualSettings({});
-				return;
-			}
-			const parsed = JSON.parse(raw);
-			applyVisualSettings(parsed);
-		} catch (error) {
-			console.error('Failed to read animation setting:', error);
-			applyVisualSettings({});
-		}
-	}, [applyVisualSettings]);
+	useBreezyfinSettingsSync(applyVisualSettings);
+
+	const handleSessionExpired = useCallback((message = SESSION_EXPIRED_MESSAGE) => {
+		jellyfinService.switchUser();
+		resetSessionState();
+		setCurrentView('login');
+		setLoginNotice(message);
+		setLoginNoticeNonce((value) => value + 1);
+	}, [resetSessionState]);
 
 	useEffect(() => {
-		// Try to restore session on load
-		const restored = jellyfinService.restoreSession();
-		if (restored) {
-			setCurrentView('home');
-		}
-		readVisualSettingsFromStorage();
-	}, [readVisualSettingsFromStorage]);
+		let cancelled = false;
+		const restoreSession = async () => {
+			const restored = jellyfinService.restoreSession();
+			if (!restored) return;
+			const user = await jellyfinService.getCurrentUser();
+			if (cancelled) return;
+			if (user) {
+				setCurrentView('home');
+				return;
+			}
+			handleSessionExpired();
+		};
+		restoreSession();
+		return () => {
+			cancelled = true;
+		};
+	}, [handleSessionExpired]);
+
+	useEffect(() => {
+		const onSessionExpired = (event) => {
+			const message = event?.detail?.message || SESSION_EXPIRED_MESSAGE;
+			handleSessionExpired(message);
+		};
+		window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+		return () => {
+			window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+		};
+	}, [handleSessionExpired]);
 
 	useEffect(() => {
 		if (!STYLE_DEBUG_ENABLED && currentView === 'styleDebug') {
 			setCurrentView('settings');
 		}
 	}, [currentView]);
-
-	useEffect(() => {
-		const handleSettingsChanged = (event) => {
-			applyVisualSettings(event?.detail);
-		};
-		const handleStorage = (event) => {
-			if (event?.key !== 'breezyfinSettings') return;
-			readVisualSettingsFromStorage();
-		};
-		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
-		window.addEventListener('storage', handleStorage);
-		return () => {
-			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
-			window.removeEventListener('storage', handleStorage);
-		};
-	}, [applyVisualSettings, readVisualSettingsFromStorage]);
 
 	useEffect(() => {
 		const setMode = (nextMode) => {
@@ -386,24 +393,28 @@ const App = (props) => {
 
 	const handleLogin = useCallback(() => {
 		clearPanelHistory();
+		setLoginNotice('');
 		setCurrentView('home');
 	}, [clearPanelHistory]);
 
 	const handleLogout = useCallback(() => {
 		jellyfinService.logout();
 		resetSessionState();
+		setLoginNotice('');
 		setCurrentView('login');
 	}, [resetSessionState]);
 
 	const handleSignOut = useCallback(() => {
 		jellyfinService.logout();
 		resetSessionState();
+		setLoginNotice('');
 		setCurrentView('login');
 	}, [resetSessionState]);
 
 	const handleSwitchUser = useCallback(() => {
 		jellyfinService.switchUser();
 		resetSessionState();
+		setLoginNotice('');
 		setCurrentView('login');
 	}, [resetSessionState]);
 
@@ -546,100 +557,132 @@ const App = (props) => {
 		return 0;
 	};
 
+	const panelChildren = [
+		<LoginPanel
+			key="login"
+			onLogin={handleLogin}
+			isActive={currentView === 'login'}
+			sessionNotice={loginNotice}
+			sessionNoticeNonce={loginNoticeNonce}
+		/>,
+		<HomePanel
+			key="home"
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			registerBackHandler={registerHomeBackHandler}
+			noCloseButton
+		/>,
+		<LibraryPanel
+			key="library"
+			library={selectedLibrary}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			onBack={handleBackToHome}
+			registerBackHandler={registerLibraryBackHandler}
+			noCloseButton
+		/>,
+		<SearchPanel
+			key="search"
+			isActive={currentView === 'search'}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			registerBackHandler={registerSearchBackHandler}
+			noCloseButton
+		/>,
+		<FavoritesPanel
+			key="favorites"
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			registerBackHandler={registerFavoritesBackHandler}
+			noCloseButton
+		/>,
+		<SettingsPanel
+			key="settings"
+			isActive={currentView === 'settings'}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onSignOut={handleSignOut}
+			onExit={handleExit}
+			registerBackHandler={registerSettingsBackHandler}
+			noCloseButton
+		/>
+	];
+
+	if (STYLE_DEBUG_ENABLED && StyleDebugPanel) {
+		panelChildren.push(
+			<StyleDebugPanel
+				key="styleDebug"
+				isActive={currentView === 'styleDebug'}
+				onNavigate={handleNavigate}
+				onSwitchUser={handleSwitchUser}
+				onLogout={handleLogout}
+				onExit={handleExit}
+				registerBackHandler={registerStyleDebugBackHandler}
+				noCloseButton
+			/>
+		);
+	}
+
+	panelChildren.push(
+		<MediaDetailsPanel
+			key="details"
+			isActive={currentView === 'details'}
+			item={selectedItem}
+			onBack={navigateBackFromDetails}
+			onPlay={handlePlay}
+			onItemSelect={handleItemSelect}
+			registerBackHandler={registerDetailsBackHandler}
+			noCloseButton
+		/>
+	);
+
+	panelChildren.push(
+		<PlayerPanel
+			key="player"
+			isActive={currentView === 'player'}
+			item={selectedItem}
+			playbackOptions={playbackOptions}
+			onBack={handleBackToDetails}
+			onPlay={handlePlay}
+			requestedControlsVisible={playerControlsVisible}
+			onControlsVisibilityChange={setPlayerControlsVisible}
+			registerBackHandler={registerPlayerBackHandler}
+		/>
+	);
+
 	return (
 		<div
 			className={css.app}
 			data-bf-animations={animationsDisabled ? 'off' : 'on'}
 			data-bf-all-animations={allAnimationsDisabled ? 'off' : 'on'}
 			data-bf-nav-theme={navbarTheme}
+			data-bf-performance-overlay={performanceOverlayEnabled ? 'on' : 'off'}
 			data-bf-input-mode={inputMode}
 			{...props}
-		>
-			<Panels
-				index={getPanelIndex()}
-				onBack={handleBack}
 			>
-					<LoginPanel onLogin={handleLogin} isActive={currentView === 'login'} />
-					<HomePanel
-						onItemSelect={handleItemSelect}
-						onNavigate={handleNavigate}
-						onSwitchUser={handleSwitchUser}
-						onLogout={handleLogout}
-						onExit={handleExit}
-						registerBackHandler={registerHomeBackHandler}
-						noCloseButton
-					/>
-					<LibraryPanel
-						library={selectedLibrary}
-						onItemSelect={handleItemSelect}
-						onNavigate={handleNavigate}
-						onSwitchUser={handleSwitchUser}
-						onLogout={handleLogout}
-						onExit={handleExit}
-						onBack={handleBackToHome}
-						registerBackHandler={registerLibraryBackHandler}
-						noCloseButton
-					/>
-					<SearchPanel
-						onItemSelect={handleItemSelect}
-						onNavigate={handleNavigate}
-						onSwitchUser={handleSwitchUser}
-						onLogout={handleLogout}
-						onExit={handleExit}
-						registerBackHandler={registerSearchBackHandler}
-						noCloseButton
-					/>
-					<FavoritesPanel
-						onItemSelect={handleItemSelect}
-						onNavigate={handleNavigate}
-						onSwitchUser={handleSwitchUser}
-						onLogout={handleLogout}
-						onExit={handleExit}
-						registerBackHandler={registerFavoritesBackHandler}
-						noCloseButton
-					/>
-						<SettingsPanel
-							onNavigate={handleNavigate}
-							onSwitchUser={handleSwitchUser}
-							onLogout={handleLogout}
-							onSignOut={handleSignOut}
-							onExit={handleExit}
-							registerBackHandler={registerSettingsBackHandler}
-							noCloseButton
-						/>
-						{STYLE_DEBUG_ENABLED && StyleDebugPanel ? (
-							<StyleDebugPanel
-								onNavigate={handleNavigate}
-								onSwitchUser={handleSwitchUser}
-								onLogout={handleLogout}
-								onExit={handleExit}
-								registerBackHandler={registerStyleDebugBackHandler}
-								noCloseButton
-							/>
-						) : null}
-					<MediaDetailsPanel
-						isActive={currentView === 'details'}
-						item={selectedItem}
-						onBack={navigateBackFromDetails}
-						onPlay={handlePlay}
-						onItemSelect={handleItemSelect}
-						registerBackHandler={registerDetailsBackHandler}
-						noCloseButton
-					/>
-				<PlayerPanel
-					isActive={currentView === 'player'}
-					item={selectedItem}
-					playbackOptions={playbackOptions}
-						onBack={handleBackToDetails}
-						onPlay={handlePlay}
-						requestedControlsVisible={playerControlsVisible}
-						onControlsVisibilityChange={setPlayerControlsVisible}
-						registerBackHandler={registerPlayerBackHandler}
-					/>
-			</Panels>
-		</div>
-	);
-};
+				<Panels
+					index={getPanelIndex()}
+					onBack={handleBack}
+				>
+					{panelChildren}
+				</Panels>
+				<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />
+			</div>
+		);
+	};
 
 const AppWithBoundary = (props) => (
 	<AppCrashBoundary>

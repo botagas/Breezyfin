@@ -130,17 +130,29 @@
 	z-index: 2;
 }
 
+.detailsHeadingStack {
+	display: flex;
+	flex-direction: column;
+	gap: 0.62rem;
+	padding-top: 0.5rem;
+	margin-bottom: 1.15rem;
+	position: sticky;
+	top: 0.12rem;
+	z-index: 20;
+}
+
 .detailsTopBar {
 	--bf-details-topbar-height: 2.35rem;
 	--bf-details-topbar-gap: 0.65rem;
-	position: sticky;
-	top: 0.12rem;
-	z-index: 15;
+	position: relative;
+	top: auto;
+	z-index: 1;
 	display: flex;
 	align-items: center;
 	gap: 0.52rem;
 	min-height: var(--bf-details-topbar-height);
-	margin-bottom: var(--bf-details-topbar-gap);
+	padding: 0.22rem 0;
+	margin-bottom: 0;
 }
 
 .detailsBackButton {
@@ -263,9 +275,11 @@
 }
 
 .episodeBreadcrumb {
-	margin: 0 0 0.9rem 0;
+	margin: 0;
 	max-width: 100%;
 	min-width: 0;
+	position: relative;
+	z-index: 1;
 }
 
 .episodeNavActions {
@@ -618,6 +632,9 @@
 
 .castSection {
 	margin-top: 8px;
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 28rem;
 }
 
 .sectionHeaderRow {
@@ -701,6 +718,7 @@
 	overflow-x: auto;
 	padding-bottom: 8px;
 	scroll-behavior: smooth;
+	contain: layout style;
 	scrollbar-width: none;
 	-ms-overflow-style: none;
 	&::-webkit-scrollbar {
@@ -776,6 +794,9 @@
 
 .seasonsSection {
 	margin-bottom: 48px;
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 24rem;
 }
 
 .seasonCards {
@@ -785,6 +806,7 @@
 	overflow-y: visible;
 	padding: 1rem;
 	scroll-behavior: smooth;
+	contain: layout style;
 	
 	// Hide scrollbar but keep functionality
 	scrollbar-width: none;
@@ -1009,12 +1031,16 @@
 
 .episodesSection {
 	margin-bottom: 32px;
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 56rem;
 }
 
 .episodeCards {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+	contain: layout style;
 }
 
 .episodeCardsSideways {
@@ -1266,11 +1292,41 @@
 	transition: transform 340ms ease, filter 340ms ease;
 }
 
-:global([data-bf-animations='off']) {
+:global([data-bf-animations='off']),
+:global([data-bf-all-animations='off']) {
+	.castCard,
+	.seasonCard,
+	.seasonPoster,
+	.episodeCard,
+	.episodeImageContainer,
+	.episodeImage {
+		transition: none !important;
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.castCard:focus,
+	.seasonCard:hover,
+	.seasonCard:focus,
+	.seasonCard:global(.spottable):focus,
+	.episodeCard:hover,
+	.episodeCard:focus,
+	.episodeCard:global(.spottable):focus,
+	.episodeCardSideways:hover,
+	.episodeCardSideways:focus,
+	.episodeCardSideways:global(.spottable):focus {
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.seasonCard,
+	.episodeCard {
+		box-shadow: none !important;
+	}
+
 	.episodeCard {
 		background: rgba(18, 24, 36, 0.34);
 		border-color: rgba(255, 255, 255, 0.14);
-		box-shadow: none;
 
 		&:hover,
 		&:focus,
@@ -1292,9 +1348,18 @@
 		}
 	}
 
-	.episodeImage {
-		transform: none !important;
-		filter: none !important;
+	.seasonPosterWrap::before,
+	.seasonPosterWrap::after {
+		content: none !important;
+		display: none !important;
+	}
+}
+
+:global([data-bf-all-animations='off']) {
+	.castScroller,
+	.seasonCards,
+	.episodeCardsSideways {
+		scroll-behavior: auto !important;
 	}
 }
 

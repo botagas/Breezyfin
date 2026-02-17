@@ -42,7 +42,7 @@
 }
 
 :global([data-bf-nav-theme='elegant']) {
-	.detailsTopBar {
+	.detailsHeadingStack {
 		top: calc(var(--bf-toolbar-height, 5.5rem) + 0.08rem);
 	}
 
@@ -84,8 +84,8 @@
 	}
 
 		.elegantControlSurfaceBase() {
-			background: rgba(255, 255, 255, 0.08) !important;
-			border: 1px solid rgba(255, 255, 255, 0.24) !important;
+			background: rgba(255, 255, 255, 0.055) !important;
+			border: 1px solid rgba(255, 255, 255, 0.18) !important;
 			border-radius: 999px !important;
 			box-shadow: none !important;
 			opacity: 1 !important;
@@ -94,7 +94,7 @@
 		}
 
 	.elegantControlSurfaceHover() {
-		background: rgba(255, 255, 255, 0.16) !important;
+		background: rgba(255, 255, 255, 0.11) !important;
 	}
 
 		.elegantControlButtonCore() {
@@ -129,14 +129,19 @@
 		.episodeSelectorButton,
 		.compactSelectorButton,
 		.dropdown,
-	.trackSelectorPrimary,
-	.detailsBackButton,
-	.actionButton,
-		.sectionToggleIconButton,
-		.episodeInfoButton,
-		.episodeWatchedButton,
+		.trackSelectorPrimary,
+		.detailsBackButton,
 		.primaryButton {
 			.elegantControlButtonCore();
+			--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+			--bf-button-fg-hover: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
+			--bf-button-fg-active: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
+		}
+
+		.actionButton,
+		.sectionToggleIconButton,
+		.episodeInfoButton,
+		.episodeWatchedButton {
 			--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
 			--bf-button-fg-hover: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
 			--bf-button-fg-active: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
@@ -146,8 +151,8 @@
 	.trackSelectorPrimary :global(.bg),
 		.primaryButton :global(.bf-button-bg),
 		.primaryButton :global(.bg) {
-			background: rgba(157, 207, 255, 0.16) !important;
-			border: 1px solid var(--bf-md-accent-border-color) !important;
+			background: rgba(157, 207, 255, 0.1) !important;
+			border: 1px solid rgba(157, 207, 255, 0.34) !important;
 			border-radius: 999px !important;
 			box-shadow: none !important;
 			opacity: 1 !important;
@@ -167,46 +172,14 @@
 	.primaryButton:hover :global(.bg),
 	.primaryButton:focus :global(.bg),
 	.primaryButton:global(.spottable):focus :global(.bg) {
-		background: rgba(157, 207, 255, 0.3) !important;
+		background: rgba(157, 207, 255, 0.18) !important;
 	}
 
 	.trackSelectorPrimary:active :global(.bf-button-bg),
 	.trackSelectorPrimary:active :global(.bg),
 	.primaryButton:active :global(.bf-button-bg),
 	.primaryButton:active :global(.bg) {
-		background: rgba(157, 207, 255, 0.4) !important;
-	}
-
-	.favoriteAction.favoriteActive :global(.bf-button-bg),
-	.favoriteAction.favoriteActive :global(.bg) {
-		background: rgba(255, 107, 127, 0.14) !important;
-		border: 1px solid rgba(255, 143, 161, 0.65) !important;
-	}
-
-	.favoriteAction.favoriteActive:hover :global(.bf-button-bg),
-	.favoriteAction.favoriteActive:focus :global(.bf-button-bg),
-	.favoriteAction.favoriteActive:global(.spottable):focus :global(.bf-button-bg),
-	.favoriteAction.favoriteActive:hover :global(.bg),
-	.favoriteAction.favoriteActive:focus :global(.bg),
-	.favoriteAction.favoriteActive:global(.spottable):focus :global(.bg) {
-		background: rgba(255, 107, 127, 0.28) !important;
-	}
-
-	.watchedAction.watchedActive :global(.bf-button-bg),
-	.watchedAction.watchedActive :global(.bg),
-	.episodeWatchedButtonActive :global(.bf-button-bg),
-	.episodeWatchedButtonActive :global(.bg) {
-		background: rgba(109, 220, 154, 0.2) !important;
-		border-color: rgba(173, 242, 201, 0.88) !important;
-	}
-
-	.watchedAction.watchedActive:hover :global(.bf-button-bg),
-	.watchedAction.watchedActive:focus :global(.bf-button-bg),
-	.watchedAction.watchedActive:global(.spottable):focus :global(.bf-button-bg),
-	.watchedAction.watchedActive:hover :global(.bg),
-	.watchedAction.watchedActive:focus :global(.bg),
-	.watchedAction.watchedActive:global(.spottable):focus :global(.bg) {
-		background: rgba(109, 220, 154, 0.28) !important;
+		background: rgba(157, 207, 255, 0.24) !important;
 	}
 
 }

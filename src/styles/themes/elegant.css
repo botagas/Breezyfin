@@ -1,6 +1,7 @@
 /* Elegant theme tokens. */
 [data-bf-nav-theme='elegant'] {
 	--bf-theme-accent: rgba(157, 207, 255, 0.98);
+	--bf-theme-panel-bg: #0b111a;
 
 	--bf-theme-surface-bg: rgba(8, 13, 20, 0.42);
 	--bf-theme-surface-border: rgba(255, 255, 255, 0.1);
@@ -17,6 +18,9 @@
 	--bf-theme-message-border: rgba(255, 255, 255, 0.14);
 	--bf-theme-message-color: rgba(238, 245, 255, 0.96);
 	--bf-theme-message-shadow: 0 0.7rem 1.8rem rgba(4, 10, 17, 0.38);
+	--bf-theme-notice-bg: rgba(115, 196, 255, 0.2);
+	--bf-theme-notice-border: rgba(166, 221, 255, 0.42);
+	--bf-theme-notice-color: rgba(236, 247, 255, 0.98);
 	--bf-theme-error-bg: rgba(96, 38, 50, 0.4);
 	--bf-theme-error-border: rgba(255, 163, 180, 0.42);
 	--bf-theme-error-color: rgba(255, 228, 233, 0.98);

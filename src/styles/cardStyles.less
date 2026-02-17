@@ -14,7 +14,15 @@
 .card-shell() {
 	border-radius: 1.1rem;
 	outline: none;
+	transform: translateZ(0);
 	transition: transform 180ms ease, filter 180ms ease;
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		transition: none !important;
+		transform: none !important;
+		filter: none !important;
+	}
 }
 
 .card-focus-lift() {
@@ -46,6 +54,7 @@
 	:global([data-bf-animations='off']) &,
 	:global([data-bf-all-animations='off']) & {
 		box-shadow: none;
+		transition: none !important;
 	}
 }
 
@@ -74,7 +83,9 @@
 	}
 
 	:global([data-bf-animations='off']) &::before,
-	:global([data-bf-animations='off']) &::after {
+	:global([data-bf-animations='off']) &::after,
+	:global([data-bf-all-animations='off']) &::before,
+	:global([data-bf-all-animations='off']) &::after {
 		display: none;
 		opacity: 0 !important;
 	}
@@ -86,9 +97,11 @@
 		transition: transform 340ms ease, filter 340ms ease;
 	}
 
-	:global([data-bf-animations='off']) & img {
+	:global([data-bf-animations='off']) & img,
+	:global([data-bf-all-animations='off']) & img {
 		transform: none !important;
 		filter: none !important;
+		transition: none !important;
 	}
 }
 
@@ -109,14 +122,22 @@
 		box-shadow: none;
 	}
 
-	:global([data-bf-animations='off']) &::before {
+	:global([data-bf-animations='off']) &::before,
+	:global([data-bf-all-animations='off']) &::before {
 		opacity: 0 !important;
 	}
 
-	:global([data-bf-animations='off']) & img {
+	:global([data-bf-animations='off']) & img,
+	:global([data-bf-all-animations='off']) & img {
 		transform: none !important;
 		filter: none !important;
 	}
+}
+
+.panel-grid-performance() {
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 1400px;
 }
 
 .card-placeholder-surface() {

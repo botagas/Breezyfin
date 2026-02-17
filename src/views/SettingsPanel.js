@@ -12,6 +12,9 @@ import Toolbar from '../components/Toolbar';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
+import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
+import { wipeAllAppCache } from '../utils/cacheMaintenance';
 
 import css from './SettingsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -32,6 +35,7 @@ const DEFAULT_SETTINGS = {
 	enableTranscoding: true,
 	forceTranscoding: false,
 	forceTranscodingWithSubtitles: true,
+	relaxedPlaybackProfile: false,
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
 	disableAnimations: false,
@@ -45,6 +49,7 @@ const DEFAULT_SETTINGS = {
 	showBackdrops: true,
 	showSeasonImages: false,
 	useSidewaysEpisodeList: true,
+	showPerformanceOverlay: false,
 	homeRows: {
 		recentlyAdded: true,
 		continueWatching: true,
@@ -102,6 +107,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
 	const [appLogs, setAppLogs] = useState([]);
 	const [appLogCount, setAppLogCount] = useState(0);
+	const [wipeCacheConfirmOpen, setWipeCacheConfirmOpen] = useState(false);
+	const [cacheWipeInProgress, setCacheWipeInProgress] = useState(false);
+	const [cacheWipeError, setCacheWipeError] = useState('');
 	const toolbarBackHandlerRef = useRef(null);
 	const savedServersByKey = useMemo(() => {
 		const map = new Map();
@@ -113,26 +121,23 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 
 	const loadSettings = useCallback(() => {
 		try {
-			const stored = localStorage.getItem('breezyfinSettings');
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				const normalizedOrder = Array.isArray(parsed.homeRowOrder)
-					? parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key))
-					: [];
-				const resolvedOrder = [
-					...normalizedOrder,
-					...HOME_ROW_ORDER.filter((key) => !normalizedOrder.includes(key))
-				];
-				setSettings({
-					...DEFAULT_SETTINGS,
-					...parsed,
-					homeRows: {
-						...DEFAULT_SETTINGS.homeRows,
-						...(parsed.homeRows || {})
-					},
-					homeRowOrder: resolvedOrder
-				});
-			}
+			const parsed = readBreezyfinSettings();
+			const normalizedOrder = Array.isArray(parsed.homeRowOrder)
+				? parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key))
+				: [];
+			const resolvedOrder = [
+				...normalizedOrder,
+				...HOME_ROW_ORDER.filter((key) => !normalizedOrder.includes(key))
+			];
+			setSettings({
+				...DEFAULT_SETTINGS,
+				...parsed,
+				homeRows: {
+					...DEFAULT_SETTINGS.homeRows,
+					...(parsed.homeRows || {})
+				},
+				homeRowOrder: resolvedOrder
+			});
 		} catch (error) {
 			console.error('Failed to load settings:', error);
 		}
@@ -188,13 +193,8 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const handleSettingChange = useCallback((key, value) => {
 		setSettings((prevSettings) => {
 			const newSettings = { ...prevSettings, [key]: value };
-			try {
-				localStorage.setItem('breezyfinSettings', JSON.stringify(newSettings));
-				if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-					window.dispatchEvent(new CustomEvent('breezyfin-settings-changed', { detail: newSettings }));
-				}
-			} catch (error) {
-				console.error('Failed to save settings:', error);
+			if (!writeBreezyfinSettings(newSettings)) {
+				console.error('Failed to save settings');
 			}
 			return newSettings;
 		});
@@ -209,10 +209,8 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 					[rowKey]: !prevSettings.homeRows?.[rowKey]
 				}
 			};
-			try {
-				localStorage.setItem('breezyfinSettings', JSON.stringify(updated));
-			} catch (error) {
-				console.error('Failed to save settings:', error);
+			if (!writeBreezyfinSettings(updated)) {
+				console.error('Failed to save home row settings');
 			}
 			return updated;
 		});
@@ -227,10 +225,8 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 			if (swapIndex < 0 || swapIndex >= order.length) return prevSettings;
 			[order[index], order[swapIndex]] = [order[swapIndex], order[index]];
 			const updated = { ...prevSettings, homeRowOrder: order };
-			try {
-				localStorage.setItem('breezyfinSettings', JSON.stringify(updated));
-			} catch (error) {
-				console.error('Failed to save settings:', error);
+			if (!writeBreezyfinSettings(updated)) {
+				console.error('Failed to save home row order');
 			}
 			return updated;
 		});
@@ -395,6 +391,36 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		setLogsPopupOpen(false);
 	}, []);
 
+	const openWipeCacheConfirm = useCallback(() => {
+		setCacheWipeError('');
+		setWipeCacheConfirmOpen(true);
+	}, []);
+
+	const closeWipeCacheConfirm = useCallback(() => {
+		if (cacheWipeInProgress) return;
+		setWipeCacheConfirmOpen(false);
+	}, [cacheWipeInProgress]);
+
+	const handleWipeCacheConfirm = useCallback(async () => {
+		if (cacheWipeInProgress) return;
+		setCacheWipeInProgress(true);
+		setCacheWipeError('');
+
+		try {
+			const summary = await wipeAllAppCache();
+			console.info('[Settings] Cache wipe summary:', summary);
+			if (typeof window !== 'undefined') {
+				window.setTimeout(() => {
+					window.location.reload();
+				}, 160);
+			}
+		} catch (error) {
+			console.error('Failed to wipe application cache:', error);
+			setCacheWipeError('Failed to wipe app cache. Please restart the TV and try again.');
+			setCacheWipeInProgress(false);
+		}
+	}, [cacheWipeInProgress]);
+
 	const openStylingDebugPanel = useCallback(() => {
 		if (!STYLE_DEBUG_ENABLED) return;
 		if (typeof onNavigate === 'function') {
@@ -436,6 +462,10 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		handleSettingChange('forceTranscodingWithSubtitles', !settings.forceTranscodingWithSubtitles);
 	}, [handleSettingChange, settings.forceTranscodingWithSubtitles]);
 
+	const toggleRelaxedPlaybackProfile = useCallback(() => {
+		handleSettingChange('relaxedPlaybackProfile', !settings.relaxedPlaybackProfile);
+	}, [handleSettingChange, settings.relaxedPlaybackProfile]);
+
 	const toggleShowBackdrops = useCallback(() => {
 		handleSettingChange('showBackdrops', !settings.showBackdrops);
 	}, [handleSettingChange, settings.showBackdrops]);
@@ -459,6 +489,10 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const toggleShowMediaBar = useCallback(() => {
 		handleSettingChange('showMediaBar', !settings.showMediaBar);
 	}, [handleSettingChange, settings.showMediaBar]);
+
+	const toggleShowPerformanceOverlay = useCallback(() => {
+		handleSettingChange('showPerformanceOverlay', !settings.showPerformanceOverlay);
+	}, [handleSettingChange, settings.showPerformanceOverlay]);
 
 	const handleNavbarThemeSelect = useCallback((event) => {
 		const themeValue = event.currentTarget.dataset.theme;
@@ -524,6 +558,12 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	};
 
 	const handleInternalBack = useCallback(() => {
+		if (wipeCacheConfirmOpen) {
+			if (!cacheWipeInProgress) {
+				setWipeCacheConfirmOpen(false);
+			}
+			return true;
+		}
 		if (logsPopupOpen) {
 			setLogsPopupOpen(false);
 			return true;
@@ -559,19 +599,16 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	}, [
 		audioLangPopupOpen,
 		bitratePopupOpen,
+		cacheWipeInProgress,
 		logoutConfirmOpen,
 		logsPopupOpen,
 		navbarThemePopupOpen,
 		playNextPromptModePopupOpen,
-		subtitleLangPopupOpen
+		subtitleLangPopupOpen,
+		wipeCacheConfirmOpen
 	]);
 
-	useEffect(() => {
-		if (!isActive) return undefined;
-		if (typeof registerBackHandler !== 'function') return undefined;
-		registerBackHandler(handleInternalBack);
-		return () => registerBackHandler(null);
-	}, [handleInternalBack, isActive, registerBackHandler]);
+	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
 	return (
 		<Panel {...rest}>
@@ -890,6 +927,22 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 
 						<section className={css.section}>
 							<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowPerformanceOverlay}
+								selected={settings.showPerformanceOverlay === true}
+							>
+								Performance Overlay (FPS/Input)
+							</SwitchItem>
+							{STYLE_DEBUG_ENABLED ? (
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={toggleRelaxedPlaybackProfile}
+									selected={settings.relaxedPlaybackProfile === true}
+								>
+									Relaxed Playback Profile (Debug)
+								</SwitchItem>
+							) : null}
 							{STYLE_DEBUG_ENABLED ? (
 								<Item
 									className={css.settingItem}
@@ -903,6 +956,12 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 								label="Logs"
 								slotAfter={`${appLogCount} entries`}
 								onClick={openLogsPopup}
+							/>
+							<Item
+								className={css.settingItem}
+								label="Wipe App Cache"
+								slotAfter={cacheWipeInProgress ? 'Wiping...' : 'Run'}
+								onClick={openWipeCacheConfirm}
 							/>
 						</section>
 				</div>
@@ -1040,11 +1099,11 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 					</div>
 				</Popup>
 
-				<Popup
-					open={logsPopupOpen}
-					onClose={closeLogsPopup}
-					css={popupShellCss}
-				>
+			<Popup
+				open={logsPopupOpen}
+				onClose={closeLogsPopup}
+				css={popupShellCss}
+			>
 				<div className={`${popupStyles.popupSurface} ${css.logPopupContent}`}>
 					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
 						<div className={css.logActions}>
@@ -1062,6 +1121,39 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 							</div>
 						))}
 					</Scroller>
+				</div>
+			</Popup>
+
+			<Popup
+				open={wipeCacheConfirmOpen}
+				onClose={closeWipeCacheConfirm}
+				noAutoDismiss={cacheWipeInProgress}
+				css={popupShellCss}
+			>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Wipe App Cache</BodyText>
+					<BodyText className={css.popupMessage}>
+						This clears local storage, session storage, cache storage, and IndexedDB, then reloads the app.
+					</BodyText>
+					{cacheWipeError ? (
+						<BodyText className={css.popupMessage}>{cacheWipeError}</BodyText>
+					) : null}
+					<div className={css.popupActions}>
+						<Button
+							onClick={closeWipeCacheConfirm}
+							disabled={cacheWipeInProgress}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleWipeCacheConfirm}
+							className={css.dangerButton}
+							disabled={cacheWipeInProgress}
+							selected={cacheWipeInProgress}
+						>
+							{cacheWipeInProgress ? 'Wiping...' : 'Wipe & Reload'}
+						</Button>
+					</div>
 				</div>
 			</Popup>
 		</Panel>

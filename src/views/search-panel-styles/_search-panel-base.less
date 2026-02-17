@@ -17,7 +17,7 @@
 
 .resultsContent {
 	min-height: 100%;
-	background: #121212;
+	background: var(--bf-theme-panel-bg, #121212);
 	display: flex;
 	flex-direction: column;
 	padding-top: var(--bf-search-overlay-height);
@@ -201,7 +201,7 @@
 .resultsScroller {
 	flex: 1;
 	min-height: 0;
-	background: #121212;
+	background: var(--bf-theme-panel-bg, #121212);
 	overscroll-behavior: contain;
 }
 
@@ -210,6 +210,7 @@
 	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 	gap: 1.5rem;
 	padding: 0.75rem 4rem calc(4rem + var(--bf-panel-content-bottom-padding, 4rem));
+	.panel-grid-performance();
 }
 
 .resultCard {

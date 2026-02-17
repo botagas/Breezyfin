@@ -1,0 +1,903 @@
+.sectionSubtitle {
+	font-size: 0.83em;
+	line-height: 1.35;
+	color: rgba(224, 235, 246, 0.82);
+}
+
+.snipzyDefs {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.snipzyGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+	gap: 1rem;
+}
+
+.snipzySample {
+	--snipzy-backdrop-image: none;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.78rem;
+	padding: 1rem;
+	border-radius: 1rem;
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	background: linear-gradient(160deg, rgba(6, 11, 18, 0.58), rgba(6, 11, 18, 0.68));
+	box-shadow: 0 0.45rem 1.3rem rgba(0, 0, 0, 0.3);
+}
+
+.snipzySample::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	pointer-events: none;
+	background:
+		radial-gradient(120% 90% at 8% 12%, rgba(136, 201, 255, 0.2), rgba(136, 201, 255, 0) 62%),
+		radial-gradient(100% 70% at 92% 88%, rgba(98, 169, 255, 0.16), rgba(98, 169, 255, 0) 64%);
+	opacity: 0.9;
+}
+
+.snipzySampleBackdropImage {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.52;
+	transform: scale(1.04);
+}
+
+.snipzySample > :not(.snipzySampleBackdropImage) {
+	position: relative;
+	z-index: 2;
+}
+
+.snipzySampleTitle {
+	font-size: 0.82em;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: rgba(244, 249, 255, 0.97);
+}
+
+.snipzyExactForm {
+	--bg-color: rgba(255, 255, 255, 0.25);
+	--highlight: rgba(255, 255, 255, 0.75);
+	--text: #ffffff;
+	--input-bg: rgba(255, 255, 255, 0.1);
+	--input-border: rgba(255, 255, 255, 0.2);
+	--input-focus: rgba(255, 255, 255, 0.3);
+	position: relative;
+	width: 400px;
+	min-height: 450px;
+	border-radius: 20px;
+	overflow: hidden;
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+	font-family: 'Poppins', sans-serif;
+}
+
+.snipzyExactFormFilter,
+.snipzyExactFormOverlay,
+.snipzyExactFormSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.snipzyExactFormFilter {
+	z-index: 1;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	filter: url(#glass-distortion-form-exact) saturate(120%) brightness(1.15);
+}
+
+.snipzyExactFormOverlay {
+	z-index: 2;
+	background: var(--bg-color);
+}
+
+.snipzyExactFormSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactFormContent {
+	position: relative;
+	z-index: 4;
+	padding: 30px;
+	color: var(--text);
+	height: 100%;
+}
+
+.snipzyExactFormContainer {
+	display: none;
+	opacity: 0;
+	transform: translateX(20px);
+	transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.snipzyExactFormContainerActive {
+	display: block;
+	opacity: 1;
+	transform: translateX(0);
+}
+
+.snipzyExactFormContainer h3 {
+	margin: 0 0 20px 0;
+	font-size: 28px;
+	font-weight: 600;
+	text-align: center;
+}
+
+.snipzyExactFormGroup {
+	position: relative;
+	margin-bottom: 20px;
+}
+
+.snipzyExactFormFieldIcon {
+	position: absolute;
+	left: 15px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--text);
+	opacity: 0.8;
+	font-style: normal;
+	font-weight: 700;
+}
+
+.snipzyExactFormGroup input {
+	width: 100%;
+	padding: 12px 15px 12px 45px;
+	background: var(--input-bg);
+	border: 1px solid var(--input-border);
+	border-radius: 10px;
+	color: var(--text);
+	font-size: 16px;
+	transition: border-color 0.3s ease, background 0.3s ease;
+	box-sizing: border-box;
+}
+
+.snipzyExactFormGroup input:focus {
+	outline: none;
+	background: var(--input-focus);
+	border-color: var(--highlight);
+}
+
+.snipzyExactFormGroup input::placeholder {
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.snipzyExactFormInputError {
+	border-color: #ff9ea5 !important;
+	background: rgba(255, 80, 102, 0.12) !important;
+}
+
+.snipzyExactFormSubmit {
+	width: 100%;
+	padding: 12px;
+	background: rgba(255, 255, 255, 0.2);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 10px;
+	color: var(--text);
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	margin-top: 10px;
+}
+
+.snipzyExactFormSubmit:hover {
+	background: rgba(255, 255, 255, 0.3);
+	border-color: rgba(255, 255, 255, 0.4);
+}
+
+.snipzyExactFormSubmitSuccess {
+	background: rgba(120, 255, 188, 0.32);
+	border-color: rgba(157, 255, 211, 0.5);
+}
+
+.snipzyExactFormSwitch {
+	text-align: center;
+	margin-top: 20px;
+	font-size: 14px;
+	opacity: 0.8;
+}
+
+.snipzyExactFormSwitchLink {
+	color: var(--text);
+	text-decoration: none;
+	font-weight: 600;
+	opacity: 1;
+	border: none;
+	background: transparent;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+}
+
+.snipzyExactFormSwitchLink:hover {
+	text-decoration: underline;
+}
+
+.snipzyExactFormError {
+	margin: 10px 0 0;
+	font-size: 13px;
+	text-align: center;
+	color: #ffb5c0;
+}
+
+@media (prefers-color-scheme: dark) {
+	.snipzyExactForm {
+		--bg-color: rgba(0, 0, 0, 0.25);
+		--highlight: rgba(255, 255, 255, 0.15);
+		--input-bg: rgba(0, 0, 0, 0.2);
+		--input-border: rgba(255, 255, 255, 0.1);
+		--input-focus: rgba(0, 0, 0, 0.3);
+	}
+}
+
+.snipzyExactIconsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+	gap: 24px;
+	max-width: 400px;
+	margin: 0 auto;
+}
+
+.snipzyExactIcon {
+	--bg-color: rgba(255, 255, 255, 0.25);
+	--highlight: rgba(255, 255, 255, 0.75);
+	--icon-color: #ffffff;
+	--icon-size: 64px;
+	position: relative;
+	width: var(--icon-size);
+	height: var(--icon-size);
+	border-radius: 16px;
+	overflow: hidden;
+	background: transparent;
+	cursor: pointer;
+	transition: transform 0.2s ease;
+}
+
+.snipzyExactIcon:hover {
+	transform: scale(1.1);
+}
+
+.snipzyExactIconFilter,
+.snipzyExactIconOverlay,
+.snipzyExactIconSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.snipzyExactIconFilter {
+	z-index: 1;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	filter: url(#glass-distortion) saturate(120%) brightness(1.15);
+}
+
+.snipzyExactIconOverlay {
+	z-index: 2;
+	background: var(--bg-color);
+}
+
+.snipzyExactIconSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactIconContent {
+	position: relative;
+	z-index: 4;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.snipzyExactIconContent svg {
+	width: 80%;
+	height: 80%;
+	color: var(--icon-color);
+	transition: transform 0.2s ease;
+}
+
+.snipzyExactIcon:hover .snipzyExactIconContent svg {
+	transform: scale(0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+	.snipzyExactIcon {
+		--bg-color: rgba(0, 0, 0, 0.25);
+		--highlight: rgba(255, 255, 255, 0.15);
+	}
+}
+
+.snipzyExactNav {
+	--bg-color: rgba(255, 255, 255, 0.25);
+	--highlight: rgba(255, 255, 255, 0.75);
+	--text: #ffffff;
+	position: relative;
+	width: 100%;
+	max-width: 600px;
+	border-radius: 12px;
+	overflow: hidden;
+	background: transparent;
+}
+
+.snipzyExactNavFilter,
+.snipzyExactNavOverlay,
+.snipzyExactNavSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.snipzyExactNavFilter {
+	z-index: 1;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	filter: url(#glass-distortion) saturate(120%) brightness(1.15);
+}
+
+.snipzyExactNavOverlay {
+	z-index: 2;
+	background: var(--bg-color);
+}
+
+.snipzyExactNavSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactNavContent {
+	position: relative;
+	z-index: 4;
+	padding: 16px;
+}
+
+.snipzyExactNavList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	justify-content: center;
+	gap: 24px;
+}
+
+.snipzyExactNavItem {
+	color: var(--text);
+	text-decoration: none;
+	font-weight: 500;
+	font-size: 16px;
+	padding: 8px 16px;
+	border-radius: 8px;
+	transition: background-color 0.2s ease;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+}
+
+.snipzyExactNavItem:hover {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
+.snipzyExactNavItemActive {
+	background-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+	.snipzyExactNav {
+		--bg-color: rgba(0, 0, 0, 0.25);
+		--highlight: rgba(255, 255, 255, 0.15);
+	}
+}
+
+.snipzyExactSearch {
+	--bg-color: rgba(255, 255, 255, 0.25);
+	--highlight: rgba(255, 255, 255, 0.75);
+	--text: #ffffff;
+	--input-bg: rgba(255, 255, 255, 0.1);
+	--input-border: rgba(255, 255, 255, 0.2);
+	--input-focus: rgba(255, 255, 255, 0.3);
+	position: relative;
+	width: 500px;
+	max-width: 100%;
+	border-radius: 20px;
+	overflow: hidden;
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+	font-family: 'Poppins', sans-serif;
+}
+
+.snipzyExactSearchFilter,
+.snipzyExactSearchOverlay,
+.snipzyExactSearchSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.snipzyExactSearchFilter {
+	z-index: 1;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	filter: url(#glass-distortion-search-exact) saturate(120%) brightness(1.15);
+}
+
+.snipzyExactSearchOverlay {
+	z-index: 2;
+	background: var(--bg-color);
+}
+
+.snipzyExactSearchSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactSearchContent {
+	position: relative;
+	z-index: 4;
+	color: var(--text);
+}
+
+.snipzyExactSearchContainer {
+	position: relative;
+	padding: 20px;
+	display: flex;
+	align-items: center;
+	transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.snipzyExactSearchContainerExpanded {
+	padding: 25px 20px;
+}
+
+.snipzyExactSearchIcon {
+	position: absolute;
+	left: 35px;
+	font-size: 18px;
+	color: var(--text);
+	opacity: 0.8;
+	pointer-events: none;
+	transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+	transform-origin: center;
+}
+
+.snipzyExactSearchContainerExpanded .snipzyExactSearchIcon {
+	transform: scale(1.1);
+	opacity: 1;
+}
+
+.snipzyExactSearchIcon svg {
+	width: 18px;
+	height: 18px;
+	display: block;
+}
+
+.snipzyExactSearchInput {
+	width: 100%;
+	padding: 12px 45px;
+	background: var(--input-bg);
+	border: 1px solid var(--input-border);
+	border-radius: 12px;
+	color: var(--text);
+	font-size: 16px;
+	transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+	will-change: transform, box-shadow, background;
+	box-sizing: border-box;
+}
+
+.snipzyExactSearchInput:focus {
+	outline: none;
+	background: var(--input-focus);
+	border-color: var(--highlight);
+	transform: translateY(-2px);
+	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.snipzyExactSearchInput::placeholder {
+	color: rgba(255, 255, 255, 0.6);
+	transition: opacity 0.3s ease;
+}
+
+.snipzyExactSearchInput:focus::placeholder {
+	opacity: 0.4;
+}
+
+.snipzyExactSearchClear {
+	position: absolute;
+	right: 35px;
+	background: none;
+	border: none;
+	color: var(--text);
+	opacity: 0;
+	cursor: pointer;
+	transition: opacity 0.3s ease;
+	padding: 5px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.snipzyExactSearchClear svg {
+	width: 16px;
+	height: 16px;
+	display: block;
+}
+
+.snipzyExactSearchClearVisible {
+	opacity: 0.7;
+}
+
+.snipzyExactSearchClear:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.snipzyExactSearchSuggestions {
+	padding: 0 20px 20px;
+	max-height: 0;
+	opacity: 0;
+	overflow: hidden;
+	transform: translateY(-10px);
+	transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+	pointer-events: none;
+}
+
+.snipzyExactSearchSuggestionsActive {
+	max-height: 300px;
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+.snipzyExactSuggestionGroup h4 {
+	font-size: 14px;
+	margin: 0 0 10px;
+	opacity: 0.7;
+	font-weight: 500;
+}
+
+.snipzyExactSuggestionGroup ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.snipzyExactSuggestionGroup li {
+	opacity: 0;
+	transform: translateX(-10px);
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.snipzyExactSearchSuggestionsActive .snipzyExactSuggestionGroup li {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+.snipzyExactSuggestionGroup li:nth-child(1) {
+	transition-delay: 0.1s;
+}
+
+.snipzyExactSuggestionGroup li:nth-child(2) {
+	transition-delay: 0.15s;
+}
+
+.snipzyExactSuggestionGroup li:nth-child(3) {
+	transition-delay: 0.2s;
+}
+
+.snipzyExactSuggestionItem {
+	padding: 8px 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	width: 100%;
+	border: none;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	font: inherit;
+}
+
+.snipzyExactSuggestionItem:hover {
+	background: rgba(255, 255, 255, 0.1);
+	transform: translateX(5px);
+}
+
+.snipzyExactSuggestionIcon {
+	opacity: 0.7;
+	font-size: 14px;
+	transition: transform 0.3s ease;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+}
+
+.snipzyExactSuggestionIcon svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+.snipzyExactSuggestionItem:hover .snipzyExactSuggestionIcon {
+	transform: scale(1.1);
+}
+
+@media (prefers-color-scheme: dark) {
+	.snipzyExactSearch {
+		--bg-color: rgba(0, 0, 0, 0.25);
+		--highlight: rgba(255, 255, 255, 0.15);
+		--input-bg: rgba(0, 0, 0, 0.2);
+		--input-border: rgba(255, 255, 255, 0.1);
+		--input-focus: rgba(0, 0, 0, 0.3);
+	}
+}
+
+.snipzyExactSpinner {
+	--bg-color: rgba(255, 255, 255, 0.25);
+	--highlight: rgba(255, 255, 255, 0.75);
+	--spinner-size: 80px;
+	--ring-size: 64px;
+	--core-size: 24px;
+	position: relative;
+	width: var(--spinner-size);
+	height: var(--spinner-size);
+	border-radius: 50%;
+	overflow: hidden;
+	background: transparent;
+}
+
+.snipzyExactSpinnerFilter,
+.snipzyExactSpinnerOverlay,
+.snipzyExactSpinnerSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.snipzyExactSpinnerFilter {
+	z-index: 1;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	filter: url(#glass-distortion) saturate(120%) brightness(1.15);
+}
+
+.snipzyExactSpinnerOverlay {
+	z-index: 2;
+	background: var(--bg-color);
+}
+
+.snipzyExactSpinnerSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactSpinnerContent {
+	position: relative;
+	z-index: 4;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.snipzyExactSpinnerRing {
+	position: absolute;
+	width: var(--ring-size);
+	height: var(--ring-size);
+	border: 2px solid transparent;
+	border-top-color: rgba(255, 255, 255, 0.8);
+	border-right-color: rgba(255, 255, 255, 0.6);
+	border-radius: 50%;
+	animation: snipzy-exact-spin 1s linear infinite;
+}
+
+.snipzyExactSpinnerCore {
+	width: var(--core-size);
+	height: var(--core-size);
+	background: rgba(255, 255, 255, 0.9);
+	border-radius: 50%;
+	animation: snipzy-exact-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes snipzy-exact-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes snipzy-exact-pulse {
+	from {
+		transform: scale(0.8);
+		opacity: 0.5;
+	}
+	to {
+		transform: scale(1);
+		opacity: 0.8;
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	.snipzyExactSpinner {
+		--bg-color: rgba(0, 0, 0, 0.25);
+		--highlight: rgba(255, 255, 255, 0.15);
+	}
+}
+
+.snipzyExactToggleGroup {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	min-width: 200px;
+}
+
+.snipzyExactToggle {
+	--bg-color: rgba(255, 255, 255, 0.25);
+	--highlight: rgba(255, 255, 255, 0.75);
+	--text: #ffffff;
+	--track-width: 60px;
+	--track-height: 32px;
+	--thumb-size: 24px;
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	cursor: pointer;
+	font-family: 'Poppins', sans-serif;
+}
+
+.snipzyExactToggleInput {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.snipzyExactToggleTrack {
+	position: relative;
+	width: var(--track-width);
+	height: var(--track-height);
+	border-radius: 16px;
+	overflow: hidden;
+}
+
+.snipzyExactToggleTrackFilter,
+.snipzyExactToggleTrackOverlay,
+.snipzyExactToggleTrackSpecular,
+.snipzyExactToggleThumbFilter,
+.snipzyExactToggleThumbOverlay,
+.snipzyExactToggleThumbSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.snipzyExactToggleTrackFilter,
+.snipzyExactToggleThumbFilter {
+	z-index: 1;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	filter: url(#glass-distortion) saturate(120%) brightness(1.15);
+}
+
+.snipzyExactToggleTrackOverlay {
+	z-index: 2;
+	background: var(--bg-color);
+	transition: background-color 0.3s ease;
+}
+
+.snipzyExactToggleTrackSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactToggleThumb {
+	position: absolute;
+	z-index: 4;
+	top: 4px;
+	left: 4px;
+	width: var(--thumb-size);
+	height: var(--thumb-size);
+	border-radius: 50%;
+	transition: transform 0.3s ease;
+	overflow: hidden;
+}
+
+.snipzyExactToggleThumbOverlay {
+	z-index: 2;
+	background: rgba(255, 255, 255, 0.9);
+}
+
+.snipzyExactToggleThumbSpecular {
+	z-index: 3;
+	box-shadow: inset 1px 1px 1px var(--highlight);
+}
+
+.snipzyExactToggleLabel {
+	color: var(--text);
+	font-size: 16px;
+	user-select: none;
+}
+
+.snipzyExactToggleInput:checked + .snipzyExactToggleTrack .snipzyExactToggleThumb {
+	transform: translateX(calc(var(--track-width) - var(--thumb-size) - 8px));
+}
+
+.snipzyExactToggleInput:checked + .snipzyExactToggleTrack .snipzyExactToggleTrackOverlay {
+	background: rgba(255, 255, 255, 0.4);
+}
+
+.snipzyExactToggleInput:focus-visible + .snipzyExactToggleTrack {
+	outline: 2px solid rgba(255, 255, 255, 0.5);
+	outline-offset: 2px;
+}
+
+.snipzyExactToggle:hover .snipzyExactToggleTrack .snipzyExactToggleTrackOverlay {
+	background: rgba(255, 255, 255, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+	.snipzyExactToggle {
+		--bg-color: rgba(0, 0, 0, 0.25);
+		--highlight: rgba(255, 255, 255, 0.15);
+	}
+
+	.snipzyExactToggleThumbOverlay {
+		background: rgba(255, 255, 255, 0.8);
+	}
+}
+
+:global([data-bf-all-animations='off']) {
+	.snipzyExactFormContainer,
+	.snipzyExactFormSubmit,
+	.snipzyExactNavItem,
+	.snipzyExactSearchContainer,
+	.snipzyExactSearchIcon,
+	.snipzyExactSearchInput,
+	.snipzyExactSearchClear,
+	.snipzyExactSearchSuggestions,
+	.snipzyExactSuggestionGroup li,
+	.snipzyExactSuggestionItem,
+	.snipzyExactSuggestionIcon,
+	.snipzyExactSpinnerRing,
+	.snipzyExactSpinnerCore,
+	.snipzyExactToggleTrackOverlay,
+	.snipzyExactToggleThumb {
+		transition: none !important;
+		animation: none !important;
+	}
+}
+
+@media (max-width: 959px) {
+	.snipzyGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.snipzyExactForm,
+	.snipzyExactSearch,
+	.snipzyExactSpinner,
+	.snipzyExactToggleGroup {
+		width: 100%;
+		max-width: none;
+	}
+}

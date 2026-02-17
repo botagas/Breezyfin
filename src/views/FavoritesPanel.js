@@ -4,13 +4,13 @@ import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
-import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
+import PosterMediaCard from '../components/PosterMediaCard';
+import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 
 import css from './FavoritesPanel.module.less';
 
-const SpottableDiv = Spottable('div');
 const FILTERS = [
 	{ id: 'all', label: 'All', types: ['Movie', 'Series', 'Episode'] },
 	{ id: 'movies', label: 'Movies', types: ['Movie'] },
@@ -79,49 +79,6 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 		handleRemoveFavorite(event, item);
 	}, [favoritesById]);
 
-	const handleCardImageError = useCallback((event) => {
-		event.target.style.display = 'none';
-		event.target.parentElement.classList.add(css.placeholder);
-	}, []);
-
-	const getImageUrl = (item) => {
-		if (!item || !jellyfinService.serverUrl || !jellyfinService.accessToken) return null;
-		const base = `${jellyfinService.serverUrl}/Items`;
-		// Primary with tag (best cache)
-		if (item.ImageTags?.Primary) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}&api_key=${jellyfinService.accessToken}`;
-		}
-		// Primary without tag (fallback even if ImageTags missing)
-		if (item.Id) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		// Backdrop
-		if (item.BackdropImageTags?.length) {
-			return `${base}/${item.Id}/Images/Backdrop/0?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		// For episodes/series with known series image
-		if (item.SeriesId) {
-			if (item.SeriesPrimaryImageTag) {
-				return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&tag=${item.SeriesPrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
-			}
-			return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		return null;
-	};
-
-	const getItemSubtitle = (item) => {
-		switch (item.Type) {
-			case 'Episode':
-				return `${item.SeriesName || ''} - S${item.ParentIndexNumber || 0}:E${item.IndexNumber || 0}`;
-			case 'Movie':
-				return item.ProductionYear ? `${item.ProductionYear}` : '';
-			case 'Series':
-				return item.ProductionYear ? `${item.ProductionYear}` : '';
-			default:
-				return item.Type || '';
-		}
-	};
-
 	return (
 		<Panel {...rest}>
 			<Header title="Favorites" />
@@ -165,54 +122,50 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 								</div>
 							) : (
 								<div className={css.favoritesGrid}>
-									{favorites.map(item => (
-										<SpottableDiv
-											key={item.Id}
-											data-item-id={item.Id}
-											className={css.favoriteCard}
-											onClick={handleFavoriteCardClick}
-										>
-											<div className={css.cardImage}>
-												{getImageUrl(item) ? (
-													<img
-														src={getImageUrl(item)}
-														alt={item.Name}
-														onError={handleCardImageError}
-														loading="lazy"
-														decoding="async"
-														draggable={false}
+									{favorites.map(item => {
+										const imageUrl = getPosterCardImageUrl(item);
+										return (
+											<PosterMediaCard
+												key={item.Id}
+												itemId={item.Id}
+												className={css.favoriteCard}
+												imageClassName={css.cardImage}
+												placeholderClassName={css.placeholder}
+												placeholderInnerClassName={css.placeholderInner}
+												infoClassName={css.cardInfo}
+												titleClassName={css.cardTitle}
+												subtitleClassName={css.cardSubtitle}
+												imageUrl={imageUrl}
+												title={item.Name}
+												subtitle={getMediaItemSubtitle(item)}
+												placeholderText={item.Name?.charAt(0) || '?'}
+												onClick={handleFavoriteCardClick}
+												overlayContent={(
+													<>
+													<Button
+														className={css.unfavoriteButton}
+														icon="hearthollow"
+														size="small"
+														data-item-id={item.Id}
+														onClick={handleUnfavoriteClick}
+														title="Remove from favorites"
 													/>
-												) : (
-													<div className={css.placeholderInner}>
-														<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-													</div>
+													{item.UserData?.Played && (
+														<div className={css.watchedBadge}>{'\u2713'}</div>
+													)}
+													{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
+														<div className={css.progressBar}>
+															<div
+																className={css.progress}
+																style={{ width: `${item.UserData.PlayedPercentage}%` }}
+															/>
+														</div>
+													)}
+													</>
 												)}
-												<Button
-													className={css.unfavoriteButton}
-													icon="hearthollow"
-													size="small"
-													data-item-id={item.Id}
-													onClick={handleUnfavoriteClick}
-													title="Remove from favorites"
-												/>
-												{item.UserData?.Played && (
-													<div className={css.watchedBadge}>{'\u2713'}</div>
-												)}
-												{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-													<div className={css.progressBar}>
-														<div
-															className={css.progress}
-															style={{ width: `${item.UserData.PlayedPercentage}%` }}
-														/>
-													</div>
-												)}
-											</div>
-											<div className={css.cardInfo}>
-												<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-												<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-											</div>
-										</SpottableDiv>
-									))}
+											/>
+										);
+									})}
 								</div>
 							)}
 						</div>

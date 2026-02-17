@@ -1,4 +1,7 @@
 .page {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -23,7 +26,66 @@
 	background-size: 240px 240px, 360px 360px;
 }
 
+.backdropLayer {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.backdropImage {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transform: scale(1.04);
+	transition: opacity 500ms ease;
+}
+
+.backdropImageCurrent {
+	opacity: 0.5;
+}
+
+.backdropImageIncoming {
+	opacity: 0.5;
+	animation: login-backdrop-fade-in 500ms ease both;
+}
+
+.backdropImageOutgoing {
+	opacity: 0.5;
+	animation: login-backdrop-fade-out 500ms ease both;
+}
+
+.backdropGradient {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to bottom, rgba(7, 10, 15, 0.44), rgba(7, 10, 15, 0.84) 72%, rgba(7, 10, 15, 0.95)),
+		radial-gradient(130% 120% at 50% 0%, rgba(17, 47, 74, 0.32), rgba(17, 47, 74, 0) 65%);
+}
+
+@keyframes login-backdrop-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 0.5;
+	}
+}
+
+@keyframes login-backdrop-fade-out {
+	from {
+		opacity: 0.5;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
 .loginBox {
+	position: relative;
+	z-index: 1;
 	max-width: 100%;
 	width: min(92vw, 50%);
 	background: rgba(0, 0, 0, 0.35);
@@ -171,6 +233,19 @@
 	margin-top: 16px;
 	opacity: 0.8;
 	text-align: center;
+}
+
+.noticeBanner {
+	margin-top: 12px;
+	padding: 14px 18px;
+	border-radius: 10px;
+	background: var(--bf-theme-notice-bg, var(--bf-theme-message-bg, rgba(18, 24, 36, 0.86)));
+	border: 1px solid var(--bf-theme-notice-border, var(--bf-theme-message-border, rgba(255, 255, 255, 0.22)));
+	color: var(--bf-theme-notice-color, var(--bf-theme-message-color, rgba(245, 250, 255, 0.96)));
+	box-shadow: var(--bf-theme-message-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
+	backdrop-filter: blur(0.6rem);
+	-webkit-backdrop-filter: blur(0.6rem);
+	line-height: 1.5;
 }
 
 .errorBanner {

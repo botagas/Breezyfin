@@ -9,6 +9,8 @@ import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
 import {KeyCodes} from '../utils/keyCodes';
+import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
+import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 
 import css from './HomePanel.module.less';
 
@@ -137,97 +139,41 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 		}
 	}, []);
 
-	useEffect(() => {
-		try {
-			const stored = localStorage.getItem('breezyfinSettings');
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				if (parsed.homeRows) {
-					setHomeRowSettings({
-						recentlyAdded: parsed.homeRows.recentlyAdded !== false,
-						continueWatching: parsed.homeRows.continueWatching !== false,
-						nextUp: parsed.homeRows.nextUp !== false,
-						latestMovies: parsed.homeRows.latestMovies !== false,
-						latestShows: parsed.homeRows.latestShows !== false,
-						myRequests: parsed.homeRows.myRequests !== false
-					});
-				}
-				if (Array.isArray(parsed.homeRowOrder)) {
-					const normalized = parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
-					const resolved = [
-						...normalized,
-						...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
-					];
-					setHomeRowOrder(resolved);
-				}
-				setShowMediaBar(parsed.showMediaBar !== false);
-			}
-		} catch (err) {
-			console.warn('Failed to load home row settings:', err);
+	const applyHomeSettings = useCallback((settingsPayload) => {
+		const settings = settingsPayload || {};
+		if (settings.homeRows) {
+			setHomeRowSettings({
+				recentlyAdded: settings.homeRows.recentlyAdded !== false,
+				continueWatching: settings.homeRows.continueWatching !== false,
+				nextUp: settings.homeRows.nextUp !== false,
+				latestMovies: settings.homeRows.latestMovies !== false,
+				latestShows: settings.homeRows.latestShows !== false,
+				myRequests: settings.homeRows.myRequests !== false
+			});
 		}
+		if (Array.isArray(settings.homeRowOrder)) {
+			const normalized = settings.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
+			const resolved = [
+				...normalized,
+				...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
+			];
+			setHomeRowOrder(resolved);
+		}
+		setShowMediaBar(settings.showMediaBar !== false);
+	}, []);
+
+	useBreezyfinSettingsSync(applyHomeSettings);
+
+	useEffect(() => {
 		loadContent();
 	}, [loadContent]);
-
-	useEffect(() => {
-		const applyMediaBarSetting = (settingsPayload) => {
-			if (!settingsPayload || typeof settingsPayload !== 'object') return;
-			if (Object.prototype.hasOwnProperty.call(settingsPayload, 'showMediaBar')) {
-				setShowMediaBar(settingsPayload.showMediaBar !== false);
-			}
-		};
-
-		const handleSettingsChanged = (event) => {
-			applyMediaBarSetting(event?.detail);
-		};
-
-		const handleStorage = (event) => {
-			if (event?.key !== 'breezyfinSettings') return;
-			try {
-				const parsed = event.newValue ? JSON.parse(event.newValue) : {};
-				applyMediaBarSetting(parsed);
-			} catch (error) {
-				console.warn('Failed to apply updated settings:', error);
-			}
-		};
-
-		window.addEventListener('breezyfin-settings-changed', handleSettingsChanged);
-		window.addEventListener('storage', handleStorage);
-		return () => {
-			window.removeEventListener('breezyfin-settings-changed', handleSettingsChanged);
-			window.removeEventListener('storage', handleStorage);
-		};
-	}, []);
 
 	const handleItemClick = useCallback((item) => {
 		onItemSelect(item);
 	}, [onItemSelect]);
 
 	const getCardImageUrl = useCallback((item) => {
-		// Prefer episode-specific art when the item is an episode (e.g., Continue Watching / Next Up)
-		if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 640);
-		}
-
-		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 640);
-		}
-
-		// Fallback to series backdrop if available
-		if (item?.SeriesId && item?.ParentBackdropImageTags?.length) {
-			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 640);
-		}
-
-		// Fallback to primary art
-		if (item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 640);
-		}
-
-		// Last resort: series primary
-		if (item?.SeriesId) {
-			return jellyfinService.getImageUrl(item.SeriesId, 'Primary', 640);
-		}
-
-		return '';
+		return getLandscapeCardImageUrl(item, {width: 640});
 	}, []);
 
 	const getMediaRowImageUrl = useCallback((id, mediaItem) => {

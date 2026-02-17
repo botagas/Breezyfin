@@ -1,1 +1,26 @@
 /* FavoritesPanel: shared tail overrides (input-mode/performance toggles, final normalizers). */
+:global([data-bf-animations='off']),
+:global([data-bf-all-animations='off']) {
+	.favoriteCard {
+		transition: none !important;
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.favoriteCard:hover,
+	.favoriteCard:focus,
+	.favoriteCard:global(.spottable):focus {
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.unfavoriteButton {
+		transition: none !important;
+	}
+}
+
+:global([data-bf-all-animations='off']) {
+	.favoritesGrid {
+		contain: layout style;
+	}
+}

@@ -4,34 +4,50 @@
 
 # Breezyfin for webOS
 
-Breezyfin is a Jellyfin client for LG webOS TVs, built with Enact Sandstone. It provides a fast, modern interface for browsing, searching, and streaming your Jellyfin media library.
+Breezyfin is a Jellyfin client for LG webOS TVs, built with Enact Sandstone.
+It focuses on TV-first navigation, themeable UI, and resilient playback handling for webOS constraints.
+The app was inspired by other great apps and themes, like JellySee, AndroidTV-FireTV, Moonfin, ElegantFin and more. Please do check them out.
 
-## Features
+## Current capabilities
 
-- Login to your Jellyfin server
-- Browse libraries and media
-- Search and filter content
-- Favorites and recently played
-- Media playback with HLS support
-- Settings and customization
-- UI/UX design tailored specifically for webOS users
+- Multi-server, multi-user saved sessions with quick account switching
+- Session restore on startup, with automatic redirect to Login when token/session is expired
+- Home, Library, Search, Favorites, Media Details, and Player panels
+- Classic and Elegant navigation themes
+- Performance Mode and Performance+ Mode (animation reduction options)
+- Rich Media Details workflows (favorites, watched status, track pickers, episodes/seasons, side list toggle)
+- Player with direct play, direct stream, and transcode handling
+- Subtitle/audio compatibility fallbacks for webOS playback paths
+- Diagnostics tools (logs, performance overlay, cache wipe, style debug panel)
 
-## Getting Started
+## Install on TV (IPK)
 
-### Testing
+Watch repository releases for prebuilt IPK artifacts.
 
-Watch out for any new releases in this repository. 
-Releases typically contain a ready-to-use IPK file.
-- Download the IPK file from releases.
-- Use WebOS Dev Manager (or a different tool of your choice) to install the app on the TV.
+1. Download the latest IPK from Releases.
+2. Install it with webOS Dev Manager (or your preferred webOS install tool).
 
-### Development
+## Install on TV (Homebrew dev repo)
+
+Breezyfin is not yet listed in the main Homebrew catalog, but you can add the dev feed now.
+
+1. Open Homebrew Channel on your TV.
+2. Go to Repositories / Manage Repositories.
+3. Add this repo URL:
+`https://raw.githubusercontent.com/botagas/Breezyfin/develop/homebrew-dev.json`
+4. Refresh repositories.
+5. Install `Breezyfin` from the newly added source.
+
+Direct feed file in this repository:
+`/Users/patrikas/Desktop/IT/Development/Breezyfin/homebrew-dev.json`
+
+## Local development
 
 Clone the repository and install dependencies:
 
 ```sh
-git clone https://github.com/your-org/breezyfin-webos.git
-cd breezyfin-webos/Breezyfin
+git clone https://github.com/botagas/Breezyfin.git
+cd Breezyfin
 npm install
 ```
 
@@ -42,12 +58,65 @@ npm run serve
 ```
 Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
-### Build for Production
+## Debug flags
+
+The app supports build-time/runtime debug behavior through environment flags:
+
+- `REACT_APP_ENABLE_STYLE_DEBUG=1`
+  - Forces Styling Debug panel/features on.
+- `REACT_APP_DISABLE_STYLE_DEBUG=1`
+  - Forces Styling Debug panel/features off.
+- `REACT_APP_ENABLE_PERSISTENT_LOGS=1`
+  - Forces persistent app log capture on (stored in `localStorage`).
+- `REACT_APP_DISABLE_PERSISTENT_LOGS=1`
+  - Forces persistent app log capture off.
+
+Examples:
+
+```sh
+# Development server with persistent logs enabled
+REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run serve
+
+# Production build with Style Debug enabled and persistent logs on
+REACT_APP_ENABLE_STYLE_DEBUG=1 REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run pack-p
+```
+
+Media Details focus tracing (runtime toggle):
+
+- Query param: `?bfFocusDebug=1`
+- Or from browser console:
+
+```js
+localStorage.setItem('breezyfinFocusDebug', '1');
+```
+
+## Runtime diagnostics (Settings panel)
+
+Diagnostics currently include:
+
+- Performance Overlay (`FPS`, `Input`, `Mode`)
+- Relaxed Playback Profile toggle (debug-only visibility)
+- Styling Debug Panel shortcut (debug-only visibility)
+- Logs viewer and clear action
+- Wipe App Cache (clears local/session storage, cache storage, IndexedDB, unregisters service workers, then reloads)
+
+## Production build
 
 ```sh
 npm run pack-p
 ```
 Output will be in the `dist/` folder.
+
+## Possible improvements
+
+- Stabilize playback across edge-case media by improving server capability checks and fallback messaging.
+- Expand hardware / software compatibility by testing across multiple webOS versions and TV chipsets.
+- Continue reducing remote-input latency and focus jitter in dense UI views.
+- Improve consistency of themed components and shared style tokens across all panels.
+- Expand diagnostics with actionable playback telemetry export for issue reports.
+- Add automated test coverage for panel navigation, playback recovery paths, and settings persistence.
+- Add CI quality gates for lint/test/build plus release artifact checks.
+- Improve accessibility/readability options (larger text mode, stronger contrast presets, clearer focus indicators).
 
 ## Release automation
 
@@ -66,4 +135,4 @@ Pull requests and issues are welcome! Please follow the code style and add tests
 
 - Built with [Enact Sandstone](https://github.com/enactjs/sandstone)
 - Uses [Jellyfin SDK](https://github.com/jellyfin/sdk)
-- **BEWARE**: AI was used when developing this app. This means that it may have vulnerabilities, dead-code, and functional issues that could be addressed in the future. It is currently in the **BAREBONES** stage.
+- AI-assisted development was used; please review changes carefully and report regressions/issues.

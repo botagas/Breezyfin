@@ -1,0 +1,36 @@
+.overlay {
+	position: fixed;
+	top: 1rem;
+	right: 1rem;
+	z-index: 2147483647;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.45rem 0.7rem;
+	border-radius: 999px;
+	background: rgba(5, 10, 18, 0.72);
+	border: 1px solid rgba(255, 255, 255, 0.24);
+	backdrop-filter: blur(0.45rem);
+	-webkit-backdrop-filter: blur(0.45rem);
+	pointer-events: none;
+	box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.35);
+	font-size: 0.75rem;
+	letter-spacing: 0.01em;
+}
+
+.metric {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.3rem;
+}
+
+.label {
+	color: rgba(232, 238, 248, 0.72);
+	text-transform: uppercase;
+	font-size: 0.64rem;
+}
+
+.value {
+	color: #f8fbff;
+	font-weight: 600;
+}

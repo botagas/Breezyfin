@@ -7,15 +7,16 @@ import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
-import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
+import PosterMediaCard from '../components/PosterMediaCard';
+import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
+import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 
 import css from './SearchPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
 import {popupShellCss} from '../styles/popupStyles';
 
-const SpottableDiv = Spottable('div');
 const FILTER_OPTIONS = [
 	{ id: 'movies', label: 'Movies', types: ['Movie'] },
 	{ id: 'series', label: 'Series', types: ['Series'] },
@@ -24,7 +25,7 @@ const FILTER_OPTIONS = [
 ];
 const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
 
-const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
+const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, isActive = false, ...rest }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
@@ -144,11 +145,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		return false;
 	}, [filterPopupOpen]);
 
-	useEffect(() => {
-		if (typeof registerBackHandler !== 'function') return undefined;
-		registerBackHandler(handleInternalBack);
-		return () => registerBackHandler(null);
-	}, [handleInternalBack, registerBackHandler]);
+	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
 	const handleFilterToggleClick = useCallback((event) => {
 		const filterId = event.currentTarget.dataset.filterId;
@@ -197,58 +194,6 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 			cards[idx + columns].focus();
 		}
 	}, []);
-
-	const handleResultImageError = useCallback((e) => {
-		e.target.style.display = 'none';
-		e.target.parentElement.classList.add(css.placeholder);
-	}, []);
-
-	const getImageUrl = (item) => {
-		if (!item || !jellyfinService.serverUrl || !jellyfinService.accessToken) return null;
-		const base = `${jellyfinService.serverUrl}/Items`;
-
-		if (item.Type === 'Person') {
-			if (item.PrimaryImageTag) {
-				return `${base}/${item.Id}/Images/Primary?maxWidth=200&tag=${item.PrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
-			}
-			// Fallback without tag
-			return `${base}/${item.Id}/Images/Primary?maxWidth=200&api_key=${jellyfinService.accessToken}`;
-		}
-
-		if (item.ImageTags?.Primary) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}&api_key=${jellyfinService.accessToken}`;
-		}
-		if (item.BackdropImageTags?.length) {
-			return `${base}/${item.Id}/Images/Backdrop/0?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		// For episodes, try series image
-		if (item.SeriesId) {
-			if (item.SeriesPrimaryImageTag) {
-				return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&tag=${item.SeriesPrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
-			}
-			return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		// Fallback without tag even if ImageTags missing
-		if (item.Id) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		return null;
-	};
-
-	const getItemSubtitle = (item) => {
-		switch (item.Type) {
-			case 'Episode':
-				return `${item.SeriesName || ''} - S${item.ParentIndexNumber || 0}:E${item.IndexNumber || 0}`;
-			case 'Movie':
-				return item.ProductionYear ? `${item.ProductionYear}` : '';
-			case 'Series':
-				return item.ProductionYear ? `${item.ProductionYear}` : '';
-			case 'Person':
-				return item.Role || 'Person';
-			default:
-				return item.Type || '';
-		}
-	};
 
 	return (
 		<Panel {...rest}>
@@ -305,30 +250,31 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 							) : (
 								<div className={css.resultsGrid}>
 									{results.map(item => {
-										const imageUrl = getImageUrl(item);
+										const imageUrl = getPosterCardImageUrl(item, {
+											maxWidth: 400,
+											personMaxWidth: 200,
+											includeBackdrop: true,
+											includeSeriesFallback: true
+										});
 										return (
-											<SpottableDiv
+											<PosterMediaCard
 												key={item.Id}
-												data-item-id={item.Id}
+												itemId={item.Id}
 												className={css.resultCard}
+												imageClassName={css.cardImage}
+												placeholderClassName={css.placeholder}
+												placeholderInnerClassName={css.placeholderInner}
+												infoClassName={css.cardInfo}
+												titleClassName={css.cardTitle}
+												subtitleClassName={css.cardSubtitle}
+												imageUrl={imageUrl}
+												title={item.Name}
+												subtitle={getMediaItemSubtitle(item, {includePersonRole: true})}
+												placeholderText={item.Name?.charAt(0) || '?'}
 												onClick={handleResultCardClick}
 												onKeyDown={handleResultCardKeyDown}
-											>
-												<div className={css.cardImage}>
-													{imageUrl ? (
-														<img
-															src={imageUrl}
-															alt={item.Name}
-															onError={handleResultImageError}
-															loading="lazy"
-															decoding="async"
-															draggable={false}
-														/>
-													) : (
-														<div className={css.placeholderInner}>
-															<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-														</div>
-													)}
+												overlayContent={(
+													<>
 													{item.UserData?.Played && (
 														<div className={css.watchedBadge}>{'\u2713'}</div>
 													)}
@@ -340,12 +286,9 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 															/>
 														</div>
 													)}
-												</div>
-												<div className={css.cardInfo}>
-													<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-													<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-												</div>
-											</SpottableDiv>
+													</>
+												)}
+											/>
 										);
 									})}
 								</div>

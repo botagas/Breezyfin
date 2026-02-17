@@ -2,6 +2,21 @@ import { Jellyfin } from '@jellyfin/sdk';
 import { getPlaystateApi } from '@jellyfin/sdk/lib/utils/api/playstate-api';
 import serverManager from './serverManager';
 import {APP_VERSION} from '../utils/appInfo';
+import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
+
+const WEBOS_AUDIO_CODEC_PRIORITY = ['eac3', 'ec3', 'ac3', 'dolby', 'aac', 'mp3', 'mp2', 'flac', 'opus', 'vorbis', 'pcm_s24le', 'pcm_s16le', 'lpcm', 'wav'];
+const WEBOS_SUPPORTED_AUDIO_CODECS = new Set(WEBOS_AUDIO_CODEC_PRIORITY);
+const WEBOS_DIRECTPLAY_TEXT_SUBTITLE_CODECS = new Set([
+	'srt',
+	'subrip',
+	'vtt',
+	'webvtt',
+	'txt',
+	'smi',
+	'sami',
+	'ttml',
+	'dfxp'
+]);
 
 class JellyfinService {
 	constructor() {
@@ -21,6 +36,30 @@ class JellyfinService {
 		this.accessToken = null;
 		this.serverName = null;
 		this.username = null;
+		this.sessionExpiredNotified = false;
+	}
+
+	_isAuthFailureStatus(status) {
+		return status === 401 || status === 403;
+	}
+
+	_notifySessionExpired(message = SESSION_EXPIRED_MESSAGE) {
+		if (this.sessionExpiredNotified) return;
+		this.sessionExpiredNotified = true;
+		if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+		window.dispatchEvent(
+			new CustomEvent(SESSION_EXPIRED_EVENT, {
+				detail: {message}
+			})
+		);
+	}
+
+	_handleAuthFailureStatus(status) {
+		if (this._isAuthFailureStatus(status)) {
+			this._notifySessionExpired();
+			return true;
+		}
+		return false;
 	}
 
 	// Initialize connection to Jellyfin server
@@ -67,6 +106,7 @@ class JellyfinService {
 				this.userId = data.User.Id;
 				this.username = data.User?.Name || username;
 				this.serverName = data?.ServerName || this.serverName || this.serverUrl;
+				this.sessionExpiredNotified = false;
 
 				// Update API with auth token
 				this.api.accessToken = this.accessToken;
@@ -107,6 +147,7 @@ class JellyfinService {
 		this.serverName = entry.serverName;
 		this.username = entry.username;
 		this.api = this.jellyfin.createApi(entry.url, entry.accessToken);
+		this.sessionExpiredNotified = false;
 		return true;
 	}
 
@@ -164,6 +205,7 @@ class JellyfinService {
 		this.accessToken = null;
 		this.serverName = null;
 		this.username = null;
+		this.sessionExpiredNotified = false;
 	}
 
 	// Leave the current session but keep saved accounts for quick switching.
@@ -176,6 +218,7 @@ class JellyfinService {
 		this.accessToken = null;
 		this.serverName = null;
 		this.username = null;
+		this.sessionExpiredNotified = false;
 	}
 
 	// Switch to a saved server/user combination
@@ -210,6 +253,7 @@ class JellyfinService {
 			this.accessToken = null;
 			this.serverName = null;
 			this.username = null;
+			this.sessionExpiredNotified = false;
 		}
 	}
 
@@ -237,6 +281,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getLatestMedia failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -256,6 +304,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getRecentlyAdded failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -275,6 +327,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getNextUp failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -294,6 +350,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getResumeItems failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -303,28 +363,31 @@ class JellyfinService {
 	}
 
 	// Get current user info
-	getCurrentUser() {
+	async getCurrentUser() {
 		if (!this.userId) return null;
-		return fetch(`${this.serverUrl}/Users/${this.userId}`, {
-			headers: {
-				'X-Emby-Token': this.accessToken
-			}
-		})
-			.then(res => res.json())
-			.then((user) => {
-				const active = serverManager.getActiveServer();
-				if (active?.id && active?.activeUser?.userId) {
-					serverManager.updateUser(active.id, active.activeUser.userId, {
-						username: user?.Name || active.activeUser.username || 'User',
-						avatarTag: user?.PrimaryImageTag || null
-					});
+		try {
+			const response = await fetch(`${this.serverUrl}/Users/${this.userId}`, {
+				headers: {
+					'X-Emby-Token': this.accessToken
 				}
-				return user;
-			})
-			.catch(err => {
-				console.error('Failed to get current user:', err);
-				return null;
 			});
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				return null;
+			}
+			const user = await response.json();
+			const active = serverManager.getActiveServer();
+			if (active?.id && active?.activeUser?.userId) {
+				serverManager.updateUser(active.id, active.activeUser.userId, {
+					username: user?.Name || active.activeUser.username || 'User',
+					avatarTag: user?.PrimaryImageTag || null
+				});
+			}
+			return user;
+		} catch (err) {
+			console.error('Failed to get current user:', err);
+			return null;
+		}
 	}
 
 	// Get library views
@@ -338,6 +401,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getLibraryViews failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -361,6 +428,10 @@ class JellyfinService {
 					'X-Emby-Token': this.accessToken
 				}
 			});
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getLibraryItems failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -380,6 +451,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getItem failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data;
 		} catch (error) {
@@ -399,6 +474,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getSeasons failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -418,6 +497,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getEpisodes failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -437,6 +520,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getNextUpEpisode failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			// Return first episode if available
 			if (data.Items && data.Items.length > 0) {
@@ -452,6 +539,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!seasonsResponse.ok) {
+				this._handleAuthFailureStatus(seasonsResponse.status);
+				throw new Error(`getNextUpEpisode seasons fetch failed with status ${seasonsResponse.status}`);
+			}
 			const seasonsData = await seasonsResponse.json();
 			if (seasonsData.Items && seasonsData.Items.length > 0) {
 				// Get first non-special season (IndexNumber > 0)
@@ -467,9 +558,216 @@ class JellyfinService {
 		}
 	}
 
+	_normalizeCodec(codec) {
+		return (codec || '').toString().trim().toLowerCase();
+	}
+
+	_toInteger(value) {
+		if (Number.isInteger(value)) return value;
+		if (typeof value === 'string' && value.trim() !== '') {
+			const parsed = Number(value);
+			return Number.isInteger(parsed) ? parsed : null;
+		}
+		return null;
+	}
+
+	_getAudioStreams(mediaSource) {
+		return mediaSource?.MediaStreams?.filter((stream) => stream.Type === 'Audio') || [];
+	}
+
+	_getSubtitleStreams(mediaSource) {
+		return mediaSource?.MediaStreams?.filter((stream) => stream.Type === 'Subtitle') || [];
+	}
+
+	_getVideoStream(mediaSource) {
+		return mediaSource?.MediaStreams?.find((stream) => stream.Type === 'Video') || null;
+	}
+
+	_isSupportedAudioCodec(codec) {
+		const normalized = this._normalizeCodec(codec);
+		return !normalized || WEBOS_SUPPORTED_AUDIO_CODECS.has(normalized);
+	}
+
+	_getDefaultAudioStreamIndex(mediaSource) {
+		const explicitDefault = this._toInteger(mediaSource?.DefaultAudioStreamIndex);
+		if (explicitDefault !== null) return explicitDefault;
+		const defaultStream = this._getAudioStreams(mediaSource).find((stream) => stream.IsDefault);
+		return this._toInteger(defaultStream?.Index);
+	}
+
+	_getSubtitleStreamByIndex(mediaSource, streamIndex) {
+		const index = this._toInteger(streamIndex);
+		if (index === null || index < 0) return null;
+		return this._getSubtitleStreams(mediaSource).find((stream) => this._toInteger(stream.Index) === index) || null;
+	}
+
+	_normalizeSubtitleCodec(stream) {
+		const candidates = [
+			stream?.Codec,
+			stream?.CodecTag,
+			stream?.DeliveryMethod,
+			stream?.DisplayTitle
+		];
+		for (const candidate of candidates) {
+			const normalized = this._normalizeCodec(candidate);
+			if (normalized) return normalized;
+		}
+		return '';
+	}
+
+	_isTextSubtitleCodec(codec) {
+		const normalized = this._normalizeCodec(codec);
+		return WEBOS_DIRECTPLAY_TEXT_SUBTITLE_CODECS.has(normalized);
+	}
+
+	_shouldTranscodeForSubtitleSelection(mediaSource, subtitleStreamIndex) {
+		const subtitleStream = this._getSubtitleStreamByIndex(mediaSource, subtitleStreamIndex);
+		if (!subtitleStream) return false;
+		const codec = this._normalizeSubtitleCodec(subtitleStream);
+		// Fail-safe: only keep direct-play for known text subtitle codecs.
+		return !this._isTextSubtitleCodec(codec);
+	}
+
+	_findBestCompatibleAudioStreamIndex(mediaSource) {
+		const audioStreams = this._getAudioStreams(mediaSource);
+		if (!audioStreams.length) return null;
+		let best = null;
+		for (const stream of audioStreams) {
+			const codec = this._normalizeCodec(stream.Codec);
+			if (codec && !this._isSupportedAudioCodec(codec)) continue;
+			const priority = WEBOS_AUDIO_CODEC_PRIORITY.indexOf(codec);
+			const priorityScore = priority >= 0 ? (WEBOS_AUDIO_CODEC_PRIORITY.length - priority) : 1;
+			const channels = Number.isFinite(stream.Channels) ? stream.Channels : 0;
+			const score = priorityScore * 100 + channels;
+			if (!best || score > best.score) {
+				best = {index: this._toInteger(stream.Index), score};
+			}
+		}
+		return best?.index ?? null;
+	}
+
+	_scoreMediaSource(mediaSource, {forceTranscoding = false} = {}) {
+		if (!mediaSource) return Number.NEGATIVE_INFINITY;
+		const videoStream = this._getVideoStream(mediaSource);
+		const audioStreams = this._getAudioStreams(mediaSource);
+		const hasCompatibleAudio = !audioStreams.length || audioStreams.some((stream) => this._isSupportedAudioCodec(stream.Codec));
+		let score = 0;
+
+		if (forceTranscoding) {
+			if (mediaSource.SupportsTranscoding) score += 1200;
+			if (mediaSource.TranscodingUrl) score += 900;
+			if (mediaSource.TranscodingContainer) score += 120;
+		} else {
+			if (mediaSource.SupportsDirectPlay) score += 1400;
+			if (mediaSource.SupportsDirectStream) score += 1000;
+			if (!mediaSource.TranscodingUrl) score += 150;
+			if (mediaSource.SupportsTranscoding) score += 50;
+			if (hasCompatibleAudio) score += 180;
+			else if (audioStreams.length > 0) score -= 250;
+		}
+
+		if (videoStream?.Width >= 3840) score += 60;
+		else if (videoStream?.Width >= 1920) score += 40;
+		else if (videoStream?.Width >= 1280) score += 20;
+		if (videoStream?.BitRate && videoStream.BitRate <= 120000000) score += 20;
+
+		return score;
+	}
+
+	_selectMediaSource(mediaSources, {preferredMediaSourceId = null, forceTranscoding = false} = {}) {
+		if (!Array.isArray(mediaSources) || mediaSources.length === 0) {
+			return {source: null, index: -1, score: Number.NEGATIVE_INFINITY, reason: 'none'};
+		}
+
+		if (preferredMediaSourceId) {
+			const preferredIndex = mediaSources.findIndex((source) => source.Id === preferredMediaSourceId);
+			if (preferredIndex >= 0) {
+				return {
+					source: mediaSources[preferredIndex],
+					index: preferredIndex,
+					score: Number.POSITIVE_INFINITY,
+					reason: 'requested'
+				};
+			}
+		}
+
+		let bestIndex = 0;
+		let bestScore = Number.NEGATIVE_INFINITY;
+		for (let index = 0; index < mediaSources.length; index += 1) {
+			const score = this._scoreMediaSource(mediaSources[index], {forceTranscoding});
+			if (score > bestScore) {
+				bestScore = score;
+				bestIndex = index;
+			}
+		}
+		return {
+			source: mediaSources[bestIndex],
+			index: bestIndex,
+			score: bestScore,
+			reason: 'scored'
+		};
+	}
+
+	_reorderMediaSources(mediaSources, selectedIndex) {
+		if (!Array.isArray(mediaSources) || selectedIndex <= 0 || selectedIndex >= mediaSources.length) {
+			return mediaSources;
+		}
+		const selected = mediaSources[selectedIndex];
+		const reordered = mediaSources.slice();
+		reordered.splice(selectedIndex, 1);
+		reordered.unshift(selected);
+		return reordered;
+	}
+
+	_determinePlayMethod(mediaSource, {forceTranscoding = false} = {}) {
+		if (!mediaSource) return 'DirectStream';
+		if (forceTranscoding) return 'Transcode';
+		const audioStreams = this._getAudioStreams(mediaSource);
+		const hasCompatibleAudio = !audioStreams.length || audioStreams.some((stream) => this._isSupportedAudioCodec(stream.Codec));
+		if (!hasCompatibleAudio && mediaSource.TranscodingUrl) return 'Transcode';
+		if (mediaSource.SupportsDirectPlay) return 'DirectPlay';
+		if (mediaSource.SupportsDirectStream) return 'DirectStream';
+		if (mediaSource.TranscodingUrl) return 'Transcode';
+		return 'DirectStream';
+	}
+
+	async _fetchPlaybackInfo(itemId, payload) {
+		const response = await fetch(`${this.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${this.userId}`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Emby-Token': this.accessToken
+			},
+			body: JSON.stringify(payload)
+		});
+		if (!response.ok) {
+			this._handleAuthFailureStatus(response.status);
+			const errorText = await response.text();
+			console.error('PlaybackInfo error response:', errorText);
+			const compactError = String(errorText || '').replace(/\s+/g, ' ').trim().slice(0, 280);
+			throw new Error(`HTTP ${response.status}: ${response.statusText}${compactError ? ` - ${compactError}` : ''}`);
+		}
+		return response.json();
+	}
+
+	_buildPlaystatePayload(basePayload, session = {}) {
+		const payload = {
+			...basePayload,
+			PlayMethod: session.playMethod || basePayload.PlayMethod || 'DirectStream'
+		};
+		if (session.playSessionId) payload.PlaySessionId = session.playSessionId;
+		if (session.mediaSourceId) payload.MediaSourceId = session.mediaSourceId;
+		if (Number.isInteger(session.audioStreamIndex)) payload.AudioStreamIndex = session.audioStreamIndex;
+		if (session.subtitleStreamIndex === -1 || Number.isInteger(session.subtitleStreamIndex)) {
+			payload.SubtitleStreamIndex = session.subtitleStreamIndex;
+		}
+		return payload;
+	}
+
 	// Get playback info and URL
 	async getPlaybackInfo(itemId, options = {}) {
 		try {
+			const relaxedPlaybackProfile = options.relaxedPlaybackProfile === true;
 			const payload = {};
 			if (options.mediaSourceId) {
 				payload.MediaSourceId = options.mediaSourceId;
@@ -479,8 +777,9 @@ class JellyfinService {
 			}
 			if (options.subtitleStreamIndex !== undefined && options.subtitleStreamIndex !== null) {
 				payload.SubtitleStreamIndex = options.subtitleStreamIndex;
-				// For webOS, prefer burned-in subtitles when a specific track is chosen
-				if (options.subtitleStreamIndex >= 0) {
+				// In strict/default mode prefer burned-in subtitles for webOS compatibility.
+				// Relaxed profile lets Jellyfin choose alternate subtitle handling paths.
+				if (!relaxedPlaybackProfile && options.subtitleStreamIndex >= 0) {
 					payload.SubtitleMethod = 'Encode';
 				}
 			}
@@ -491,65 +790,108 @@ class JellyfinService {
 			// Settings-driven knobs
 			const forceTranscoding = options.forceTranscoding === true;
 			const enableTranscoding = options.enableTranscoding !== false; // default on
+			// Keep stream copy available on transcode sessions unless explicitly disabled.
+			// This mirrors Jellyfin client behavior and prevents fragile full re-encode failures.
+			const allowStreamCopyOnTranscode = options.allowStreamCopyOnTranscode !== false;
+			const allowStreamCopy = enableTranscoding && (!forceTranscoding || allowStreamCopyOnTranscode);
 			const maxBitrateSetting = options.maxBitrate ? parseInt(options.maxBitrate, 10) : null;
-
-			// webOS-optimized device profile
-			payload.EnableDirectPlay = !forceTranscoding;
-			payload.EnableDirectStream = !forceTranscoding;
-			payload.EnableTranscoding = enableTranscoding;
-			payload.AllowVideoStreamCopy = enableTranscoding && !forceTranscoding;
-			payload.AllowAudioStreamCopy = enableTranscoding && !forceTranscoding;
-			payload.AutoOpenLiveStream = true;
-			if (maxBitrateSetting) {
-				payload.MaxStreamingBitrate = maxBitrateSetting * 1000000; // convert Mbps to bps
+			let requestedAudioStreamIndex = Number.isInteger(options.audioStreamIndex) ? options.audioStreamIndex : null;
+			const directPlayProfiles = forceTranscoding ? [] : [
+				// webOS natively supports HLS
+				{ Container: 'hls', Type: 'Video', VideoCodec: 'h264,hevc', AudioCodec: 'aac,ac3,eac3,mp3' },
+				// MP4 container - webOS TVs have excellent MP4 support
+				{ Container: 'mp4,m4v', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2' },
+				// MKV support varies by webOS version, but newer versions support it
+				// Drop DTS from the direct-play list so Jellyfin will transcode DTS/DTS-HD
+				{ Container: 'mkv', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2' },
+				// Audio direct play
+				{ Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
+				{ Container: 'aac', Type: 'Audio', AudioCodec: 'aac' },
+				{ Container: 'flac', Type: 'Audio', AudioCodec: 'flac' },
+				{ Container: 'webm', Type: 'Audio', AudioCodec: 'vorbis,opus' }
+			];
+			if (relaxedPlaybackProfile && !forceTranscoding) {
+				directPlayProfiles.push({
+					Container: 'mkv',
+					Type: 'Video',
+					VideoCodec: 'h264,hevc,mpeg4,mpeg2video,vp9,av1',
+					AudioCodec: 'aac,ac3,eac3,mp3,mp2,flac,opus,vorbis,pcm,dts,dca,truehd'
+				});
 			}
-			payload.DeviceProfile = {
-				Name: 'Breezyfin webOS TV',
-				MaxStreamingBitrate: maxBitrateSetting ? maxBitrateSetting * 1000000 : 120000000,
-				MaxStaticBitrate: 100000000,
-				MusicStreamingTranscodingBitrate: 384000,
-				DirectPlayProfiles: forceTranscoding ? [] : [
-					// webOS natively supports HLS
-					{ Container: 'hls', Type: 'Video', VideoCodec: 'h264,hevc', AudioCodec: 'aac,ac3,eac3,mp3' },
-					// MP4 container - webOS TVs have excellent MP4 support
-					{ Container: 'mp4,m4v', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2' },
-					// MKV support varies by webOS version, but newer versions support it
-					// Drop DTS from the direct-play list so Jellyfin will transcode DTS/DTS-HD
-					{ Container: 'mkv', Type: 'Video', VideoCodec: 'h264,hevc,mpeg4,mpeg2video', AudioCodec: 'aac,ac3,eac3,mp3,mp2' },
-					// Audio direct play
-					{ Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
-					{ Container: 'aac', Type: 'Audio', AudioCodec: 'aac' },
-					{ Container: 'flac', Type: 'Audio', AudioCodec: 'flac' },
-					{ Container: 'webm', Type: 'Audio', AudioCodec: 'vorbis,opus' }
-				],
-				TranscodingProfiles: [
-					// HLS transcoding - BEST for webOS (hardware accelerated)
-					// Use stereo for maximum compatibility
+
+			const transcodingProfiles = [
+				// HLS transcoding - BEST for webOS (hardware accelerated)
+				// Use stereo for maximum compatibility
+				{
+					Container: 'ts',
+					Type: 'Video',
+					AudioCodec: 'aac',
+					VideoCodec: 'h264',
+					Context: 'Streaming',
+					Protocol: 'hls',
+					MaxAudioChannels: '2',
+					MinSegments: '1',
+					BreakOnNonKeyFrames: false
+				},
+				// HLS Audio
+				{
+					Container: 'ts',
+					Type: 'Audio',
+					AudioCodec: 'aac',
+					Context: 'Streaming',
+					Protocol: 'hls',
+					MaxAudioChannels: '2',
+					BreakOnNonKeyFrames: false
+				},
+				// HTTP Audio fallback
+				{ Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3', Context: 'Streaming', Protocol: 'http', MaxAudioChannels: '2' }
+			];
+
+			if (relaxedPlaybackProfile) {
+				transcodingProfiles.push(
 					{
 						Container: 'ts',
 						Type: 'Video',
-						AudioCodec: 'aac',
+						AudioCodec: 'aac,ac3,mp3',
 						VideoCodec: 'h264',
 						Context: 'Streaming',
 						Protocol: 'hls',
-						MaxAudioChannels: '2',
+						MaxAudioChannels: '6',
 						MinSegments: '1',
 						BreakOnNonKeyFrames: false
 					},
-					// HLS Audio
 					{
-						Container: 'ts',
-						Type: 'Audio',
-						AudioCodec: 'aac',
+						Container: 'mp4',
+						Type: 'Video',
+						AudioCodec: 'aac,ac3,mp3',
+						VideoCodec: 'h264',
 						Context: 'Streaming',
-						Protocol: 'hls',
-						MaxAudioChannels: '2',
-						BreakOnNonKeyFrames: false
-					},
-					// HTTP Audio fallback
-					{ Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3', Context: 'Streaming', Protocol: 'http', MaxAudioChannels: '2' }
-				],
-				SubtitleProfiles: [
+						Protocol: 'http',
+						MaxAudioChannels: '6'
+					}
+				);
+			}
+
+			const subtitleProfiles = relaxedPlaybackProfile
+				? [
+					{ Format: 'ass', Method: 'External' },
+					{ Format: 'ssa', Method: 'External' },
+					{ Format: 'srt', Method: 'External' },
+					{ Format: 'subrip', Method: 'External' },
+					{ Format: 'vtt', Method: 'External' },
+					{ Format: 'webvtt', Method: 'External' },
+					{ Format: 'ass', Method: 'Encode' },
+					{ Format: 'ssa', Method: 'Encode' },
+					{ Format: 'srt', Method: 'Encode' },
+					{ Format: 'subrip', Method: 'Encode' },
+					{ Format: 'vtt', Method: 'Encode' },
+					{ Format: 'webvtt', Method: 'Encode' },
+					{ Format: 'pgs', Method: 'Encode' },
+					{ Format: 'pgssub', Method: 'Encode' },
+					{ Format: 'dvbsub', Method: 'Encode' },
+					{ Format: 'dvdsub', Method: 'Encode' }
+				]
+				: [
 					// Burn-in all subtitles for webOS compatibility
 					// webOS has limited native subtitle support, so we transcode with burn-in
 					{ Format: 'ass', Method: 'Encode' },
@@ -562,7 +904,26 @@ class JellyfinService {
 					{ Format: 'pgssub', Method: 'Encode' },
 					{ Format: 'dvbsub', Method: 'Encode' },
 					{ Format: 'dvdsub', Method: 'Encode' }
-				],
+				];
+
+			// webOS-optimized device profile
+			payload.EnableDirectPlay = !forceTranscoding;
+			payload.EnableDirectStream = !forceTranscoding;
+			payload.EnableTranscoding = enableTranscoding;
+			payload.AllowVideoStreamCopy = allowStreamCopy;
+			payload.AllowAudioStreamCopy = allowStreamCopy;
+			payload.AutoOpenLiveStream = true;
+			if (maxBitrateSetting) {
+				payload.MaxStreamingBitrate = maxBitrateSetting * 1000000; // convert Mbps to bps
+			}
+			payload.DeviceProfile = {
+				Name: relaxedPlaybackProfile ? 'Breezyfin webOS TV (Relaxed)' : 'Breezyfin webOS TV',
+				MaxStreamingBitrate: maxBitrateSetting ? maxBitrateSetting * 1000000 : 120000000,
+				MaxStaticBitrate: 100000000,
+				MusicStreamingTranscodingBitrate: 384000,
+				DirectPlayProfiles: directPlayProfiles,
+				TranscodingProfiles: transcodingProfiles,
+				SubtitleProfiles: subtitleProfiles,
 				ContainerProfiles: [],
 				CodecProfiles: [
 					{
@@ -607,23 +968,115 @@ class JellyfinService {
 				]
 			};
 
-			// Use POST with populated profile
-			const response = await fetch(`${this.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${this.userId}`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Emby-Token': this.accessToken
-				},
-				body: JSON.stringify(payload)
-			});
+			let data = await this._fetchPlaybackInfo(itemId, payload);
+			const adjustments = [];
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error('PlaybackInfo error response:', errorText);
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			if (!data?.MediaSources?.length) {
+				return data;
 			}
 
-			const data = await response.json();
+			// Pick the most compatible source and move it to index 0 so the caller can use MediaSources[0].
+			const sourceSelection = this._selectMediaSource(data.MediaSources, {
+				preferredMediaSourceId: options.mediaSourceId,
+				forceTranscoding
+			});
+			if (sourceSelection.index > 0) {
+				data.MediaSources = this._reorderMediaSources(data.MediaSources, sourceSelection.index);
+				adjustments.push({
+					type: 'sourceSelection',
+					toast: 'Playback source optimized for this TV.'
+				});
+			}
+
+			let selectedSource = data.MediaSources[0];
+
+			// If the default audio codec is unsupported, re-request with a compatible track.
+			if (!Number.isInteger(options.audioStreamIndex) && !forceTranscoding && selectedSource) {
+				const defaultAudioIndex = this._getDefaultAudioStreamIndex(selectedSource);
+				const fallbackAudioIndex = this._findBestCompatibleAudioStreamIndex(selectedSource);
+				if (defaultAudioIndex !== null && fallbackAudioIndex !== null && defaultAudioIndex !== fallbackAudioIndex) {
+					const defaultAudioStream = this._getAudioStreams(selectedSource).find((stream) => this._toInteger(stream.Index) === defaultAudioIndex);
+					const defaultCodecSupported = this._isSupportedAudioCodec(defaultAudioStream?.Codec);
+					if (!defaultCodecSupported) {
+						const retryPayload = {
+							...payload,
+							MediaSourceId: selectedSource.Id,
+							AudioStreamIndex: fallbackAudioIndex
+						};
+						const retryData = await this._fetchPlaybackInfo(itemId, retryPayload);
+						if (retryData?.MediaSources?.length) {
+							data = retryData;
+							const retrySelection = this._selectMediaSource(data.MediaSources, {
+								preferredMediaSourceId: selectedSource.Id,
+								forceTranscoding
+							});
+							if (retrySelection.index > 0) {
+								data.MediaSources = this._reorderMediaSources(data.MediaSources, retrySelection.index);
+							}
+							selectedSource = data.MediaSources[0];
+							requestedAudioStreamIndex = fallbackAudioIndex;
+							adjustments.push({
+								type: 'audioFallback',
+								toast: 'Switched audio track for compatibility.'
+							});
+						}
+					}
+				}
+			}
+
+			// If we determined playback needs transcoding but no URL was returned, force a transcode-only request.
+			const selectedSubtitleStreamIndex = this._toInteger(payload.SubtitleStreamIndex);
+			const subtitleNeedsTranscoding =
+				selectedSubtitleStreamIndex !== null &&
+				selectedSubtitleStreamIndex >= 0 &&
+				this._shouldTranscodeForSubtitleSelection(selectedSource, selectedSubtitleStreamIndex);
+			let playMethod = this._determinePlayMethod(selectedSource, {
+				forceTranscoding: forceTranscoding || subtitleNeedsTranscoding
+			});
+			if (subtitleNeedsTranscoding) {
+				adjustments.push({
+					type: 'subtitleTranscodeGuard',
+					toast: 'Using transcoding for subtitle compatibility.'
+				});
+			}
+			if (playMethod === 'Transcode' && !selectedSource?.TranscodingUrl && enableTranscoding) {
+				const transcodePayload = {
+					...payload,
+					EnableDirectPlay: false,
+					EnableDirectStream: false,
+					EnableTranscoding: true
+				};
+				if (selectedSource?.Id) {
+					transcodePayload.MediaSourceId = selectedSource.Id;
+				}
+				if (Number.isInteger(requestedAudioStreamIndex)) {
+					transcodePayload.AudioStreamIndex = requestedAudioStreamIndex;
+				}
+				const transcodedData = await this._fetchPlaybackInfo(itemId, transcodePayload);
+				if (transcodedData?.MediaSources?.length) {
+					data = transcodedData;
+					const transcodeSelection = this._selectMediaSource(data.MediaSources, {
+						preferredMediaSourceId: selectedSource?.Id,
+						forceTranscoding: true
+					});
+					if (transcodeSelection.index > 0) {
+						data.MediaSources = this._reorderMediaSources(data.MediaSources, transcodeSelection.index);
+					}
+					selectedSource = data.MediaSources[0];
+					playMethod = 'Transcode';
+					adjustments.push({
+						type: 'forcedTranscode',
+						toast: 'Using transcoding for compatibility.'
+					});
+				}
+			}
+
+			data.__breezyfin = {
+				playMethod,
+				selectedMediaSourceId: selectedSource?.Id || null,
+				selectedAudioStreamIndex: requestedAudioStreamIndex,
+				adjustments
+			};
 			return data;
 		} catch (error) {
 			console.error('Failed to get playback info:', error);
@@ -662,42 +1115,42 @@ class JellyfinService {
 	}
 
 	// Report playback started
-	async reportPlaybackStart(itemId, positionTicks = 0) {
+	async reportPlaybackStart(itemId, positionTicks = 0, session = {}) {
 		const playstateApi = getPlaystateApi(this.api);
 		await playstateApi.reportPlaybackStart({
-			playbackStartInfo: {
+			playbackStartInfo: this._buildPlaystatePayload({
 				ItemId: itemId,
 				PositionTicks: positionTicks,
 				IsPaused: false,
 				IsMuted: false,
 				PlayMethod: 'DirectStream'
-			}
+			}, session)
 		});
 	}
 
 	// Report playback progress
-	async reportPlaybackProgress(itemId, positionTicks, isPaused = false) {
+	async reportPlaybackProgress(itemId, positionTicks, isPaused = false, session = {}) {
 		const playstateApi = getPlaystateApi(this.api);
 		await playstateApi.reportPlaybackProgress({
-			playbackProgressInfo: {
+			playbackProgressInfo: this._buildPlaystatePayload({
 				ItemId: itemId,
 				PositionTicks: positionTicks,
 				IsPaused: isPaused,
 				IsMuted: false,
 				PlayMethod: 'DirectStream'
-			}
+			}, session)
 		});
 	}
 
 	// Report playback stopped
-	async reportPlaybackStopped(itemId, positionTicks) {
+	async reportPlaybackStopped(itemId, positionTicks, session = {}) {
 		const playstateApi = getPlaystateApi(this.api);
 		await playstateApi.reportPlaybackStopped({
-			playbackStopInfo: {
+			playbackStopInfo: this._buildPlaystatePayload({
 				ItemId: itemId,
 				PositionTicks: positionTicks,
 				PlayMethod: 'DirectStream'
-			}
+			}, session)
 		});
 	}
 
@@ -716,6 +1169,10 @@ class JellyfinService {
 					'X-Emby-Token': this.accessToken
 				}
 			});
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`search failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -736,6 +1193,10 @@ class JellyfinService {
 					}
 				}
 			);
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getFavorites failed with status ${response.status}`);
+			}
 			const data = await response.json();
 			return data.Items || [];
 		} catch (error) {
@@ -759,6 +1220,7 @@ class JellyfinService {
 			);
 
 			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
 				throw new Error(`Failed to toggle favorite: ${response.status}`);
 			}
 
@@ -794,6 +1256,7 @@ class JellyfinService {
 			);
 
 			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
 				throw new Error(`Failed to mark watched: ${response.status}`);
 			}
 
@@ -818,6 +1281,7 @@ class JellyfinService {
 			);
 
 			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
 				throw new Error(`Failed to mark unwatched: ${response.status}`);
 			}
 
@@ -845,6 +1309,10 @@ class JellyfinService {
 					'X-Emby-Token': this.accessToken
 				}
 			});
+			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
+				throw new Error(`getServerInfo failed with status ${response.status}`);
+			}
 			return await response.json();
 		} catch (error) {
 			console.error('getServerInfo error:', error);
@@ -856,6 +1324,9 @@ class JellyfinService {
 	async getPublicServerInfo() {
 		try {
 			const response = await fetch(`${this.serverUrl}/System/Info/Public`);
+			if (!response.ok) {
+				throw new Error(`getPublicServerInfo failed with status ${response.status}`);
+			}
 			return await response.json();
 		} catch (error) {
 			console.error('getPublicServerInfo error:', error);
@@ -873,6 +1344,7 @@ class JellyfinService {
 				}
 			});
 			if (!response.ok) {
+				this._handleAuthFailureStatus(response.status);
 				console.warn('getMediaSegments non-200:', response.status);
 				return [];
 			}

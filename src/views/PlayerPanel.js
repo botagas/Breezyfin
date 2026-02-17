@@ -3,7 +3,6 @@ import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Slider from '@enact/sandstone/Slider';
 import BodyText from '@enact/sandstone/BodyText';
-import Spinner from '@enact/sandstone/Spinner';
 import Popup from '@enact/sandstone/Popup';
 import Item from '@enact/sandstone/Item';
 import Scroller from '@enact/sandstone/Scroller';
@@ -12,10 +11,20 @@ import Hls from 'hls.js';
 import jellyfinService from '../services/jellyfinService';
 import {KeyCodes} from '../utils/keyCodes';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../utils/errorMessages';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
+import {isStyleDebugEnabled} from '../utils/featureFlags';
+import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useTrackPreferences } from '../hooks/useTrackPreferences';
+import { useToastMessage } from '../hooks/useToastMessage';
 
 import css from './PlayerPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
 import {popupShellCss} from '../styles/popupStyles';
+
+const MAX_HLS_NETWORK_RECOVERY_ATTEMPTS = 1;
+const MAX_HLS_MEDIA_RECOVERY_ATTEMPTS = 1;
+const MAX_PLAY_SESSION_REBUILD_ATTEMPTS = 1;
+const RELAXED_PLAYBACK_PROFILE_ENABLED = isStyleDebugEnabled();
 
 const PlayerPanel = ({
 	item,
@@ -33,10 +42,16 @@ const PlayerPanel = ({
 	const progressIntervalRef = useRef(null);
 	const seekOffsetRef = useRef(0); // Track offset for transcoded stream seeking
 	const playbackSettingsRef = useRef({}); // Persist user playback settings between re-requests
+	const playbackSessionRef = useRef({
+		playSessionId: null,
+		mediaSourceId: null,
+		playMethod: 'DirectStream'
+	});
+	const currentAudioTrackRef = useRef(null);
+	const currentSubtitleTrackRef = useRef(null);
 	const startupFallbackTimerRef = useRef(null);
 	const transcodeFallbackAttemptedRef = useRef(false);
 	const reloadAttemptedRef = useRef(false);
-	const trackPreferenceRef = useRef(null);
 	const lastProgressRef = useRef({ time: 0, timestamp: 0 });
 	const loadVideoRef = useRef(null);
 	const playbackOverrideRef = useRef(null);
@@ -52,7 +67,22 @@ const PlayerPanel = ({
 	const nextEpisodePromptStartTicksRef = useRef(null);
 	const wasSkipOverlayVisibleRef = useRef(false);
 	const skipFocusRetryTimerRef = useRef(null);
-	const [toastMessage, setToastMessage] = useState('');
+	const subtitleCompatibilityFallbackAttemptedRef = useRef(false);
+	const hlsNetworkRecoveryAttemptsRef = useRef(0);
+	const hlsMediaRecoveryAttemptsRef = useRef(0);
+	const playSessionRebuildAttemptsRef = useRef(0);
+	const playbackFailureLockedRef = useRef(false);
+	const {
+		toastMessage,
+		setToastMessage
+	} = useToastMessage({durationMs: 2000});
+	const {
+		loadTrackPreferences,
+		pickPreferredAudio,
+		pickPreferredSubtitle,
+		saveAudioSelection,
+		saveSubtitleSelection
+	} = useTrackPreferences();
 
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
@@ -82,6 +112,7 @@ const PlayerPanel = ({
 	const [nextEpisodePromptDismissed, setNextEpisodePromptDismissed] = useState(false);
 	const [nextEpisodeData, setNextEpisodeData] = useState(null);
 	const [seekFeedback, setSeekFeedback] = useState('');
+	const isCurrentTranscoding = mediaSourceData?.__selectedPlayMethod === 'Transcode';
 
 	useEffect(() => {
 		if (typeof requestedControlsVisible === 'boolean') {
@@ -108,6 +139,22 @@ const PlayerPanel = ({
 		}
 		return opts;
 	}, [currentAudioTrack, currentSubtitleTrack]);
+
+	useEffect(() => {
+		currentAudioTrackRef.current = currentAudioTrack;
+	}, [currentAudioTrack]);
+
+	useEffect(() => {
+		currentSubtitleTrackRef.current = currentSubtitleTrack;
+	}, [currentSubtitleTrack]);
+
+	const getPlaybackSessionContext = useCallback(() => ({
+		...playbackSessionRef.current,
+		audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
+		subtitleStreamIndex: (currentSubtitleTrackRef.current === -1 || Number.isInteger(currentSubtitleTrackRef.current))
+			? currentSubtitleTrackRef.current
+			: undefined
+	}), []);
 
 	// Find the next episode relative to the current one
 	const getNextEpisode = useCallback(async (currentItem) => {
@@ -206,10 +253,10 @@ const PlayerPanel = ({
 		progressIntervalRef.current = setInterval(async () => {
 			if (videoRef.current && item) {
 				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-				await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, false);
+				await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, false, getPlaybackSessionContext());
 			}
 		}, 10000);
-	}, [item]);
+	}, [getPlaybackSessionContext, item]);
 
 	const clearStartWatch = useCallback(() => {
 		if (startWatchTimerRef.current) {
@@ -248,14 +295,177 @@ const PlayerPanel = ({
 		tryFocus();
 	}, []);
 
+	const resetRecoveryGuards = useCallback(() => {
+		playbackFailureLockedRef.current = false;
+		hlsNetworkRecoveryAttemptsRef.current = 0;
+		hlsMediaRecoveryAttemptsRef.current = 0;
+	}, []);
+
+	const stopHlsRecoveryLoop = useCallback(() => {
+		if (!hlsRef.current) return;
+		try {
+			hlsRef.current.stopLoad?.();
+		} catch (err) {
+			console.warn('Error stopping HLS load:', err);
+		}
+		try {
+			hlsRef.current.destroy();
+		} catch (err) {
+			console.warn('Error destroying HLS instance during failure handling:', err);
+		}
+		hlsRef.current = null;
+	}, []);
+
+	const attemptPlaybackSessionRebuild = useCallback((reason, options = {}) => {
+		const {
+			toast = '',
+			errorData = null
+		} = options;
+		if (playbackFailureLockedRef.current) return false;
+		if (reloadAttemptedRef.current) {
+			console.warn(`[Player] ${reason}, rebuild already attempted for this load`);
+			return false;
+		}
+		if (playSessionRebuildAttemptsRef.current >= MAX_PLAY_SESSION_REBUILD_ATTEMPTS) {
+			console.warn(
+				`[Player] ${reason}, rebuild limit reached (${MAX_PLAY_SESSION_REBUILD_ATTEMPTS})`
+			);
+			return false;
+		}
+
+		playSessionRebuildAttemptsRef.current += 1;
+		reloadAttemptedRef.current = true;
+		const rebuildAttempt = playSessionRebuildAttemptsRef.current;
+		const seekSeconds = Math.max(0, (videoRef.current?.currentTime || 0) + seekOffsetRef.current);
+
+		console.warn(
+			`[Player] ${reason}. Rebuilding session with fresh PlaySessionId (${rebuildAttempt}/${MAX_PLAY_SESSION_REBUILD_ATTEMPTS})`,
+			errorData || ''
+		);
+
+		clearStartWatch();
+		if (startupFallbackTimerRef.current) {
+			clearTimeout(startupFallbackTimerRef.current);
+			startupFallbackTimerRef.current = null;
+		}
+
+		if (hlsRef.current) {
+			try {
+				hlsRef.current.destroy();
+			} catch (destroyErr) {
+				console.warn('Failed to destroy HLS instance during session rebuild:', destroyErr);
+			}
+			hlsRef.current = null;
+		}
+		if (videoRef.current) {
+			videoRef.current.removeAttribute('src');
+			videoRef.current.load();
+		}
+
+		playbackOverrideRef.current = {
+			...(playbackOptions || {}),
+			audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
+			subtitleStreamIndex:
+				(currentSubtitleTrackRef.current === -1 || Number.isInteger(currentSubtitleTrackRef.current))
+					? currentSubtitleTrackRef.current
+					: undefined,
+			seekSeconds,
+			forceNewSession: true
+		};
+
+		setError(null);
+		setLoading(true);
+		setPlaying(false);
+		if (toast) {
+			setToastMessage(toast);
+		}
+
+		if (typeof loadVideoRef.current === 'function') {
+			setTimeout(() => {
+				if (!playbackFailureLockedRef.current) {
+					loadVideoRef.current();
+				}
+			}, 0);
+			return true;
+		}
+		return false;
+	}, [clearStartWatch, playbackOptions, setToastMessage]);
+
 	const showPlaybackError = useCallback((message) => {
+		playbackFailureLockedRef.current = true;
+		stopHlsRecoveryLoop();
 		const errorMessage = message || 'Failed to play video';
 		setError(errorMessage);
-		setToastMessage(errorMessage);
+		setToastMessage('');
 		setShowControls(true);
 		setLoading(false);
 		clearStartWatch();
-	}, [clearStartWatch]);
+		if (startupFallbackTimerRef.current) {
+			clearTimeout(startupFallbackTimerRef.current);
+			startupFallbackTimerRef.current = null;
+		}
+	}, [clearStartWatch, setToastMessage, stopHlsRecoveryLoop]);
+
+	const attemptHlsFatalRecovery = useCallback((hls, errorData, source = 'HLS') => {
+		if (!errorData?.fatal) return false;
+		if (playbackFailureLockedRef.current) return true;
+
+		if (errorData.type === Hls.ErrorTypes.NETWORK_ERROR) {
+			const statusCode = Number(errorData?.response?.code);
+			const isServerHttpFailure = Number.isFinite(statusCode) && statusCode >= 500;
+			if (isServerHttpFailure && errorData.details === 'fragLoadError') {
+				const rebuilt = attemptPlaybackSessionRebuild(
+					`${source} fragment request failed with HTTP ${statusCode}`,
+					{
+						toast: 'Server stream failed. Rebuilding playback session...',
+						errorData
+					}
+				);
+				if (rebuilt) {
+					return true;
+				}
+				showPlaybackError(
+					'Playback failed after session rebuild attempt. Please retry or go back.'
+				);
+				return true;
+			}
+
+			const attemptNumber = hlsNetworkRecoveryAttemptsRef.current + 1;
+			if (attemptNumber <= MAX_HLS_NETWORK_RECOVERY_ATTEMPTS) {
+				hlsNetworkRecoveryAttemptsRef.current = attemptNumber;
+				console.warn(
+					`[Player] ${source} fatal network error. Recovery ${attemptNumber}/${MAX_HLS_NETWORK_RECOVERY_ATTEMPTS}`,
+					errorData
+				);
+				hls.startLoad();
+				return true;
+			}
+			showPlaybackError(
+				'Playback failed after multiple network retries. Please retry or go back.'
+			);
+			return true;
+		}
+
+		if (errorData.type === Hls.ErrorTypes.MEDIA_ERROR) {
+			const attemptNumber = hlsMediaRecoveryAttemptsRef.current + 1;
+			if (attemptNumber <= MAX_HLS_MEDIA_RECOVERY_ATTEMPTS) {
+				hlsMediaRecoveryAttemptsRef.current = attemptNumber;
+				console.warn(
+					`[Player] ${source} fatal media error. Recovery ${attemptNumber}/${MAX_HLS_MEDIA_RECOVERY_ATTEMPTS}`,
+					errorData
+				);
+				hls.recoverMediaError();
+				return true;
+			}
+			showPlaybackError(
+				'Playback failed after repeated media recovery attempts. Please retry or go back.'
+			);
+			return true;
+		}
+
+		showPlaybackError(`HLS playback error: ${errorData.details || 'unknown error'}`);
+		return true;
+	}, [attemptPlaybackSessionRebuild, showPlaybackError]);
 
 	// Stop playback and clean up
 	const handleStop = useCallback(async () => {
@@ -281,7 +491,7 @@ const PlayerPanel = ({
 		if (videoRef.current && item) {
 			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
 			try {
-				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks);
+				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks, getPlaybackSessionContext());
 			} catch (err) {
 				console.warn('Failed to report playback stopped:', err);
 			}
@@ -292,12 +502,20 @@ const PlayerPanel = ({
 			videoRef.current.removeAttribute('src');
 			videoRef.current.load();
 		}
-	}, [clearStartWatch, item]);
+		playbackSessionRef.current = {
+			playSessionId: null,
+			mediaSourceId: null,
+			playMethod: 'DirectStream'
+		};
+	}, [clearStartWatch, getPlaybackSessionContext, item]);
 
 	// Attempt to fall back to transcoding if direct playback looks unhealthy
 	const attemptTranscodeFallback = useCallback(async (reason) => {
+		if (playbackFailureLockedRef.current) {
+			return false;
+		}
 		// If user already forced transcoding or we've tried already, bail
-		if (playbackSettingsRef.current.forceTranscoding || transcodeFallbackAttemptedRef.current) {
+		if (playbackSettingsRef.current.strictTranscodingMode || transcodeFallbackAttemptedRef.current) {
 			return false;
 		}
 		// Only try if the server can transcode
@@ -315,87 +533,50 @@ const PlayerPanel = ({
 			loadVideoRef.current(true);
 		}
 		return true;
-	}, [handleStop, mediaSourceData]);
+	}, [handleStop, mediaSourceData, setToastMessage]);
 
-	// Track preference helpers
-	const loadTrackPreferences = useCallback(() => {
-		try {
-			const stored = localStorage.getItem('breezyfinTrackPrefs');
-			return stored ? JSON.parse(stored) : null;
-		} catch (err) {
-			console.warn('Failed to load track preferences:', err);
-			return null;
-		}
+	const isSubtitleCompatibilityError = useCallback((errorData) => {
+		const fromMessage = typeof errorData === 'string' ? errorData : '';
+		const responseUrl = errorData?.response?.url;
+		const fragmentUrl = errorData?.frag?.url;
+		const videoUrl = videoRef.current?.currentSrc || '';
+		const joined = [fromMessage, responseUrl, fragmentUrl, videoUrl]
+			.filter((value) => typeof value === 'string' && value.length > 0)
+			.join(' ');
+		return joined.includes('SubtitleCodecNotSupported');
 	}, []);
 
-	const saveTrackPreferences = useCallback((prefs) => {
+	const attemptSubtitleCompatibilityFallback = useCallback(async (errorData = null) => {
+		if (playbackFailureLockedRef.current) return false;
+		if (subtitleCompatibilityFallbackAttemptedRef.current) return false;
+		const selectedSubtitle = currentSubtitleTrackRef.current;
+		if (!(Number.isInteger(selectedSubtitle) && selectedSubtitle >= 0)) return false;
+		if (!isSubtitleCompatibilityError(errorData)) return false;
+		if (playbackSettingsRef.current.strictTranscodingMode) {
+			setToastMessage('Subtitle burn-in failed. Strict transcoding mode is enabled.');
+			return false;
+		}
+
+		subtitleCompatibilityFallbackAttemptedRef.current = true;
+		setToastMessage('Subtitle track is not supported by server transcoding. Retrying without subtitles.');
+		playbackOverrideRef.current = {
+			...(playbackOptions || {}),
+			audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
+			subtitleStreamIndex: -1,
+			seekSeconds: videoRef.current?.currentTime || 0,
+			forceNewSession: true
+		};
+		setCurrentSubtitleTrack(-1);
 		try {
-			localStorage.setItem('breezyfinTrackPrefs', JSON.stringify(prefs));
-			trackPreferenceRef.current = prefs;
-		} catch (err) {
-			console.warn('Failed to save track preferences:', err);
+			await handleStop();
+		} catch (fallbackError) {
+			console.warn('Failed while preparing subtitle compatibility fallback:', fallbackError);
 		}
-	}, []);
-
-	const pickPreferredAudio = (audioStreams, providedAudio, defaultAudio) => {
-		if (!audioStreams.length) return null;
-		const pref = trackPreferenceRef.current?.audio;
-		if (Number.isInteger(pref?.index) && audioStreams.some(s => s.Index === pref.index)) {
-			return pref.index;
+		if (typeof loadVideoRef.current === 'function') {
+			loadVideoRef.current();
 		}
-		if (Number.isInteger(providedAudio) && audioStreams.some(s => s.Index === providedAudio)) {
-			return providedAudio;
-		}
-		if (pref) {
-			const languageMatch = audioStreams.find(s => s.Language && s.Language.toLowerCase() === pref.language?.toLowerCase());
-			if (languageMatch) return languageMatch.Index;
-		}
-		return (defaultAudio?.Index ?? audioStreams[0]?.Index ?? null);
-	};
-
-	const pickPreferredSubtitle = (subtitleStreams, providedSubtitle, defaultSubtitle) => {
-		// Explicit "off" wins
-		if (providedSubtitle === -1) return -1;
-		if (Number.isInteger(providedSubtitle) && subtitleStreams.some(s => s.Index === providedSubtitle)) {
-			return providedSubtitle;
-		}
-
-		const pref = trackPreferenceRef.current?.subtitle;
-		// Respect saved "off"
-		if (pref?.off) return -1;
-		if (Number.isInteger(pref?.index) && subtitleStreams.some(s => s.Index === pref.index)) {
-			return pref.index;
-		}
-
-		// Respect saved language, avoiding forced when possible
-		if (pref?.language) {
-			const lowerLang = pref.language.toLowerCase();
-			const nonForced = subtitleStreams.find(s =>
-				s.Language && s.Language.toLowerCase() === lowerLang && !s.IsForced
-			);
-			if (nonForced) return nonForced.Index;
-			const anyLang = subtitleStreams.find(s =>
-				s.Language && s.Language.toLowerCase() === lowerLang
-			);
-			if (anyLang) return anyLang.Index;
-		}
-
-		// If default is forced, try to find a non-forced alternative in same language, then any non-forced
-		if (defaultSubtitle?.IsForced) {
-			const sameLangNonForced = subtitleStreams.find(s =>
-				!s.IsForced &&
-				defaultSubtitle.Language &&
-				s.Language &&
-				s.Language.toLowerCase() === defaultSubtitle.Language.toLowerCase()
-			);
-			if (sameLangNonForced) return sameLangNonForced.Index;
-			const anyNonForced = subtitleStreams.find(s => !s.IsForced);
-			if (anyNonForced) return anyNonForced.Index;
-		}
-
-		// Default Jellyfin pick, or none
-		return (defaultSubtitle?.Index ?? -1);
-	};
+		return true;
+	}, [handleStop, isSubtitleCompatibilityError, playbackOptions, setToastMessage]);
 
 	// Load and play video
 	const loadVideo = useCallback(async (forceTranscodeOverride = false) => {
@@ -407,13 +588,15 @@ const PlayerPanel = ({
 			return;
 		}
 
+		resetRecoveryGuards();
 		setLoading(true);
 		reloadAttemptedRef.current = false;
+		subtitleCompatibilityFallbackAttemptedRef.current = false;
 		// Reset last progress marker so stall detection can work even before timeupdate
-		lastProgressRef.current = { time: 0, timestamp: Date.now() };
+		lastProgressRef.current = {time: 0, timestamp: Date.now()};
 		setError(null);
 		seekOffsetRef.current = 0; // Reset seek offset for new video
-		trackPreferenceRef.current = loadTrackPreferences();
+		loadTrackPreferences();
 
 		// Clean up any existing HLS instance
 		if (hlsRef.current) {
@@ -423,23 +606,39 @@ const PlayerPanel = ({
 
 		loadVideoRef.current = loadVideo;
 
-		try {
-
-			// Load user settings to check for force transcoding
-			const settingsJson = localStorage.getItem('breezyfinSettings');
-			const settings = settingsJson ? JSON.parse(settingsJson) : {};
+			try {
+				// Load user settings to check for force transcoding
+			const settings = readBreezyfinSettings();
 			let forceTranscoding = forceTranscodeOverride || settings.forceTranscoding || false;
+			let forcedBySubtitlePreference = false;
 			const enableTranscoding = settings.enableTranscoding !== false;
 			const maxBitrate = settings.maxBitrate;
 			const autoPlayNext = settings.autoPlayNext !== false;
+			const relaxedPlaybackProfile = RELAXED_PLAYBACK_PROFILE_ENABLED && settings.relaxedPlaybackProfile === true;
+			const requestedSubtitleTrack =
+				(playbackOverrideRef.current?.subtitleStreamIndex === -1 || Number.isInteger(playbackOverrideRef.current?.subtitleStreamIndex))
+					? playbackOverrideRef.current?.subtitleStreamIndex
+					: playbackOptions?.subtitleStreamIndex;
 
 			// Check if we should force transcoding for subtitles
-			const hasSubtitles = playbackOptions?.subtitleStreamIndex !== undefined && playbackOptions?.subtitleStreamIndex >= 0;
+			const hasSubtitles =
+				Number.isInteger(requestedSubtitleTrack) && requestedSubtitleTrack >= 0;
+			const strictTranscodingMode =
+				settings.forceTranscoding === true ||
+				(hasSubtitles && settings.forceTranscodingWithSubtitles !== false);
 			if (!forceTranscoding && hasSubtitles && settings.forceTranscodingWithSubtitles !== false) {
 				forceTranscoding = true;
+				forcedBySubtitlePreference = true;
 			}
 
-			playbackSettingsRef.current = { forceTranscoding, enableTranscoding, maxBitrate, autoPlayNext };
+			playbackSettingsRef.current = {
+				forceTranscoding,
+				strictTranscodingMode,
+				enableTranscoding,
+				maxBitrate,
+				autoPlayNext,
+				relaxedPlaybackProfile
+			};
 
 			// Get playback info from Jellyfin
 			let playbackInfo = null;
@@ -458,14 +657,42 @@ const PlayerPanel = ({
 				throw new Error('No media source available');
 			}
 
+			const playbackMeta = playbackInfo?.__breezyfin || {};
+			const compatibilityToasts = [];
+			if (forcedBySubtitlePreference) {
+				compatibilityToasts.push('Subtitles selected: using transcoding for compatibility.');
+			}
+			if (Array.isArray(playbackMeta.adjustments)) {
+				playbackMeta.adjustments.forEach((adjustment) => {
+					if (adjustment?.toast) compatibilityToasts.push(adjustment.toast);
+				});
+			}
+			if (compatibilityToasts.length > 0) {
+				setToastMessage([...new Set(compatibilityToasts)].join(' '));
+			}
+
 			// Guard: if user forced transcoding but the server didn't provide a transcoding URL, bail with a clear message
 			if (playbackSettingsRef.current.forceTranscoding && !mediaSource.TranscodingUrl) {
 				throw new Error('Transcoding was forced, but the server did not return a transcoding URL.');
 			}
 
+			const resolvedPlayMethod =
+				playbackMeta.playMethod ||
+				(mediaSource.TranscodingUrl
+					? 'Transcode'
+					: (mediaSource.SupportsDirectPlay ? 'DirectPlay' : 'DirectStream'));
 
-			// Store media source and session for track switching
-			setMediaSourceData(mediaSource);
+			playbackSessionRef.current = {
+				playSessionId: playbackInfo?.PlaySessionId || null,
+				mediaSourceId: mediaSource?.Id || null,
+				playMethod: resolvedPlayMethod
+			};
+
+			// Store media source and selected method for track switching and fallback checks
+			setMediaSourceData({
+				...mediaSource,
+				__selectedPlayMethod: resolvedPlayMethod
+			});
 
 			// Set duration from media source (in ticks, 10,000,000 ticks = 1 second)
 			// This is the actual duration, not from the video element which may report incorrect values during transcoding
@@ -478,15 +705,15 @@ const PlayerPanel = ({
 			}
 
 			// Extract audio and subtitle tracks
-			const audioStreams = mediaSource.MediaStreams?.filter(s => s.Type === 'Audio') || [];
-			const subtitleStreams = mediaSource.MediaStreams?.filter(s => s.Type === 'Subtitle') || [];
+			const audioStreams = mediaSource.MediaStreams?.filter((s) => s.Type === 'Audio') || [];
+			const subtitleStreams = mediaSource.MediaStreams?.filter((s) => s.Type === 'Subtitle') || [];
 
 			setAudioTracks(audioStreams);
 			setSubtitleTracks(subtitleStreams);
 
 			// Set default selected tracks
-			const defaultAudio = audioStreams.find(s => s.IsDefault) || audioStreams[0];
-			const defaultSubtitle = subtitleStreams.find(s => s.IsDefault);
+			const defaultAudio = audioStreams.find((s) => s.IsDefault) || audioStreams[0];
+			const defaultSubtitle = subtitleStreams.find((s) => s.IsDefault);
 
 			// Use subtitle from playbackOptions if provided (selected from MediaDetailsPanel)
 			const providedAudio = Number.isInteger(playbackOptions?.audioStreamIndex)
@@ -503,28 +730,36 @@ const PlayerPanel = ({
 			const overrideAudio = Number.isInteger(playbackOverrideRef.current?.audioStreamIndex)
 				? playbackOverrideRef.current.audioStreamIndex
 				: null;
-			const overrideSubtitle = (playbackOverrideRef.current?.subtitleStreamIndex === -1 || Number.isInteger(playbackOverrideRef.current?.subtitleStreamIndex))
-				? playbackOverrideRef.current.subtitleStreamIndex
-				: null;
+			const overrideSubtitle =
+				(playbackOverrideRef.current?.subtitleStreamIndex === -1 ||
+					Number.isInteger(playbackOverrideRef.current?.subtitleStreamIndex))
+					? playbackOverrideRef.current.subtitleStreamIndex
+					: null;
 
 			const selectedAudio = Number.isInteger(overrideAudio) ? overrideAudio : initialAudio;
-			const selectedSubtitle = (overrideSubtitle === -1 || Number.isInteger(overrideSubtitle)) ? overrideSubtitle : initialSubtitle;
+			const selectedSubtitle =
+				(overrideSubtitle === -1 || Number.isInteger(overrideSubtitle))
+					? overrideSubtitle
+					: initialSubtitle;
 
 			setCurrentAudioTrack(selectedAudio);
 			setCurrentSubtitleTrack(selectedSubtitle);
 
-
 			// Determine video URL and playback method
 			let videoUrl;
 			let isHls = false;
+			const useTranscoding = resolvedPlayMethod === 'Transcode';
 
-			if (mediaSource.TranscodingUrl) {
+			if (useTranscoding) {
+				if (!mediaSource.TranscodingUrl) {
+					throw new Error('Transcoding selected, but no transcoding URL was returned.');
+				}
 				// Server wants to transcode - use the transcoding URL
 				videoUrl = `${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`;
 				isHls = mediaSource.TranscodingUrl.includes('.m3u8') ||
-				        mediaSource.TranscodingUrl.includes('/hls/') ||
-				        mediaSource.TranscodingContainer?.toLowerCase() === 'ts';
-			} else if (!playbackSettingsRef.current.forceTranscoding && mediaSource.SupportsDirectStream) {
+					mediaSource.TranscodingUrl.includes('/hls/') ||
+					mediaSource.TranscodingContainer?.toLowerCase() === 'ts';
+			} else if (resolvedPlayMethod === 'DirectStream' && mediaSource.SupportsDirectStream) {
 				// Direct stream - server remuxes without transcoding
 				videoUrl = jellyfinService.getPlaybackUrl(
 					item.Id,
@@ -534,15 +769,16 @@ const PlayerPanel = ({
 					mediaSource.Container,
 					mediaSource.LiveStreamId
 				);
-			} else if (!playbackSettingsRef.current.forceTranscoding && mediaSource.SupportsDirectPlay) {
+			} else if (resolvedPlayMethod === 'DirectPlay' && mediaSource.SupportsDirectPlay) {
 				// Direct play - play file as-is
-				videoUrl = `${jellyfinService.serverUrl}/Videos/${item.Id}/stream?static=true&mediaSourceId=${mediaSource.Id}&api_key=${jellyfinService.accessToken}`;
+				videoUrl =
+					`${jellyfinService.serverUrl}/Videos/${item.Id}/stream?static=true&mediaSourceId=${mediaSource.Id}&api_key=${jellyfinService.accessToken}`;
 			} else {
 				throw new Error('No supported playback method available');
 			}
 
 			// When transcoding, enforce the selected tracks and optionally force a fresh PlaySessionId
-			if (mediaSource.TranscodingUrl) {
+			if (useTranscoding && mediaSource.TranscodingUrl) {
 				// Server wants to transcode - use the transcoding URL
 				const url = new URL(`${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`);
 				if (Number.isInteger(selectedAudio)) {
@@ -567,14 +803,13 @@ const PlayerPanel = ({
 			// Mark overrides to clear once playback has actually started
 			pendingOverrideClearRef.current = !!playbackOverrideRef.current;
 
-
 			const video = videoRef.current;
 			if (!video) {
 				throw new Error('Video element not available');
 			}
 
 			// If we picked a direct path, set a startup timeout to fall back to transcode if it stalls
-			if (!mediaSource.TranscodingUrl && mediaSource.SupportsTranscoding) {
+			if (!useTranscoding && mediaSource.SupportsTranscoding) {
 				if (startupFallbackTimerRef.current) {
 					clearTimeout(startupFallbackTimerRef.current);
 				}
@@ -584,13 +819,12 @@ const PlayerPanel = ({
 				}, 12000);
 			}
 
-			// Log browser codec support
-
 			if (isHls) {
 				// Handle HLS playback
 				// Check for native HLS support
-				const nativeHls = video.canPlayType('application/vnd.apple.mpegURL') ||
-				                  video.canPlayType('application/x-mpegURL');
+				const nativeHls =
+					video.canPlayType('application/vnd.apple.mpegURL') ||
+					video.canPlayType('application/x-mpegURL');
 
 				// Try native HLS first on webOS, fallback to HLS.js if it fails
 				if (nativeHls) {
@@ -620,19 +854,22 @@ const PlayerPanel = ({
 						hls.loadSource(videoUrl);
 						hls.attachMedia(video);
 
-						hls.on(Hls.Events.MANIFEST_PARSED, () => {
-						});
-
 						hls.on(Hls.Events.ERROR, (event, data) => {
 							console.error('HLS.js error:', data);
+							if (isSubtitleCompatibilityError(data) && playbackSettingsRef.current.strictTranscodingMode) {
+								showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
+								return;
+							}
+							if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details === 'fragLoadError') {
+								attemptSubtitleCompatibilityFallback(data).then((handled) => {
+									if (!handled) {
+										attemptHlsFatalRecovery(hls, data, 'HLS.js');
+									}
+								});
+								return;
+							}
 							if (data.fatal) {
-								if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-									hls.startLoad();
-								} else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-									hls.recoverMediaError();
-								} else {
-									showPlaybackError(`HLS playback error: ${data.details}`);
-								}
+								attemptHlsFatalRecovery(hls, data, 'HLS.js');
 							}
 						});
 					};
@@ -650,46 +887,49 @@ const PlayerPanel = ({
 						clearTimeout(fallbackTimer);
 						tryHlsJsFallback();
 					};
-					video.addEventListener('error', errorHandler, { once: true });
+					video.addEventListener('error', errorHandler, {once: true});
 
 					// Clear timer if video starts loading successfully
-				video.addEventListener('loadstart', () => {
-					clearTimeout(fallbackTimer);
-					video.removeEventListener('error', errorHandler);
-				}, { once: true });
+					video.addEventListener('loadstart', () => {
+						clearTimeout(fallbackTimer);
+						video.removeEventListener('error', errorHandler);
+					}, {once: true});
 
-				video.src = videoUrl;
-			} else if (Hls.isSupported()) {
-				const hls = new Hls({
-					enableWorker: true,
-					lowLatencyMode: false,
-					backBufferLength: 90,
-					maxBufferLength: 30,
-					maxMaxBufferLength: 600,
-					fragLoadingTimeOut: 20000,
-					levelLoadingTimeOut: 20000,
-					fragLoadingMaxRetry: 4,
-					levelLoadingMaxRetry: 4,
-					startLevel: -1
-				});
+					video.src = videoUrl;
+				} else if (Hls.isSupported()) {
+					const hls = new Hls({
+						enableWorker: true,
+						lowLatencyMode: false,
+						backBufferLength: 90,
+						maxBufferLength: 30,
+						maxMaxBufferLength: 600,
+						fragLoadingTimeOut: 20000,
+						levelLoadingTimeOut: 20000,
+						fragLoadingMaxRetry: 4,
+						levelLoadingMaxRetry: 4,
+						startLevel: -1
+					});
 					hlsRef.current = hls;
 
 					hls.loadSource(videoUrl);
 					hls.attachMedia(video);
 
-					hls.on(Hls.Events.MANIFEST_PARSED, () => {
-					});
-
 					hls.on(Hls.Events.ERROR, (event, data) => {
 						console.error('HLS error:', data);
+						if (isSubtitleCompatibilityError(data) && playbackSettingsRef.current.strictTranscodingMode) {
+							showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
+							return;
+						}
+						if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details === 'fragLoadError') {
+							attemptSubtitleCompatibilityFallback(data).then((handled) => {
+								if (!handled) {
+									attemptHlsFatalRecovery(hls, data, 'HLS.js');
+								}
+							});
+							return;
+						}
 						if (data.fatal) {
-							if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-								hls.startLoad();
-							} else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-								hls.recoverMediaError();
-							} else {
-								showPlaybackError(`HLS playback error: ${data.details}`);
-							}
+							attemptHlsFatalRecovery(hls, data, 'HLS.js');
 						}
 					});
 				} else {
@@ -707,7 +947,7 @@ const PlayerPanel = ({
 			} catch (playError) {
 				if (isFatalPlaybackError(playError)) {
 					const errorMessage = getPlaybackErrorMessage(playError);
-					if (!mediaSource.TranscodingUrl) {
+					if (!useTranscoding) {
 						const didFallback = await attemptTranscodeFallback(errorMessage);
 						if (didFallback) {
 							return;
@@ -724,40 +964,32 @@ const PlayerPanel = ({
 			}
 			startWatchTimerRef.current = setTimeout(() => {
 				if (!videoRef.current) return;
+
 				// Consider it stalled if not playing OR if currentTime hasn't advanced recently
-				const last = lastProgressRef.current || { time: 0, timestamp: 0 };
+				const last = lastProgressRef.current || {time: 0, timestamp: 0};
 				const now = Date.now();
-				const stagnant = (now - last.timestamp > 5000) && Math.abs((videoRef.current.currentTime || 0) - last.time) < 0.25;
+				const stagnant =
+					(now - last.timestamp > 5000) &&
+					Math.abs((videoRef.current.currentTime || 0) - last.time) < 0.25;
 				if (playing && !stagnant) return;
-				// One-shot recovery: rebuild session with a fresh PlaySessionId
-				if (reloadAttemptedRef.current) {
-					console.warn('[Player] Playback stall after load() and recovery already attempted');
-					return;
-				}
-				console.warn('[Player] Playback stalled after load(), rebuilding session with fresh PlaySessionId');
-				console.warn('[Player] Video readyState:', videoRef.current?.readyState, 'networkState:', videoRef.current?.networkState, 'currentTime:', videoRef.current?.currentTime, 'lastProgress:', last);
-				reloadAttemptedRef.current = true;
-				clearStartWatch();
-				if (startupFallbackTimerRef.current) {
-					clearTimeout(startupFallbackTimerRef.current);
-					startupFallbackTimerRef.current = null;
-				}
-				// Tear down current HLS/video source
-				if (hlsRef.current) {
-					try {
-						hlsRef.current.destroy();
-					} catch (destroyErr) {
-						console.warn('Failed to destroy HLS instance during stall recovery:', destroyErr);
+
+				const rebuilt = attemptPlaybackSessionRebuild(
+					'Playback stalled after load()',
+					{
+						toast: 'Playback stalled. Rebuilding session...',
+						errorData: {
+							videoReadyState: videoRef.current?.readyState,
+							videoNetworkState: videoRef.current?.networkState,
+							videoCurrentTime: videoRef.current?.currentTime,
+							lastProgress: last
+						}
 					}
-					hlsRef.current = null;
+				);
+				if (!rebuilt) {
+					showPlaybackError(
+						'Playback failed after session rebuild attempt. Please retry or go back.'
+					);
 				}
-				if (videoRef.current) {
-					videoRef.current.removeAttribute('src');
-					videoRef.current.load();
-				}
-				// Force a new session on reload
-				playbackOverrideRef.current = { ...(playbackOptions || {}), forceNewSession: true };
-				loadVideo();
 			}, 7000);
 
 			// Final fallback: if still loading after 12s, surface an error with retry
@@ -765,18 +997,36 @@ const PlayerPanel = ({
 				clearTimeout(failStartTimerRef.current);
 			}
 			failStartTimerRef.current = setTimeout(() => {
-				if (!loading) return;
+				if (playbackFailureLockedRef.current) return;
+				const videoElement = videoRef.current;
+				if (!videoElement) return;
+				// Consider startup unresolved when we still have no useful buffered/playable data.
+				if (videoElement.readyState >= 3) return;
 				console.warn('[Player] Playback failed to start within timeout, showing retry');
 				showPlaybackError('Playback failed to start. Please try again.');
 			}, 12000);
 
 			// Note: Position will be set in handleLoadedMetadata after metadata loads
-
 		} catch (err) {
 			console.error('Failed to load video:', err);
 			showPlaybackError(getPlaybackErrorMessage(err, 'Failed to load video'));
 		}
-		}, [attemptTranscodeFallback, clearStartWatch, item, loadTrackPreferences, loading, playbackOptions, playing, showPlaybackError]);
+	}, [
+		attemptHlsFatalRecovery,
+		attemptPlaybackSessionRebuild,
+		attemptSubtitleCompatibilityFallback,
+		attemptTranscodeFallback,
+		isSubtitleCompatibilityError,
+		item,
+		loadTrackPreferences,
+		pickPreferredAudio,
+		pickPreferredSubtitle,
+		playbackOptions,
+		playing,
+		resetRecoveryGuards,
+		setToastMessage,
+		showPlaybackError
+	]);
 
 	// Video event handlers
 	const handleLoadedMetadata = useCallback(() => {
@@ -832,14 +1082,15 @@ const PlayerPanel = ({
 
 			// Report to Jellyfin
 			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-			await jellyfinService.reportPlaybackStart(item.Id, positionTicks);
+			await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
 			startProgressReporting();
 		} catch (playError) {
 			console.error('Auto-play failed:', playError);
 			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
 			setPlaying(false);
+
 			// If direct playback fails immediately, try a one-time transcode fallback
-			if (!mediaSourceData?.TranscodingUrl && isFatalPlaybackError(playError)) {
+			if (!isCurrentTranscoding && isFatalPlaybackError(playError)) {
 				const didFallback = await attemptTranscodeFallback(errorMessage);
 				if (didFallback) {
 					return;
@@ -851,29 +1102,26 @@ const PlayerPanel = ({
 				setToastMessage('Playback failed to start. Press Play/Retry.');
 			}
 		}
-		}, [attemptTranscodeFallback, clearStartWatch, loading, item, mediaSourceData?.TranscodingUrl, showPlaybackError, startProgressReporting]);
+	}, [attemptTranscodeFallback, clearStartWatch, getPlaybackSessionContext, isCurrentTranscoding, loading, item, setToastMessage, showPlaybackError, startProgressReporting]);
 
 	// Detect skip intro/credits segments based on current playback position
 	const checkSkipSegments = useCallback((positionSeconds) => {
 		if (!Number.isFinite(positionSeconds)) return;
-		let skipSegmentPromptsEnabled = true;
-		let playNextPromptEnabled = true;
-		let playNextPromptMode = 'segmentsOrLast60';
+			let skipSegmentPromptsEnabled = true;
+			let playNextPromptEnabled = true;
+			let playNextPromptMode = 'segmentsOrLast60';
 
-		// Optional opt-out for intro/recap/preview skip prompts.
-		try {
-			const settingsJson = localStorage.getItem('breezyfinSettings');
-			if (settingsJson) {
-				const settings = JSON.parse(settingsJson);
+			// Optional opt-out for intro/recap/preview skip prompts.
+			try {
+				const settings = readBreezyfinSettings();
 				skipSegmentPromptsEnabled = settings.skipIntro !== false;
 				playNextPromptEnabled = settings.showPlayNextPrompt !== false;
 				if (settings.playNextPromptMode === 'segmentsOnly' || settings.playNextPromptMode === 'segmentsOrLast60') {
 					playNextPromptMode = settings.playNextPromptMode;
 				}
+			} catch (_) {
+				// ignore parse issues
 			}
-		} catch (_) {
-			// ignore parse issues
-		}
 
 		const positionTicks = positionSeconds * 10000000;
 		const activeSegment = mediaSegments.find(
@@ -966,6 +1214,7 @@ const PlayerPanel = ({
 	}, [checkSkipSegments]);
 
 	const handleVideoError = useCallback(async (e) => {
+		if (playbackFailureLockedRef.current) return;
 		const video = videoRef.current;
 		const mediaError = video?.error;
 
@@ -986,9 +1235,18 @@ const PlayerPanel = ({
 			errorMessage = errorMessages[mediaError.code] || `Error code: ${mediaError.code}`;
 			console.error('MediaError code:', mediaError.code, '-', errorMessage);
 		}
+		if (isSubtitleCompatibilityError(errorMessage) && playbackSettingsRef.current.strictTranscodingMode) {
+			showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
+			return;
+		}
+
+		const subtitleFallbackWorked = await attemptSubtitleCompatibilityFallback(errorMessage);
+		if (subtitleFallbackWorked) {
+			return;
+		}
 
 		// Try falling back to transcoding once if we were on a direct path
-		if (!mediaSourceData?.TranscodingUrl) {
+		if (!isCurrentTranscoding) {
 			const didFallback = await attemptTranscodeFallback(errorMessage);
 			if (didFallback) {
 				return;
@@ -1002,7 +1260,7 @@ const PlayerPanel = ({
 			console.warn('Error while handling playback failure:', stopErr);
 		}
 		showPlaybackError(errorMessage);
-	}, [attemptTranscodeFallback, handleStop, mediaSourceData, showPlaybackError]);
+	}, [attemptSubtitleCompatibilityFallback, attemptTranscodeFallback, handleStop, isCurrentTranscoding, isSubtitleCompatibilityError, showPlaybackError]);
 
 	const handleEnded = useCallback(async () => {
 		await handleStop();
@@ -1021,7 +1279,7 @@ const PlayerPanel = ({
 		}
 
 		onBack();
-		}, [buildPlaybackOptions, getNextEpisode, handleStop, hasNextEpisode, item, onBack, onPlay]);
+	}, [buildPlaybackOptions, getNextEpisode, handleStop, hasNextEpisode, item, onBack, onPlay]);
 
 	// Playback controls
 	const handlePlay = useCallback(async ({keepHidden = false} = {}) => {
@@ -1033,7 +1291,7 @@ const PlayerPanel = ({
 				setShowControls(keepHidden ? false : !resumeFromPaused);
 
 				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-				await jellyfinService.reportPlaybackStart(item.Id, positionTicks);
+				await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
 				startProgressReporting();
 			} catch (err) {
 				console.error('Play failed:', err);
@@ -1045,7 +1303,7 @@ const PlayerPanel = ({
 				}
 			}
 		}
-	}, [item, showPlaybackError, startProgressReporting]);
+	}, [getPlaybackSessionContext, item, setToastMessage, showPlaybackError, startProgressReporting]);
 
 	const handlePause = useCallback(async ({keepHidden = false} = {}) => {
 		if (videoRef.current) {
@@ -1054,18 +1312,21 @@ const PlayerPanel = ({
 			setShowControls(!keepHidden);
 
 			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-			await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, true);
+			await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, true, getPlaybackSessionContext());
 		}
-	}, [item]);
+	}, [getPlaybackSessionContext, item]);
 
 	const handleRetryPlayback = useCallback(async () => {
 		setError(null);
 		setToastMessage('');
-		reloadAttemptedRef.current = false;
+		resetRecoveryGuards();
+		playSessionRebuildAttemptsRef.current = 0;
 		transcodeFallbackAttemptedRef.current = false;
+		reloadAttemptedRef.current = false;
+		subtitleCompatibilityFallbackAttemptedRef.current = false;
 		await handleStop();
 		loadVideo();
-	}, [handleStop, loadVideo]);
+	}, [handleStop, loadVideo, resetRecoveryGuards, setToastMessage]);
 
 	const handleSeek = useCallback(async (e) => {
 		const seekTime = e.value;
@@ -1076,8 +1337,10 @@ const PlayerPanel = ({
 
 		lastInteractionRef.current = Date.now();
 		// For HLS streams (native or HLS.js), let the player handle seeking
-		const isHls = mediaSourceData?.TranscodingUrl?.includes('.m3u8') ||
-		              mediaSourceData?.TranscodingUrl?.includes('/hls/');
+		const isHls = isCurrentTranscoding && (
+			mediaSourceData?.TranscodingUrl?.includes('.m3u8') ||
+			mediaSourceData?.TranscodingUrl?.includes('/hls/')
+		);
 
 		if (isHls) {
 			// HLS supports native seeking via currentTime
@@ -1085,8 +1348,8 @@ const PlayerPanel = ({
 
 			// Report seek to Jellyfin
 			const seekTicks = Math.floor(seekTime * 10000000);
-			await jellyfinService.reportPlaybackProgress(item.Id, seekTicks, videoRef.current.paused);
-		} else if (mediaSourceData?.TranscodingUrl) {
+			await jellyfinService.reportPlaybackProgress(item.Id, seekTicks, videoRef.current.paused, getPlaybackSessionContext());
+		} else if (isCurrentTranscoding) {
 			// For transcoding, rebuild the session at the target timestamp.
 			try {
 				const seekTicks = Math.floor(seekTime * 10000000);
@@ -1109,7 +1372,7 @@ const PlayerPanel = ({
 			// For direct play/stream, we can seek directly
 			videoRef.current.currentTime = seekTime;
 		}
-	}, [checkSkipSegments, currentAudioTrack, currentSubtitleTrack, handleStop, item, loadVideo, mediaSourceData, playbackOptions]);
+	}, [checkSkipSegments, currentAudioTrack, currentSubtitleTrack, getPlaybackSessionContext, handleStop, isCurrentTranscoding, item, loadVideo, mediaSourceData, playbackOptions]);
 
 	const handleVolumeChange = useCallback((e) => {
 		lastInteractionRef.current = Date.now();
@@ -1151,16 +1414,7 @@ const PlayerPanel = ({
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);
 		setShowAudioPopup(false);
-		// Persist preference
-		const chosen = audioTracks.find(s => s.Index === trackIndex);
-		saveTrackPreferences({
-			...(trackPreferenceRef.current || {}),
-			audio: {
-				index: trackIndex,
-				language: chosen?.Language || null
-			},
-			subtitle: trackPreferenceRef.current?.subtitle
-		});
+		saveAudioSelection(trackIndex, audioTracks);
 
 		// For HLS streams using HLS.js, use native audio track switching
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
@@ -1177,23 +1431,13 @@ const PlayerPanel = ({
 		}
 		// Fallback: reload playback with the chosen track
 		reloadWithTrackSelection(trackIndex, currentSubtitleTrack);
-	}, [audioTracks, currentSubtitleTrack, reloadWithTrackSelection, saveTrackPreferences]);
+	}, [audioTracks, currentSubtitleTrack, reloadWithTrackSelection, saveAudioSelection]);
 
 	// Change subtitle track
 	const handleSubtitleTrackChange = useCallback(async (trackIndex) => {
 		setCurrentSubtitleTrack(trackIndex);
 		setShowSubtitlePopup(false);
-		// Persist preference (including "off")
-		const chosen = subtitleTracks.find(s => s.Index === trackIndex);
-		saveTrackPreferences({
-			...(trackPreferenceRef.current || {}),
-			subtitle: trackIndex === -1 ? { off: true } : {
-				index: trackIndex,
-				language: chosen?.Language || null,
-				isForced: !!chosen?.IsForced
-			},
-			audio: trackPreferenceRef.current?.audio
-		});
+		saveSubtitleSelection(trackIndex, subtitleTracks);
 
 		// For HLS streams, subtitle switching via source reload doesn't work well
 		// External subtitles would need to be handled separately
@@ -1214,7 +1458,7 @@ const PlayerPanel = ({
 
 		// Fallback: reload playback with the selected subtitle track
 		reloadWithTrackSelection(currentAudioTrack, trackIndex);
-	}, [currentAudioTrack, reloadWithTrackSelection, saveTrackPreferences, subtitleTracks]);
+	}, [currentAudioTrack, reloadWithTrackSelection, saveSubtitleSelection, setToastMessage, subtitleTracks]);
 
 	const getTrackLabel = (track) => {
 		const parts = [];
@@ -1463,6 +1707,8 @@ const PlayerPanel = ({
 	// Effects
 	useEffect(() => {
 		if (item) {
+			resetRecoveryGuards();
+			playSessionRebuildAttemptsRef.current = 0;
 			transcodeFallbackAttemptedRef.current = false;
 			reloadAttemptedRef.current = false;
 			setSkipOverlayVisible(false);
@@ -1482,36 +1728,36 @@ const PlayerPanel = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [item]);
 
-useEffect(() => {
-	let hideTimer;
-	// Only auto-hide when video is playing and no modal is open
-	if (showControls && playing && !showAudioPopup && !showSubtitlePopup) {
-		hideTimer = setInterval(() => {
-			const inactiveFor = Date.now() - lastInteractionRef.current;
-			if (inactiveFor > 5000) {
-				setShowControls(false);
-			}
-		}, 1000);
-	}
-	return () => clearInterval(hideTimer);
-}, [showControls, playing, showAudioPopup, showSubtitlePopup]);
-
-// Playback health watchdog: if direct playback stalls, try transcode fallback
-useEffect(() => {
-	if (!mediaSourceData || mediaSourceData.TranscodingUrl) return undefined;
-	const interval = setInterval(() => {
-		const now = Date.now();
-		const last = lastProgressRef.current;
-		// If we haven't moved at least 0.5s in 12s of playback, consider it stalled
-		if (playing && now - last.timestamp > 12000) {
-			if (videoRef.current && Math.abs(videoRef.current.currentTime - last.time) < 0.5) {
-				console.warn('[Player] Playback stall detected, attempting transcode fallback');
-				attemptTranscodeFallback('Playback stalled');
-			}
+	useEffect(() => {
+		let hideTimer;
+		// Only auto-hide when video is playing and no modal is open
+		if (showControls && playing && !showAudioPopup && !showSubtitlePopup) {
+			hideTimer = setInterval(() => {
+				const inactiveFor = Date.now() - lastInteractionRef.current;
+				if (inactiveFor > 5000) {
+					setShowControls(false);
+				}
+			}, 1000);
 		}
-	}, 5000);
-	return () => clearInterval(interval);
-	}, [attemptTranscodeFallback, mediaSourceData, playing]);
+		return () => clearInterval(hideTimer);
+	}, [showControls, playing, showAudioPopup, showSubtitlePopup]);
+
+	// Playback health watchdog: if direct playback stalls, try transcode fallback
+	useEffect(() => {
+		if (!mediaSourceData || isCurrentTranscoding) return undefined;
+		const interval = setInterval(() => {
+			const now = Date.now();
+			const last = lastProgressRef.current;
+			// If we haven't moved at least 0.5s in 12s of playback, consider it stalled
+			if (playing && now - last.timestamp > 12000) {
+				if (videoRef.current && Math.abs(videoRef.current.currentTime - last.time) < 0.5) {
+					console.warn('[Player] Playback stall detected, attempting transcode fallback');
+					attemptTranscodeFallback('Playback stalled');
+				}
+			}
+		}, 5000);
+		return () => clearInterval(interval);
+	}, [attemptTranscodeFallback, isCurrentTranscoding, mediaSourceData, playing]);
 
 	useEffect(() => () => {
 		if (skipFocusRetryTimerRef.current) {
@@ -1520,13 +1766,6 @@ useEffect(() => {
 		}
 	}, []);
 
-	// Auto-hide toast messages
-	useEffect(() => {
-		if (!toastMessage) return undefined;
-		const t = setTimeout(() => setToastMessage(''), 2000);
-		return () => clearTimeout(t);
-	}, [toastMessage]);
-
 	useEffect(() => () => {
 		if (seekFeedbackTimerRef.current) {
 			clearTimeout(seekFeedbackTimerRef.current);
@@ -1534,11 +1773,7 @@ useEffect(() => {
 		}
 	}, []);
 
-	useEffect(() => {
-		if (typeof registerBackHandler !== 'function') return undefined;
-		registerBackHandler(handleInternalBack);
-		return () => registerBackHandler(null);
-	}, [handleInternalBack, registerBackHandler]);
+	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
 	// Auto-focus skip when it appears; otherwise, focus play/pause after pausing.
 	useEffect(() => {
@@ -1682,8 +1917,22 @@ useEffect(() => {
 
 				{loading && (
 					<div className={css.loading}>
-						<Spinner />
-						<BodyText>Loading...</BodyText>
+						<svg className={css.loadingDefs} aria-hidden="true" focusable="false">
+							<filter id="glass-distortion-player-loading">
+								<feTurbulence type="turbulence" baseFrequency="0.008" numOctaves="2" result="noise" />
+								<feDisplacementMap in="SourceGraphic" in2="noise" scale="77" />
+							</filter>
+						</svg>
+						<div className={css.loadingGlassSpinner}>
+							<div className={css.loadingGlassFilter} />
+							<div className={css.loadingGlassOverlay} />
+							<div className={css.loadingGlassSpecular} />
+							<div className={css.loadingGlassContent}>
+								<div className={css.loadingSpinnerRing} />
+								<div className={css.loadingSpinnerCore} />
+							</div>
+						</div>
+						<BodyText className={css.loadingText}>Loading...</BodyText>
 					</div>
 				)}
 
@@ -1741,7 +1990,7 @@ useEffect(() => {
 					</div>
 				)}
 
-				{toastMessage && (
+				{toastMessage && !error && (
 					<div className={css.playerToast}>{toastMessage}</div>
 				)}
 

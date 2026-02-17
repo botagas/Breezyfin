@@ -11,4 +11,24 @@
 		-webkit-backdrop-filter: none !important;
 		box-shadow: none !important;
 	}
+
+	.resultsGrid {
+		contain: layout style;
+	}
+}
+
+:global([data-bf-animations='off']),
+:global([data-bf-all-animations='off']) {
+	.resultCard {
+		transition: none !important;
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.resultCard:hover,
+	.resultCard:focus,
+	.resultCard:global(.spottable):focus {
+		transform: none !important;
+		filter: none !important;
+	}
 }
