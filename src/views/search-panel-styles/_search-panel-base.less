@@ -1,0 +1,349 @@
+@import (reference) '../../styles/cardStyles.less';
+
+.searchContainer {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
+	--bf-search-offset: calc(var(--bf-top-chrome-height, 12rem) + 0.5rem);
+	--bf-search-controls-height: 4.2rem;
+	--bf-search-overlay-height: calc(var(--bf-search-offset) + var(--bf-search-controls-height));
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh + var(--bf-panel-overlap-lift));
+	min-height: 0;
+	background: transparent;
+	overflow: hidden;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
+	position: relative;
+}
+
+.resultsContent {
+	min-height: 100%;
+	background: #121212;
+	display: flex;
+	flex-direction: column;
+	padding-top: var(--bf-search-overlay-height);
+}
+
+.resultsBody {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.searchBox {
+	padding: var(--bf-search-offset) 4rem 0.95rem;
+	background: transparent;
+	width: 100%;
+	box-sizing: border-box;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 40;
+	isolation: isolate;
+	pointer-events: none;
+}
+
+.searchControls {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	position: relative;
+	z-index: 1;
+	pointer-events: auto;
+}
+
+.searchFieldShell {
+	flex: 1 1 auto;
+	min-width: 0;
+	border-radius: 999px;
+	background: var(--bf-theme-input-surface-bg, rgba(255, 255, 255, 0.035));
+	border: 1px solid var(--bf-theme-input-surface-border, rgba(255, 255, 255, 0.18));
+	backdrop-filter: blur(0.5rem);
+	-webkit-backdrop-filter: blur(0.5rem);
+	box-shadow: 0 0.45rem 1.5rem rgba(0, 0, 0, 0.25);
+	overflow: hidden;
+	transition: background 140ms ease, border-color 140ms ease;
+
+	&:focus-within {
+		background: var(--bf-theme-input-focus-bg, rgba(255, 255, 255, 0.055));
+		border-color: var(--bf-theme-input-focus-border, rgba(255, 255, 255, 0.24));
+	}
+
+	&:hover,
+	&:hover:focus-within {
+		background: var(--bf-theme-input-hover-bg, rgba(255, 255, 255, 0.095));
+		border-color: var(--bf-theme-input-hover-border, rgba(255, 255, 255, 0.3));
+	}
+
+	/* Keep the search field shape stable; disable Sandstone focusExpand growth here. */
+	:global(.bf-input-trigger),
+	:global(.bf-input-trigger.focusExpand),
+	:global(.bf-input-trigger:hover),
+	:global(.bf-input-trigger:focus),
+	:global(.bf-input-trigger:active),
+	:global(.bf-input-trigger.spottable:focus) {
+		margin: 0 !important;
+		transform: none !important;
+		border-radius: 999px !important;
+	}
+
+	:global(.bf-input-trigger > div:first-of-type) {
+		background: transparent !important;
+		border: none !important;
+		transform: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	:global(.bf-input-trigger) {
+		background: transparent !important;
+	}
+
+	/* Override global input-trigger hover styling that creates a smaller inner shape. */
+	:global(.bf-input-trigger:hover > div:first-of-type),
+	:global(.bf-input-trigger:focus > div:first-of-type),
+	:global(.bf-input-trigger:active > div:first-of-type),
+	:global(.bf-input-trigger.spottable:focus > div:first-of-type) {
+		background: transparent !important;
+		border: none !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.searchInput {
+	flex: 1 1 auto;
+	width: 100% !important;
+	max-width: none !important;
+	min-width: 0 !important;
+	margin: 0 !important;
+	display: block !important;
+	font-size: 1.2em;
+}
+
+.filterTriggerButton {
+	--bf-search-filter-size: 3rem;
+	position: relative;
+	min-width: var(--bf-search-filter-size) !important;
+	width: var(--bf-search-filter-size) !important;
+	height: var(--bf-search-filter-size) !important;
+	padding: 0 !important;
+	flex-shrink: 0;
+	overflow: visible !important;
+	border-radius: 999px !important;
+	border: 1px solid rgba(255, 255, 255, 0.2) !important;
+	background: rgba(255, 255, 255, 0.08) !important;
+	backdrop-filter: blur(0.45rem) !important;
+	-webkit-backdrop-filter: blur(0.45rem) !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+
+	:global(.icon) {
+		font-size: 1.05rem !important;
+	}
+}
+
+.filterAppliedBadge {
+	position: absolute;
+	top: -0.28rem;
+	right: -0.28rem;
+	min-width: 1.05rem;
+	height: 1.05rem;
+	padding: 0 0.25rem;
+	border-radius: 999px;
+	background: rgba(63, 184, 255, 0.95);
+	color: #04111e;
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1.05rem;
+	text-align: center;
+	box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.35);
+	pointer-events: none;
+}
+
+.filterTriggerButton:global(.focusExpand) {
+	margin: 0 !important;
+	transform: none !important;
+}
+
+.loadingState {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	min-height: 0;
+}
+
+.emptyState {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	min-height: 0;
+	opacity: 0.6;
+	text-align: center;
+	padding: 2rem 4rem;
+	width: 100%;
+	max-width: none;
+	box-sizing: border-box;
+	align-self: center;
+}
+
+.emptyState :global(.BodyText) {
+	display: block;
+	width: 100%;
+	text-align: center;
+	margin: 0 auto;
+}
+
+.resultsScroller {
+	flex: 1;
+	min-height: 0;
+	background: #121212;
+	overscroll-behavior: contain;
+}
+
+.resultsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+	gap: 1.5rem;
+	padding: 0.75rem 4rem calc(4rem + var(--bf-panel-content-bottom-padding, 4rem));
+}
+
+.resultCard {
+	cursor: pointer;
+	.card-shell();
+	position: relative;
+
+	&:global(.focusExpand) {
+		margin: 0 !important;
+	}
+
+	&:hover,
+	&:global(.spottable):focus {
+		.card-focus-lift();
+
+		.cardImage {
+			.card-image-focus();
+		}
+	}
+}
+
+.cardImage {
+	.card-image-shell(2/3);
+	.card-image-overlays();
+
+	&.placeholder {
+		.card-placeholder-surface();
+
+		&::after {
+			content: 'No Image';
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			height: 100%;
+			background: none;
+			color: rgba(233, 238, 244, 0.65);
+			font-size: 0.78em;
+			letter-spacing: 0.03em;
+		}
+	}
+}
+
+.placeholderInner {
+	position: relative;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	font-size: 2em;
+	color: rgba(233, 238, 244, 0.6);
+	.card-placeholder-surface();
+}
+
+.watchedBadge {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	.status-badge-pill();
+}
+
+.progressBar {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: rgba(255, 255, 255, 0.22);
+	z-index: 3;
+}
+
+.progress {
+	height: 100%;
+	background: #3cb2f0;
+}
+
+.cardInfo {
+	padding: 0.5rem 0.2rem 0;
+}
+
+.cardTitle {
+	margin: 0.58rem 0 0 0;
+	.card-title-text();
+}
+
+.cardSubtitle {
+	margin-top: 0.28rem;
+	.card-subtitle-text();
+}
+
+.filterPopupContent {
+	padding: 0.4rem;
+	min-width: min(28rem, 92vw);
+}
+
+.filterPopupTitle {
+	margin: 0 0 0.8rem;
+}
+
+.filterPopupActions {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+.filterPopupOptions {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+}
+
+.filterPopupActionButton,
+.filterPopupOptionButton {
+	border-radius: 999px !important;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 999px !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+		border: none !important;
+	}
+}

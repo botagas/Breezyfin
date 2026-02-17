@@ -1752,6 +1752,7 @@ useEffect(() => {
 								onClick={handleBackButton}
 								size="large"
 								icon="arrowlargeleft"
+								className={css.playerBackButton}
 							/>
 							<BodyText className={css.title}>{item?.Name}</BodyText>
 						</div>

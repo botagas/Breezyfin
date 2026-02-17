@@ -255,7 +255,6 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 			<Header title="Search" />
 				<Toolbar
 					activeSection="search"
-					aboveNativeHeader
 					onNavigate={onNavigate}
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}
@@ -263,34 +262,33 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 					registerBackHandler={registerToolbarBackHandler}
 				/>
 			<div className={css.searchContainer}>
+				<div className={css.searchBox}>
+					<div className={css.searchControls}>
+						<div className={css.searchFieldShell}>
+							<Input
+								className={`bf-input-trigger ${css.searchInput}`}
+								placeholder="Search movies, shows, people..."
+								value={searchTerm}
+								onChange={handleSearchChange}
+								dismissOnEnter
+								size="small"
+							/>
+						</div>
+						<Button
+							className={css.filterTriggerButton}
+							onClick={openFilterPopup}
+							size="small"
+							icon="edit"
+							aria-label={`Filters${appliedFilterCount ? `, ${appliedFilterCount} applied` : ''}`}
+						>
+							{appliedFilterCount > 0 && (
+								<span className={css.filterAppliedBadge}>{appliedFilterCount}</span>
+							)}
+						</Button>
+					</div>
+				</div>
 				<Scroller className={css.resultsScroller}>
 					<div className={css.resultsContent}>
-						<div className={css.searchBox}>
-							<div className={css.searchControls}>
-								<div className={css.searchFieldShell}>
-									<Input
-										className={`bf-input-trigger ${css.searchInput}`}
-										placeholder="Search movies, shows, people..."
-										value={searchTerm}
-										onChange={handleSearchChange}
-										dismissOnEnter
-										size="small"
-									/>
-								</div>
-								<Button
-									className={css.filterTriggerButton}
-									onClick={openFilterPopup}
-									size="small"
-									icon="edit"
-									aria-label={`Filters${appliedFilterCount ? `, ${appliedFilterCount} applied` : ''}`}
-								>
-									{appliedFilterCount > 0 && (
-										<span className={css.filterAppliedBadge}>{appliedFilterCount}</span>
-									)}
-								</Button>
-							</div>
-						</div>
-
 						<div className={css.resultsBody}>
 							{loading ? (
 								<div className={css.loadingState}>

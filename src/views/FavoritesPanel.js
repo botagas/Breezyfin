@@ -127,7 +127,6 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 			<Header title="Favorites" />
 				<Toolbar
 					activeSection="favorites"
-					aboveNativeHeader
 					onNavigate={onNavigate}
 					onSwitchUser={onSwitchUser}
 					onLogout={onLogout}

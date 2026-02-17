@@ -1,0 +1,49 @@
+.loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+}
+
+.content {
+	padding: var(--bf-home-content-offset, 0rem) 0 var(--bf-panel-content-bottom-padding, 4rem);
+	background: linear-gradient(to bottom, rgba(18, 18, 18, 0.98) 0%, #121212 120px);
+	min-height: 0;
+}
+
+.emptyStateCenter {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 64px 60px;
+	pointer-events: none;
+	z-index: 200;
+}
+
+.emptyState {
+	padding: 32px 40px;
+	text-align: center;
+	font-size: 1.1em;
+	opacity: 0.85;
+	width: 80vw;
+	max-width: 1200px;
+}
+
+.scroller {
+	height: 100vh;
+	min-height: 0;
+	padding-top: 0;
+	margin-top: calc(-1 * var(--bf-home-scroller-overlap, var(--bf-toolbar-height, 4.5rem)));
+	overscroll-behavior: contain;
+}
+
+/* Normalize default margins for headings/body text within home content */
+.content :global(.heading),
+.content :global(.BodyText) {
+	margin: 0;
+}

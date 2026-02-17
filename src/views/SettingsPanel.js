@@ -393,6 +393,12 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		setLogsPopupOpen(false);
 	}, []);
 
+	const openStylingDebugPanel = useCallback(() => {
+		if (typeof onNavigate === 'function') {
+			onNavigate('styleDebug');
+		}
+	}, [onNavigate]);
+
 	const registerToolbarBackHandler = useCallback((handler) => {
 		toolbarBackHandlerRef.current = handler;
 	}, []);
@@ -569,7 +575,6 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 			<Header title="Settings" />
 			<Toolbar
 				activeSection="settings"
-				aboveNativeHeader
 				onNavigate={onNavigate}
 				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}
@@ -882,6 +887,12 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
+						<Item
+							className={css.settingItem}
+							label="Styling Debug Panel"
+							slotAfter="Open"
+							onClick={openStylingDebugPanel}
+						/>
 						<Item
 							className={css.settingItem}
 							label="Logs"

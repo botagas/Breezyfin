@@ -1,0 +1,212 @@
+.scrollerElegant {
+	margin-top: 0;
+}
+
+.elegantMode {
+	background-color: rgb(var(--bf-media-details-base-rgb));
+	background: linear-gradient(
+		to bottom,
+		rgba(var(--bf-media-details-base-rgb), 0.98) 0%,
+		rgb(var(--bf-media-details-base-rgb)) 120px
+	);
+}
+
+.backdropElegant img {
+	opacity: 0.92;
+	filter: none;
+	transform: none;
+}
+
+.gradientElegant {
+	background: linear-gradient(
+		to bottom,
+		rgba(7, 12, 19, 0.03) 0%,
+		rgba(7, 12, 19, 0.08) 30%,
+		rgba(7, 12, 19, 0.55) 58%,
+		rgba(12, 16, 23, 0.9) 74%,
+		rgb(var(--bf-media-details-base-rgb)) 100%
+	);
+}
+
+.contentElegant {
+	padding-top: 0.25rem;
+}
+
+.introSectionElegant {
+	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 0.35rem);
+}
+
+.contentElegant .pageHeader {
+	padding-top: 26vh;
+	margin-bottom: 1rem;
+}
+
+:global([data-bf-nav-theme='elegant']) {
+	.detailsTopBar {
+		top: calc(var(--bf-toolbar-height, 5.5rem) + 0.08rem);
+	}
+
+	.contentElegant .overview {
+		margin-top: 0.9rem;
+		margin-bottom: 0.4rem;
+		padding: 0.58rem 0.75rem;
+		border-radius: 0.75rem;
+		background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26)) !important;
+		border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1)) !important;
+		box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+	}
+
+	.contentElegant .overview::before,
+	.contentElegant .overview::after {
+		content: none !important;
+		display: none !important;
+	}
+
+	.detailsContainer {
+		--bf-md-elegant-accent: rgba(157, 207, 255, 0.98);
+		--bf-md-accent-border-color: rgba(157, 207, 255, 0.56);
+	}
+
+	.stickyControls {
+		background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
+		border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
+		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+		box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45));
+		top: calc(var(--bf-toolbar-height, 5.5rem) + 0.8rem);
+	}
+
+	.stickyControlsInline {
+		position: relative;
+		top: auto;
+	}
+
+		.elegantControlSurfaceBase() {
+			background: rgba(255, 255, 255, 0.08) !important;
+			border: 1px solid rgba(255, 255, 255, 0.24) !important;
+			border-radius: 999px !important;
+			box-shadow: none !important;
+			opacity: 1 !important;
+			backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+			-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+		}
+
+	.elegantControlSurfaceHover() {
+		background: rgba(255, 255, 255, 0.16) !important;
+	}
+
+		.elegantControlButtonCore() {
+			background: transparent !important;
+			border: none !important;
+			box-shadow: none !important;
+
+			:global(.bf-button-bg),
+			:global(.bg) {
+				.elegantControlSurfaceBase();
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg),
+		&:hover :global(.bg),
+		&:focus :global(.bg),
+		&:global(.spottable):focus :global(.bg) {
+			.elegantControlSurfaceHover();
+		}
+
+			:global(.bf-button-bg)::before,
+			:global(.bg)::before,
+			:global(.bf-button-bg)::after,
+			:global(.bg)::after,
+			:global(.client)::before {
+				content: none !important;
+				display: none !important;
+			}
+		}
+
+		.episodeSelectorButton,
+		.compactSelectorButton,
+		.dropdown,
+	.trackSelectorPrimary,
+	.detailsBackButton,
+	.actionButton,
+		.sectionToggleIconButton,
+		.episodeInfoButton,
+		.episodeWatchedButton,
+		.primaryButton {
+			.elegantControlButtonCore();
+			--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+			--bf-button-fg-hover: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
+			--bf-button-fg-active: var(--bf-theme-accent, rgba(157, 207, 255, 0.98));
+		}
+
+	.trackSelectorPrimary :global(.bf-button-bg),
+	.trackSelectorPrimary :global(.bg),
+		.primaryButton :global(.bf-button-bg),
+		.primaryButton :global(.bg) {
+			background: rgba(157, 207, 255, 0.16) !important;
+			border: 1px solid var(--bf-md-accent-border-color) !important;
+			border-radius: 999px !important;
+			box-shadow: none !important;
+			opacity: 1 !important;
+			backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+			-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+		}
+
+	.trackSelectorPrimary:hover :global(.bf-button-bg),
+	.trackSelectorPrimary:focus :global(.bf-button-bg),
+	.trackSelectorPrimary:global(.spottable):focus :global(.bf-button-bg),
+	.trackSelectorPrimary:hover :global(.bg),
+	.trackSelectorPrimary:focus :global(.bg),
+	.trackSelectorPrimary:global(.spottable):focus :global(.bg),
+	.primaryButton:hover :global(.bf-button-bg),
+	.primaryButton:focus :global(.bf-button-bg),
+	.primaryButton:global(.spottable):focus :global(.bf-button-bg),
+	.primaryButton:hover :global(.bg),
+	.primaryButton:focus :global(.bg),
+	.primaryButton:global(.spottable):focus :global(.bg) {
+		background: rgba(157, 207, 255, 0.3) !important;
+	}
+
+	.trackSelectorPrimary:active :global(.bf-button-bg),
+	.trackSelectorPrimary:active :global(.bg),
+	.primaryButton:active :global(.bf-button-bg),
+	.primaryButton:active :global(.bg) {
+		background: rgba(157, 207, 255, 0.4) !important;
+	}
+
+	.favoriteAction.favoriteActive :global(.bf-button-bg),
+	.favoriteAction.favoriteActive :global(.bg) {
+		background: rgba(255, 107, 127, 0.14) !important;
+		border: 1px solid rgba(255, 143, 161, 0.65) !important;
+	}
+
+	.favoriteAction.favoriteActive:hover :global(.bf-button-bg),
+	.favoriteAction.favoriteActive:focus :global(.bf-button-bg),
+	.favoriteAction.favoriteActive:global(.spottable):focus :global(.bf-button-bg),
+	.favoriteAction.favoriteActive:hover :global(.bg),
+	.favoriteAction.favoriteActive:focus :global(.bg),
+	.favoriteAction.favoriteActive:global(.spottable):focus :global(.bg) {
+		background: rgba(255, 107, 127, 0.28) !important;
+	}
+
+	.watchedAction.watchedActive :global(.bf-button-bg),
+	.watchedAction.watchedActive :global(.bg),
+	.episodeWatchedButtonActive :global(.bf-button-bg),
+	.episodeWatchedButtonActive :global(.bg) {
+		background: rgba(109, 220, 154, 0.2) !important;
+		border-color: rgba(173, 242, 201, 0.88) !important;
+	}
+
+	.watchedAction.watchedActive:hover :global(.bf-button-bg),
+	.watchedAction.watchedActive:focus :global(.bf-button-bg),
+	.watchedAction.watchedActive:global(.spottable):focus :global(.bf-button-bg),
+	.watchedAction.watchedActive:hover :global(.bg),
+	.watchedAction.watchedActive:focus :global(.bg),
+	.watchedAction.watchedActive:global(.spottable):focus :global(.bg) {
+		background: rgba(109, 220, 154, 0.28) !important;
+	}
+
+}

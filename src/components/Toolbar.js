@@ -18,7 +18,6 @@ const TOOLBAR_THEME_ELEGANT = 'elegant';
 const Toolbar = ({
 	activeSection = 'home',
 	activeLibraryId = null,
-	aboveNativeHeader = false,
 	registerBackHandler,
 	onNavigate,
 	onSwitchUser,
@@ -449,7 +448,7 @@ const Toolbar = ({
 
 	return (
 		<div
-			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''} ${!isElegantTheme && aboveNativeHeader ? css.toolbarClassicAboveHeader : ''}`}
+			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''}`}
 			data-bf-navbar="true"
 			data-bf-navbar-theme={toolbarTheme}
 			style={toolbarStyle}
@@ -537,7 +536,7 @@ const Toolbar = ({
 										aria-label="Libraries"
 										spotlightId="toolbar-libraries"
 									>
-										<Icon size="small">folder</Icon>
+										<Icon size="small">list</Icon>
 									</SpottableDiv>
 									{showLibrariesPopup && (
 										<div className={css.elegantLibraryPopup}>

@@ -9,6 +9,7 @@ import LibraryPanel from '../views/LibraryPanel';
 import SearchPanel from '../views/SearchPanel';
 import FavoritesPanel from '../views/FavoritesPanel';
 import SettingsPanel from '../views/SettingsPanel';
+import StyleDebugPanel from '../views/StyleDebugPanel';
 import PlayerPanel from '../views/PlayerPanel';
 import MediaDetailsPanel from '../views/MediaDetailsPanel';
 import jellyfinService from '../services/jellyfinService';
@@ -20,7 +21,7 @@ import css from './App.module.less';
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
 
 const App = (props) => {
-	const [currentView, setCurrentView] = useState('login'); // 'login', 'home', 'library', 'search', 'favorites', 'settings', 'details', 'player'
+	const [currentView, setCurrentView] = useState('login'); // 'login', 'home', 'library', 'search', 'favorites', 'settings', 'styleDebug', 'details', 'player'
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
@@ -40,6 +41,7 @@ const App = (props) => {
 	const searchBackHandlerRef = useRef(null);
 	const favoritesBackHandlerRef = useRef(null);
 	const settingsBackHandlerRef = useRef(null);
+	const styleDebugBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
 	const panelHistoryRef = useRef([]);
 
@@ -120,6 +122,23 @@ const App = (props) => {
 		setPlaybackOptions(null);
 		return true;
 	}, [navigateBackInHistory, resolveDetailsReturnView]);
+	const fallbackToDetailsFromPlayer = useCallback(() => {
+		let historyFallbackItem = null;
+		for (let index = panelHistoryRef.current.length - 1; index >= 0; index -= 1) {
+			const snapshotItem = panelHistoryRef.current[index]?.selectedItem;
+			if (snapshotItem) {
+				historyFallbackItem = snapshotItem;
+				break;
+			}
+		}
+		const fallbackItem = selectedItem || previousItem || historyFallbackItem || null;
+		if (fallbackItem) {
+			setSelectedItem(fallbackItem);
+		}
+		setPlayerControlsVisible(true);
+		setCurrentView('details');
+		return true;
+	}, [previousItem, selectedItem]);
 
 	const applyVisualSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -269,6 +288,14 @@ const App = (props) => {
 				setSelectedLibrary(null);
 				setPlaybackOptions(null);
 				return true;
+			case 'styleDebug':
+				if (runBackHandler(styleDebugBackHandlerRef)) return true;
+				if (navigateBackInHistory()) return true;
+				setCurrentView('settings');
+				setSelectedItem(null);
+				setSelectedLibrary(null);
+				setPlaybackOptions(null);
+				return true;
 			case 'details':
 				if (typeof detailsBackHandlerRef.current === 'function') {
 					const handledInDetails = detailsBackHandlerRef.current();
@@ -289,8 +316,7 @@ const App = (props) => {
 					return true;
 				}
 				if (navigateBackInHistory()) return true;
-				setCurrentView('details');
-				return true;
+				return fallbackToDetailsFromPlayer();
 			case 'home':
 				if (runBackHandler(homeBackHandlerRef)) return true;
 				return false; // Allow default behavior (exit prompt)
@@ -298,7 +324,7 @@ const App = (props) => {
 			default:
 				return false; // Allow default behavior (exit prompt)
 		}
-	}, [currentView, navigateBackFromDetails, navigateBackInHistory, playerControlsVisible]);
+	}, [currentView, fallbackToDetailsFromPlayer, navigateBackFromDetails, navigateBackInHistory, playerControlsVisible]);
 
 	useEffect(() => {
 		handleBackRef.current = handleBack;
@@ -392,7 +418,8 @@ const App = (props) => {
 			targetView === 'library' ||
 			targetView === 'search' ||
 			targetView === 'favorites' ||
-			targetView === 'settings'
+			targetView === 'settings' ||
+			targetView === 'styleDebug'
 				? (targetView !== currentView || nextLibraryId !== currentLibraryId)
 				: false;
 		if (shouldTrackHistory) {
@@ -414,6 +441,7 @@ const App = (props) => {
 			case 'search':
 			case 'favorites':
 			case 'settings':
+			case 'styleDebug':
 				setCurrentView(section);
 				setSelectedItem(null);
 				setSelectedLibrary(null);
@@ -444,9 +472,8 @@ const App = (props) => {
 
 	const handleBackToDetails = useCallback(() => {
 		if (navigateBackInHistory()) return;
-		setPlayerControlsVisible(true);
-		setCurrentView('details');
-	}, [navigateBackInHistory]);
+		fallbackToDetailsFromPlayer();
+	}, [fallbackToDetailsFromPlayer, navigateBackInHistory]);
 
 	const handleExit = useCallback(() => {
 		if (typeof window !== 'undefined' && window.close) {
@@ -482,6 +509,10 @@ const App = (props) => {
 		settingsBackHandlerRef.current = handler;
 	}, []);
 
+	const registerStyleDebugBackHandler = useCallback((handler) => {
+		styleDebugBackHandlerRef.current = handler;
+	}, []);
+
 	const getPanelIndex = () => {
 		if (currentView === 'login') return 0;
 		if (currentView === 'home') return 1;
@@ -489,8 +520,9 @@ const App = (props) => {
 		if (currentView === 'search') return 3;
 		if (currentView === 'favorites') return 4;
 		if (currentView === 'settings') return 5;
-		if (currentView === 'details') return 6;
-		if (currentView === 'player') return 7;
+		if (currentView === 'styleDebug') return 6;
+		if (currentView === 'details') return 7;
+		if (currentView === 'player') return 8;
 		return 0;
 	};
 
@@ -555,6 +587,14 @@ const App = (props) => {
 							registerBackHandler={registerSettingsBackHandler}
 							noCloseButton
 						/>
+					<StyleDebugPanel
+						onNavigate={handleNavigate}
+						onSwitchUser={handleSwitchUser}
+						onLogout={handleLogout}
+						onExit={handleExit}
+						registerBackHandler={registerStyleDebugBackHandler}
+						noCloseButton
+					/>
 					<MediaDetailsPanel
 						isActive={currentView === 'details'}
 						item={selectedItem}

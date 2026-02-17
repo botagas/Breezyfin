@@ -1,0 +1,37 @@
+/* Force borderless hover across Media Details control buttons */
+.detailsContainer {
+	.detailsBackButton,
+	.episodeNavButton,
+	.actionButton,
+	.sectionToggleIconButton,
+	.episodeInfoButton,
+	.episodeWatchedButton,
+	.episodeSelectorButton,
+	.compactSelectorButton,
+	.dropdown,
+	.trackSelectorPrimary,
+	.primaryButton,
+	.popupButton {
+		&:hover {
+			:global(.bf-button-bg),
+			:global(.bg) {
+				border-color: transparent !important;
+			}
+		}
+	}
+}
+
+:global([data-bf-all-animations='off']) {
+	.stickyControls {
+		background: var(--bf-theme-ultra-surface-bg, rgba(9, 13, 19, 0.62)) !important;
+		backdrop-filter: blur(0.5rem) !important;
+		-webkit-backdrop-filter: blur(0.5rem) !important;
+		box-shadow: none !important;
+	}
+}
+
+/* Normalize text margins for headings/body text */
+.detailsContainer :global(.heading),
+.detailsContainer :global(.BodyText) {
+	margin: 0;
+}
