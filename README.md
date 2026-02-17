@@ -53,7 +53,7 @@ Output will be in the `dist/` folder.
 
 This repository supports automated prerelease/stable publishing for webOS Homebrew distribution:
 
-- `develop` branch -> prerelease assets under tag `develop`
+- `develop` branch -> prerelease assets under tag `nightly`
 - `main` branch -> stable release under tag `v<appinfo.json version>`
 
 See `docs/homebrew-release-flow.md` for the full branch/release/version workflow.

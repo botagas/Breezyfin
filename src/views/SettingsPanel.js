@@ -11,6 +11,7 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
+import {isStyleDebugEnabled} from '../utils/featureFlags';
 
 import css from './SettingsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -82,6 +83,7 @@ const NAVBAR_THEME_OPTIONS = [
 	{ value: 'classic', label: 'Classic' },
 	{ value: 'elegant', label: 'Elegant' }
 ];
+const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
 
 const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, registerBackHandler, isActive = false, ...rest }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
@@ -394,6 +396,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	}, []);
 
 	const openStylingDebugPanel = useCallback(() => {
+		if (!STYLE_DEBUG_ENABLED) return;
 		if (typeof onNavigate === 'function') {
 			onNavigate('styleDebug');
 		}
@@ -885,21 +888,23 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 						<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
 					</section>
 
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
-						<Item
-							className={css.settingItem}
-							label="Styling Debug Panel"
-							slotAfter="Open"
-							onClick={openStylingDebugPanel}
-						/>
-						<Item
-							className={css.settingItem}
-							label="Logs"
-							slotAfter={`${appLogCount} entries`}
-							onClick={openLogsPopup}
-						/>
-					</section>
+						<section className={css.section}>
+							<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
+							{STYLE_DEBUG_ENABLED ? (
+								<Item
+									className={css.settingItem}
+									label="Styling Debug Panel"
+									slotAfter="Open"
+									onClick={openStylingDebugPanel}
+								/>
+							) : null}
+							<Item
+								className={css.settingItem}
+								label="Logs"
+								slotAfter={`${appLogCount} entries`}
+								onClick={openLogsPopup}
+							/>
+						</section>
 				</div>
 			</Scroller>
 

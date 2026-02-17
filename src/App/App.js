@@ -9,7 +9,6 @@ import LibraryPanel from '../views/LibraryPanel';
 import SearchPanel from '../views/SearchPanel';
 import FavoritesPanel from '../views/FavoritesPanel';
 import SettingsPanel from '../views/SettingsPanel';
-import StyleDebugPanel from '../views/StyleDebugPanel';
 import PlayerPanel from '../views/PlayerPanel';
 import MediaDetailsPanel from '../views/MediaDetailsPanel';
 import jellyfinService from '../services/jellyfinService';
@@ -19,9 +18,15 @@ import AppCrashBoundary from './AppCrashBoundary';
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
+const STYLE_DEBUG_ENABLED = process.env.REACT_APP_ENABLE_STYLE_DEBUG === '1' || process.env.NODE_ENV !== 'production';
+let StyleDebugPanel = null;
+if (STYLE_DEBUG_ENABLED) {
+	// Keep debug-only panel and assets out of stable production bundles.
+	StyleDebugPanel = require('../views/StyleDebugPanel').default;
+}
 
 const App = (props) => {
-	const [currentView, setCurrentView] = useState('login'); // 'login', 'home', 'library', 'search', 'favorites', 'settings', 'styleDebug', 'details', 'player'
+	const [currentView, setCurrentView] = useState('login'); // 'login', 'home', 'library', 'search', 'favorites', 'settings', '[styleDebug]', 'details', 'player'
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
@@ -172,6 +177,12 @@ const App = (props) => {
 	}, [readVisualSettingsFromStorage]);
 
 	useEffect(() => {
+		if (!STYLE_DEBUG_ENABLED && currentView === 'styleDebug') {
+			setCurrentView('settings');
+		}
+	}, [currentView]);
+
+	useEffect(() => {
 		const handleSettingsChanged = (event) => {
 			applyVisualSettings(event?.detail);
 		};
@@ -289,6 +300,13 @@ const App = (props) => {
 				setPlaybackOptions(null);
 				return true;
 			case 'styleDebug':
+				if (!STYLE_DEBUG_ENABLED) {
+					setCurrentView('settings');
+					setSelectedItem(null);
+					setSelectedLibrary(null);
+					setPlaybackOptions(null);
+					return true;
+				}
 				if (runBackHandler(styleDebugBackHandlerRef)) return true;
 				if (navigateBackInHistory()) return true;
 				setCurrentView('settings');
@@ -419,7 +437,7 @@ const App = (props) => {
 			targetView === 'search' ||
 			targetView === 'favorites' ||
 			targetView === 'settings' ||
-			targetView === 'styleDebug'
+			(STYLE_DEBUG_ENABLED && targetView === 'styleDebug')
 				? (targetView !== currentView || nextLibraryId !== currentLibraryId)
 				: false;
 		if (shouldTrackHistory) {
@@ -442,7 +460,7 @@ const App = (props) => {
 			case 'favorites':
 			case 'settings':
 			case 'styleDebug':
-				setCurrentView(section);
+				setCurrentView(section === 'styleDebug' && !STYLE_DEBUG_ENABLED ? 'settings' : section);
 				setSelectedItem(null);
 				setSelectedLibrary(null);
 				setPlaybackOptions(null);
@@ -514,15 +532,17 @@ const App = (props) => {
 	}, []);
 
 	const getPanelIndex = () => {
+		const detailsPanelIndex = STYLE_DEBUG_ENABLED ? 7 : 6;
+		const playerPanelIndex = STYLE_DEBUG_ENABLED ? 8 : 7;
 		if (currentView === 'login') return 0;
 		if (currentView === 'home') return 1;
 		if (currentView === 'library') return 2;
 		if (currentView === 'search') return 3;
 		if (currentView === 'favorites') return 4;
 		if (currentView === 'settings') return 5;
-		if (currentView === 'styleDebug') return 6;
-		if (currentView === 'details') return 7;
-		if (currentView === 'player') return 8;
+		if (currentView === 'styleDebug' && STYLE_DEBUG_ENABLED) return 6;
+		if (currentView === 'details') return detailsPanelIndex;
+		if (currentView === 'player') return playerPanelIndex;
 		return 0;
 	};
 
@@ -587,14 +607,16 @@ const App = (props) => {
 							registerBackHandler={registerSettingsBackHandler}
 							noCloseButton
 						/>
-					<StyleDebugPanel
-						onNavigate={handleNavigate}
-						onSwitchUser={handleSwitchUser}
-						onLogout={handleLogout}
-						onExit={handleExit}
-						registerBackHandler={registerStyleDebugBackHandler}
-						noCloseButton
-					/>
+						{STYLE_DEBUG_ENABLED && StyleDebugPanel ? (
+							<StyleDebugPanel
+								onNavigate={handleNavigate}
+								onSwitchUser={handleSwitchUser}
+								onLogout={handleLogout}
+								onExit={handleExit}
+								registerBackHandler={registerStyleDebugBackHandler}
+								noCloseButton
+							/>
+						) : null}
 					<MediaDetailsPanel
 						isActive={currentView === 'details'}
 						item={selectedItem}

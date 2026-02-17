@@ -4,11 +4,39 @@ import Scroller from '@enact/sandstone/Scroller';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../components/BreezyButton';
 import Toolbar from '../components/Toolbar';
-import debugBackdropImage from '../assets/debug-image.jpg';
+import jellyfinService from '../services/jellyfinService';
 
 import css from './StyleDebugPanel.module.less';
 
-const DEBUG_BACKDROP_URL = debugBackdropImage;
+const FALLBACK_DEBUG_BACKDROP_URL = '/icon.png';
+const DEBUG_BACKDROP_WIDTH = 1920;
+
+const shuffle = (values) => {
+	const next = [...values];
+	for (let index = next.length - 1; index > 0; index -= 1) {
+		const randomIndex = Math.floor(Math.random() * (index + 1));
+		[next[index], next[randomIndex]] = [next[randomIndex], next[index]];
+	}
+	return next;
+};
+
+const resolveItemBackdropCandidates = (item) => {
+	if (!item?.Id) return [];
+	const candidates = [];
+	if (Array.isArray(item.BackdropImageTags) && item.BackdropImageTags.length > 0) {
+		candidates.push(jellyfinService.getBackdropUrl(item.Id, 0, DEBUG_BACKDROP_WIDTH));
+	}
+	if (item.SeriesId) {
+		candidates.push(jellyfinService.getBackdropUrl(item.SeriesId, 0, DEBUG_BACKDROP_WIDTH));
+	}
+	if (item.PrimaryImageTag || item.ImageTags?.Primary) {
+		candidates.push(jellyfinService.getImageUrl(item.Id, 'Primary', DEBUG_BACKDROP_WIDTH));
+	}
+	if (item.SeriesId && item.SeriesPrimaryImageTag) {
+		candidates.push(jellyfinService.getImageUrl(item.SeriesId, 'Primary', DEBUG_BACKDROP_WIDTH));
+	}
+	return candidates.filter(Boolean);
+};
 
 const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [modeState, setModeState] = useState({
@@ -17,7 +45,10 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 		allAnimations: 'on',
 		inputMode: '5way'
 	});
+	const [backdropCandidates, setBackdropCandidates] = useState([FALLBACK_DEBUG_BACKDROP_URL]);
+	const [backdropCandidateIndex, setBackdropCandidateIndex] = useState(0);
 	const toolbarBackHandlerRef = useRef(null);
+	const activeBackdropUrl = backdropCandidates[backdropCandidateIndex] || FALLBACK_DEBUG_BACKDROP_URL;
 
 	const syncModeState = useCallback(() => {
 		if (typeof document === 'undefined') return;
@@ -66,6 +97,62 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 		return () => registerBackHandler(null);
 	}, [handleInternalBack, registerBackHandler]);
 
+	const loadRandomBackdropCandidate = useCallback(async () => {
+		if (!jellyfinService?.serverUrl || !jellyfinService?.accessToken || !jellyfinService?.userId) {
+			setBackdropCandidates([FALLBACK_DEBUG_BACKDROP_URL]);
+			setBackdropCandidateIndex(0);
+			return;
+		}
+
+		try {
+			const [latestMedia, resumeItems, nextUpItems, recentItems] = await Promise.all([
+				jellyfinService.getLatestMedia(['Movie', 'Series', 'Episode'], 40),
+				jellyfinService.getResumeItems(20),
+				jellyfinService.getNextUp(20),
+				jellyfinService.getRecentlyAdded(20)
+			]);
+
+			const itemPool = shuffle([
+				...(latestMedia || []),
+				...(resumeItems || []),
+				...(nextUpItems || []),
+				...(recentItems || [])
+			]).filter((item) => item?.Id);
+
+			const candidates = [];
+			itemPool.forEach((item) => {
+				candidates.push(...resolveItemBackdropCandidates(item));
+			});
+
+			const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+			if (uniqueCandidates.length > 0) {
+				setBackdropCandidates(uniqueCandidates);
+				setBackdropCandidateIndex(0);
+				return;
+			}
+
+			setBackdropCandidates([FALLBACK_DEBUG_BACKDROP_URL]);
+			setBackdropCandidateIndex(0);
+		} catch (error) {
+			console.error('Failed to resolve style debug backdrop candidates:', error);
+			setBackdropCandidates([FALLBACK_DEBUG_BACKDROP_URL]);
+			setBackdropCandidateIndex(0);
+		}
+	}, []);
+
+	useEffect(() => {
+		loadRandomBackdropCandidate();
+	}, [loadRandomBackdropCandidate]);
+
+	const handleBackdropImageError = useCallback(() => {
+		setBackdropCandidateIndex((previousIndex) => {
+			if (previousIndex >= backdropCandidates.length - 1) {
+				return previousIndex;
+			}
+			return previousIndex + 1;
+		});
+	}, [backdropCandidates.length]);
+
 	return (
 		<Panel {...rest}>
 			<Header title="Styling Debug Panel" />
@@ -100,69 +187,78 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 						</div>
 					</section>
 
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Backdrop Blur Test</BodyText>
-						<div className={css.backdropScenes}>
-							<div className={css.backdropScene}>
-								<img src={DEBUG_BACKDROP_URL} alt="" aria-hidden="true" className={css.backdropImage} />
-								<div className={css.backdropTint} />
-								<div className={css.backdropGlow} />
-								<div className={css.backdropPattern} />
-								<div className={css.backdropContent}>
-									<BodyText className={css.sceneLabel}>Image Backdrop</BodyText>
-									<div className={`${css.liquidCard} ${css.sceneCard}`}>
-										<BodyText className={css.cardTitle}>Card Over Backdrop</BodyText>
-										<BodyText className={css.cardBody}>
-											Use this to verify blur, tint, and highlight response against real image detail.
-										</BodyText>
+						<section className={css.section}>
+							<BodyText className={css.sectionTitle}>Backdrop Blur Test</BodyText>
+							<div className={css.backdropScenes}>
+								<div className={css.backdropScene}>
+									<img
+										src={activeBackdropUrl}
+										alt=""
+										aria-hidden="true"
+										className={css.backdropImage}
+										onError={handleBackdropImageError}
+									/>
+									<div className={css.backdropTint} />
+									<div className={css.backdropGlow} />
+									<div className={css.backdropPattern} />
+									<div className={css.backdropContent}>
+										<BodyText className={css.sceneLabel}>Image Backdrop</BodyText>
+										<div className={`${css.liquidCard} ${css.sceneCard}`}>
+											<BodyText className={css.cardTitle}>Card Over Backdrop</BodyText>
+											<BodyText className={css.cardBody}>
+												Use this to verify blur, tint, and highlight response against real image detail.
+											</BodyText>
+										</div>
+										<div className={css.sceneControls}>
+											<Button size="small" onClick={loadRandomBackdropCandidate} className={css.liquidButton}>
+												Shuffle
+											</Button>
+											<Button size="small" icon="play" onClick={handleSampleClick} className={css.liquidButton}>
+												Play
+											</Button>
+											<Button size="small" icon="speaker" onClick={handleSampleClick} className={css.liquidButton}>
+												English
+											</Button>
+											<Button
+												size="small"
+												icon="info"
+												aria-label="Info"
+												onClick={handleSampleClick}
+												className={css.liquidIconButton}
+											/>
+										</div>
 									</div>
-									<div className={css.sceneControls}>
-										<Button size="small" icon="play" onClick={handleSampleClick} className={css.liquidButton}>
-											Play
-										</Button>
-										<Button size="small" icon="speaker" onClick={handleSampleClick} className={css.liquidButton}>
-											English
-										</Button>
-										<Button
-											size="small"
-											icon="info"
-											aria-label="Info"
-											onClick={handleSampleClick}
-											className={css.liquidIconButton}
-										/>
+								</div>
+								<div className={`${css.backdropScene} ${css.backdropSceneSecondary}`}>
+									<div className={css.backdropGradientOnly} />
+									<div className={css.backdropPattern} />
+									<div className={css.backdropContent}>
+										<BodyText className={css.sceneLabel}>Abstract Backdrop</BodyText>
+										<div className={`${css.liquidCard} ${css.sceneCard}`}>
+											<BodyText className={css.cardTitle}>Card Over Gradients</BodyText>
+											<BodyText className={css.cardBody}>
+												This variant checks readability and glass depth when there is no poster/image behind.
+											</BodyText>
+										</div>
+										<div className={css.sceneControls}>
+											<Button size="small" icon="play" onClick={handleSampleClick} className={css.liquidButton}>
+												Continue
+											</Button>
+											<Button size="small" icon="subtitle" onClick={handleSampleClick} className={css.liquidButton}>
+												Off
+											</Button>
+											<Button
+												size="small"
+												icon="check"
+												aria-label="Watched"
+												onClick={handleSampleClick}
+												className={css.liquidIconButton}
+											/>
+										</div>
 									</div>
 								</div>
 							</div>
-							<div className={`${css.backdropScene} ${css.backdropSceneSecondary}`}>
-								<div className={css.backdropGradientOnly} />
-								<div className={css.backdropPattern} />
-								<div className={css.backdropContent}>
-									<BodyText className={css.sceneLabel}>Abstract Backdrop</BodyText>
-									<div className={`${css.liquidCard} ${css.sceneCard}`}>
-										<BodyText className={css.cardTitle}>Card Over Gradients</BodyText>
-										<BodyText className={css.cardBody}>
-											This variant checks readability and glass depth when there is no poster/image behind.
-										</BodyText>
-									</div>
-									<div className={css.sceneControls}>
-										<Button size="small" icon="play" onClick={handleSampleClick} className={css.liquidButton}>
-											Continue
-										</Button>
-										<Button size="small" icon="subtitle" onClick={handleSampleClick} className={css.liquidButton}>
-											Off
-										</Button>
-										<Button
-											size="small"
-											icon="check"
-											aria-label="Watched"
-											onClick={handleSampleClick}
-											className={css.liquidIconButton}
-										/>
-									</div>
-								</div>
-							</div>
-						</div>
-					</section>
+						</section>
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Liquid Button Samples</BodyText>

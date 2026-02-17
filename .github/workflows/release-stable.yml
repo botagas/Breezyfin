@@ -88,6 +88,9 @@ jobs:
         run: CI=true npm run test -- --watch=false --passWithNoTests
 
       - name: Build production bundle
+        env:
+          REACT_APP_DISABLE_STYLE_DEBUG: "1"
+          REACT_APP_DISABLE_PERSISTENT_LOGS: "1"
         run: |
           npm run clean
           npm run pack-p
