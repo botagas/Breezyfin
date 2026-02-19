@@ -88,7 +88,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 		const loadRequestId = contentLoadRequestIdRef.current;
 		setLoading(true);
 		try {
-			// Load multiple content sections in parallel
 			const [recently, resume, next, movies, shows, taggedLatest] = await Promise.all([
 				jellyfinService.getRecentlyAdded(20).catch(err => {
 					console.error('Failed to load recently added:', err);
@@ -134,8 +133,6 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 			const requestItems = (taggedLatest || []).filter(tagMatchesUser);
 			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
-
-			// Use recently added for hero banner (movies/shows with backdrops)
 			const heroContent = recently.filter(item =>
 				(item.Type === 'Movie' || item.Type === 'Series') &&
 				item.BackdropImageTags && item.BackdropImageTags.length > 0

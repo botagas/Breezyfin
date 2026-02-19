@@ -280,8 +280,6 @@ const App = (props) => {
 		};
 	}, []);
 
-	// Keep theme/performance attributes on document roots so floating-layer UI (Popup, etc.)
-	// receives the same styling tokens as in-panel content.
 	useEffect(() => {
 		if (typeof document === 'undefined') return undefined;
 		const roots = [document.documentElement, document.body].filter(Boolean);
@@ -301,7 +299,6 @@ const App = (props) => {
 		};
 	}, [allAnimationsDisabled, animationsDisabled, inputMode, navbarTheme]);
 
-	// Handle back button globally
 	const handleBack = useCallback(() => {
 		switch (currentView) {
 			case 'library':
@@ -327,10 +324,10 @@ const App = (props) => {
 				return fallbackToDetailsFromPlayer();
 			case 'home':
 				if (runPanelBackHandler(homeBackHandlerRef)) return true;
-				return false; // Allow default behavior (exit prompt)
+				return false;
 			case 'login':
 			default:
-				return false; // Allow default behavior (exit prompt)
+				return false;
 		}
 	}, [
 		currentView,
@@ -346,7 +343,6 @@ const App = (props) => {
 		handleBackRef.current = handleBack;
 	}, [handleBack]);
 
-	// Global back-key listener to keep navigation consistent outside the player
 	useEffect(() => {
 		const handleGlobalKeyDown = (e) => {
 			const code = e.keyCode || e.which;
@@ -363,17 +359,14 @@ const App = (props) => {
 		return () => document.removeEventListener('keydown', handleGlobalKeyDown, true);
 	}, [handleBack]);
 
-	// Intercept browser history back (webOS back triggers popstate)
 	useEffect(() => {
 		const handlePopState = (e) => {
 			const handled = handleBackRef.current?.();
 			if (handled) {
 				e.preventDefault?.();
-				// Re-push a dummy state so the next back event stays in-app
 				window.history.pushState({breezyfin: true}, document.title);
 			}
 		};
-		// Push only once to avoid history flooding when component re-renders.
 		const state = window.history.state || {};
 		if (!state.breezyfin) {
 			window.history.pushState({breezyfin: true}, document.title);
@@ -414,16 +407,13 @@ const App = (props) => {
 			setDetailsReturnView(currentView);
 			pushPanelHistory();
 		}
-		// Track the previous item for back navigation (e.g., series -> episode)
 		if (fromItem) {
 			setPreviousItem(fromItem);
 		} else if (selectedItem && selectedItem.Type === 'Series' && item.Type === 'Episode') {
-			// If navigating from series to episode, remember the series
 			setPreviousItem(selectedItem);
 		} else {
 			setPreviousItem(null);
 		}
-		// Always show details first, not immediate play
 		setSelectedItem(item);
 		setPlaybackOptions(null);
 		setCurrentView('details');

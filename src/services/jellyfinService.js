@@ -114,13 +114,10 @@ class JellyfinService {
 		return Array.isArray(data?.Items) ? data.Items : [];
 	}
 
-	// Initialize connection to Jellyfin server
 	async connect(serverUrl) {
 		try {
 			this.serverUrl = serverUrl;
 			this.api = this.jellyfin.createApi(serverUrl);
-
-			// Test connection
 			const response = await fetch(`${serverUrl}/System/Info/Public`);
 			if (!response.ok) throw new Error('Server not reachable');
 
@@ -133,7 +130,6 @@ class JellyfinService {
 		}
 	}
 
-	// Authenticate user
 	async authenticate(username, password) {
 		try {
 			const response = await fetch(
@@ -160,17 +156,13 @@ class JellyfinService {
 				this.serverName = data?.ServerName || this.serverName || this.serverUrl;
 				this.sessionExpiredNotified = false;
 
-				// Update API with auth token
 				this.api.accessToken = this.accessToken;
-
-				// Store credentials
 				localStorage.setItem('jellyfinAuth', JSON.stringify({
 					serverUrl: this.serverUrl,
 					accessToken: this.accessToken,
 					userId: this.userId
 				}));
 
-				// Persist to multi-server store
 					const saved = serverManager.addServer({
 						serverUrl: this.serverUrl,
 						serverName: this.serverName,
@@ -203,9 +195,7 @@ class JellyfinService {
 		return true;
 	}
 
-	// Restore session from storage
 	restoreSession(serverId = null, userId = null) {
-		// Prefer multi-server store
 		const active = serverManager.getActiveServer(serverId, userId);
 		if (active && active.activeUser) {
 			return this._applySessionFromStore({
@@ -217,7 +207,6 @@ class JellyfinService {
 			});
 		}
 
-		// Fallback to legacy storage and promote it into the multi-server store
 		const stored = localStorage.getItem('jellyfinAuth');
 		if (stored) {
 			let parsedLegacySession = null;
@@ -238,7 +227,6 @@ class JellyfinService {
 			this.userId = storedUserId;
 			this.api = this.jellyfin.createApi(serverUrl, accessToken);
 
-			// Promote to server manager for future use
 				const saved = serverManager.addServer({
 					serverUrl,
 					serverName: serverUrl,
@@ -255,7 +243,6 @@ class JellyfinService {
 		return false;
 	}
 
-	// Logout
 	logout() {
 		localStorage.removeItem('jellyfinAuth');
 		const active = serverManager.getActiveServer();
@@ -272,7 +259,6 @@ class JellyfinService {
 		this.sessionExpiredNotified = false;
 	}
 
-	// Leave the current session but keep saved accounts for quick switching.
 	switchUser() {
 		localStorage.removeItem('jellyfinAuth');
 		serverManager.clearActive();
@@ -285,7 +271,6 @@ class JellyfinService {
 		this.sessionExpiredNotified = false;
 	}
 
-	// Switch to a saved server/user combination
 	setActiveServer(serverId, userId) {
 		const active = serverManager.setActiveServer(serverId, userId);
 		if (!active || !active.activeUser) {
@@ -300,15 +285,12 @@ class JellyfinService {
 		});
 	}
 
-	// Expose saved servers for UI listing
 	getSavedServers() {
 		return serverManager.listServers();
 	}
 
-	// Remove a saved server/user without affecting others
 	forgetServer(serverId, userId) {
 		serverManager.removeUser(serverId, userId);
-		// If we just removed the active session, clear local state
 		const active = serverManager.getActiveServer();
 		if (!active || !active.activeUser) {
 			this.api = null;
@@ -321,19 +303,16 @@ class JellyfinService {
 		}
 	}
 
-	// Get image URL for item
 	getImageUrl(itemId, imageType = 'Primary', width = 400) {
 		if (!this.serverUrl) return null;
 		return `${this.serverUrl}/Items/${itemId}/Images/${imageType}?width=${width}&api_key=${this.accessToken}`;
 	}
 
-	// Get backdrop image URL
 	getBackdropUrl(itemId, index = 0, width = 1920) {
 		if (!this.serverUrl) return null;
 		return `${this.serverUrl}/Items/${itemId}/Images/Backdrop/${index}?width=${width}&api_key=${this.accessToken}`;
 	}
 
-	// Get latest media
 	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16) {
 		try {
 			const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
@@ -348,7 +327,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get recently added across all libraries
 	async getRecentlyAdded(limit = 20) {
 		try {
 			return await this._fetchItems(
@@ -362,7 +340,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get next up episodes
 	async getNextUp(limit = 24) {
 		try {
 			return await this._fetchItems(
@@ -376,7 +353,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get resume items
 	async getResumeItems(limit = 10) {
 		try {
 			return await this._fetchItems(
@@ -390,7 +366,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get current user info
 	async getCurrentUser() {
 		if (!this.userId) return null;
 		try {
@@ -411,7 +386,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get library views
 	async getLibraryViews() {
 		try {
 			return await this._fetchItems(
@@ -425,7 +399,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get items from a library
 	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0) {
 		try {
 			let url = `${this.serverUrl}/Users/${this.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount`;
@@ -442,7 +415,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get item details
 	async getItem(itemId) {
 		try {
 			return await this._request(
@@ -457,7 +429,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get seasons for a series
 	async getSeasons(seriesId) {
 		try {
 			return await this._fetchItems(
@@ -471,7 +442,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get episodes for a season
 	async getEpisodes(seriesId, seasonId) {
 		try {
 			return await this._fetchItems(
@@ -485,7 +455,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get first unwatched episode for a series
 	async getNextUpEpisode(seriesId) {
 		try {
 			const data = await this._request(
@@ -494,12 +463,9 @@ class JellyfinService {
 					context: 'getNextUpEpisode'
 				}
 			);
-			// Return first episode if available
 			if (data.Items && data.Items.length > 0) {
 				return data.Items[0];
 			}
-
-			// If no next up, get first episode of first season
 			const seasonsData = await this._request(
 				`/Shows/${seriesId}/Seasons?userId=${this.userId}`,
 				{
@@ -507,7 +473,6 @@ class JellyfinService {
 				}
 			);
 			if (seasonsData.Items && seasonsData.Items.length > 0) {
-				// Get first non-special season (IndexNumber > 0)
 				const firstSeason = seasonsData.Items.find(s => s.IndexNumber > 0) || seasonsData.Items[0];
 				const episodes = await this.getEpisodes(seriesId, firstSeason.Id);
 				return episodes[0] || null;
@@ -726,7 +691,6 @@ class JellyfinService {
 		return payload;
 	}
 
-	// Get playback info and URL
 	async getPlaybackInfo(itemId, options = {}) {
 		try {
 			const relaxedPlaybackProfile = options.relaxedPlaybackProfile === true;
@@ -749,7 +713,6 @@ class JellyfinService {
 				payload.StartTimeTicks = options.startTimeTicks;
 			}
 
-			// Settings-driven knobs
 			const forceTranscoding = options.forceTranscoding === true;
 			const enableTranscoding = options.enableTranscoding !== false; // default on
 			// Keep stream copy available on transcode sessions unless explicitly disabled.
@@ -868,7 +831,6 @@ class JellyfinService {
 					{ Format: 'dvdsub', Method: 'Encode' }
 				];
 
-			// webOS-optimized device profile
 			payload.EnableDirectPlay = !forceTranscoding;
 			payload.EnableDirectStream = !forceTranscoding;
 			payload.EnableTranscoding = enableTranscoding;
@@ -1046,9 +1008,7 @@ class JellyfinService {
 		}
 	}
 
-	// Get playback URL
 	getPlaybackUrl(itemId, mediaSourceId, playSessionId, tag, container, liveStreamId) {
-		// Use static=true for direct play
 		let url = `${this.serverUrl}/Videos/${itemId}/stream?static=true&api_key=${this.accessToken}`;
 		if (mediaSourceId) {
 			url += `&mediaSourceId=${mediaSourceId}`;
@@ -1068,7 +1028,6 @@ class JellyfinService {
 		return url;
 	}
 
-	// Get HLS stream URL for transcoding
 	getTranscodeUrl(playSessionId, mediaSource) {
 		if (mediaSource.TranscodingUrl) {
 			return `${this.serverUrl}${mediaSource.TranscodingUrl}`;
@@ -1076,7 +1035,6 @@ class JellyfinService {
 		return null;
 	}
 
-	// Report playback started
 	async reportPlaybackStart(itemId, positionTicks = 0, session = {}) {
 		const playstateApi = getPlaystateApi(this.api);
 		await playstateApi.reportPlaybackStart({
@@ -1090,7 +1048,6 @@ class JellyfinService {
 		});
 	}
 
-	// Report playback progress
 	async reportPlaybackProgress(itemId, positionTicks, isPaused = false, session = {}) {
 		const playstateApi = getPlaystateApi(this.api);
 		await playstateApi.reportPlaybackProgress({
@@ -1104,7 +1061,6 @@ class JellyfinService {
 		});
 	}
 
-	// Report playback stopped
 	async reportPlaybackStopped(itemId, positionTicks, session = {}) {
 		const playstateApi = getPlaystateApi(this.api);
 		await playstateApi.reportPlaybackStopped({
@@ -1116,7 +1072,6 @@ class JellyfinService {
 		});
 	}
 
-	// Search with type filtering
 	async search(searchTerm, itemTypes = null, limit = 25) {
 		try {
 			let url = `${this.serverUrl}/Users/${this.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
@@ -1133,7 +1088,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get all favorites
 	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100) {
 		try {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
@@ -1148,7 +1102,6 @@ class JellyfinService {
 		}
 	}
 
-	// Toggle favorite status
 	async toggleFavorite(itemId, isFavorite) {
 		try {
 			const method = isFavorite ? 'DELETE' : 'POST';
@@ -1161,7 +1114,6 @@ class JellyfinService {
 				}
 			);
 
-			// Return the new favorite status
 			return !isFavorite;
 		} catch (error) {
 			console.error('toggleFavorite error:', error);
@@ -1169,17 +1121,14 @@ class JellyfinService {
 		}
 	}
 
-	// Mark item as favorite
 	async markFavorite(itemId) {
 		return this.toggleFavorite(itemId, false);
 	}
 
-	// Unmark item as favorite
 	async unmarkFavorite(itemId) {
 		return this.toggleFavorite(itemId, true);
 	}
 
-	// Mark item as watched/played
 	async markWatched(itemId) {
 		try {
 			await this._request(
@@ -1198,7 +1147,6 @@ class JellyfinService {
 		}
 	}
 
-	// Mark item as unwatched/unplayed
 	async markUnwatched(itemId) {
 		try {
 			await this._request(
@@ -1217,7 +1165,6 @@ class JellyfinService {
 		}
 	}
 
-	// Toggle watched status
 	async toggleWatched(itemId, isWatched) {
 		if (isWatched) {
 			return this.markUnwatched(itemId);
@@ -1226,7 +1173,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get server info for settings display
 	async getServerInfo() {
 		try {
 			return await this._request('/System/Info', {
@@ -1238,7 +1184,6 @@ class JellyfinService {
 		}
 	}
 
-	// Get public server info (no auth required)
 	async getPublicServerInfo() {
 		try {
 			return await this._request('/System/Info/Public', {
@@ -1252,7 +1197,6 @@ class JellyfinService {
 		}
 	}
 
-	// Fetch intro/recap/credits segments for a media item
 	async getMediaSegments(itemId) {
 		if (!this.serverUrl || !this.accessToken || !itemId) return [];
 		try {

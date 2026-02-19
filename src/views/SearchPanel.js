@@ -135,7 +135,6 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 
 	const handleItemClick = useCallback((item) => {
 		if (item.Type === 'Person') {
-			// Could navigate to person detail view in the future
 			return;
 		}
 		onItemSelect(item);
@@ -173,7 +172,6 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		let nextSelected;
 
 		if (isCurrentlySelected) {
-			// Keep at least one selected option.
 			if (selectedFilterIds.length === 1) return;
 			nextSelected = selectedFilterIds.filter((id) => id !== filterId);
 		} else {

@@ -21,7 +21,6 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 			onCardKeyDown(e, item);
 		}
 		if (e.defaultPrevented) return;
-		// Ensure left/right navigation moves focus predictably across cards
 		if (e.keyCode === 37 && e.target.previousElementSibling) { // left
 			e.preventDefault();
 			e.target.previousElementSibling.focus();
@@ -35,7 +34,6 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		setImageError(true);
 	}, []);
 
-	// Format title: for episodes show "Series Name" and "S1:E2" below
 	const getDisplayTitle = () => {
 		if (item.Type === 'Episode') {
 			return item.SeriesName || item.Name;
@@ -52,7 +50,6 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		return null;
 	};
 
-	// Get remaining episodes count for series and episodes
 	const getRemainingCount = () => {
 		if (item.Type === 'Series' && item.UserData) {
 			const hasWatched = item.UserData.PlayedPercentage > 0 || item.UserData.PlaybackPositionTicks > 0 || item.UserData.Played;
@@ -61,10 +58,7 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 				return unwatchedCount;
 			}
 		}
-		// For episodes, check if there's a series unwatched count
 		if (item.Type === 'Episode') {
-			// Episodes from NextUp/Resume should have SeriesId and we can use the series' UnplayedItemCount
-			// This data might be embedded in the episode response from the server
 			const unwatchedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
 			if (unwatchedCount > 0) {
 				return unwatchedCount;
@@ -86,10 +80,8 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		return null;
 	};
 
-	// Use series backdrop for episodes if they don't have their own
 	const getImageUrl = () => {
 		if (item.Type === 'Episode' && item.SeriesId && imageError) {
-			// Fallback to series backdrop
 			return imageUrl.replace(item.Id, item.SeriesId);
 		}
 		return imageUrl;
@@ -168,7 +160,6 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 		};
 	}, []);
 
-	// Handle focus to scroll item into view
 	const handleFocus = useCallback((e) => {
 		if (scrollerRef.current && scrollerRef.current.contains(e.target)) {
 			const scroller = scrollerRef.current;

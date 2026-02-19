@@ -114,7 +114,6 @@ const PlayerPanel = ({
 	const [volume, setVolume] = useState(100);
 	const [muted, setMuted] = useState(false);
 
-	// Track selection state
 	const [audioTracks, setAudioTracks] = useState([]);
 	const [subtitleTracks, setSubtitleTracks] = useState([]);
 	const [currentAudioTrack, setCurrentAudioTrack] = useState(null);
@@ -154,7 +153,6 @@ const PlayerPanel = ({
 		}
 	}, [onControlsVisibilityChange, showControls]);
 
-	// Build playback options to carry current selections to the next item
 	const buildPlaybackOptions = useCallback(() => {
 		const opts = { ...playbackSettingsRef.current };
 		if (Number.isInteger(currentAudioTrack)) {
@@ -182,25 +180,21 @@ const PlayerPanel = ({
 			: undefined
 	}), []);
 
-	// Find the next episode relative to the current one
 	const getNextEpisode = useCallback(async (currentItem) => {
 		if (!currentItem || currentItem.Type !== 'Episode' || !currentItem.SeriesId) return null;
 
 		const seasonId = currentItem.SeasonId || currentItem.ParentId;
 		if (!seasonId) return null;
 
-		// Try to find next episode in the same season
 		const seasonEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, seasonId);
 		const currentIndex = seasonEpisodes.findIndex(ep => ep.Id === currentItem.Id);
 		if (currentIndex >= 0 && currentIndex < seasonEpisodes.length - 1) {
 			return seasonEpisodes[currentIndex + 1];
 		}
 
-		// Otherwise, move to the next season and pick its first episode
 		const seasons = await jellyfinService.getSeasons(currentItem.SeriesId);
 		if (!seasons || seasons.length === 0) return null;
 
-		// Sort seasons by index for predictable order
 		seasons.sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
 		const currentSeasonIndex = seasons.findIndex(s => s.Id === seasonId);
 		if (currentSeasonIndex >= 0 && currentSeasonIndex < seasons.length - 1) {
@@ -237,7 +231,6 @@ const PlayerPanel = ({
 		return null;
 	}, []);
 
-	// Pre-compute whether a next episode exists to control button visibility/behavior
 	useEffect(() => {
 		let cancelled = false;
 		const checkNext = async () => {
@@ -270,7 +263,6 @@ const PlayerPanel = ({
 		return () => { cancelled = true; };
 	}, [getNextEpisode, getPreviousEpisode, item]);
 
-	// Start progress reporting to Jellyfin server
 	const startProgressReporting = useCallback(() => {
 		if (progressIntervalRef.current) {
 			clearInterval(progressIntervalRef.current);
@@ -493,7 +485,6 @@ const PlayerPanel = ({
 		return true;
 	}, [attemptPlaybackSessionRebuild, showPlaybackError]);
 
-	// Stop playback and clean up
 	const handleStop = useCallback(async () => {
 		if (progressIntervalRef.current) {
 			clearInterval(progressIntervalRef.current);
@@ -524,7 +515,6 @@ const PlayerPanel = ({
 		}
 
 		if (videoRef.current) {
-			// Clear source to ensure next load starts cleanly
 			videoRef.current.removeAttribute('src');
 			videoRef.current.load();
 		}
@@ -535,16 +525,13 @@ const PlayerPanel = ({
 		};
 	}, [clearStartWatch, getPlaybackSessionContext, item]);
 
-	// Attempt to fall back to transcoding if direct playback looks unhealthy
 	const attemptTranscodeFallback = useCallback(async (reason) => {
 		if (playbackFailureLockedRef.current) {
 			return false;
 		}
-		// If user already forced transcoding or we've tried already, bail
 		if (playbackSettingsRef.current.strictTranscodingMode || transcodeFallbackAttemptedRef.current) {
 			return false;
 		}
-		// Only try if the server can transcode
 		if (!mediaSourceData?.SupportsTranscoding) {
 			return false;
 		}
@@ -554,7 +541,6 @@ const PlayerPanel = ({
 		await handleStop();
 		setError(null);
 		setLoading(true);
-		// Re-run loadVideo with a forced transcode override
 		if (loadVideoRef.current) {
 			loadVideoRef.current(true);
 		}
@@ -632,11 +618,9 @@ const PlayerPanel = ({
 		return hls;
 	}, [attemptHlsFatalRecovery, attemptSubtitleCompatibilityFallback, isSubtitleCompatibilityError, showPlaybackError]);
 
-	// Load and play video
 	const loadVideo = useCallback(async (forceTranscodeOverride = false) => {
 		if (!item) return;
 
-		// Wait for video element to be available
 		if (!videoRef.current) {
 			setTimeout(() => loadVideo(forceTranscodeOverride), 100);
 			return;
@@ -646,23 +630,20 @@ const PlayerPanel = ({
 		setLoading(true);
 		reloadAttemptedRef.current = false;
 		subtitleCompatibilityFallbackAttemptedRef.current = false;
-		// Reset last progress marker so stall detection can work even before timeupdate
-		lastProgressRef.current = {time: 0, timestamp: Date.now()};
+			lastProgressRef.current = {time: 0, timestamp: Date.now()};
 		setError(null);
 		seekOffsetRef.current = 0; // Reset seek offset for new video
 		loadTrackPreferences();
 
-		// Clean up any existing HLS instance
-		if (hlsRef.current) {
-			hlsRef.current.destroy();
-			hlsRef.current = null;
+			if (hlsRef.current) {
+				hlsRef.current.destroy();
+				hlsRef.current = null;
 		}
 
 		loadVideoRef.current = loadVideo;
 
-			try {
-				// Load user settings to check for force transcoding
-			const settings = readBreezyfinSettings();
+				try {
+				const settings = readBreezyfinSettings();
 			let forceTranscoding = forceTranscodeOverride || settings.forceTranscoding || false;
 			let forcedBySubtitlePreference = false;
 			const enableTranscoding = settings.enableTranscoding !== false;
@@ -674,7 +655,6 @@ const PlayerPanel = ({
 					? playbackOverrideRef.current?.subtitleStreamIndex
 					: playbackOptions?.subtitleStreamIndex;
 
-			// Check if we should force transcoding for subtitles
 			const hasSubtitles =
 				Number.isInteger(requestedSubtitleTrack) && requestedSubtitleTrack >= 0;
 			const strictTranscodingMode =
@@ -694,7 +674,6 @@ const PlayerPanel = ({
 				relaxedPlaybackProfile
 			};
 
-			// Get playback info from Jellyfin
 			let playbackInfo = null;
 			try {
 				const options = {
@@ -725,7 +704,6 @@ const PlayerPanel = ({
 				setToastMessage([...new Set(compatibilityToasts)].join(' '));
 			}
 
-			// Guard: if user forced transcoding but the server didn't provide a transcoding URL, bail with a clear message
 			if (playbackSettingsRef.current.forceTranscoding && !mediaSource.TranscodingUrl) {
 				throw new Error('Transcoding was forced, but the server did not return a transcoding URL.');
 			}
@@ -742,14 +720,11 @@ const PlayerPanel = ({
 				playMethod: resolvedPlayMethod
 			};
 
-			// Store media source and selected method for track switching and fallback checks
 			setMediaSourceData({
 				...mediaSource,
 				__selectedPlayMethod: resolvedPlayMethod
 			});
 
-			// Set duration from media source (in ticks, 10,000,000 ticks = 1 second)
-			// This is the actual duration, not from the video element which may report incorrect values during transcoding
 			if (mediaSource.RunTimeTicks) {
 				const totalDuration = mediaSource.RunTimeTicks / 10000000;
 				setDuration(totalDuration);
@@ -758,18 +733,15 @@ const PlayerPanel = ({
 				setDuration(totalDuration);
 			}
 
-			// Extract audio and subtitle tracks
 			const audioStreams = mediaSource.MediaStreams?.filter((s) => s.Type === 'Audio') || [];
 			const subtitleStreams = mediaSource.MediaStreams?.filter((s) => s.Type === 'Subtitle') || [];
 
 			setAudioTracks(audioStreams);
 			setSubtitleTracks(subtitleStreams);
 
-			// Set default selected tracks
 			const defaultAudio = audioStreams.find((s) => s.IsDefault) || audioStreams[0];
 			const defaultSubtitle = subtitleStreams.find((s) => s.IsDefault);
 
-			// Use subtitle from playbackOptions if provided (selected from MediaDetailsPanel)
 			const providedAudio = Number.isInteger(playbackOptions?.audioStreamIndex)
 				? playbackOptions.audioStreamIndex
 				: null;
@@ -780,7 +752,6 @@ const PlayerPanel = ({
 			const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
 			const initialSubtitle = pickPreferredSubtitle(subtitleStreams, providedSubtitle, defaultSubtitle);
 
-			// Respect explicit overrides (e.g., from track switching) if present
 			const overrideAudio = Number.isInteger(playbackOverrideRef.current?.audioStreamIndex)
 				? playbackOverrideRef.current.audioStreamIndex
 				: null;
@@ -799,7 +770,6 @@ const PlayerPanel = ({
 			setCurrentAudioTrack(selectedAudio);
 			setCurrentSubtitleTrack(selectedSubtitle);
 
-			// Determine video URL and playback method
 			let videoUrl;
 			let isHls = false;
 			const useTranscoding = resolvedPlayMethod === 'Transcode';
@@ -808,13 +778,11 @@ const PlayerPanel = ({
 				if (!mediaSource.TranscodingUrl) {
 					throw new Error('Transcoding selected, but no transcoding URL was returned.');
 				}
-				// Server wants to transcode - use the transcoding URL
 				videoUrl = `${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`;
 				isHls = mediaSource.TranscodingUrl.includes('.m3u8') ||
 					mediaSource.TranscodingUrl.includes('/hls/') ||
 					mediaSource.TranscodingContainer?.toLowerCase() === 'ts';
 			} else if (resolvedPlayMethod === 'DirectStream' && mediaSource.SupportsDirectStream) {
-				// Direct stream - server remuxes without transcoding
 				videoUrl = jellyfinService.getPlaybackUrl(
 					item.Id,
 					mediaSource.Id,
@@ -824,16 +792,13 @@ const PlayerPanel = ({
 					mediaSource.LiveStreamId
 				);
 			} else if (resolvedPlayMethod === 'DirectPlay' && mediaSource.SupportsDirectPlay) {
-				// Direct play - play file as-is
 				videoUrl =
 					`${jellyfinService.serverUrl}/Videos/${item.Id}/stream?static=true&mediaSourceId=${mediaSource.Id}&api_key=${jellyfinService.accessToken}`;
 			} else {
 				throw new Error('No supported playback method available');
 			}
 
-			// When transcoding, enforce the selected tracks and optionally force a fresh PlaySessionId
 			if (useTranscoding && mediaSource.TranscodingUrl) {
-				// Server wants to transcode - use the transcoding URL
 				const url = new URL(`${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`);
 				if (Number.isInteger(selectedAudio)) {
 					url.searchParams.set('AudioStreamIndex', selectedAudio);
@@ -846,7 +811,6 @@ const PlayerPanel = ({
 						url.searchParams.delete('SubtitleMethod');
 					}
 				}
-				// Only force a fresh PlaySession when we explicitly asked to (track change/override)
 				if (playbackOverrideRef.current?.forceNewSession) {
 					const newSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 					url.searchParams.set('PlaySessionId', newSessionId);
@@ -854,7 +818,6 @@ const PlayerPanel = ({
 				videoUrl = url.toString();
 			}
 
-			// Mark overrides to clear once playback has actually started
 			pendingOverrideClearRef.current = !!playbackOverrideRef.current;
 
 			const video = videoRef.current;
@@ -862,7 +825,6 @@ const PlayerPanel = ({
 				throw new Error('Video element not available');
 			}
 
-			// If we picked a direct path, set a startup timeout to fall back to transcode if it stalls
 			if (!useTranscoding && mediaSource.SupportsTranscoding) {
 				if (startupFallbackTimerRef.current) {
 					clearTimeout(startupFallbackTimerRef.current);
@@ -874,13 +836,10 @@ const PlayerPanel = ({
 			}
 
 			if (isHls) {
-				// Handle HLS playback
-				// Check for native HLS support
 				const nativeHls =
 					video.canPlayType('application/vnd.apple.mpegURL') ||
 					video.canPlayType('application/x-mpegURL');
 
-				// Try native HLS first on webOS, fallback to HLS.js if it fails
 				if (nativeHls) {
 					let fallbackTriggered = false;
 
@@ -894,14 +853,12 @@ const PlayerPanel = ({
 						attachHlsPlayback(video, videoUrl, 'HLS.js');
 					};
 
-					// Fallback after 3 seconds if not loaded
 					const fallbackTimer = setTimeout(() => {
 						if (video.readyState === 0) {
 							tryHlsJsFallback();
 						}
 					}, 3000);
 
-					// Immediate fallback if video errors
 					const errorHandler = (e) => {
 						console.error('Native HLS error:', e);
 						clearTimeout(fallbackTimer);
@@ -909,7 +866,6 @@ const PlayerPanel = ({
 					};
 					video.addEventListener('error', errorHandler, {once: true});
 
-					// Clear timer if video starts loading successfully
 					video.addEventListener('loadstart', () => {
 						clearTimeout(fallbackTimer);
 						video.removeEventListener('error', errorHandler);
@@ -922,11 +878,9 @@ const PlayerPanel = ({
 					throw new Error('HLS playback not supported on this device');
 				}
 			} else {
-				// Direct MP4/WebM playback
 				video.src = videoUrl;
 			}
 
-			// Load the video
 			video.load();
 			try {
 				await video.play();
@@ -944,14 +898,12 @@ const PlayerPanel = ({
 				}
 			}
 
-			// Startup watchdog: if playback hasn't begun shortly after load, try to kick it
 			if (startWatchTimerRef.current) {
 				clearTimeout(startWatchTimerRef.current);
 			}
 			startWatchTimerRef.current = setTimeout(() => {
 				if (!videoRef.current) return;
 
-				// Consider it stalled if not playing OR if currentTime hasn't advanced recently
 				const last = lastProgressRef.current || {time: 0, timestamp: 0};
 				const now = Date.now();
 				const stagnant =
@@ -978,7 +930,6 @@ const PlayerPanel = ({
 				}
 			}, 7000);
 
-			// Final fallback: if still loading after 12s, surface an error with retry
 			if (failStartTimerRef.current) {
 				clearTimeout(failStartTimerRef.current);
 			}
@@ -986,13 +937,11 @@ const PlayerPanel = ({
 				if (playbackFailureLockedRef.current) return;
 				const videoElement = videoRef.current;
 				if (!videoElement) return;
-				// Consider startup unresolved when we still have no useful buffered/playable data.
 				if (videoElement.readyState >= 3) return;
 				console.warn('[Player] Playback failed to start within timeout, showing retry');
 				showPlaybackError('Playback failed to start. Please try again.');
 			}, 12000);
 
-			// Note: Position will be set in handleLoadedMetadata after metadata loads
 		} catch (err) {
 			console.error('Failed to load video:', err);
 			showPlaybackError(getPlaybackErrorMessage(err, 'Failed to load video'));
@@ -1012,13 +961,8 @@ const PlayerPanel = ({
 		showPlaybackError
 	]);
 
-	// Video event handlers
 	const handleLoadedMetadata = useCallback(() => {
 		if (videoRef.current) {
-			// Note: For transcoded streams, video.duration may be inaccurate (only shows buffered duration)
-			// We use the duration from media source RunTimeTicks instead, set in loadVideo
-
-			// Set start position after metadata is loaded
 			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
 			if (typeof overrideSeek === 'number') {
 				videoRef.current.currentTime = overrideSeek;
@@ -1032,7 +976,6 @@ const PlayerPanel = ({
 	}, [item]);
 
 	const handleLoadedData = useCallback(async () => {
-		// If we got data but loading is still true, try to kick off playback
 		if (loading && videoRef.current) {
 			setLoading(false);
 			try {
@@ -1064,8 +1007,7 @@ const PlayerPanel = ({
 				startupFallbackTimerRef.current = null;
 			}
 
-			// Report to Jellyfin
-			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
+				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
 			await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
 			startProgressReporting();
 		} catch (playError) {
@@ -1073,7 +1015,6 @@ const PlayerPanel = ({
 			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
 			setPlaying(false);
 
-			// If direct playback fails immediately, try a one-time transcode fallback
 			if (!isCurrentTranscoding && isFatalPlaybackError(playError)) {
 				const didFallback = await attemptTranscodeFallback(errorMessage);
 				if (didFallback) {
@@ -1088,14 +1029,12 @@ const PlayerPanel = ({
 		}
 	}, [attemptTranscodeFallback, clearStartWatch, getPlaybackSessionContext, isCurrentTranscoding, loading, item, setToastMessage, showPlaybackError, startProgressReporting]);
 
-	// Detect skip intro/credits segments based on current playback position
 	const checkSkipSegments = useCallback((positionSeconds) => {
 		if (!Number.isFinite(positionSeconds)) return;
 			let skipSegmentPromptsEnabled = true;
 			let playNextPromptEnabled = true;
 			let playNextPromptMode = 'segmentsOrLast60';
 
-			// Optional opt-out for intro/recap/preview skip prompts.
 			try {
 				const settings = readBreezyfinSettings();
 				skipSegmentPromptsEnabled = settings.skipIntro !== false;
@@ -1160,7 +1099,6 @@ const PlayerPanel = ({
 			}
 		} else if (showNextEpisodePrompt) {
 			const promptStartTicks = nextEpisodePromptStartTicksRef.current || 0;
-			// If user rewinds before outro/credits start, hide the sticky Next Episode prompt.
 			if (positionTicks < promptStartTicks) {
 				setShowNextEpisodePrompt(false);
 				setSkipOverlayVisible(false);
@@ -1189,7 +1127,6 @@ const PlayerPanel = ({
 
 	const handleTimeUpdate = useCallback(() => {
 		if (videoRef.current) {
-			// Add seek offset to get actual position (for transcoded streams that restart from 0)
 			const actualTime = videoRef.current.currentTime + seekOffsetRef.current;
 			setCurrentTime(actualTime);
 			checkSkipSegments(actualTime);
@@ -1229,7 +1166,6 @@ const PlayerPanel = ({
 			return;
 		}
 
-		// Try falling back to transcoding once if we were on a direct path
 		if (!isCurrentTranscoding) {
 			const didFallback = await attemptTranscodeFallback(errorMessage);
 			if (didFallback) {
@@ -1237,7 +1173,6 @@ const PlayerPanel = ({
 			}
 		}
 
-		// Clean up the playback session on error
 		try {
 			await handleStop();
 		} catch (stopErr) {
@@ -1249,7 +1184,6 @@ const PlayerPanel = ({
 	const handleEnded = useCallback(async () => {
 		await handleStop();
 
-		// Auto-play next episode if enabled
 		if (playbackSettingsRef.current.autoPlayNext && item?.Type === 'Episode' && onPlay) {
 			try {
 				const nextEpisode = hasNextEpisode ? await getNextEpisode(item) : null;
@@ -1265,7 +1199,6 @@ const PlayerPanel = ({
 		onBack();
 	}, [buildPlaybackOptions, getNextEpisode, handleStop, hasNextEpisode, item, onBack, onPlay]);
 
-	// Playback controls
 	const handlePlay = useCallback(async ({keepHidden = false} = {}) => {
 		if (videoRef.current) {
 			try {
@@ -1320,17 +1253,14 @@ const PlayerPanel = ({
 		if (!videoRef.current) return;
 
 		lastInteractionRef.current = Date.now();
-		// For HLS streams (native or HLS.js), let the player handle seeking
 		const isHls = isCurrentTranscoding && (
 			mediaSourceData?.TranscodingUrl?.includes('.m3u8') ||
 			mediaSourceData?.TranscodingUrl?.includes('/hls/')
 		);
 
 		if (isHls) {
-			// HLS supports native seeking via currentTime
 			videoRef.current.currentTime = seekTime;
 
-			// Report seek to Jellyfin
 			const seekTicks = Math.floor(seekTime * 10000000);
 			await jellyfinService.reportPlaybackProgress(item.Id, seekTicks, videoRef.current.paused, getPlaybackSessionContext());
 		} else if (isCurrentTranscoding) {
@@ -1353,7 +1283,6 @@ const PlayerPanel = ({
 				setLoading(false);
 			}
 		} else {
-			// For direct play/stream, we can seek directly
 			videoRef.current.currentTime = seekTime;
 		}
 	}, [checkSkipSegments, currentAudioTrack, currentSubtitleTrack, getPlaybackSessionContext, handleStop, isCurrentTranscoding, item, loadVideo, mediaSourceData, playbackOptions]);
@@ -1377,7 +1306,6 @@ const PlayerPanel = ({
 		}
 	}, [muted]);
 
-	// Reload playback with explicit track selections, keeping position
 	const reloadWithTrackSelection = useCallback(async (audioIndex, subtitleIndex) => {
 		if (!videoRef.current) return;
 		const currentPosition = videoRef.current.currentTime || 0;
@@ -1389,22 +1317,17 @@ const PlayerPanel = ({
 			forceNewSession: true
 		};
 		setLoading(true);
-		// Stop current playback cleanly so the next request starts fresh (important for HLS/transcode)
 		await handleStop();
 		loadVideo();
 	}, [handleStop, loadVideo, playbackOptions]);
 
-	// Change audio track - requires reloading with new parameters
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);
 		closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
 		saveAudioSelection(trackIndex, audioTracks);
 
-		// For HLS streams using HLS.js, use native audio track switching
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
-			// HLS.js audio tracks are 0-based, find matching track by stream index
 			const hlsTrackIndex = hlsRef.current.audioTracks.findIndex(t => {
-				// Try to match by language or other properties
 				const mediaTrack = audioTracks.find(at => at.Index === trackIndex);
 				return t.lang === mediaTrack?.Language || t.name === mediaTrack?.Title;
 			});
@@ -1413,11 +1336,9 @@ const PlayerPanel = ({
 				return;
 			}
 		}
-		// Fallback: reload playback with the chosen track
 		reloadWithTrackSelection(trackIndex, currentSubtitleTrack);
 	}, [audioTracks, closeDisclosure, currentSubtitleTrack, reloadWithTrackSelection, saveAudioSelection]);
 
-	// Change subtitle track
 	const handleSubtitleTrackChange = useCallback(async (trackIndex) => {
 		setCurrentSubtitleTrack(trackIndex);
 		closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
@@ -1440,7 +1361,6 @@ const PlayerPanel = ({
 			setToastMessage('Subtitle change may require retry/reload on this stream');
 		}
 
-		// Fallback: reload playback with the selected subtitle track
 		reloadWithTrackSelection(currentAudioTrack, trackIndex);
 	}, [closeDisclosure, currentAudioTrack, reloadWithTrackSelection, saveSubtitleSelection, setToastMessage, subtitleTracks]);
 
@@ -1453,7 +1373,6 @@ const PlayerPanel = ({
 		return parts.join(' - ') || `Track ${track.Index}`;
 	};
 
-	// Manually trigger next episode from the player controls
 	const handlePlayNextEpisode = useCallback(async () => {
 		if (!item || item.Type !== 'Episode' || !onPlay || !hasNextEpisode) return;
 		try {
@@ -1500,7 +1419,6 @@ const PlayerPanel = ({
 		}
 	}, [error, handlePause, handlePlay, loading, playing, showAudioPopup, showControls, showSubtitlePopup]);
 
-	// Only allow seek shortcuts when focus isn't on another UI element
 	const isSeekContext = useCallback((target) => {
 		if (!target) return true;
 		if (target === videoRef.current || target === document.body || target === document.documentElement) return true;
@@ -1526,7 +1444,6 @@ const PlayerPanel = ({
 		}, 900);
 	}, [checkSkipSegments, duration]);
 
-	// Format time for display
 	const formatTime = (seconds) => {
 		if (!isFinite(seconds) || seconds < 0) return '0:00';
 		const h = Math.floor(seconds / 3600);
@@ -1667,7 +1584,6 @@ const PlayerPanel = ({
 	}, [currentSkipSegment?.Id, handleDismissNextEpisodePrompt, showNextEpisodePrompt]);
 
 	const handleInternalBack = useCallback(() => {
-		// Close secondary UI first before leaving the player.
 		if (showAudioPopup) {
 			closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
 			return true;
@@ -1680,7 +1596,6 @@ const PlayerPanel = ({
 			handleDismissSkipOverlay();
 			return true;
 		}
-		// Back hides controls first; only exits when already hidden.
 		if (showControls) {
 			setShowControls(false);
 			return true;
@@ -1688,7 +1603,6 @@ const PlayerPanel = ({
 		return false;
 	}, [closeDisclosure, handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
 
-	// Effects
 	useEffect(() => {
 		if (item) {
 			resetRecoveryGuards();
@@ -1703,7 +1617,6 @@ const PlayerPanel = ({
 			setNextEpisodePromptDismissed(false);
 			nextEpisodePromptStartTicksRef.current = null;
 			loadVideo();
-			// Prefetch skip segments for intro/credits
 			jellyfinService.getMediaSegments(item.Id).then(setMediaSegments).catch(() => setMediaSegments([]));
 		}
 		return () => {
@@ -1714,7 +1627,6 @@ const PlayerPanel = ({
 
 	useEffect(() => {
 		let hideTimer;
-		// Only auto-hide when video is playing and no modal is open
 		if (showControls && playing && !showAudioPopup && !showSubtitlePopup) {
 			hideTimer = setInterval(() => {
 				const inactiveFor = Date.now() - lastInteractionRef.current;
@@ -1726,13 +1638,11 @@ const PlayerPanel = ({
 		return () => clearInterval(hideTimer);
 	}, [showControls, playing, showAudioPopup, showSubtitlePopup]);
 
-	// Playback health watchdog: if direct playback stalls, try transcode fallback
 	useEffect(() => {
 		if (!mediaSourceData || isCurrentTranscoding) return undefined;
 		const interval = setInterval(() => {
 			const now = Date.now();
 			const last = lastProgressRef.current;
-			// If we haven't moved at least 0.5s in 12s of playback, consider it stalled
 			if (playing && now - last.timestamp > 12000) {
 				if (videoRef.current && Math.abs(videoRef.current.currentTime - last.time) < 0.5) {
 					console.warn('[Player] Playback stall detected, attempting transcode fallback');
@@ -1759,7 +1669,6 @@ const PlayerPanel = ({
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
-	// Auto-focus skip when it appears; otherwise, focus play/pause after pausing.
 	useEffect(() => {
 		let focusTimer = null;
 		const becameVisible = skipOverlayVisible && !wasSkipOverlayVisibleRef.current;
@@ -1783,7 +1692,6 @@ const PlayerPanel = ({
 		};
 	}, [focusSkipOverlayAction, playing, showControls, skipOverlayVisible]);
 
-	// Handle remote/keyboard controls for play/pause, seek, back, and control visibility
 	useEffect(() => {
 		if (!isActive) return undefined;
 
@@ -1796,7 +1704,6 @@ const PlayerPanel = ({
 			const PLAY_ONLY_KEYS = [KeyCodes.PLAY];
 			const PAUSE_KEYS = [KeyCodes.PAUSE];
 
-			// Only bring up controls on up/down when hidden
 			if ([KeyCodes.UP, KeyCodes.DOWN].includes(code) && !showControls) {
 				e.preventDefault();
 				setShowControls(true);

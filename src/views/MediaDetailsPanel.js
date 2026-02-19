@@ -284,7 +284,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	useBreezyfinSettingsSync(applyPanelSettings);
 
-	// Pick sensible defaults based on the media streams we got back
 	const applyDefaultTracks = useCallback((mediaStreams) => {
 		const {
 			selectedAudioTrack: nextAudioTrack,
@@ -298,7 +297,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		if (!item) return;
 		const playbackRequestToken = createPlaybackRequestToken();
 
-		// Don't load playback info for Series - only for playable items
 		if (item.Type === 'Series') {
 			if (isPlaybackRequestCurrent(playbackRequestToken)) {
 				setPlaybackInfo(null);
@@ -342,7 +340,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 					episodesData.find((episode) => episode?.UserData?.Played !== true) ||
 					episodesData[0];
 				setSelectedEpisode(resumeEpisode);
-				// Load playback info for selected episode
 				const playbackRequestToken = createPlaybackRequestToken();
 				const info = await jellyfinService.getPlaybackInfo(resumeEpisode.Id);
 				if (episodeRequestToken !== episodesRequestRef.current || !isPlaybackRequestCurrent(playbackRequestToken)) return;
@@ -425,7 +422,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			options.subtitleStreamIndex = selectedSubtitleTrack;
 		}
 
-		// If this is a series, play the selected episode
 		if (item?.Type === 'Series') {
 			if (selectedEpisode) {
 				onPlay(selectedEpisode, options);
@@ -464,7 +460,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			setSelectedSeason(null);
 			setSelectedEpisode(null);
 		}
-		// Initialize favorite and watched status
 		setIsFavorite(Boolean(item?.UserData?.IsFavorite));
 		setIsWatched(Boolean(item?.UserData?.Played));
 	}, [applyDefaultTracks, item, loadPlaybackInfo, loadSeasons]);
@@ -489,7 +484,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const handleEpisodeClick = useCallback(async (episode) => {
 		setSelectedEpisode(episode);
 		const playbackRequestToken = createPlaybackRequestToken();
-		// Load playback info for selected episode
 		try {
 			const info = await jellyfinService.getPlaybackInfo(episode.Id);
 			if (!isPlaybackRequestCurrent(playbackRequestToken)) return;
@@ -508,7 +502,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		try {
 			const newStatus = await jellyfinService.toggleFavorite(item.Id, isFavorite);
 			setIsFavorite(newStatus);
-			// Refresh user data so UI stays in sync
 			const updated = await jellyfinService.getItem(item.Id);
 			if (updated?.UserData) {
 				setIsWatched(updated.UserData.Played || false);
@@ -521,7 +514,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	}, [isFavorite, item, setToastMessage]);
 
 	const handleToggleWatched = useCallback(async (itemId, currentWatchedState) => {
-		// If called with parameters (from episode list), use those
 		const targetId = itemId || item?.Id;
 		const targetWatchedState = currentWatchedState !== undefined ? currentWatchedState : isWatched;
 
@@ -529,12 +521,10 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		try {
 			await jellyfinService.toggleWatched(targetId, targetWatchedState);
 
-			// If this is the main item, update the state
 			if (!itemId || itemId === item?.Id) {
 				setIsWatched(!targetWatchedState);
 			}
 
-			// If it's an episode, refresh the episode list
 			if (itemId && item?.Type === 'Series' && selectedSeason) {
 				const updatedEpisodes = await jellyfinService.getEpisodes(item.Id, selectedSeason.Id);
 				setEpisodes(updatedEpisodes);
@@ -545,7 +535,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 					}
 				}
 			} else {
-				// Refresh main item user data
 				const refreshed = await jellyfinService.getItem(targetId);
 				if (refreshed?.UserData && (!itemId || itemId === item?.Id)) {
 					setIsWatched(refreshed.UserData.Played || false);
@@ -558,7 +547,6 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		}
 	}, [isWatched, item, selectedEpisode?.Id, selectedSeason, setToastMessage]);
 
-	// Map remote back/play keys when this panel is active
 	useEffect(() => {
 		if (!isActive) return undefined;
 
@@ -631,11 +619,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
 	const backdropUrl = (() => {
-		// Prefer backdrop if available
 		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
 			return jellyfinService.getBackdropUrl(item.Id, 0, 1920);
 		}
-		// For episodes/series, try series backdrop
 		if (item?.SeriesId) {
 			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 1920);
 		}
@@ -1158,11 +1144,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		if (season?.ImageTags?.Thumb) {
 			return jellyfinService.getImageUrl(season.Id, 'Thumb', 360);
 		}
-		// Fallback to series backdrop if available
 		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
 			return jellyfinService.getBackdropUrl(item.Id, 0, 640);
 		}
-		// Fallback to series primary
 		if (item?.ImageTags?.Primary) {
 			return jellyfinService.getImageUrl(item.Id, 'Primary', 360);
 		}

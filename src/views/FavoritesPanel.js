@@ -49,7 +49,6 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 		e.stopPropagation();
 		try {
 			await jellyfinService.unmarkFavorite(item.Id);
-			// Remove from local state
 			setFavorites(prev => prev.filter(f => f.Id !== item.Id));
 		} catch (error) {
 			console.error('Failed to remove favorite:', error);

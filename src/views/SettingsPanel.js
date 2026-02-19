@@ -23,7 +23,6 @@ import css from './SettingsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
 import {popupShellCss} from '../styles/popupStyles';
 
-// Settings defaults
 const DEFAULT_SETTINGS = {
 	maxBitrate: '40',
 	enableTranscoding: true,
