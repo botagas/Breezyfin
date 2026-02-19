@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Spottable from '@enact/spotlight/Spottable';
-import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
+import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './MediaRow.module.less';
 
@@ -151,13 +151,22 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	);
 };
 
-const Container = SpotlightContainerDecorator({
-	enterTo: 'last-focused',
+const Container = createLastFocusedSpotlightContainer('div', {
 	restrict: 'self-only'
-}, 'div');
+});
 
 const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, rowIndex = 0, onCardKeyDown, ...rest }) => {
 	const scrollerRef = useRef(null);
+	const focusDebounceTimeoutRef = useRef(null);
+
+	useEffect(() => {
+		return () => {
+			if (focusDebounceTimeoutRef.current) {
+				window.clearTimeout(focusDebounceTimeoutRef.current);
+				focusDebounceTimeoutRef.current = null;
+			}
+		};
+	}, []);
 
 	// Handle focus to scroll item into view
 	const handleFocus = useCallback((e) => {
@@ -165,7 +174,13 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 			const scroller = scrollerRef.current;
 			const element = e.target.closest('.' + css.card);
 			if (element) {
-				scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
+				if (focusDebounceTimeoutRef.current) {
+					window.clearTimeout(focusDebounceTimeoutRef.current);
+				}
+				focusDebounceTimeoutRef.current = window.setTimeout(() => {
+					scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
+					focusDebounceTimeoutRef.current = null;
+				}, 45);
 			}
 		}
 	}, []);

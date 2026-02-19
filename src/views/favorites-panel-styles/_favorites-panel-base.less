@@ -1,14 +1,12 @@
 @import (reference) '../../styles/cardStyles.less';
 
 .favoritesContainer {
-	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
 	display: flex;
 	flex-direction: column;
-	height: calc(100vh + var(--bf-panel-overlap-lift));
-	min-height: 0;
+	position: absolute;
+	inset: 0;
 	background: transparent;
 	overflow: hidden;
-	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
 }
 
 .favoritesContent {
@@ -28,7 +26,7 @@
 .filters {
 	display: flex;
 	gap: 0.75rem;
-	padding: calc(var(--bf-top-chrome-height, 12rem) + 2rem) 4rem 1.5rem;
+	padding: calc(var(--bf-panel-top-offset, 4.5rem) - 0.75rem) 4rem 1.5rem;
 	background: transparent;
 	align-items: center;
 	justify-content: center;
@@ -82,7 +80,7 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 	gap: 1.5rem;
-	padding: 0.75rem 4rem calc(4rem + var(--bf-panel-content-bottom-padding, 4rem));
+	padding: 0.75rem 4rem clamp(2rem, var(--bf-panel-content-bottom-padding, 4rem), 4rem);
 	background: var(--bf-theme-panel-bg, #121212);
 	.panel-grid-performance();
 }
@@ -122,30 +120,13 @@
 		.card-placeholder-surface();
 
 		&::after {
-			content: 'No Image';
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			height: 100%;
-			background: none;
-			color: rgba(233, 238, 244, 0.65);
-			font-size: 0.78em;
-			letter-spacing: 0.03em;
+			.card-placeholder-no-image-label();
 		}
 	}
 }
 
 .placeholderInner {
-	position: relative;
-	z-index: 3;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 100%;
-	height: 100%;
-	font-size: 2em;
-	color: rgba(233, 238, 244, 0.6);
-	.card-placeholder-surface();
+	.card-placeholder-inner-content();
 }
 
 .unfavoriteButton {
@@ -180,18 +161,11 @@
 }
 
 .progressBar {
-	position: absolute;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 4px;
-	background: rgba(255, 255, 255, 0.22);
-	z-index: 3;
+	.card-progress-bar-surface();
 }
 
 .progress {
-	height: 100%;
-	background: #3cb2f0;
+	.card-progress-bar-fill();
 }
 
 .cardInfo {

@@ -269,6 +269,18 @@
 	filter: none;
 }
 
+:global([data-bf-animations='off']) .indicator,
+:global([data-bf-all-animations='off']) .indicator,
+:global([data-bf-animations='off']) .heroBannerButton,
+:global([data-bf-all-animations='off']) .heroBannerButton {
+	transition: none !important;
+}
+
+:global([data-bf-animations='off']) .indicator:hover,
+:global([data-bf-all-animations='off']) .indicator:hover {
+	transform: none !important;
+}
+
 @keyframes heroBackdropIn {
 	from {
 		opacity: 0;

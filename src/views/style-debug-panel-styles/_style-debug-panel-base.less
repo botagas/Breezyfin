@@ -10,9 +10,14 @@
 }
 
 .content {
+	--bf-styledebug-liquid-bg: var(--bf-theme-popup-bg, rgba(18, 24, 36, 0.86));
+	--bf-styledebug-liquid-border: var(--bf-theme-popup-border, rgba(255, 255, 255, 0.22));
+	--bf-styledebug-liquid-shadow: var(--bf-theme-popup-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
+	--bf-styledebug-liquid-hover-bg: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
+	--bf-styledebug-liquid-active-bg: rgba(255, 255, 255, 0.18);
 	min-height: 100%;
 	background: #121212;
-	padding: calc(var(--bf-top-chrome-height, 12rem) + 1.4rem) 4rem calc(4rem + var(--bf-panel-content-bottom-padding, 4rem));
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 1.4rem) 4rem calc(var(--bf-panel-content-bottom-padding, 4rem) + 1.5rem);
 }
 
 .section {
@@ -192,10 +197,10 @@
 .liquidButton :global(.bg),
 .liquidIconButton :global(.bf-button-bg),
 .liquidIconButton :global(.bg) {
-	background: var(--bf-theme-popup-bg, rgba(18, 24, 36, 0.86)) !important;
-	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.22)) !important;
+	background: var(--bf-styledebug-liquid-bg) !important;
+	border: 1px solid var(--bf-styledebug-liquid-border) !important;
 	border-radius: 999px !important;
-	box-shadow: var(--bf-theme-popup-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4)) !important;
+	box-shadow: var(--bf-styledebug-liquid-shadow) !important;
 	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
 	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
 	transition: background 150ms ease, border-color 150ms ease;
@@ -213,14 +218,14 @@
 .liquidIconButton:hover :global(.bg),
 .liquidIconButton:focus :global(.bg),
 .liquidIconButton:global(.spottable):focus :global(.bg) {
-	background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+	background: var(--bf-styledebug-liquid-hover-bg) !important;
 }
 
 .liquidButton:active :global(.bf-button-bg),
 .liquidButton:active :global(.bg),
 .liquidIconButton:active :global(.bf-button-bg),
 .liquidIconButton:active :global(.bg) {
-	background: rgba(255, 255, 255, 0.18) !important;
+	background: var(--bf-styledebug-liquid-active-bg) !important;
 }
 
 .liquidIconButton {

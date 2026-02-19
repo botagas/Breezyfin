@@ -3,25 +3,19 @@ import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
-import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
 import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
+import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 
 import css from './HomePanel.module.less';
 
-const HOME_ROW_ORDER = [
-	'myRequests',
-	'continueWatching',
-	'nextUp',
-	'recentlyAdded',
-	'latestMovies',
-	'latestShows'
-];
+const SERIES_UNPLAYED_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
@@ -43,8 +37,55 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 	const [showMediaBar, setShowMediaBar] = useState(true);
 	const homeScrollToRef = useRef(null);
+	const seriesUnplayedCacheRef = useRef(new Map());
+	const contentLoadRequestIdRef = useRef(0);
+
+	const hydrateEpisodeSeriesProgress = useCallback(async (episodeGroups = []) => {
+		const normalizedGroups = episodeGroups.map((group) => (Array.isArray(group) ? group : []));
+		const allEpisodes = normalizedGroups.flat();
+		const seriesIds = [...new Set(
+			allEpisodes
+				.filter((episode) => episode?.Type === 'Episode' && episode?.SeriesId)
+				.map((episode) => episode.SeriesId)
+		)];
+		if (seriesIds.length === 0) {
+			return normalizedGroups;
+		}
+
+		const cache = seriesUnplayedCacheRef.current;
+		const now = Date.now();
+		const missingSeriesIds = seriesIds.filter((seriesId) => {
+			const cached = cache.get(seriesId);
+			return !(cached && now - cached.timestamp < SERIES_UNPLAYED_CACHE_TTL_MS);
+		});
+
+		await Promise.all(missingSeriesIds.map(async (seriesId) => {
+			try {
+				const series = await jellyfinService.getItem(seriesId);
+				const count = Number(series?.UserData?.UnplayedItemCount);
+				cache.set(seriesId, {
+					count: Number.isFinite(count) ? count : 0,
+					timestamp: Date.now()
+				});
+			} catch (error) {
+				console.error('Failed to fetch series data:', error);
+			}
+		}));
+
+		return normalizedGroups.map((episodes) => episodes.map((episode) => {
+			if (episode?.Type !== 'Episode' || !episode?.SeriesId) return episode;
+			const cached = cache.get(episode.SeriesId);
+			if (!cached || cached.count <= 0) return episode;
+			return {
+				...episode,
+				UnplayedItemCount: cached.count
+			};
+		}));
+	}, []);
 
 	const loadContent = useCallback(async () => {
+		contentLoadRequestIdRef.current += 1;
+		const loadRequestId = contentLoadRequestIdRef.current;
 		setLoading(true);
 		try {
 			// Load multiple content sections in parallel
@@ -91,33 +132,8 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 			};
 
 			const requestItems = (taggedLatest || []).filter(tagMatchesUser);
-
-			// For episodes in resume/next, fetch series data to get unwatched count
-			const enhanceEpisodes = async (episodes) => {
-				const seriesIds = [...new Set(episodes.filter(e => e.Type === 'Episode' && e.SeriesId).map(e => e.SeriesId))];
-				const seriesDataMap = {};
-
-				await Promise.all(seriesIds.map(async (seriesId) => {
-					try {
-						const series = await jellyfinService.getItem(seriesId);
-						if (series && series.UserData) {
-							seriesDataMap[seriesId] = series.UserData.UnplayedItemCount || 0;
-						}
-					} catch (err) {
-						console.error('Failed to fetch series data:', err);
-					}
-				}));
-
-				return episodes.map(episode => {
-					if (episode.Type === 'Episode' && episode.SeriesId && seriesDataMap[episode.SeriesId]) {
-						return { ...episode, UnplayedItemCount: seriesDataMap[episode.SeriesId] };
-					}
-					return episode;
-				});
-			};
-
-			const enhancedResume = await enhanceEpisodes(resume);
-			const enhancedNext = await enhanceEpisodes(next);
+			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
+			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 
 			// Use recently added for hero banner (movies/shows with backdrops)
 			const heroContent = recently.filter(item =>
@@ -133,11 +149,14 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 			setLatestShows(shows || []);
 			setMyRequests(requestItems || []);
 		} catch (error) {
+			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 			console.error('Failed to load content:', error);
 		} finally {
-			setLoading(false);
+			if (loadRequestId === contentLoadRequestIdRef.current) {
+				setLoading(false);
+			}
 		}
-	}, []);
+	}, [hydrateEpisodeSeriesProgress]);
 
 	const applyHomeSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -166,6 +185,9 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 
 	useEffect(() => {
 		loadContent();
+		return () => {
+			contentLoadRequestIdRef.current += 1;
+		};
 	}, [loadContent]);
 
 	const handleItemClick = useCallback((item) => {
@@ -190,16 +212,9 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 		homeScrollToRef.current = fn;
 	}, []);
 
-	const focusTopToolbarAction = useCallback(() => {
-		if (Spotlight?.focus?.('toolbar-home')) return true;
-		const target = document.querySelector('[data-spotlight-id="toolbar-home"]') ||
-			document.querySelector('[data-spotlight-id="toolbar-user"]');
-		if (target?.focus) {
-			target.focus({preventScroll: true});
-			return true;
-		}
-		return false;
-	}, []);
+	const focusTopToolbarAction = useCallback(() => (
+		focusToolbarSpotlightTargets(['toolbar-home', 'toolbar-user'])
+	), []);
 
 	const handleHomeCardKeyDown = useCallback((e) => {
 		const code = e.keyCode || e.which;
@@ -253,18 +268,21 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 	const hasContent = visibleRows.length > 0;
 	const hasHero = showMediaBar && heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
+	const topToolbar = (
+		<Toolbar
+			activeSection="home"
+			onNavigate={handleNavigation}
+			onSwitchUser={onSwitchUser}
+			onLogout={onLogout}
+			onExit={onExit}
+			registerBackHandler={registerBackHandler}
+		/>
+	);
 
 	if (loading) {
 		return (
 			<Panel {...rest}>
-					<Toolbar
-						activeSection="home"
-						onNavigate={handleNavigation}
-						onSwitchUser={onSwitchUser}
-						onLogout={onLogout}
-						onExit={onExit}
-						registerBackHandler={registerBackHandler}
-					/>
+				{topToolbar}
 				<div className={css.loading}>
 					<Spinner />
 				</div>
@@ -274,14 +292,7 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 
 	return (
 		<Panel {...rest}>
-				<Toolbar
-					activeSection="home"
-					onNavigate={handleNavigation}
-					onSwitchUser={onSwitchUser}
-					onLogout={onLogout}
-					onExit={onExit}
-					registerBackHandler={registerBackHandler}
-				/>
+			{topToolbar}
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>
 					<div className={css.emptyState}>

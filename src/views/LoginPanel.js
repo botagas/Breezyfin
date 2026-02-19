@@ -9,6 +9,8 @@ import Input from '@enact/sandstone/Input';
 import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import {getUserErrorMessage} from '../utils/errorMessages';
+import { shuffleArray } from '../utils/arrayUtils';
+import { useMapById } from '../hooks/useMapById';
 
 import css from './LoginPanel.module.less';
 
@@ -19,15 +21,6 @@ const LOGIN_BACKDROP_WIDTH = 1920;
 const LOGIN_BACKDROP_MAX_IMAGES = 24;
 const LOGIN_BACKDROP_ROTATE_INTERVAL_MS = 9000;
 const LOGIN_BACKDROP_TRANSITION_MS = 500;
-
-const shuffle = (values) => {
-	const next = [...values];
-	for (let index = next.length - 1; index > 0; index -= 1) {
-		const randomIndex = Math.floor(Math.random() * (index + 1));
-		[next[index], next[randomIndex]] = [next[randomIndex], next[index]];
-	}
-	return next;
-};
 
 const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
@@ -47,14 +40,11 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	const [backdropImageErrors, setBackdropImageErrors] = useState({});
 	const backdropRotateTimerRef = useRef(null);
 	const backdropTransitionTimerRef = useRef(null);
-	const savedServersByKey = useMemo(() => {
-		const map = new Map();
-		savedServers.forEach((entry) => {
-			const key = `${entry.serverId}:${entry.userId}`;
-			map.set(key, entry);
-		});
-		return map;
-	}, [savedServers]);
+	const savedServerKeySelector = useCallback(
+		(entry) => `${entry.serverId}:${entry.userId}`,
+		[]
+	);
+	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
 	const currentBackdropUrl = loginBackdropUrls[activeBackdropIndex] || '';
 	const previousBackdropUrl =
 		previousBackdropIndex === null || previousBackdropIndex === activeBackdropIndex
@@ -183,7 +173,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 				);
 				if (isCancelled) return;
 				const uniqueBackdrops = [...new Set(perServerBackdrops.flat().filter(Boolean))];
-				const nextBackdrops = shuffle(uniqueBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
+				const nextBackdrops = shuffleArray(uniqueBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
 				setLoginBackdropUrls(nextBackdrops);
 				setBackdropImageErrors({});
 			} catch (err) {

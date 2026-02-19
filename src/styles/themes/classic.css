@@ -41,4 +41,21 @@
 	--bf-theme-settings-surface-strong: rgba(20, 30, 40, 0.9);
 	--bf-theme-settings-border: rgba(138, 196, 255, 0.2);
 	--bf-theme-settings-focus: rgba(63, 184, 255, 0.28);
+	--bf-theme-settings-bg-base: #0c1218;
+	--bf-theme-settings-bg-glow-a: rgba(63, 184, 255, 0.18);
+	--bf-theme-settings-bg-glow-b: rgba(0, 208, 156, 0.14);
+	--bf-theme-settings-title-color: #d9efff;
+	--bf-theme-settings-text-strong: #e7f5ff;
+	--bf-theme-settings-row-divider: rgba(255, 255, 255, 0.08);
+	--bf-theme-settings-row-divider-strong: rgba(255, 255, 255, 0.12);
+	--bf-theme-settings-log-surface: rgba(0, 0, 0, 0.32);
+	--bf-theme-settings-server-card-bg: rgba(7, 13, 20, 0.38);
+	--bf-theme-settings-server-card-active-bg: rgba(63, 184, 255, 0.15);
+	--bf-theme-settings-danger-bg: rgba(244, 84, 84, 0.2);
+	--bf-theme-settings-danger-border: rgba(244, 84, 84, 0.4);
+	--bf-theme-settings-danger-bg-hover: rgba(244, 84, 84, 0.34);
+}
+
+[data-bf-nav-theme='classic'] .bf-header {
+	display: none !important;
 }

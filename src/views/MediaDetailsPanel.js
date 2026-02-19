@@ -17,6 +17,9 @@ import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useTrackPreferences } from '../hooks/useTrackPreferences';
 import { useToastMessage } from '../hooks/useToastMessage';
 import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
+import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useMapById } from '../hooks/useMapById';
+import { useItemMetadata } from '../hooks/useItemMetadata';
 
 import css from './MediaDetailsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -60,6 +63,17 @@ const toLanguageDisplayName = (language) => {
 	return String(language);
 };
 
+const MEDIA_DETAILS_DISCLOSURE_KEYS = {
+	AUDIO_PICKER: 'audioPickerPopup',
+	SUBTITLE_PICKER: 'subtitlePickerPopup',
+	EPISODE_PICKER: 'episodePickerPopup'
+};
+const INITIAL_MEDIA_DETAILS_DISCLOSURES = {
+	[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER]: false,
+	[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER]: false,
+	[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER]: false
+};
+
 const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
 	const [playbackInfo, setPlaybackInfo] = useState(null);
@@ -69,21 +83,37 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [episodes, setEpisodes] = useState([]);
 	const [selectedSeason, setSelectedSeason] = useState(null);
 	const [selectedEpisode, setSelectedEpisode] = useState(null);
-	const [showAudioPicker, setShowAudioPicker] = useState(false);
-	const [showSubtitlePicker, setShowSubtitlePicker] = useState(false);
-	const [showEpisodePicker, setShowEpisodePicker] = useState(false);
+	const {
+		disclosures,
+		openDisclosure,
+		closeDisclosure
+	} = useDisclosureMap(INITIAL_MEDIA_DETAILS_DISCLOSURES);
+	const showAudioPicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER] === true;
+	const showSubtitlePicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER] === true;
+	const showEpisodePicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER] === true;
 	const [headerLogoUnavailable, setHeaderLogoUnavailable] = useState(false);
 	const [episodeNavList, setEpisodeNavList] = useState([]);
-	const [detailMetadata, setDetailMetadata] = useState(null);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
-	const [navbarTheme, setNavbarTheme] = useState('classic');
+	const [navbarTheme, setNavbarTheme] = useState('elegant');
 	const [showSeasonImages, setShowSeasonImages] = useState(false);
 	const [useSidewaysEpisodeList, setUseSidewaysEpisodeList] = useState(true);
 	const [isCastCollapsed, setIsCastCollapsed] = useState(false);
 	const [overviewExpanded, setOverviewExpanded] = useState(false);
 	const [hasOverviewOverflow, setHasOverviewOverflow] = useState(false);
 	const [backdropUnavailable, setBackdropUnavailable] = useState(false);
+	const detailMetadata = useItemMetadata(item?.Id, {
+		enabled: Boolean(item?.Id),
+		errorContext: 'item metadata'
+	});
+	const seasonMetadata = useItemMetadata(selectedSeason?.Id, {
+		enabled: item?.Type === 'Series' && Boolean(selectedSeason?.Id),
+		errorContext: 'season metadata'
+	});
+	const selectedEpisodeMetadata = useItemMetadata(selectedEpisode?.Id, {
+		enabled: item?.Type === 'Series' && Boolean(selectedEpisode?.Id),
+		errorContext: 'selected episode metadata'
+	});
 	const castRowRef = useRef(null);
 	const castScrollerRef = useRef(null);
 	const seasonScrollerRef = useRef(null);
@@ -102,6 +132,9 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const playbackInfoRequestRef = useRef(0);
 	const episodesRequestRef = useRef(0);
 	const seasonsRequestRef = useRef(0);
+	const castFocusScrollTimeoutRef = useRef(null);
+	const seasonFocusScrollTimeoutRef = useRef(null);
+	const episodeFocusScrollTimeoutRef = useRef(null);
 	const {
 		resolveDefaultTrackSelection,
 		saveAudioSelection,
@@ -176,30 +209,16 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const isPlaybackRequestCurrent = useCallback((token) => {
 		return playbackInfoRequestRef.current === token;
 	}, []);
-	const seasonsById = useMemo(() => {
-		const map = new Map();
-		seasons.forEach((season) => {
-			map.set(String(season.Id), season);
-		});
-		return map;
-	}, [seasons]);
-	const episodesById = useMemo(() => {
-		const map = new Map();
-		episodes.forEach((episode) => {
-			map.set(String(episode.Id), episode);
-		});
-		return map;
-	}, [episodes]);
+	const seasonsById = useMapById(seasons);
+	const episodesById = useMapById(episodes);
 	const popupEpisodesById = useMemo(() => {
-		const map = new Map();
-		episodes.forEach((episode) => {
-			map.set(String(episode.Id), episode);
-		});
+		const map = new Map(episodesById);
 		episodeNavList.forEach((episode) => {
+			if (!episode?.Id) return;
 			map.set(String(episode.Id), episode);
 		});
 		return map;
-	}, [episodeNavList, episodes]);
+	}, [episodeNavList, episodesById]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -239,41 +258,31 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		setIsCastCollapsed(false);
 	}, [item?.Id, item?.SeriesId, item?.Type]);
 
+	useEffect(() => {
+		return () => {
+			if (castFocusScrollTimeoutRef.current) {
+				window.clearTimeout(castFocusScrollTimeoutRef.current);
+				castFocusScrollTimeoutRef.current = null;
+			}
+			if (seasonFocusScrollTimeoutRef.current) {
+				window.clearTimeout(seasonFocusScrollTimeoutRef.current);
+				seasonFocusScrollTimeoutRef.current = null;
+			}
+			if (episodeFocusScrollTimeoutRef.current) {
+				window.clearTimeout(episodeFocusScrollTimeoutRef.current);
+				episodeFocusScrollTimeoutRef.current = null;
+			}
+		};
+	}, []);
+
 	const applyPanelSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		setNavbarTheme(settings.navbarTheme === 'elegant' ? 'elegant' : 'classic');
+		setNavbarTheme(settings.navbarTheme === 'classic' ? 'classic' : 'elegant');
 		setShowSeasonImages(settings.showSeasonImages === true);
 		setUseSidewaysEpisodeList(settings.useSidewaysEpisodeList !== false);
 	}, []);
 
 	useBreezyfinSettingsSync(applyPanelSettings);
-
-	useEffect(() => {
-		let cancelled = false;
-
-		const loadDetailMetadata = async () => {
-			if (!item?.Id) {
-				setDetailMetadata(null);
-				return;
-			}
-			try {
-				const detailed = await jellyfinService.getItem(item.Id);
-				if (!cancelled) {
-					setDetailMetadata(detailed || null);
-				}
-			} catch (error) {
-				console.error('Failed to load item metadata:', error);
-				if (!cancelled) {
-					setDetailMetadata(null);
-				}
-			}
-		};
-
-		loadDetailMetadata();
-		return () => {
-			cancelled = true;
-		};
-	}, [item?.Id]);
 
 	// Pick sensible defaults based on the media streams we got back
 	const applyDefaultTracks = useCallback((mediaStreams) => {
@@ -462,20 +471,20 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	const handleInternalBack = useCallback(() => {
 		if (showEpisodePicker) {
-			setShowEpisodePicker(false);
+			closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
 			return true;
 		}
 		if (showAudioPicker) {
-			setShowAudioPicker(false);
+			closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER);
 			return true;
 		}
 		if (showSubtitlePicker) {
-			setShowSubtitlePicker(false);
+			closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER);
 			return true;
 		}
 		handleBack();
 		return true;
-	}, [handleBack, showAudioPicker, showEpisodePicker, showSubtitlePicker]);
+	}, [closeDisclosure, handleBack, showAudioPicker, showEpisodePicker, showSubtitlePicker]);
 
 	const handleEpisodeClick = useCallback(async (episode) => {
 		setSelectedEpisode(episode);
@@ -676,12 +685,40 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 			})) || [])
 	];
 
-	const people = detailMetadata?.People || item?.People || [];
+	const people = useMemo(() => {
+		const mergedPeople = [
+			...(Array.isArray(detailMetadata?.People) ? detailMetadata.People : []),
+			...(Array.isArray(seasonMetadata?.People) ? seasonMetadata.People : []),
+			...(Array.isArray(selectedEpisodeMetadata?.People) ? selectedEpisodeMetadata.People : []),
+			...(Array.isArray(item?.People) ? item.People : [])
+		];
+		const seen = new Set();
+		return mergedPeople.filter((person) => {
+			const uniqueKey = `${person?.Id || person?.Name || ''}:${person?.Type || ''}:${person?.Role || ''}`;
+			if (seen.has(uniqueKey)) return false;
+			seen.add(uniqueKey);
+			return true;
+		});
+	}, [detailMetadata?.People, item?.People, seasonMetadata?.People, selectedEpisodeMetadata?.People]);
+	const hasRole = useCallback((person, role) => {
+		const type = String(person?.Type || '').toLowerCase();
+		const personRole = String(person?.Role || '').toLowerCase();
+		if (role === 'director') {
+			return type === 'director' || personRole === 'director';
+		}
+		if (role === 'writer') {
+			return type === 'writer' || personRole.includes('writer');
+		}
+		return false;
+	}, []);
+	const toUniqueNames = useCallback((peopleList) => (
+		[...new Set(peopleList.map((person) => person?.Name).filter(Boolean))]
+	), []);
 	const cast = people.filter(p => p.Type === 'Actor');
-	const directors = people.filter(p => p.Type === 'Director');
-	const writers = people.filter(p => p.Type === 'Writer');
-	const directorNames = directors.map((person) => person.Name).filter(Boolean).join(', ');
-	const writerNames = writers.map((person) => person.Name).filter(Boolean).join(', ');
+	const directors = people.filter((person) => hasRole(person, 'director'));
+	const writers = people.filter((person) => hasRole(person, 'writer'));
+	const directorNames = toUniqueNames(directors).join(', ');
+	const writerNames = toUniqueNames(writers).join(', ');
 	const hasCreatorCredits = Boolean(directorNames || writerNames);
 	const focusSeasonWatchedButton = (seasonCard) => {
 		const watchedTarget = seasonCard?.querySelector(
@@ -693,13 +730,25 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const scrollCastIntoView = useCallback((element) => {
 		if (!element || !castScrollerRef.current) return;
 		const scroller = castScrollerRef.current;
-		scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+		if (castFocusScrollTimeoutRef.current) {
+			window.clearTimeout(castFocusScrollTimeoutRef.current);
+		}
+		castFocusScrollTimeoutRef.current = window.setTimeout(() => {
+			scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+			castFocusScrollTimeoutRef.current = null;
+		}, 45);
 	}, []);
 
 	const scrollSeasonIntoView = useCallback((element) => {
 		if (!element || !seasonScrollerRef.current) return;
 		const scroller = seasonScrollerRef.current;
-		scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+		if (seasonFocusScrollTimeoutRef.current) {
+			window.clearTimeout(seasonFocusScrollTimeoutRef.current);
+		}
+		seasonFocusScrollTimeoutRef.current = window.setTimeout(() => {
+			scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+			seasonFocusScrollTimeoutRef.current = null;
+		}, 45);
 	}, []);
 
 	const focusSeasonCardByIndex = (index) => {
@@ -1259,28 +1308,28 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		: (shouldShowContinue ? 'Continue' : 'Play');
 
 	const closeAudioPicker = useCallback(() => {
-		setShowAudioPicker(false);
-	}, []);
+		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER);
+	}, [closeDisclosure]);
 
 	const openAudioPicker = useCallback(() => {
-		setShowAudioPicker(true);
-	}, []);
+		openDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER);
+	}, [openDisclosure]);
 
 	const closeSubtitlePicker = useCallback(() => {
-		setShowSubtitlePicker(false);
-	}, []);
+		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER);
+	}, [closeDisclosure]);
 
 	const openSubtitlePicker = useCallback(() => {
-		setShowSubtitlePicker(true);
-	}, []);
+		openDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER);
+	}, [openDisclosure]);
 
 	const closeEpisodePicker = useCallback(() => {
-		setShowEpisodePicker(false);
-	}, []);
+		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
+	}, [closeDisclosure]);
 
 	const openEpisodePicker = useCallback(() => {
-		setShowEpisodePicker(true);
-	}, []);
+		openDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
+	}, [openDisclosure]);
 
 	const captureDetailsScrollTo = useCallback((fn) => {
 		detailsScrollToRef.current = fn;
@@ -1336,8 +1385,8 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		} else if (onItemSelect) {
 			onItemSelect(episode, item);
 		}
-		setShowEpisodePicker(false);
-	}, [handleEpisodeClick, item, onItemSelect, popupEpisodesById]);
+		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
+	}, [closeDisclosure, handleEpisodeClick, item, onItemSelect, popupEpisodesById]);
 
 	const handleCastCardFocus = useCallback((e) => {
 		scrollCastIntoView(e.currentTarget);
@@ -1463,7 +1512,15 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	const handleEpisodeCardFocus = useCallback((e) => {
 		if (!isSidewaysEpisodeLayout || !episodesListRef.current) return;
-		scrollElementIntoHorizontalView(episodesListRef.current, e.currentTarget, {minBuffer: 70, edgeRatio: 0.12});
+		const scroller = episodesListRef.current;
+		const card = e.currentTarget;
+		if (episodeFocusScrollTimeoutRef.current) {
+			window.clearTimeout(episodeFocusScrollTimeoutRef.current);
+		}
+		episodeFocusScrollTimeoutRef.current = window.setTimeout(() => {
+			scrollElementIntoHorizontalView(scroller, card, {minBuffer: 70, edgeRatio: 0.12});
+			episodeFocusScrollTimeoutRef.current = null;
+		}, 45);
 	}, [isSidewaysEpisodeLayout]);
 
 	const handleEpisodeInfoClick = useCallback((e) => {

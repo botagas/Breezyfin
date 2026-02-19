@@ -16,6 +16,7 @@ import {isStyleDebugEnabled} from '../utils/featureFlags';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useTrackPreferences } from '../hooks/useTrackPreferences';
 import { useToastMessage } from '../hooks/useToastMessage';
+import { useDisclosureMap } from '../hooks/useDisclosureMap';
 
 import css from './PlayerPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -25,6 +26,26 @@ const MAX_HLS_NETWORK_RECOVERY_ATTEMPTS = 1;
 const MAX_HLS_MEDIA_RECOVERY_ATTEMPTS = 1;
 const MAX_PLAY_SESSION_REBUILD_ATTEMPTS = 1;
 const RELAXED_PLAYBACK_PROFILE_ENABLED = isStyleDebugEnabled();
+const HLS_PLAYER_CONFIG = {
+	enableWorker: true,
+	lowLatencyMode: false,
+	backBufferLength: 90,
+	maxBufferLength: 30,
+	maxMaxBufferLength: 600,
+	fragLoadingTimeOut: 20000,
+	levelLoadingTimeOut: 20000,
+	fragLoadingMaxRetry: 4,
+	levelLoadingMaxRetry: 4,
+	startLevel: -1
+};
+const PLAYER_DISCLOSURE_KEYS = {
+	AUDIO_TRACKS: 'audioTracksPopup',
+	SUBTITLE_TRACKS: 'subtitleTracksPopup'
+};
+const INITIAL_PLAYER_DISCLOSURES = {
+	[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS]: false,
+	[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS]: false
+};
 
 const PlayerPanel = ({
 	item,
@@ -98,8 +119,13 @@ const PlayerPanel = ({
 	const [subtitleTracks, setSubtitleTracks] = useState([]);
 	const [currentAudioTrack, setCurrentAudioTrack] = useState(null);
 	const [currentSubtitleTrack, setCurrentSubtitleTrack] = useState(null);
-	const [showAudioPopup, setShowAudioPopup] = useState(false);
-	const [showSubtitlePopup, setShowSubtitlePopup] = useState(false);
+	const {
+		disclosures,
+		openDisclosure,
+		closeDisclosure
+	} = useDisclosureMap(INITIAL_PLAYER_DISCLOSURES);
+	const showAudioPopup = disclosures[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS] === true;
+	const showSubtitlePopup = disclosures[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS] === true;
 	const [mediaSourceData, setMediaSourceData] = useState(null);
 	const [hasNextEpisode, setHasNextEpisode] = useState(false);
 	const [hasPreviousEpisode, setHasPreviousEpisode] = useState(false);
@@ -578,6 +604,34 @@ const PlayerPanel = ({
 		return true;
 	}, [handleStop, isSubtitleCompatibilityError, playbackOptions, setToastMessage]);
 
+	const attachHlsPlayback = useCallback((video, sourceUrl, sourceLabel = 'HLS.js') => {
+		const hls = new Hls(HLS_PLAYER_CONFIG);
+		hlsRef.current = hls;
+		hls.loadSource(sourceUrl);
+		hls.attachMedia(video);
+
+		hls.on(Hls.Events.ERROR, (event, data) => {
+			console.error(`${sourceLabel} error:`, data);
+			if (isSubtitleCompatibilityError(data) && playbackSettingsRef.current.strictTranscodingMode) {
+				showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
+				return;
+			}
+			if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details === 'fragLoadError') {
+				attemptSubtitleCompatibilityFallback(data).then((handled) => {
+					if (!handled) {
+						attemptHlsFatalRecovery(hls, data, sourceLabel);
+					}
+				});
+				return;
+			}
+			if (data.fatal) {
+				attemptHlsFatalRecovery(hls, data, sourceLabel);
+			}
+		});
+
+		return hls;
+	}, [attemptHlsFatalRecovery, attemptSubtitleCompatibilityFallback, isSubtitleCompatibilityError, showPlaybackError]);
+
 	// Load and play video
 	const loadVideo = useCallback(async (forceTranscodeOverride = false) => {
 		if (!item) return;
@@ -837,41 +891,7 @@ const PlayerPanel = ({
 						video.src = '';
 						video.removeAttribute('src');
 
-						const hls = new Hls({
-							enableWorker: true,
-							lowLatencyMode: false,
-							backBufferLength: 90,
-							maxBufferLength: 30,
-							maxMaxBufferLength: 600,
-							fragLoadingTimeOut: 20000,
-							levelLoadingTimeOut: 20000,
-							fragLoadingMaxRetry: 4,
-							levelLoadingMaxRetry: 4,
-							startLevel: -1
-						});
-						hlsRef.current = hls;
-
-						hls.loadSource(videoUrl);
-						hls.attachMedia(video);
-
-						hls.on(Hls.Events.ERROR, (event, data) => {
-							console.error('HLS.js error:', data);
-							if (isSubtitleCompatibilityError(data) && playbackSettingsRef.current.strictTranscodingMode) {
-								showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
-								return;
-							}
-							if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details === 'fragLoadError') {
-								attemptSubtitleCompatibilityFallback(data).then((handled) => {
-									if (!handled) {
-										attemptHlsFatalRecovery(hls, data, 'HLS.js');
-									}
-								});
-								return;
-							}
-							if (data.fatal) {
-								attemptHlsFatalRecovery(hls, data, 'HLS.js');
-							}
-						});
+						attachHlsPlayback(video, videoUrl, 'HLS.js');
 					};
 
 					// Fallback after 3 seconds if not loaded
@@ -897,41 +917,7 @@ const PlayerPanel = ({
 
 					video.src = videoUrl;
 				} else if (Hls.isSupported()) {
-					const hls = new Hls({
-						enableWorker: true,
-						lowLatencyMode: false,
-						backBufferLength: 90,
-						maxBufferLength: 30,
-						maxMaxBufferLength: 600,
-						fragLoadingTimeOut: 20000,
-						levelLoadingTimeOut: 20000,
-						fragLoadingMaxRetry: 4,
-						levelLoadingMaxRetry: 4,
-						startLevel: -1
-					});
-					hlsRef.current = hls;
-
-					hls.loadSource(videoUrl);
-					hls.attachMedia(video);
-
-					hls.on(Hls.Events.ERROR, (event, data) => {
-						console.error('HLS error:', data);
-						if (isSubtitleCompatibilityError(data) && playbackSettingsRef.current.strictTranscodingMode) {
-							showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
-							return;
-						}
-						if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details === 'fragLoadError') {
-							attemptSubtitleCompatibilityFallback(data).then((handled) => {
-								if (!handled) {
-									attemptHlsFatalRecovery(hls, data, 'HLS.js');
-								}
-							});
-							return;
-						}
-						if (data.fatal) {
-							attemptHlsFatalRecovery(hls, data, 'HLS.js');
-						}
-					});
+					attachHlsPlayback(video, videoUrl, 'HLS.js');
 				} else {
 					throw new Error('HLS playback not supported on this device');
 				}
@@ -1012,11 +998,9 @@ const PlayerPanel = ({
 			showPlaybackError(getPlaybackErrorMessage(err, 'Failed to load video'));
 		}
 	}, [
-		attemptHlsFatalRecovery,
+		attachHlsPlayback,
 		attemptPlaybackSessionRebuild,
-		attemptSubtitleCompatibilityFallback,
 		attemptTranscodeFallback,
-		isSubtitleCompatibilityError,
 		item,
 		loadTrackPreferences,
 		pickPreferredAudio,
@@ -1413,7 +1397,7 @@ const PlayerPanel = ({
 	// Change audio track - requires reloading with new parameters
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);
-		setShowAudioPopup(false);
+		closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
 		saveAudioSelection(trackIndex, audioTracks);
 
 		// For HLS streams using HLS.js, use native audio track switching
@@ -1431,12 +1415,12 @@ const PlayerPanel = ({
 		}
 		// Fallback: reload playback with the chosen track
 		reloadWithTrackSelection(trackIndex, currentSubtitleTrack);
-	}, [audioTracks, currentSubtitleTrack, reloadWithTrackSelection, saveAudioSelection]);
+	}, [audioTracks, closeDisclosure, currentSubtitleTrack, reloadWithTrackSelection, saveAudioSelection]);
 
 	// Change subtitle track
 	const handleSubtitleTrackChange = useCallback(async (trackIndex) => {
 		setCurrentSubtitleTrack(trackIndex);
-		setShowSubtitlePopup(false);
+		closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
 		saveSubtitleSelection(trackIndex, subtitleTracks);
 
 		// For HLS streams, subtitle switching via source reload doesn't work well
@@ -1458,7 +1442,7 @@ const PlayerPanel = ({
 
 		// Fallback: reload playback with the selected subtitle track
 		reloadWithTrackSelection(currentAudioTrack, trackIndex);
-	}, [currentAudioTrack, reloadWithTrackSelection, saveSubtitleSelection, setToastMessage, subtitleTracks]);
+	}, [closeDisclosure, currentAudioTrack, reloadWithTrackSelection, saveSubtitleSelection, setToastMessage, subtitleTracks]);
 
 	const getTrackLabel = (track) => {
 		const parts = [];
@@ -1624,20 +1608,20 @@ const PlayerPanel = ({
 	}, []);
 
 	const openAudioPopup = useCallback(() => {
-		setShowAudioPopup(true);
-	}, []);
+		openDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
+	}, [openDisclosure]);
 
 	const closeAudioPopup = useCallback(() => {
-		setShowAudioPopup(false);
-	}, []);
+		closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
+	}, [closeDisclosure]);
 
 	const openSubtitlePopup = useCallback(() => {
-		setShowSubtitlePopup(true);
-	}, []);
+		openDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
+	}, [openDisclosure]);
 
 	const closeSubtitlePopup = useCallback(() => {
-		setShowSubtitlePopup(false);
-	}, []);
+		closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
+	}, [closeDisclosure]);
 
 	const handleProgressSliderKeyDown = useCallback((e) => {
 		const SEEK_STEP = 15;
@@ -1685,11 +1669,11 @@ const PlayerPanel = ({
 	const handleInternalBack = useCallback(() => {
 		// Close secondary UI first before leaving the player.
 		if (showAudioPopup) {
-			setShowAudioPopup(false);
+			closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
 			return true;
 		}
 		if (showSubtitlePopup) {
-			setShowSubtitlePopup(false);
+			closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
 			return true;
 		}
 		if (skipOverlayVisible) {
@@ -1702,7 +1686,7 @@ const PlayerPanel = ({
 			return true;
 		}
 		return false;
-	}, [handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
+	}, [closeDisclosure, handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
 
 	// Effects
 	useEffect(() => {

@@ -62,6 +62,58 @@ class JellyfinService {
 		return false;
 	}
 
+	_buildRequestUrl(pathOrUrl) {
+		if (!pathOrUrl) return '';
+		if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+		const normalizedPath = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+		return `${this.serverUrl}${normalizedPath}`;
+	}
+
+	_getAuthHeaders(extraHeaders = {}) {
+		return {
+			'X-Emby-Token': this.accessToken,
+			...extraHeaders
+		};
+	}
+
+	async _request(pathOrUrl, options = {}) {
+		const {
+			method = 'GET',
+			headers = {},
+			body,
+			includeAuth = true,
+			expectJson = true,
+			context = 'request',
+			suppressAuthHandling = false
+		} = options;
+		const url = this._buildRequestUrl(pathOrUrl);
+		const response = await fetch(url, {
+			method,
+			headers: includeAuth ? this._getAuthHeaders(headers) : headers,
+			body
+		});
+
+		if (!response.ok) {
+			if (!suppressAuthHandling) {
+				this._handleAuthFailureStatus(response.status);
+			}
+			const errorText = await response.text().catch(() => '');
+			const compactError = String(errorText || '').replace(/\s+/g, ' ').trim().slice(0, 280);
+			throw new Error(`${context} failed with status ${response.status}${compactError ? ` - ${compactError}` : ''}`);
+		}
+
+		if (!expectJson) return response;
+		return response.json();
+	}
+
+	async _fetchItems(pathOrUrl, options = {}, context = 'request') {
+		const data = await this._request(pathOrUrl, {
+			...options,
+			context
+		});
+		return Array.isArray(data?.Items) ? data.Items : [];
+	}
+
 	// Initialize connection to Jellyfin server
 	async connect(serverUrl) {
 		try {
@@ -168,7 +220,19 @@ class JellyfinService {
 		// Fallback to legacy storage and promote it into the multi-server store
 		const stored = localStorage.getItem('jellyfinAuth');
 		if (stored) {
-			const { serverUrl, accessToken, userId: storedUserId } = JSON.parse(stored);
+			let parsedLegacySession = null;
+			try {
+				parsedLegacySession = JSON.parse(stored);
+			} catch (error) {
+				console.warn('[jellyfinService] Failed to parse legacy jellyfinAuth payload:', error);
+				localStorage.removeItem('jellyfinAuth');
+				return false;
+			}
+			const { serverUrl, accessToken, userId: storedUserId } = parsedLegacySession || {};
+			if (!serverUrl || !accessToken || !storedUserId) {
+				localStorage.removeItem('jellyfinAuth');
+				return false;
+			}
 			this.serverUrl = serverUrl;
 			this.accessToken = accessToken;
 			this.userId = storedUserId;
@@ -273,20 +337,11 @@ class JellyfinService {
 	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16) {
 		try {
 			const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Users/${this.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
+				{},
+				'getLatestMedia'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getLatestMedia failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error(`getLatestMedia ${includeItemTypes} error:`, error);
 			return [];
@@ -296,20 +351,11 @@ class JellyfinService {
 	// Get recently added across all libraries
 	async getRecentlyAdded(limit = 20) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Users/${this.userId}/Items?limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+				{},
+				'getRecentlyAdded'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getRecentlyAdded failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('getRecentlyAdded error:', error);
 			return [];
@@ -319,20 +365,11 @@ class JellyfinService {
 	// Get next up episodes
 	async getNextUp(limit = 24) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Shows/NextUp?userId=${this.userId}&limit=${limit}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber&imageTypeLimit=1&enableTotalRecordCount=false`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Shows/NextUp?userId=${this.userId}&limit=${limit}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber&imageTypeLimit=1&enableTotalRecordCount=false`,
+				{},
+				'getNextUp'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getNextUp failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('Failed to get next up:', error);
 			return [];
@@ -342,20 +379,11 @@ class JellyfinService {
 	// Get resume items
 	async getResumeItems(limit = 10) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items/Resume?limit=${limit}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Users/${this.userId}/Items/Resume?limit=${limit}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+				{},
+				'getResumeItems'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getResumeItems failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('getResumeItems error:', error);
 			return [];
@@ -366,16 +394,9 @@ class JellyfinService {
 	async getCurrentUser() {
 		if (!this.userId) return null;
 		try {
-			const response = await fetch(`${this.serverUrl}/Users/${this.userId}`, {
-				headers: {
-					'X-Emby-Token': this.accessToken
-				}
+			const user = await this._request(`/Users/${this.userId}`, {
+				context: 'getCurrentUser'
 			});
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				return null;
-			}
-			const user = await response.json();
 			const active = serverManager.getActiveServer();
 			if (active?.id && active?.activeUser?.userId) {
 				serverManager.updateUser(active.id, active.activeUser.userId, {
@@ -393,20 +414,11 @@ class JellyfinService {
 	// Get library views
 	async getLibraryViews() {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Views`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Users/${this.userId}/Views`,
+				{},
+				'getLibraryViews'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getLibraryViews failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('getLibraryViews error:', error);
 			return [];
@@ -423,17 +435,7 @@ class JellyfinService {
 				url += `&includeItemTypes=${types}`;
 			}
 
-			const response = await fetch(url, {
-				headers: {
-					'X-Emby-Token': this.accessToken
-				}
-			});
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getLibraryItems failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
+			return await this._fetchItems(url, {}, 'getLibraryItems');
 		} catch (error) {
 			console.error('getLibraryItems error:', error);
 			return [];
@@ -443,20 +445,12 @@ class JellyfinService {
 	// Get item details
 	async getItem(itemId) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items/${itemId}?fields=Overview,Genres,People,Studios,MediaStreams`,
+			return await this._request(
+				`/Users/${this.userId}/Items/${itemId}?fields=Overview,Genres,People,Studios,MediaStreams`,
 				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
+					context: 'getItem'
 				}
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getItem failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data;
 		} catch (error) {
 			console.error('getItem error:', error);
 			return null;
@@ -466,20 +460,11 @@ class JellyfinService {
 	// Get seasons for a series
 	async getSeasons(seriesId) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Shows/${seriesId}/Seasons?userId=${this.userId}&fields=Overview`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Shows/${seriesId}/Seasons?userId=${this.userId}&fields=Overview`,
+				{},
+				'getSeasons'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getSeasons failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('getSeasons error:', error);
 			return [];
@@ -489,20 +474,11 @@ class JellyfinService {
 	// Get episodes for a season
 	async getEpisodes(seriesId, seasonId) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Shows/${seriesId}/Episodes?seasonId=${seasonId}&userId=${this.userId}&fields=Overview,SeriesName,ParentIndexNumber,IndexNumber`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Shows/${seriesId}/Episodes?seasonId=${seasonId}&userId=${this.userId}&fields=Overview,SeriesName,ParentIndexNumber,IndexNumber`,
+				{},
+				'getEpisodes'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getEpisodes failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('getEpisodes error:', error);
 			return [];
@@ -512,38 +488,24 @@ class JellyfinService {
 	// Get first unwatched episode for a series
 	async getNextUpEpisode(seriesId) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Shows/NextUp?seriesId=${seriesId}&userId=${this.userId}&fields=Overview,SeriesName,ParentIndexNumber,IndexNumber`,
+			const data = await this._request(
+				`/Shows/NextUp?seriesId=${seriesId}&userId=${this.userId}&fields=Overview,SeriesName,ParentIndexNumber,IndexNumber`,
 				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
+					context: 'getNextUpEpisode'
 				}
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getNextUpEpisode failed with status ${response.status}`);
-			}
-			const data = await response.json();
 			// Return first episode if available
 			if (data.Items && data.Items.length > 0) {
 				return data.Items[0];
 			}
 
 			// If no next up, get first episode of first season
-			const seasonsResponse = await fetch(
-				`${this.serverUrl}/Shows/${seriesId}/Seasons?userId=${this.userId}`,
+			const seasonsData = await this._request(
+				`/Shows/${seriesId}/Seasons?userId=${this.userId}`,
 				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
+					context: 'getNextUpEpisode seasons'
 				}
 			);
-			if (!seasonsResponse.ok) {
-				this._handleAuthFailureStatus(seasonsResponse.status);
-				throw new Error(`getNextUpEpisode seasons fetch failed with status ${seasonsResponse.status}`);
-			}
-			const seasonsData = await seasonsResponse.json();
 			if (seasonsData.Items && seasonsData.Items.length > 0) {
 				// Get first non-special season (IndexNumber > 0)
 				const firstSeason = seasonsData.Items.find(s => s.IndexNumber > 0) || seasonsData.Items[0];
@@ -1164,17 +1126,7 @@ class JellyfinService {
 				url += `&includeItemTypes=${types}`;
 			}
 
-			const response = await fetch(url, {
-				headers: {
-					'X-Emby-Token': this.accessToken
-				}
-			});
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`search failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
+			return await this._fetchItems(url, {}, 'search');
 		} catch (error) {
 			console.error('search error:', error);
 			return [];
@@ -1185,20 +1137,11 @@ class JellyfinService {
 	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100) {
 		try {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${limit}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
-				{
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
-				}
+			return await this._fetchItems(
+				`/Users/${this.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${limit}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
+				{},
+				'getFavorites'
 			);
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getFavorites failed with status ${response.status}`);
-			}
-			const data = await response.json();
-			return data.Items || [];
 		} catch (error) {
 			console.error('getFavorites error:', error);
 			return [];
@@ -1209,20 +1152,14 @@ class JellyfinService {
 	async toggleFavorite(itemId, isFavorite) {
 		try {
 			const method = isFavorite ? 'DELETE' : 'POST';
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/FavoriteItems/${itemId}`,
+			await this._request(
+				`/Users/${this.userId}/FavoriteItems/${itemId}`,
 				{
-					method: method,
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
+					method,
+					expectJson: false,
+					context: 'toggleFavorite'
 				}
 			);
-
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`Failed to toggle favorite: ${response.status}`);
-			}
 
 			// Return the new favorite status
 			return !isFavorite;
@@ -1245,20 +1182,14 @@ class JellyfinService {
 	// Mark item as watched/played
 	async markWatched(itemId) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/PlayedItems/${itemId}`,
+			await this._request(
+				`/Users/${this.userId}/PlayedItems/${itemId}`,
 				{
 					method: 'POST',
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
+					expectJson: false,
+					context: 'markWatched'
 				}
 			);
-
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`Failed to mark watched: ${response.status}`);
-			}
 
 			return true;
 		} catch (error) {
@@ -1270,20 +1201,14 @@ class JellyfinService {
 	// Mark item as unwatched/unplayed
 	async markUnwatched(itemId) {
 		try {
-			const response = await fetch(
-				`${this.serverUrl}/Users/${this.userId}/PlayedItems/${itemId}`,
+			await this._request(
+				`/Users/${this.userId}/PlayedItems/${itemId}`,
 				{
 					method: 'DELETE',
-					headers: {
-						'X-Emby-Token': this.accessToken
-					}
+					expectJson: false,
+					context: 'markUnwatched'
 				}
 			);
-
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`Failed to mark unwatched: ${response.status}`);
-			}
 
 			return false;
 		} catch (error) {
@@ -1304,16 +1229,9 @@ class JellyfinService {
 	// Get server info for settings display
 	async getServerInfo() {
 		try {
-			const response = await fetch(`${this.serverUrl}/System/Info`, {
-				headers: {
-					'X-Emby-Token': this.accessToken
-				}
+			return await this._request('/System/Info', {
+				context: 'getServerInfo'
 			});
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				throw new Error(`getServerInfo failed with status ${response.status}`);
-			}
-			return await response.json();
 		} catch (error) {
 			console.error('getServerInfo error:', error);
 			return null;
@@ -1323,11 +1241,11 @@ class JellyfinService {
 	// Get public server info (no auth required)
 	async getPublicServerInfo() {
 		try {
-			const response = await fetch(`${this.serverUrl}/System/Info/Public`);
-			if (!response.ok) {
-				throw new Error(`getPublicServerInfo failed with status ${response.status}`);
-			}
-			return await response.json();
+			return await this._request('/System/Info/Public', {
+				includeAuth: false,
+				context: 'getPublicServerInfo',
+				suppressAuthHandling: true
+			});
 		} catch (error) {
 			console.error('getPublicServerInfo error:', error);
 			return null;
@@ -1338,17 +1256,9 @@ class JellyfinService {
 	async getMediaSegments(itemId) {
 		if (!this.serverUrl || !this.accessToken || !itemId) return [];
 		try {
-			const response = await fetch(`${this.serverUrl}/MediaSegments/${itemId}`, {
-				headers: {
-					'X-Emby-Token': this.accessToken
-				}
+			const data = await this._request(`/MediaSegments/${itemId}`, {
+				context: 'getMediaSegments'
 			});
-			if (!response.ok) {
-				this._handleAuthFailureStatus(response.status);
-				console.warn('getMediaSegments non-200:', response.status);
-				return [];
-			}
-			const data = await response.json();
 			return Array.isArray(data?.Items) ? data.Items : [];
 		} catch (error) {
 			console.error('getMediaSegments error:', error);

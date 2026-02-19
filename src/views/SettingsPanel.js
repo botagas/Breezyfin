@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
@@ -8,26 +8,20 @@ import Item from '@enact/sandstone/Item';
 import SwitchItem from '@enact/sandstone/SwitchItem';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
-import Toolbar from '../components/Toolbar';
+import SettingsToolbar from '../components/SettingsToolbar';
+import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useMapById } from '../hooks/useMapById';
 import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
 import { wipeAllAppCache } from '../utils/cacheMaintenance';
 
 import css from './SettingsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
 import {popupShellCss} from '../styles/popupStyles';
-
-const HOME_ROW_ORDER = [
-	'myRequests',
-	'continueWatching',
-	'nextUp',
-	'recentlyAdded',
-	'latestMovies',
-	'latestShows'
-];
 
 // Settings defaults
 const DEFAULT_SETTINGS = {
@@ -38,10 +32,10 @@ const DEFAULT_SETTINGS = {
 	relaxedPlaybackProfile: false,
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
-	disableAnimations: false,
+	disableAnimations: true,
 	disableAllAnimations: false,
 	showMediaBar: true,
-	navbarTheme: 'classic',
+	navbarTheme: 'elegant',
 	autoPlayNext: true,
 	showPlayNextPrompt: true,
 	playNextPromptMode: 'segmentsOrLast60',
@@ -89,6 +83,36 @@ const NAVBAR_THEME_OPTIONS = [
 	{ value: 'elegant', label: 'Elegant' }
 ];
 const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
+const SETTINGS_DISCLOSURE_KEYS = {
+	BITRATE: 'bitratePopup',
+	AUDIO_LANGUAGE: 'audioLanguagePopup',
+	SUBTITLE_LANGUAGE: 'subtitleLanguagePopup',
+	NAVBAR_THEME: 'navbarThemePopup',
+	PLAY_NEXT_PROMPT_MODE: 'playNextPromptModePopup',
+	LOGOUT_CONFIRM: 'logoutConfirmPopup',
+	LOGS: 'logsPopup',
+	WIPE_CACHE_CONFIRM: 'wipeCacheConfirmPopup'
+};
+const INITIAL_SETTINGS_DISCLOSURES = {
+	[SETTINGS_DISCLOSURE_KEYS.BITRATE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME]: false,
+	[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM]: false,
+	[SETTINGS_DISCLOSURE_KEYS.LOGS]: false,
+	[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM]: false
+};
+const DISCLOSURE_BACK_PRIORITY = [
+	SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM,
+	SETTINGS_DISCLOSURE_KEYS.LOGS,
+	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
+	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
+	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
+	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
+	SETTINGS_DISCLOSURE_KEYS.BITRATE
+];
 
 const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, registerBackHandler, isActive = false, ...rest }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
@@ -96,28 +120,31 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const [serverInfo, setServerInfo] = useState(null);
 	const [userInfo, setUserInfo] = useState(null);
 	const [loading, setLoading] = useState(true);
-	const [bitratePopupOpen, setBitratePopupOpen] = useState(false);
-	const [audioLangPopupOpen, setAudioLangPopupOpen] = useState(false);
-	const [subtitleLangPopupOpen, setSubtitleLangPopupOpen] = useState(false);
-	const [navbarThemePopupOpen, setNavbarThemePopupOpen] = useState(false);
-	const [playNextPromptModePopupOpen, setPlayNextPromptModePopupOpen] = useState(false);
-	const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 	const [savedServers, setSavedServers] = useState([]);
 	const [switchingServerId, setSwitchingServerId] = useState(null);
-	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
 	const [appLogs, setAppLogs] = useState([]);
 	const [appLogCount, setAppLogCount] = useState(0);
-	const [wipeCacheConfirmOpen, setWipeCacheConfirmOpen] = useState(false);
 	const [cacheWipeInProgress, setCacheWipeInProgress] = useState(false);
 	const [cacheWipeError, setCacheWipeError] = useState('');
+	const {
+		disclosures,
+		openDisclosure,
+		closeDisclosure
+	} = useDisclosureMap(INITIAL_SETTINGS_DISCLOSURES);
 	const toolbarBackHandlerRef = useRef(null);
-	const savedServersByKey = useMemo(() => {
-		const map = new Map();
-		savedServers.forEach((entry) => {
-			map.set(`${entry.serverId}:${entry.userId}`, entry);
-		});
-		return map;
-	}, [savedServers]);
+	const savedServerKeySelector = useCallback(
+		(entry) => `${entry.serverId}:${entry.userId}`,
+		[]
+	);
+	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
+	const bitratePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.BITRATE] === true;
+	const audioLangPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE] === true;
+	const subtitleLangPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE] === true;
+	const navbarThemePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME] === true;
+	const playNextPromptModePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE] === true;
+	const logoutConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM] === true;
+	const logsPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGS] === true;
+	const wipeCacheConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM] === true;
 
 	const loadSettings = useCallback(() => {
 		try {
@@ -272,20 +299,20 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	}, [refreshSavedServers]);
 
 	const handleLogoutConfirm = useCallback(() => {
-		setLogoutConfirmOpen(false);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
 		if (typeof onSignOut === 'function') {
 			onSignOut();
 			return;
 		}
 		onLogout();
-	}, [onLogout, onSignOut]);
+	}, [closeDisclosure, onLogout, onSignOut]);
 
 	const openLogsPopup = useCallback(() => {
 		const logs = getAppLogs();
 		setAppLogs(logs.slice().reverse());
 		setAppLogCount(logs.length);
-		setLogsPopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGS);
+	}, [openDisclosure]);
 
 	const handleClearLogs = useCallback(() => {
 		clearAppLogs();
@@ -344,62 +371,62 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	}, [handleForgetServer, savedServersByKey]);
 
 	const openLogoutConfirm = useCallback(() => {
-		setLogoutConfirmOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
+	}, [openDisclosure]);
 
 	const closeLogoutConfirm = useCallback(() => {
-		setLogoutConfirmOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
+	}, [closeDisclosure]);
 
 	const openBitratePopup = useCallback(() => {
-		setBitratePopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
+	}, [openDisclosure]);
 
 	const closeBitratePopup = useCallback(() => {
-		setBitratePopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
+	}, [closeDisclosure]);
 
 	const openAudioLangPopup = useCallback(() => {
-		setAudioLangPopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
+	}, [openDisclosure]);
 
 	const closeAudioLangPopup = useCallback(() => {
-		setAudioLangPopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
+	}, [closeDisclosure]);
 
 	const openSubtitleLangPopup = useCallback(() => {
-		setSubtitleLangPopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
+	}, [openDisclosure]);
 
 	const closeSubtitleLangPopup = useCallback(() => {
-		setSubtitleLangPopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
+	}, [closeDisclosure]);
 
 	const openNavbarThemePopup = useCallback(() => {
-		setNavbarThemePopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
+	}, [openDisclosure]);
 
 	const closeNavbarThemePopup = useCallback(() => {
-		setNavbarThemePopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
+	}, [closeDisclosure]);
 
 	const closePlayNextPromptModePopup = useCallback(() => {
-		setPlayNextPromptModePopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
+	}, [closeDisclosure]);
 
 	const closeLogsPopup = useCallback(() => {
-		setLogsPopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGS);
+	}, [closeDisclosure]);
 
 	const openWipeCacheConfirm = useCallback(() => {
 		setCacheWipeError('');
-		setWipeCacheConfirmOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM);
+	}, [openDisclosure]);
 
 	const closeWipeCacheConfirm = useCallback(() => {
 		if (cacheWipeInProgress) return;
-		setWipeCacheConfirmOpen(false);
-	}, [cacheWipeInProgress]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM);
+	}, [cacheWipeInProgress, closeDisclosure]);
 
 	const handleWipeCacheConfirm = useCallback(async () => {
 		if (cacheWipeInProgress) return;
@@ -432,105 +459,109 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		toolbarBackHandlerRef.current = handler;
 	}, []);
 
+	const toggleBooleanSetting = useCallback((key) => {
+		handleSettingChange(key, !settings[key]);
+	}, [handleSettingChange, settings]);
+
 	const toggleEnableTranscoding = useCallback(() => {
-		handleSettingChange('enableTranscoding', !settings.enableTranscoding);
-	}, [handleSettingChange, settings.enableTranscoding]);
+		toggleBooleanSetting('enableTranscoding');
+	}, [toggleBooleanSetting]);
 
 	const toggleAutoPlayNext = useCallback(() => {
-		handleSettingChange('autoPlayNext', !settings.autoPlayNext);
-	}, [handleSettingChange, settings.autoPlayNext]);
+		toggleBooleanSetting('autoPlayNext');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowPlayNextPrompt = useCallback(() => {
-		handleSettingChange('showPlayNextPrompt', !settings.showPlayNextPrompt);
-	}, [handleSettingChange, settings.showPlayNextPrompt]);
+		toggleBooleanSetting('showPlayNextPrompt');
+	}, [toggleBooleanSetting]);
 
 	const openPlayNextPromptModePopup = useCallback(() => {
 		if (settings.showPlayNextPrompt !== false) {
-			setPlayNextPromptModePopupOpen(true);
+			openDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
 		}
-	}, [settings.showPlayNextPrompt]);
+	}, [openDisclosure, settings.showPlayNextPrompt]);
 
 	const toggleSkipIntro = useCallback(() => {
-		handleSettingChange('skipIntro', !settings.skipIntro);
-	}, [handleSettingChange, settings.skipIntro]);
+		toggleBooleanSetting('skipIntro');
+	}, [toggleBooleanSetting]);
 
 	const toggleForceTranscoding = useCallback(() => {
-		handleSettingChange('forceTranscoding', !settings.forceTranscoding);
-	}, [handleSettingChange, settings.forceTranscoding]);
+		toggleBooleanSetting('forceTranscoding');
+	}, [toggleBooleanSetting]);
 
 	const toggleForceTranscodingWithSubtitles = useCallback(() => {
-		handleSettingChange('forceTranscodingWithSubtitles', !settings.forceTranscodingWithSubtitles);
-	}, [handleSettingChange, settings.forceTranscodingWithSubtitles]);
+		toggleBooleanSetting('forceTranscodingWithSubtitles');
+	}, [toggleBooleanSetting]);
 
 	const toggleRelaxedPlaybackProfile = useCallback(() => {
-		handleSettingChange('relaxedPlaybackProfile', !settings.relaxedPlaybackProfile);
-	}, [handleSettingChange, settings.relaxedPlaybackProfile]);
+		toggleBooleanSetting('relaxedPlaybackProfile');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowBackdrops = useCallback(() => {
-		handleSettingChange('showBackdrops', !settings.showBackdrops);
-	}, [handleSettingChange, settings.showBackdrops]);
+		toggleBooleanSetting('showBackdrops');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowSeasonImages = useCallback(() => {
-		handleSettingChange('showSeasonImages', !settings.showSeasonImages);
-	}, [handleSettingChange, settings.showSeasonImages]);
+		toggleBooleanSetting('showSeasonImages');
+	}, [toggleBooleanSetting]);
 
 	const toggleSidewaysEpisodeList = useCallback(() => {
-		handleSettingChange('useSidewaysEpisodeList', !settings.useSidewaysEpisodeList);
-	}, [handleSettingChange, settings.useSidewaysEpisodeList]);
+		toggleBooleanSetting('useSidewaysEpisodeList');
+	}, [toggleBooleanSetting]);
 
 	const toggleDisableAnimations = useCallback(() => {
-		handleSettingChange('disableAnimations', !settings.disableAnimations);
-	}, [handleSettingChange, settings.disableAnimations]);
+		toggleBooleanSetting('disableAnimations');
+	}, [toggleBooleanSetting]);
 
 	const toggleDisableAllAnimations = useCallback(() => {
-		handleSettingChange('disableAllAnimations', !settings.disableAllAnimations);
-	}, [handleSettingChange, settings.disableAllAnimations]);
+		toggleBooleanSetting('disableAllAnimations');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowMediaBar = useCallback(() => {
-		handleSettingChange('showMediaBar', !settings.showMediaBar);
-	}, [handleSettingChange, settings.showMediaBar]);
+		toggleBooleanSetting('showMediaBar');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowPerformanceOverlay = useCallback(() => {
-		handleSettingChange('showPerformanceOverlay', !settings.showPerformanceOverlay);
-	}, [handleSettingChange, settings.showPerformanceOverlay]);
+		toggleBooleanSetting('showPerformanceOverlay');
+	}, [toggleBooleanSetting]);
 
 	const handleNavbarThemeSelect = useCallback((event) => {
 		const themeValue = event.currentTarget.dataset.theme;
 		if (!themeValue) return;
 		handleSettingChange('navbarTheme', themeValue);
-		setNavbarThemePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const handleBitrateSelect = useCallback((event) => {
 		const bitrate = event.currentTarget.dataset.bitrate;
 		if (!bitrate) return;
 		handleSettingChange('maxBitrate', bitrate);
-		setBitratePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const handleAudioLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
 		handleSettingChange('preferredAudioLanguage', language);
-		setAudioLangPopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const handleSubtitleLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
 		handleSettingChange('preferredSubtitleLanguage', language);
-		setSubtitleLangPopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const setSegmentsOnlyPromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOnly');
-		setPlayNextPromptModePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const setSegmentsOrLast60PromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOrLast60');
-		setPlayNextPromptModePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const getBitrateLabel = (value) => {
 		const option = BITRATE_OPTIONS.find(o => o.value === value);
@@ -558,38 +589,15 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	};
 
 	const handleInternalBack = useCallback(() => {
-		if (wipeCacheConfirmOpen) {
-			if (!cacheWipeInProgress) {
-				setWipeCacheConfirmOpen(false);
+		for (const disclosureKey of DISCLOSURE_BACK_PRIORITY) {
+			if (disclosures[disclosureKey] !== true) continue;
+			if (
+				disclosureKey === SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM &&
+				cacheWipeInProgress
+			) {
+				return true;
 			}
-			return true;
-		}
-		if (logsPopupOpen) {
-			setLogsPopupOpen(false);
-			return true;
-		}
-		if (logoutConfirmOpen) {
-			setLogoutConfirmOpen(false);
-			return true;
-		}
-		if (playNextPromptModePopupOpen) {
-			setPlayNextPromptModePopupOpen(false);
-			return true;
-		}
-		if (navbarThemePopupOpen) {
-			setNavbarThemePopupOpen(false);
-			return true;
-		}
-		if (subtitleLangPopupOpen) {
-			setSubtitleLangPopupOpen(false);
-			return true;
-		}
-		if (audioLangPopupOpen) {
-			setAudioLangPopupOpen(false);
-			return true;
-		}
-		if (bitratePopupOpen) {
-			setBitratePopupOpen(false);
+			closeDisclosure(disclosureKey);
 			return true;
 		}
 		if (typeof toolbarBackHandlerRef.current === 'function') {
@@ -597,15 +605,9 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 		}
 		return false;
 	}, [
-		audioLangPopupOpen,
-		bitratePopupOpen,
 		cacheWipeInProgress,
-		logoutConfirmOpen,
-		logsPopupOpen,
-		navbarThemePopupOpen,
-		playNextPromptModePopupOpen,
-		subtitleLangPopupOpen,
-		wipeCacheConfirmOpen
+		closeDisclosure,
+		disclosures
 	]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
@@ -613,8 +615,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	return (
 		<Panel {...rest}>
 			<Header title="Settings" />
-			<Toolbar
-				activeSection="settings"
+			<SettingsToolbar
 				onNavigate={onNavigate}
 				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}
@@ -773,7 +774,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 					</section>
 
 					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Playback</BodyText>
+						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
 
 							<Item
 								className={css.settingItem}

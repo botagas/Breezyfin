@@ -1,5 +1,10 @@
 :global([data-bf-nav-theme='elegant']) {
 	.content {
+		--bf-styledebug-liquid-bg: rgba(255, 255, 255, 0.08);
+		--bf-styledebug-liquid-border: rgba(255, 255, 255, 0.24);
+		--bf-styledebug-liquid-shadow: none;
+		--bf-styledebug-liquid-hover-bg: rgba(255, 255, 255, 0.16);
+		--bf-styledebug-liquid-active-bg: rgba(255, 255, 255, 0.22);
 		background: radial-gradient(110rem 60rem at 50% -18rem, rgba(35, 62, 90, 0.33), #121212 55%);
 	}
 
@@ -27,32 +32,7 @@
 	.liquidButton :global(.bg),
 	.liquidIconButton :global(.bf-button-bg),
 	.liquidIconButton :global(.bg) {
-		background: rgba(255, 255, 255, 0.08) !important;
-		border: 1px solid rgba(255, 255, 255, 0.24) !important;
-		box-shadow: none !important;
 		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2)) !important;
 		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2)) !important;
-	}
-
-	.liquidButton:hover :global(.bf-button-bg),
-	.liquidButton:focus :global(.bf-button-bg),
-	.liquidButton:global(.spottable):focus :global(.bf-button-bg),
-	.liquidButton:hover :global(.bg),
-	.liquidButton:focus :global(.bg),
-	.liquidButton:global(.spottable):focus :global(.bg),
-	.liquidIconButton:hover :global(.bf-button-bg),
-	.liquidIconButton:focus :global(.bf-button-bg),
-	.liquidIconButton:global(.spottable):focus :global(.bf-button-bg),
-	.liquidIconButton:hover :global(.bg),
-	.liquidIconButton:focus :global(.bg),
-	.liquidIconButton:global(.spottable):focus :global(.bg) {
-		background: rgba(255, 255, 255, 0.16) !important;
-	}
-
-	.liquidButton:active :global(.bf-button-bg),
-	.liquidButton:active :global(.bg),
-	.liquidIconButton:active :global(.bf-button-bg),
-	.liquidIconButton:active :global(.bg) {
-		background: rgba(255, 255, 255, 0.22) !important;
 	}
 }

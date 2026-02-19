@@ -44,6 +44,19 @@
 	--bf-theme-settings-surface-strong: rgba(14, 22, 33, 0.78);
 	--bf-theme-settings-border: rgba(170, 218, 255, 0.16);
 	--bf-theme-settings-focus: rgba(157, 207, 255, 0.22);
+	--bf-theme-settings-bg-base: #0b111a;
+	--bf-theme-settings-bg-glow-a: rgba(157, 207, 255, 0.12);
+	--bf-theme-settings-bg-glow-b: rgba(95, 198, 255, 0.1);
+	--bf-theme-settings-title-color: rgba(236, 245, 255, 0.95);
+	--bf-theme-settings-text-strong: rgba(238, 246, 255, 0.95);
+	--bf-theme-settings-row-divider: rgba(255, 255, 255, 0.07);
+	--bf-theme-settings-row-divider-strong: rgba(255, 255, 255, 0.1);
+	--bf-theme-settings-log-surface: rgba(8, 13, 20, 0.38);
+	--bf-theme-settings-server-card-bg: rgba(8, 13, 20, 0.34);
+	--bf-theme-settings-server-card-active-bg: rgba(157, 207, 255, 0.16);
+	--bf-theme-settings-danger-bg: rgba(204, 94, 112, 0.18);
+	--bf-theme-settings-danger-border: rgba(255, 163, 180, 0.34);
+	--bf-theme-settings-danger-bg-hover: rgba(204, 94, 112, 0.28);
 }
 
 /* Elegant nav theme: softer typography and stronger frosted chrome. */
@@ -55,6 +68,7 @@
 [data-bf-nav-theme='elegant'] {
 	--bf-header-height: 0rem;
 	--bf-toolbar-height: var(--bf-toolbar-height-elegant);
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height));
 	--bf-home-scroller-overlap: var(--bf-toolbar-height);
 	--bf-home-content-offset: calc(var(--bf-toolbar-height) + 0.5rem);
 	--bf-panel-scroller-offset-nudge: 0.75rem;

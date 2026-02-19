@@ -372,16 +372,16 @@
 	filter: none !important;
 }
 
-:global([data-bf-animations='off']) .liquidLayerFilter,
+:global([data-bf-animations='off']) .liquidLayerFilter {
+	backdrop-filter: blur(0.56rem) !important;
+	-webkit-backdrop-filter: blur(0.56rem) !important;
+	filter: var(--bf-glass-distortion-filter, none) saturate(1.12) brightness(1.04) !important;
+}
+
 :global([data-bf-animations='off']) .glassFilter {
 	backdrop-filter: blur(0.56rem) !important;
 	-webkit-backdrop-filter: blur(0.56rem) !important;
-	filter: none !important;
-}
-
-:global([data-bf-animations='off']) .liquidLayerSpecular,
-:global([data-bf-animations='off']) .glassSpecular {
-	box-shadow: none !important;
+	filter: var(--bf-glass-distortion-filter, none) saturate(1.14) brightness(1.05) !important;
 }
 
 :global([data-bf-animations='off']) .userMenuElegant,

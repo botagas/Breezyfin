@@ -1,14 +1,12 @@
 @import (reference) '../../styles/cardStyles.less';
 
 .libraryContainer {
-	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
 	display: flex;
 	flex-direction: column;
-	height: calc(100vh + var(--bf-panel-overlap-lift));
-	min-height: 0;
+	position: absolute;
+	inset: 0;
 	background: var(--bf-theme-panel-bg, #121212);
 	overflow: hidden;
-	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
 }
 
 .scroller {
@@ -29,9 +27,14 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
 	gap: 2rem;
-	padding: calc(var(--bf-top-chrome-height, 12rem) + 2rem) 4rem calc(2rem + var(--bf-panel-content-bottom-padding, 4rem));
+	/* Panel body already sits below native header; offset content by toolbar chrome only. */
+	padding: calc(var(--bf-panel-top-offset, 4.5rem) - 0.75rem) 4rem clamp(2rem, var(--bf-panel-content-bottom-padding, 4rem), 4rem);
 	background: var(--bf-theme-panel-bg, #121212);
 	.panel-grid-performance();
+	/* Keep scroll metrics stable from first render; deferred content-visibility causes late scrollbar updates. */
+	content-visibility: visible;
+	contain: layout style;
+	contain-intrinsic-size: auto;
 }
 
 .loadingMore {
@@ -45,6 +48,7 @@
 .gridCard {
 	cursor: pointer;
 	.card-shell();
+	.card-focus-expand-reset();
 
 	&:hover,
 	&:global(.spottable):focus {
@@ -64,14 +68,8 @@
 		.card-placeholder-surface();
 
 		&::after {
-			content: 'No Image';
-			color: rgba(233, 238, 244, 0.65);
+			.card-placeholder-no-image-label();
 			font-size: 1em;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			background: none;
-			height: 100%;
 		}
 	}
 }
@@ -85,16 +83,12 @@
 }
 
 .progressBar {
-	position: absolute;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 4px;
+	.card-progress-bar-surface();
 	background: rgba(255, 255, 255, 0.3);
 }
 
 .progress {
-	height: 100%;
+	.card-progress-bar-fill();
 	background: #00a4dc;
 	transition: width 0.3s ease;
 }

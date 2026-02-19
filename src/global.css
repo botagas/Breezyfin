@@ -15,8 +15,10 @@ body,
 	--bf-toolbar-height-elegant: 5.5rem;
 	--bf-toolbar-height: var(--bf-toolbar-height-classic);
 	--bf-top-chrome-height: calc(var(--bf-header-height) + var(--bf-toolbar-height));
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height));
 	--bf-home-scroller-overlap: var(--bf-toolbar-height);
 	--bf-home-content-offset: 0rem;
+	--bf-search-panel-offset-adjust: -3.25rem;
 	--bf-panel-scroller-offset-nudge: 0rem;
 	--bf-home-hero-nudge: 0rem;
 	--bf-panel-content-bottom-padding-classic: 7rem;
@@ -39,11 +41,13 @@ body,
 
 /* Explicit classic token reset so switching away from Elegant always restores baseline layout geometry. */
 [data-bf-nav-theme='classic'] {
-	--bf-header-height: 7.5rem;
+	--bf-header-height: 0rem;
 	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height) + 1rem);
 	--bf-home-scroller-overlap: var(--bf-toolbar-height);
 	--bf-home-content-offset: 0rem;
-	/* Non-home panels need a small upward correction to align under classic header+toolbar. */
+	--bf-search-panel-offset-adjust: 0rem;
+	/* Non-home panels need a small upward correction to align under classic toolbar chrome. */
 	--bf-panel-scroller-offset-nudge: -1rem;
 	--bf-home-hero-nudge: 0rem;
 	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);

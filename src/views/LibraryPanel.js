@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
-import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
+import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import {KeyCodes} from '../utils/keyCodes';
+import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
+import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
+import { useMapById } from '../hooks/useMapById';
 import {
 	getPlaybackProgressPercent,
 	getPosterCardImageUrl,
@@ -18,6 +21,7 @@ import css from './LibraryPanel.module.less';
 
 const LIBRARY_PAGE_SIZE = 60;
 const FOCUS_PREFETCH_THRESHOLD = 12;
+const LibraryGridSpotlightContainer = createLastFocusedSpotlightContainer();
 
 const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [loading, setLoading] = useState(true);
@@ -29,13 +33,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
-	const itemsById = useMemo(() => {
-		const map = new Map();
-		items.forEach((item) => {
-			map.set(String(item.Id), item);
-		});
-		return map;
-	}, [items]);
+	const itemsById = useMapById(items);
 
 	const getItemTypesForLibrary = useCallback((libraryValue) => {
 		if (!libraryValue) return undefined;
@@ -141,15 +139,8 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 	}, []);
 
 	const focusTopToolbarAction = useCallback(() => {
-		if (library?.Id && Spotlight?.focus?.(`toolbar-library-${library.Id}`)) return true;
-		if (Spotlight?.focus?.('toolbar-home')) return true;
-		const target = document.querySelector('[data-spotlight-id="toolbar-home"]') ||
-			document.querySelector('[data-spotlight-id="toolbar-user"]');
-		if (target?.focus) {
-			target.focus({preventScroll: true});
-			return true;
-		}
-		return false;
+		const preferredLibraryId = library?.Id ? `toolbar-library-${library.Id}` : null;
+		return focusToolbarSpotlightTargets([preferredLibraryId, 'toolbar-home', 'toolbar-user']);
 	}, [library?.Id]);
 
 	const handleGridCardKeyDown = useCallback((event) => {
@@ -184,20 +175,23 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 			loadNextPage();
 		}
 	}, [loadNextPage]);
+	const topToolbar = (
+		<Toolbar
+			activeSection="library"
+			activeLibraryId={library?.Id}
+			onNavigate={onNavigate}
+			onSwitchUser={onSwitchUser}
+			onLogout={onLogout}
+			onExit={onExit}
+			registerBackHandler={registerBackHandler}
+		/>
+	);
 
 	if (loading) {
 		return (
 			<Panel {...rest}>
 				<Header title={library?.Name || 'Library'} />
-					<Toolbar
-						activeSection="library"
-						activeLibraryId={library?.Id}
-						onNavigate={onNavigate}
-						onSwitchUser={onSwitchUser}
-						onLogout={onLogout}
-						onExit={onExit}
-						registerBackHandler={registerBackHandler}
-					/>
+				{topToolbar}
 				<div className={css.loading}>
 					<Spinner />
 				</div>
@@ -208,22 +202,15 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 	return (
 		<Panel {...rest}>
 			<Header title={library?.Name || 'Library'} />
-				<Toolbar
-					activeSection="library"
-					activeLibraryId={library?.Id}
-					onNavigate={onNavigate}
-					onSwitchUser={onSwitchUser}
-					onLogout={onLogout}
-					onExit={onExit}
-					registerBackHandler={registerBackHandler}
-				/>
+			{topToolbar}
 			<div className={css.libraryContainer}>
 				<Scroller
 					className={css.scroller}
 					cbScrollTo={captureLibraryScrollTo}
 					onScrollStop={handleScrollerScrollStop}
 				>
-					<div className={css.gridContainer} ref={gridRef}>
+					<div ref={gridRef}>
+						<LibraryGridSpotlightContainer className={css.gridContainer} spotlightId="library-grid">
 							{items.map((item, index) => (
 								<PosterMediaCard
 									key={item.Id}
@@ -242,21 +229,14 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 									onKeyDown={handleGridCardKeyDown}
 									onFocus={handleGridCardFocus}
 									overlayContent={(
-										<>
-											{getUnwatchedCount(item) !== null && hasStartedWatching(item) && (
-												<div className={css.progressBadge}>
-													{getUnwatchedCount(item) === 0 ? '\u2713' : getUnwatchedCount(item)}
-												</div>
-											)}
-											{item.Type !== 'Series' && hasStartedWatching(item) && (
-												<div className={css.progressBar}>
-													<div
-														className={css.progress}
-														style={{ width: `${getPlaybackProgressPercent(item)}%` }}
-													/>
-												</div>
-											)}
-										</>
+										<MediaCardStatusOverlay
+											showWatched={getUnwatchedCount(item) !== null && hasStartedWatching(item)}
+											watchedContent={getUnwatchedCount(item) === 0 ? '\u2713' : getUnwatchedCount(item)}
+											watchedClassName={css.progressBadge}
+											progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
+											progressBarClassName={css.progressBar}
+											progressClassName={css.progress}
+										/>
 									)}
 								/>
 						))}
@@ -265,6 +245,7 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 								<Spinner size="small" />
 							</div>
 						)}
+						</LibraryGridSpotlightContainer>
 					</div>
 				</Scroller>
 			</div>

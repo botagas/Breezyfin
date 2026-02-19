@@ -10,8 +10,13 @@ import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
+import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
+import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useMapById } from '../hooks/useMapById';
+import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './SearchPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -23,31 +28,28 @@ const FILTER_OPTIONS = [
 	{ id: 'episodes', label: 'Episodes', types: ['Episode'] },
 	{ id: 'people', label: 'People', types: ['Person'] }
 ];
+const SEARCH_DISCLOSURE_KEYS = {
+	FILTER_POPUP: 'filterPopup'
+};
+const INITIAL_SEARCH_DISCLOSURES = {
+	[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP]: false
+};
 const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
+const SearchResultsSpotlightContainer = createLastFocusedSpotlightContainer();
 
 const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, isActive = false, ...rest }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [hasSearched, setHasSearched] = useState(false);
-	const [filterPopupOpen, setFilterPopupOpen] = useState(false);
+	const {disclosures, openDisclosure, closeDisclosure} = useDisclosureMap(INITIAL_SEARCH_DISCLOSURES);
+	const filterPopupOpen = disclosures[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP] === true;
 	const [selectedFilterIds, setSelectedFilterIds] = useState(ALL_FILTER_IDS);
 	const searchDebounceRef = useRef(null);
+	const activeSearchRequestIdRef = useRef(0);
 	const toolbarBackHandlerRef = useRef(null);
-	const filtersById = useMemo(() => {
-		const map = new Map();
-		FILTER_OPTIONS.forEach((filter) => {
-			map.set(filter.id, filter);
-		});
-		return map;
-	}, []);
-	const resultsById = useMemo(() => {
-		const map = new Map();
-		results.forEach((item) => {
-			map.set(String(item.Id), item);
-		});
-		return map;
-	}, [results]);
+	const filtersById = useMapById(FILTER_OPTIONS, 'id');
+	const resultsById = useMapById(results);
 	const appliedFilterCount = useMemo(
 		() => (selectedFilterIds.length < FILTER_OPTIONS.length ? selectedFilterIds.length : 0),
 		[selectedFilterIds]
@@ -64,23 +66,31 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		return Array.from(selectedTypeSet);
 	}, [filtersById]);
 
-	const performSearch = useCallback(async (term, filterTypes) => {
+	const performSearch = useCallback(async (term, filterTypes, requestId) => {
+		if (requestId !== activeSearchRequestIdRef.current) return;
 		if (!term || term.trim().length < 2) {
+			if (requestId !== activeSearchRequestIdRef.current) return;
 			setResults([]);
 			setHasSearched(false);
+			setLoading(false);
 			return;
 		}
 
+		if (requestId !== activeSearchRequestIdRef.current) return;
 		setLoading(true);
 		setHasSearched(true);
 		try {
 			const items = await jellyfinService.search(term.trim(), filterTypes, 50);
-			setResults(items);
+			if (requestId !== activeSearchRequestIdRef.current) return;
+			setResults(Array.isArray(items) ? items : []);
 		} catch (error) {
+			if (requestId !== activeSearchRequestIdRef.current) return;
 			console.error('Search failed:', error);
 			setResults([]);
 		} finally {
-			setLoading(false);
+			if (requestId === activeSearchRequestIdRef.current) {
+				setLoading(false);
+			}
 		}
 	}, []);
 
@@ -88,8 +98,16 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		if (searchDebounceRef.current) {
 			clearTimeout(searchDebounceRef.current);
 		}
+		activeSearchRequestIdRef.current += 1;
+		const requestId = activeSearchRequestIdRef.current;
+		if (!term || term.trim().length < 2) {
+			setResults([]);
+			setHasSearched(false);
+			setLoading(false);
+			return;
+		}
 		searchDebounceRef.current = setTimeout(() => {
-			performSearch(term, filterTypes);
+			performSearch(term, filterTypes, requestId);
 		}, 500);
 	}, [performSearch]);
 
@@ -98,6 +116,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 			clearTimeout(searchDebounceRef.current);
 			searchDebounceRef.current = null;
 		}
+		activeSearchRequestIdRef.current += 1;
 	}, []);
 
 	const handleSearchChange = useCallback((e) => {
@@ -123,12 +142,12 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 	}, [onItemSelect]);
 
 	const openFilterPopup = useCallback(() => {
-		setFilterPopupOpen(true);
-	}, []);
+		openDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
+	}, [openDisclosure]);
 
 	const closeFilterPopup = useCallback(() => {
-		setFilterPopupOpen(false);
-	}, []);
+		closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
+	}, [closeDisclosure]);
 
 	const registerToolbarBackHandler = useCallback((handler) => {
 		toolbarBackHandlerRef.current = handler;
@@ -136,14 +155,14 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 
 	const handleInternalBack = useCallback(() => {
 		if (filterPopupOpen) {
-			setFilterPopupOpen(false);
+			closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
 			return true;
 		}
 		if (typeof toolbarBackHandlerRef.current === 'function') {
 			return toolbarBackHandlerRef.current() === true;
 		}
 		return false;
-	}, [filterPopupOpen]);
+	}, [closeDisclosure, filterPopupOpen]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
@@ -174,6 +193,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		if (!selectedItem) return;
 		handleItemClick(selectedItem);
 	}, [handleItemClick, resultsById]);
+	const posterCardClassProps = getPosterCardClassProps(css);
 
 	const handleResultCardKeyDown = useCallback((e) => {
 		const card = e.currentTarget;
@@ -248,7 +268,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 									<BodyText>Enter a search term to find movies, shows, and more</BodyText>
 								</div>
 							) : (
-								<div className={css.resultsGrid}>
+								<SearchResultsSpotlightContainer className={css.resultsGrid} spotlightId="search-results-grid">
 									{results.map(item => {
 										const imageUrl = getPosterCardImageUrl(item, {
 											maxWidth: 400,
@@ -261,12 +281,7 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 												key={item.Id}
 												itemId={item.Id}
 												className={css.resultCard}
-												imageClassName={css.cardImage}
-												placeholderClassName={css.placeholder}
-												placeholderInnerClassName={css.placeholderInner}
-												infoClassName={css.cardInfo}
-												titleClassName={css.cardTitle}
-												subtitleClassName={css.cardSubtitle}
+												{...posterCardClassProps}
 												imageUrl={imageUrl}
 												title={item.Name}
 												subtitle={getMediaItemSubtitle(item, {includePersonRole: true})}
@@ -274,24 +289,18 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 												onClick={handleResultCardClick}
 												onKeyDown={handleResultCardKeyDown}
 												overlayContent={(
-													<>
-													{item.UserData?.Played && (
-														<div className={css.watchedBadge}>{'\u2713'}</div>
-													)}
-													{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-														<div className={css.progressBar}>
-															<div
-																className={css.progress}
-																style={{ width: `${item.UserData.PlayedPercentage}%` }}
-															/>
-														</div>
-													)}
-													</>
+													<MediaCardStatusOverlay
+														showWatched={item.UserData?.Played === true}
+														watchedClassName={css.watchedBadge}
+														progressPercent={item.UserData?.PlayedPercentage}
+														progressBarClassName={css.progressBar}
+														progressClassName={css.progress}
+													/>
 												)}
 											/>
 										);
 									})}
-								</div>
+								</SearchResultsSpotlightContainer>
 							)}
 							</div>
 					</div>

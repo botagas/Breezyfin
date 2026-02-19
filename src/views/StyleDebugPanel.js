@@ -3,8 +3,9 @@ import { Panel, Header } from '../components/BreezyPanels';
 import Scroller from '@enact/sandstone/Scroller';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../components/BreezyButton';
-import Toolbar from '../components/Toolbar';
+import SettingsToolbar from '../components/SettingsToolbar';
 import jellyfinService from '../services/jellyfinService';
+import { shuffleArray } from '../utils/arrayUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 
@@ -12,15 +13,6 @@ import css from './StyleDebugPanel.module.less';
 
 const FALLBACK_DEBUG_BACKDROP_URL = '/icon.png';
 const DEBUG_BACKDROP_WIDTH = 1920;
-
-const shuffle = (values) => {
-	const next = [...values];
-	for (let index = next.length - 1; index > 0; index -= 1) {
-		const randomIndex = Math.floor(Math.random() * (index + 1));
-		[next[index], next[randomIndex]] = [next[randomIndex], next[index]];
-	}
-	return next;
-};
 
 const resolveItemBackdropCandidates = (item) => {
 	if (!item?.Id) return [];
@@ -135,7 +127,7 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 				jellyfinService.getRecentlyAdded(20)
 			]);
 
-			const itemPool = shuffle([
+			const itemPool = shuffleArray([
 				...(latestMedia || []),
 				...(resumeItems || []),
 				...(nextUpItems || []),
@@ -354,8 +346,7 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 	return (
 		<Panel {...rest}>
 			<Header title="Styling Debug Panel" />
-			<Toolbar
-				activeSection="settings"
+			<SettingsToolbar
 				onNavigate={onNavigate}
 				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}

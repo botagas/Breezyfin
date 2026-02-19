@@ -42,10 +42,6 @@
 }
 
 :global([data-bf-nav-theme='elegant']) {
-	.detailsHeadingStack {
-		top: calc(var(--bf-toolbar-height, 5.5rem) + 0.08rem);
-	}
-
 	.contentElegant .overview {
 		margin-top: 0.9rem;
 		margin-bottom: 0.4rem;
@@ -75,7 +71,7 @@
 		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
 		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
 		box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45));
-		top: calc(var(--bf-toolbar-height, 5.5rem) + 0.8rem);
+		top: 0.8rem;
 	}
 
 	.stickyControlsInline {
@@ -128,9 +124,9 @@
 
 		.episodeSelectorButton,
 		.compactSelectorButton,
+		.episodeNavButton,
 		.dropdown,
 		.trackSelectorPrimary,
-		.detailsBackButton,
 		.primaryButton {
 			.elegantControlButtonCore();
 			--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
@@ -139,7 +135,6 @@
 		}
 
 		.actionButton,
-		.sectionToggleIconButton,
 		.episodeInfoButton,
 		.episodeWatchedButton {
 			--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
@@ -149,8 +144,10 @@
 
 	.trackSelectorPrimary :global(.bf-button-bg),
 	.trackSelectorPrimary :global(.bg),
-		.primaryButton :global(.bf-button-bg),
-		.primaryButton :global(.bg) {
+	.primaryButton :global(.bf-button-bg),
+	.primaryButton :global(.bg),
+	.episodeNavButton :global(.bf-button-bg),
+	.episodeNavButton :global(.bg) {
 			background: rgba(157, 207, 255, 0.1) !important;
 			border: 1px solid rgba(157, 207, 255, 0.34) !important;
 			border-radius: 999px !important;
@@ -171,15 +168,56 @@
 	.primaryButton:global(.spottable):focus :global(.bf-button-bg),
 	.primaryButton:hover :global(.bg),
 	.primaryButton:focus :global(.bg),
-	.primaryButton:global(.spottable):focus :global(.bg) {
+	.primaryButton:global(.spottable):focus :global(.bg),
+	.episodeNavButton:hover :global(.bf-button-bg),
+	.episodeNavButton:focus :global(.bf-button-bg),
+	.episodeNavButton:global(.spottable):focus :global(.bf-button-bg),
+	.episodeNavButton:hover :global(.bg),
+	.episodeNavButton:focus :global(.bg),
+	.episodeNavButton:global(.spottable):focus :global(.bg) {
 		background: rgba(157, 207, 255, 0.18) !important;
 	}
 
 	.trackSelectorPrimary:active :global(.bf-button-bg),
 	.trackSelectorPrimary:active :global(.bg),
 	.primaryButton:active :global(.bf-button-bg),
-	.primaryButton:active :global(.bg) {
+	.primaryButton:active :global(.bg),
+	.episodeNavButton:active :global(.bf-button-bg),
+	.episodeNavButton:active :global(.bg) {
 		background: rgba(157, 207, 255, 0.24) !important;
+	}
+
+	.detailsBackButton {
+		--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+		--bf-button-fg-hover: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+		--bf-button-fg-active: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+
+		:global(.bf-button-bg),
+		:global(.bg) {
+			background: transparent !important;
+			border: 1px solid transparent !important;
+			border-radius: 999px !important;
+			box-shadow: none !important;
+			backdrop-filter: none !important;
+			-webkit-backdrop-filter: none !important;
+			transition: background 180ms ease, border-color 180ms ease, transform 180ms ease !important;
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg),
+		&:hover :global(.bg),
+		&:focus :global(.bg),
+		&:global(.spottable):focus :global(.bg) {
+			background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+			border-color: var(--bf-theme-surface-border, rgba(255, 255, 255, 0.18)) !important;
+		}
+
+		&:active :global(.bf-button-bg),
+		&:active :global(.bg) {
+			background: rgba(157, 207, 255, 0.2) !important;
+			border-color: rgba(157, 207, 255, 0.38) !important;
+		}
 	}
 
 }

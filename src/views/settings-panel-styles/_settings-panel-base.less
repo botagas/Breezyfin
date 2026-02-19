@@ -3,14 +3,27 @@
 	--bf-settings-content-bottom-pad: 4rem;
 	--bf-settings-bottom-spacer: 0rem;
 	--settings-accent: var(--bf-theme-accent, #3fb8ff);
+	--settings-bg-base: var(--bf-theme-settings-bg-base, #0c1218);
+	--settings-bg-glow-a: var(--bf-theme-settings-bg-glow-a, rgba(63, 184, 255, 0.18));
+	--settings-bg-glow-b: var(--bf-theme-settings-bg-glow-b, rgba(0, 208, 156, 0.14));
 	--settings-surface: var(--bf-theme-settings-surface, rgba(14, 22, 30, 0.82));
 	--settings-surface-strong: var(--bf-theme-settings-surface-strong, rgba(20, 30, 40, 0.9));
 	--settings-border: var(--bf-theme-settings-border, rgba(138, 196, 255, 0.2));
 	--settings-focus: var(--bf-theme-settings-focus, rgba(63, 184, 255, 0.28));
+	--settings-title-color: var(--bf-theme-settings-title-color, #d9efff);
+	--settings-text-strong: var(--bf-theme-settings-text-strong, #e7f5ff);
+	--settings-row-divider: var(--bf-theme-settings-row-divider, rgba(255, 255, 255, 0.08));
+	--settings-row-divider-strong: var(--bf-theme-settings-row-divider-strong, rgba(255, 255, 255, 0.12));
+	--settings-log-surface: var(--bf-theme-settings-log-surface, rgba(0, 0, 0, 0.32));
+	--settings-server-card-bg: var(--bf-theme-settings-server-card-bg, rgba(7, 13, 20, 0.38));
+	--settings-server-card-active-bg: var(--bf-theme-settings-server-card-active-bg, rgba(63, 184, 255, 0.15));
+	--settings-danger-bg: var(--bf-theme-settings-danger-bg, rgba(244, 84, 84, 0.2));
+	--settings-danger-border: var(--bf-theme-settings-danger-border, rgba(244, 84, 84, 0.4));
+	--settings-danger-bg-hover: var(--bf-theme-settings-danger-bg-hover, rgba(244, 84, 84, 0.34));
 	background:
-		radial-gradient(120rem 50rem at 20% -10%, rgba(63, 184, 255, 0.18), transparent 60%),
-		radial-gradient(100rem 60rem at 100% -20%, rgba(0, 208, 156, 0.14), transparent 58%),
-		#0c1218;
+		radial-gradient(120rem 50rem at 20% -10%, var(--settings-bg-glow-a), transparent 60%),
+		radial-gradient(100rem 60rem at 100% -20%, var(--settings-bg-glow-b), transparent 58%),
+		var(--settings-bg-base);
 	height: calc(100vh + var(--bf-panel-overlap-lift));
 	min-height: 0;
 	padding-top: 0;
@@ -52,15 +65,15 @@
 	font-weight: 700;
 	margin-bottom: 1.1rem;
 	padding-bottom: 0.5rem;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-	color: #d9efff;
+	border-bottom: 1px solid var(--settings-row-divider-strong);
+	color: var(--settings-title-color);
 	letter-spacing: 0.02em;
 }
 
 .infoItem {
 	background: transparent !important;
 	padding: 0.85rem 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	border-bottom: 1px solid var(--settings-row-divider);
 	
 	&:last-of-type {
 		border-bottom: none;
@@ -71,7 +84,7 @@
 .switchItem {
 	background: transparent !important;
 	padding: 0.85rem 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	border-bottom: 1px solid var(--settings-row-divider);
 	transition: none;
 
 	&:last-of-type {
@@ -98,12 +111,12 @@
 .logoutButton {
 	margin-top: 1rem;
 	width: 100%;
-	background: rgba(244, 84, 84, 0.2);
-	border: 1px solid rgba(244, 84, 84, 0.4);
+	background: var(--settings-danger-bg);
+	border: 1px solid var(--settings-danger-border);
 	
 	&:hover,
 	&:focus {
-		background: rgba(244, 84, 84, 0.34);
+		background: var(--settings-danger-bg-hover);
 	}
 }
 
@@ -122,7 +135,7 @@
 	font-size: 1.15em;
 	font-weight: 600;
 	margin-bottom: 1rem;
-	color: #ecf8ff;
+	color: var(--settings-text-strong);
 }
 
 .popupMessage {
@@ -220,12 +233,12 @@
 	border: 1px solid rgba(153, 215, 255, 0.24);
 	border-radius: 10px;
 	padding: 0.75rem;
-	background: rgba(0, 0, 0, 0.32);
+	background: var(--settings-log-surface);
 }
 
 .logEntry {
 	padding: 0.6rem 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	border-bottom: 1px solid var(--settings-row-divider);
 }
 
 .logEntry:last-child {
@@ -248,7 +261,7 @@
 	margin-top: 1rem;
 	margin-bottom: 0.5rem;
 	font-weight: 600;
-	color: rgba(214, 237, 255, 0.9);
+	color: var(--settings-title-color);
 }
 
 .rowOrderList {
@@ -263,7 +276,7 @@
 	justify-content: space-between;
 	gap: 0.75rem;
 	padding: 0.6rem 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	border-bottom: 1px solid var(--settings-row-divider-strong);
 }
 
 .rowOrderLabel {
@@ -289,13 +302,13 @@
 	padding: 0.9rem 1rem;
 	border: 1px solid rgba(170, 216, 255, 0.2);
 	border-radius: 10px;
-	background: rgba(7, 13, 20, 0.38);
+	background: var(--settings-server-card-bg);
 	transition: none;
 }
 
 .activeCard {
 	border-color: rgba(122, 214, 255, 0.6);
-	background: rgba(63, 184, 255, 0.15);
+	background: var(--settings-server-card-active-bg);
 }
 
 .serverCardMain {
@@ -307,7 +320,7 @@
 
 .serverTitle {
 	font-weight: 700;
-	color: #e7f5ff;
+	color: var(--settings-text-strong);
 }
 
 .serverMeta {

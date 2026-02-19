@@ -1,3 +1,5 @@
+@import (reference) '../../styles/cardStyles.less';
+
 .scroller {
 	min-height: 100%;
 	height: 100%;
@@ -136,9 +138,9 @@
 	gap: 0.62rem;
 	padding-top: 0.5rem;
 	margin-bottom: 1.15rem;
-	position: sticky;
-	top: 0.12rem;
-	z-index: 20;
+	position: static;
+	top: auto;
+	z-index: 4;
 }
 
 .detailsTopBar {
@@ -156,6 +158,9 @@
 }
 
 .detailsBackButton {
+	--bf-button-fg: #ffffff;
+	--bf-button-fg-hover: #ffffff;
+	--bf-button-fg-active: #ffffff;
 	min-width: 2.35rem !important;
 	width: 2.35rem !important;
 	height: 2.35rem !important;
@@ -164,8 +169,28 @@
 	background: transparent !important;
 	border: none !important;
 
-	.mdControlSurface(rgba(255, 255, 255, 0.08); 1px solid rgba(255, 255, 255, 0.24); 999px);
-	.mdControlHoverSurface(rgba(255, 255, 255, 0.16));
+	.mdControlSurface(transparent; 1px solid transparent; 999px);
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(255, 255, 255, 0.14) !important;
+		border-color: rgba(255, 255, 255, 0.3) !important;
+	}
+
+	&:active :global(.bf-button-bg),
+	&:active :global(.bg) {
+		background: rgba(255, 255, 255, 0.2) !important;
+		border-color: rgba(255, 255, 255, 0.38) !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		transition: background 180ms ease, border-color 180ms ease, transform 180ms ease !important;
+	}
 }
 
 .detailsTopTitle {
@@ -300,6 +325,9 @@
 }
 
 .episodeNavButton {
+	--bf-button-fg: #ffffff;
+	--bf-button-fg-hover: #111111;
+	--bf-button-fg-active: #111111;
 	max-width: min(32rem, 100%) !important;
 	min-width: 0 !important;
 	flex: 0 1 auto;
@@ -323,8 +351,8 @@
 		line-height: 1.15 !important;
 	}
 
-	.mdControlSurface(rgba(255, 255, 255, 0.06); 1px solid rgba(255, 255, 255, 0.22); 999px);
-	.mdControlHoverSurface(rgba(255, 255, 255, 0.14));
+	.mdControlSurface(transparent; 1px solid rgba(255, 255, 255, 0.4); 999px);
+	.mdControlHoverSurface(#ffffff);
 
 	:global(.bf-button-bg),
 	:global(.bg) {
@@ -644,28 +672,6 @@
 	gap: 0.4rem;
 }
 
-.sectionToggleIconButton {
-	min-width: 1.8rem !important;
-	width: 1.8rem !important;
-	height: 1.8rem !important;
-	padding: 0 !important;
-	border-radius: 999px !important;
-	background: transparent !important;
-	border: none !important;
-	align-self: center;
-
-	.mdControlSurface(rgba(255, 255, 255, 0.08); 1px solid rgba(255, 255, 255, 0.22); 999px);
-
-	:global(.Icon),
-	:global(.icon) {
-		font-size: 0.88rem !important;
-		width: 0.88rem !important;
-		height: 0.88rem !important;
-	}
-
-	.mdControlHoverSurface(rgba(255, 255, 255, 0.17));
-}
-
 .castToggleRow {
 	display: inline-flex;
 	align-items: center;
@@ -738,10 +744,10 @@
 	text-align: center;
 	min-width: 15rem;
 	outline: none;
-	transition: transform 0.15s ease;
+	transition: transform 0.12s ease;
 
 	&:focus {
-		transform: translateY(-4px);
+		transform: translateY(-2px);
 	}
 }
 
@@ -821,7 +827,7 @@
 	flex-shrink: 0;
 	width: 15rem;
 	cursor: pointer;
-	transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease, border-color 180ms ease;
+	transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 	border-radius: 1rem;
 	overflow: hidden;
 	background: linear-gradient(160deg, rgba(32, 41, 57, 0.82) 0%, rgba(17, 24, 36, 0.78) 100%);
@@ -840,16 +846,14 @@
 	}
 
 	&:hover {
-		transform: translateY(-6px) scale(1.025);
-		filter: saturate(1.06);
-		box-shadow: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
+		transform: translateY(-2px);
+		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
 	}
 
 	&:global(.spottable):focus,
 	&:focus {
-		transform: translateY(-6px) scale(1.025);
-		filter: saturate(1.06);
-		box-shadow: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
+		transform: translateY(-2px);
+		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
 		--seasonCardBorderColor: rgba(212, 226, 255, 0.9);
 	}
 
@@ -862,13 +866,13 @@
 	&:hover .seasonPoster,
 	&:global(.spottable):focus .seasonPoster,
 	&:focus .seasonPoster {
-		transform: scale(1.04);
-		filter: saturate(1.06);
+		transform: none;
+		filter: none;
 	}
 
 	&.selected {
 		--seasonCardBorderColor: rgba(169, 206, 255, 0.95);
-		box-shadow: 0 8px 22px rgba(57, 120, 203, 0.35);
+		box-shadow: 0 6px 14px rgba(57, 120, 203, 0.25);
 	}
 }
 
@@ -974,7 +978,7 @@
 	aspect-ratio: 2/3;
 	object-fit: cover;
 	display: block;
-	transition: transform 340ms ease, filter 340ms ease;
+	transition: opacity 180ms ease;
 }
 
 .seasonPosterWrap {
@@ -993,17 +997,7 @@
 		z-index: 2;
 	}
 
-	&::after {
-		content: '';
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: 45%;
-		background: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
-		pointer-events: none;
-		z-index: 1;
-	}
+	.card-image-bottom-fade-overlay();
 }
 
 .seasonName {
@@ -1073,7 +1067,7 @@
 .episodeCardSideways:hover,
 .episodeCardSideways:focus,
 .episodeCardSideways:global(.spottable):focus {
-	transform: translateY(-4px);
+	transform: translateY(-2px);
 }
 
 .episodeCardSideways .episodeImageContainer {
@@ -1116,7 +1110,7 @@
 	background: rgba(18, 24, 36, 0.45);
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: var(--bf-media-details-episode-radius);
-	transition: background 180ms ease, transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+	transition: background 140ms ease, transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 	height: 15rem;
 	overflow: hidden;
 
@@ -1124,12 +1118,12 @@
 	&:focus,
 	&:global(.spottable):focus {
 		background: rgba(24, 34, 50, 0.62);
-		transform: translateX(8px);
+		transform: translateX(3px);
 		border-color: rgba(212, 226, 255, 0.42);
-		box-shadow: 0 14px 26px rgba(0, 0, 0, 0.34);
+		box-shadow: 0 8px 14px rgba(0, 0, 0, 0.28);
 
 		.episodeImageContainer {
-			box-shadow: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
+			box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
 		}
 
 		.episodeImageContainer::before {
@@ -1137,8 +1131,8 @@
 		}
 
 		.episodeImage {
-			transform: scale(1.04);
-			filter: saturate(1.06);
+			transform: none;
+			filter: none;
 		}
 	}
 
@@ -1289,7 +1283,7 @@
 	object-fit: cover;
 	flex-shrink: 0;
 	display: block;
-	transition: transform 340ms ease, filter 340ms ease;
+	transition: opacity 180ms ease;
 }
 
 :global([data-bf-animations='off']),
@@ -1431,6 +1425,8 @@
 .episodeName {
 	font-size: 1.2em;
 	font-weight: 600;
+	line-height: 1.25;
+	padding-bottom: 0.08em;
 	color: rgba(255, 255, 255, 0.95);
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
@@ -1466,7 +1462,7 @@
 
 .stickyControls {
 	position: sticky;
-	top: calc(0.12rem + var(--bf-details-topbar-height, 2.35rem) + var(--bf-details-topbar-gap, 0.65rem) + 0.45rem);
+	top: 0.5rem;
 	background: rgba(18, 18, 18, 0.95);
 	padding: 16px 24px;
 	border-radius: var(--bf-media-details-control-radius);

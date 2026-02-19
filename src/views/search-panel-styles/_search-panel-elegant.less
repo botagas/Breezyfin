@@ -1,4 +1,9 @@
 :global([data-bf-nav-theme='elegant']) {
+	.searchContainer {
+		/* Elegant navbar is taller; keep the search box close to it. */
+		--bf-search-offset: calc(var(--bf-panel-top-offset, 4.5rem) - 4.75rem);
+	}
+
 	.searchControls {
 		border-radius: 999px;
 		padding: 0.34rem 0.38rem;

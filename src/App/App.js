@@ -16,19 +16,32 @@ import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
+import {isStyleDebugEnabled} from '../utils/featureFlags';
 import AppCrashBoundary from './AppCrashBoundary';
 
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
-const STYLE_DEBUG_ENABLED = process.env.REACT_APP_ENABLE_STYLE_DEBUG === '1' || process.env.NODE_ENV !== 'production';
+const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
 let StyleDebugPanel = null;
 if (STYLE_DEBUG_ENABLED) {
 	// Keep debug-only panel and assets out of stable production bundles.
 	StyleDebugPanel = require('../views/StyleDebugPanel').default;
 }
 
+const resolveInitialVisualSettings = () => {
+	const settings = readBreezyfinSettings();
+	return {
+		animationsDisabled: settings.disableAnimations !== false,
+		allAnimationsDisabled: settings.disableAllAnimations === true,
+		navbarTheme: settings.navbarTheme === 'classic' ? 'classic' : 'elegant',
+		performanceOverlayEnabled: settings.showPerformanceOverlay === true
+	};
+};
+
 const App = (props) => {
+	const initialVisualSettingsRef = useRef(resolveInitialVisualSettings());
 	const [currentView, setCurrentView] = useState('login');
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
@@ -36,10 +49,10 @@ const App = (props) => {
 	const [previousItem, setPreviousItem] = useState(null);
 	const [detailsReturnView, setDetailsReturnView] = useState('home');
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
-	const [animationsDisabled, setAnimationsDisabled] = useState(false);
-	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(false);
-	const [navbarTheme, setNavbarTheme] = useState('classic');
-	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(false);
+	const [animationsDisabled, setAnimationsDisabled] = useState(initialVisualSettingsRef.current.animationsDisabled);
+	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(initialVisualSettingsRef.current.allAnimationsDisabled);
+	const [navbarTheme, setNavbarTheme] = useState(initialVisualSettingsRef.current.navbarTheme);
+	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
 	const [inputMode, setInputMode] = useState(() => (
 		Spotlight?.getPointerMode?.() ? 'pointer' : '5way'
 	));
@@ -112,6 +125,32 @@ const App = (props) => {
 		clearPanelHistory();
 	}, [clearPanelHistory]);
 
+	const clearPanelSelection = useCallback((options = {}) => {
+		const {clearLibrary = true} = options;
+		setSelectedItem(null);
+		setPlaybackOptions(null);
+		if (clearLibrary) {
+			setSelectedLibrary(null);
+		}
+	}, []);
+
+	const runPanelBackHandler = useCallback((handlerRef) => {
+		if (typeof handlerRef?.current !== 'function') return false;
+		return handlerRef.current() === true;
+	}, []);
+
+	const navigateToViewAndClearSelection = useCallback((view, options = {}) => {
+		setCurrentView(view);
+		clearPanelSelection(options);
+	}, [clearPanelSelection]);
+
+	const handleSectionBack = useCallback((handlerRef, fallbackView = 'home', options = {}) => {
+		if (runPanelBackHandler(handlerRef)) return true;
+		if (navigateBackInHistory()) return true;
+		navigateToViewAndClearSelection(fallbackView, options);
+		return true;
+	}, [navigateBackInHistory, navigateToViewAndClearSelection, runPanelBackHandler]);
+
 	const resolveDetailsReturnView = useCallback(() => {
 		if (detailsReturnView === 'library') {
 			return selectedLibrary ? 'library' : 'home';
@@ -125,14 +164,9 @@ const App = (props) => {
 		}
 
 		const targetView = resolveDetailsReturnView();
-		setCurrentView(targetView);
-		if (targetView === 'home') {
-			setSelectedLibrary(null);
-		}
-		setSelectedItem(null);
-		setPlaybackOptions(null);
+		navigateToViewAndClearSelection(targetView, {clearLibrary: targetView === 'home'});
 		return true;
-	}, [navigateBackInHistory, resolveDetailsReturnView]);
+	}, [navigateBackInHistory, navigateToViewAndClearSelection, resolveDetailsReturnView]);
 	const fallbackToDetailsFromPlayer = useCallback(() => {
 		let historyFallbackItem = null;
 		for (let index = panelHistoryRef.current.length - 1; index >= 0; index -= 1) {
@@ -153,9 +187,9 @@ const App = (props) => {
 
 	const applyVisualSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		setAnimationsDisabled(settings.disableAnimations === true);
+		setAnimationsDisabled(settings.disableAnimations !== false);
 		setAllAnimationsDisabled(settings.disableAllAnimations === true);
-		setNavbarTheme(settings.navbarTheme === 'elegant' ? 'elegant' : 'classic');
+		setNavbarTheme(settings.navbarTheme === 'classic' ? 'classic' : 'elegant');
 		setPerformanceOverlayEnabled(settings.showPerformanceOverlay === true);
 	}, []);
 
@@ -269,73 +303,22 @@ const App = (props) => {
 
 	// Handle back button globally
 	const handleBack = useCallback(() => {
-		const runBackHandler = (handlerRef) => {
-			if (typeof handlerRef?.current !== 'function') return false;
-			return handlerRef.current() === true;
-		};
 		switch (currentView) {
 			case 'library':
-				if (runBackHandler(libraryBackHandlerRef)) return true;
-				if (navigateBackInHistory()) return true;
-				setCurrentView('home');
-				setSelectedItem(null);
-				setSelectedLibrary(null);
-				setPlaybackOptions(null);
-				return true;
+				return handleSectionBack(libraryBackHandlerRef, 'home');
 			case 'search':
-				if (runBackHandler(searchBackHandlerRef)) return true;
-				if (navigateBackInHistory()) return true;
-				setCurrentView('home');
-				setSelectedItem(null);
-				setSelectedLibrary(null);
-				setPlaybackOptions(null);
-				return true;
+				return handleSectionBack(searchBackHandlerRef, 'home');
 			case 'favorites':
-				if (runBackHandler(favoritesBackHandlerRef)) return true;
-				if (navigateBackInHistory()) return true;
-				setCurrentView('home');
-				setSelectedItem(null);
-				setSelectedLibrary(null);
-				setPlaybackOptions(null);
-				return true;
+				return handleSectionBack(favoritesBackHandlerRef, 'home');
 			case 'settings':
-				if (runBackHandler(settingsBackHandlerRef)) return true;
-				if (navigateBackInHistory()) return true;
-				setCurrentView('home');
-				setSelectedItem(null);
-				setSelectedLibrary(null);
-				setPlaybackOptions(null);
-				return true;
+				return handleSectionBack(settingsBackHandlerRef, 'home');
 			case 'styleDebug':
-				if (!STYLE_DEBUG_ENABLED) {
-					setCurrentView('settings');
-					setSelectedItem(null);
-					setSelectedLibrary(null);
-					setPlaybackOptions(null);
-					return true;
-				}
-				if (runBackHandler(styleDebugBackHandlerRef)) return true;
-				if (navigateBackInHistory()) return true;
-				setCurrentView('settings');
-				setSelectedItem(null);
-				setSelectedLibrary(null);
-				setPlaybackOptions(null);
-				return true;
+				return handleSectionBack(styleDebugBackHandlerRef, 'settings');
 			case 'details':
-				if (typeof detailsBackHandlerRef.current === 'function') {
-					const handledInDetails = detailsBackHandlerRef.current();
-					if (handledInDetails) {
-						return true;
-					}
-				}
+				if (runPanelBackHandler(detailsBackHandlerRef)) return true;
 				return navigateBackFromDetails();
 			case 'player':
-				if (typeof playerBackHandlerRef.current === 'function') {
-					const handledInPlayer = playerBackHandlerRef.current();
-					if (handledInPlayer) {
-						return true;
-					}
-				}
+				if (runPanelBackHandler(playerBackHandlerRef)) return true;
 				if (playerControlsVisible) {
 					setPlayerControlsVisible(false);
 					return true;
@@ -343,13 +326,21 @@ const App = (props) => {
 				if (navigateBackInHistory()) return true;
 				return fallbackToDetailsFromPlayer();
 			case 'home':
-				if (runBackHandler(homeBackHandlerRef)) return true;
+				if (runPanelBackHandler(homeBackHandlerRef)) return true;
 				return false; // Allow default behavior (exit prompt)
 			case 'login':
 			default:
 				return false; // Allow default behavior (exit prompt)
 		}
-	}, [currentView, fallbackToDetailsFromPlayer, navigateBackFromDetails, navigateBackInHistory, playerControlsVisible]);
+	}, [
+		currentView,
+		fallbackToDetailsFromPlayer,
+		handleSectionBack,
+		navigateBackFromDetails,
+		navigateBackInHistory,
+		playerControlsVisible,
+		runPanelBackHandler
+	]);
 
 	useEffect(() => {
 		handleBackRef.current = handleBack;

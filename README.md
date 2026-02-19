@@ -13,7 +13,7 @@ The app was inspired by other great apps and themes, like JellySee, AndroidTV-Fi
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
 - Home, Library, Search, Favorites, Media Details, and Player panels
-- Classic and Elegant navigation themes
+- Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
 - Rich Media Details workflows (favorites, watched status, track pickers, episodes/seasons, side list toggle)
 - Player with direct play, direct stream, and transcode handling
@@ -38,9 +38,6 @@ Breezyfin is not yet listed in the main Homebrew catalog, but you can add the de
 4. Refresh repositories.
 5. Install `Breezyfin` from the newly added source.
 
-Direct feed file in this repository:
-`/Users/patrikas/Desktop/IT/Development/Breezyfin/homebrew-dev.json`
-
 ## Local development
 
 Clone the repository and install dependencies:
@@ -58,9 +55,40 @@ npm run serve
 ```
 Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
+## Developer guidelines
+
+Before adding new panel logic, prefer shared building blocks first:
+
+- Back handling: `src/hooks/usePanelBackHandler.js`
+- Popup/menu state: `src/hooks/useDisclosureMap.js`
+- Map lookups by id/key: `src/hooks/useMapById.js`
+- Item metadata fetch/state: `src/hooks/useItemMetadata.js`
+- Toast lifecycle: `src/hooks/useToastMessage.js`
+- Track preference persistence: `src/hooks/useTrackPreferences.js`
+- Image fallback handling: `src/hooks/useImageErrorFallback.js`
+- Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
+- Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
+- Shared toolbar focus helper: `src/utils/toolbarFocus.js`
+- Shared home row order constant: `src/constants/homeRows.js`
+- Shared poster card class helper: `src/utils/posterCardClassProps.js`
+
+Styling and theme references:
+
+- Theme tokens: `src/styles/themes/classic.css`, `src/styles/themes/elegant.css`
+- Shared popup surface styles: `src/styles/popupStyles.module.less`, `src/styles/popupStyles.js`
+- Panel styling pattern: `src/views/*-panel-styles/` split files (base + per-theme + shared tail)
+
 ## Debug flags
 
 The app supports build-time/runtime debug behavior through environment flags:
+
+Defaults:
+
+- In non-production builds, Style Debug features are enabled by default.
+- Persistent app logging follows the same default as Style Debug.
+- In production builds, both are off unless explicitly enabled by flags.
+
+Flags:
 
 - `REACT_APP_ENABLE_STYLE_DEBUG=1`
   - Forces Styling Debug panel/features on.
@@ -106,6 +134,11 @@ Diagnostics currently include:
 npm run pack-p
 ```
 Output will be in the `dist/` folder.
+
+## Code quality audits
+
+- Dead CSS module audit: `npm run audit:styles`
+- Mixed JS/LESS duplicate snippet audit: `npm run audit:duplicates`
 
 ## Possible improvements
 

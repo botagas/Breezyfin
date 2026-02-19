@@ -41,6 +41,7 @@ const resetServiceState = () => {
 
 describe('jellyfinService', () => {
 	let errorSpy;
+	let warnSpy;
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -48,10 +49,12 @@ describe('jellyfinService', () => {
 		resetServiceState();
 		global.fetch = jest.fn();
 		errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+		warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 	});
 
 	afterEach(() => {
 		errorSpy.mockRestore();
+		warnSpy.mockRestore();
 	});
 
 	it('connects to server and stores server metadata', async () => {
@@ -168,6 +171,40 @@ describe('jellyfinService', () => {
 			})
 		);
 		expect(serverManager.setActiveServer).toHaveBeenCalledWith('legacy-srv', 'legacy-user');
+	});
+
+	it('clears malformed legacy jellyfinAuth payload and does not restore session', () => {
+		serverManager.getActiveServer.mockReturnValue(null);
+		localStorage.setItem('jellyfinAuth', '{"serverUrl":"http://broken.local"');
+
+		const restored = jellyfinService.restoreSession();
+
+		expect(restored).toBe(false);
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+		expect(serverManager.addServer).not.toHaveBeenCalled();
+		expect(jellyfinService.serverUrl).toBe(null);
+		expect(jellyfinService.accessToken).toBe(null);
+		expect(jellyfinService.userId).toBe(null);
+	});
+
+	it('clears incomplete legacy jellyfinAuth payload and does not restore session', () => {
+		serverManager.getActiveServer.mockReturnValue(null);
+		localStorage.setItem(
+			'jellyfinAuth',
+			JSON.stringify({
+				serverUrl: 'http://legacy.local',
+				userId: 'legacy-user'
+			})
+		);
+
+		const restored = jellyfinService.restoreSession();
+
+		expect(restored).toBe(false);
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+		expect(serverManager.addServer).not.toHaveBeenCalled();
+		expect(jellyfinService.serverUrl).toBe(null);
+		expect(jellyfinService.accessToken).toBe(null);
+		expect(jellyfinService.userId).toBe(null);
 	});
 
 	it('updates saved user metadata when current user profile is loaded', async () => {

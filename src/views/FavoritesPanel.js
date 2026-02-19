@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
@@ -7,7 +7,10 @@ import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
+import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import { useMapById } from '../hooks/useMapById';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
+import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 
 import css from './FavoritesPanel.module.less';
 
@@ -22,13 +25,7 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
-	const favoritesById = useMemo(() => {
-		const map = new Map();
-		favorites.forEach((favorite) => {
-			map.set(String(favorite.Id), favorite);
-		});
-		return map;
-	}, [favorites]);
+	const favoritesById = useMapById(favorites);
 
 	const loadFavorites = useCallback(async () => {
 		setLoading(true);
@@ -78,6 +75,7 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 		if (!item) return;
 		handleRemoveFavorite(event, item);
 	}, [favoritesById]);
+	const posterCardClassProps = getPosterCardClassProps(css);
 
 	return (
 		<Panel {...rest}>
@@ -129,39 +127,29 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 												key={item.Id}
 												itemId={item.Id}
 												className={css.favoriteCard}
-												imageClassName={css.cardImage}
-												placeholderClassName={css.placeholder}
-												placeholderInnerClassName={css.placeholderInner}
-												infoClassName={css.cardInfo}
-												titleClassName={css.cardTitle}
-												subtitleClassName={css.cardSubtitle}
+												{...posterCardClassProps}
 												imageUrl={imageUrl}
 												title={item.Name}
 												subtitle={getMediaItemSubtitle(item)}
 												placeholderText={item.Name?.charAt(0) || '?'}
 												onClick={handleFavoriteCardClick}
 												overlayContent={(
-													<>
-													<Button
-														className={css.unfavoriteButton}
-														icon="hearthollow"
-														size="small"
-														data-item-id={item.Id}
-														onClick={handleUnfavoriteClick}
-														title="Remove from favorites"
-													/>
-													{item.UserData?.Played && (
-														<div className={css.watchedBadge}>{'\u2713'}</div>
-													)}
-													{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-														<div className={css.progressBar}>
-															<div
-																className={css.progress}
-																style={{ width: `${item.UserData.PlayedPercentage}%` }}
-															/>
-														</div>
-													)}
-													</>
+													<MediaCardStatusOverlay
+														showWatched={item.UserData?.Played === true}
+														watchedClassName={css.watchedBadge}
+														progressPercent={item.UserData?.PlayedPercentage}
+														progressBarClassName={css.progressBar}
+														progressClassName={css.progress}
+													>
+														<Button
+															className={css.unfavoriteButton}
+															icon="hearthollow"
+															size="small"
+															data-item-id={item.Id}
+															onClick={handleUnfavoriteClick}
+															title="Remove from favorites"
+														/>
+													</MediaCardStatusOverlay>
 												)}
 											/>
 										);

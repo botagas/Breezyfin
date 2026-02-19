@@ -22,6 +22,7 @@ const PosterMediaCard = ({
 	onClick,
 	onKeyDown,
 	onFocus,
+	onPointerDown,
 	overlayContent = null,
 	placeholderText = '?',
 	usePlaceholderClassWhenNoImage = false,
@@ -41,6 +42,7 @@ const PosterMediaCard = ({
 			onClick={onClick}
 			onKeyDown={onKeyDown}
 			onFocus={onFocus}
+			onPointerDown={onPointerDown}
 			{...rest}
 		>
 			<div className={imageContainerClassName}>

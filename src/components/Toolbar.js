@@ -8,6 +8,9 @@ import jellyfinService from '../services/jellyfinService';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useDismissOnOutsideInteraction } from '../hooks/useDismissOnOutsideInteraction';
+import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useMapById } from '../hooks/useMapById';
 
 import css from './Toolbar.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -16,6 +19,14 @@ import {popupShellCss} from '../styles/popupStyles';
 const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
 const TOOLBAR_THEME_ELEGANT = 'elegant';
+const TOOLBAR_DISCLOSURE_KEYS = {
+	USER_MENU: 'userMenu',
+	LIBRARIES_POPUP: 'librariesPopup'
+};
+const INITIAL_TOOLBAR_DISCLOSURES = {
+	[TOOLBAR_DISCLOSURE_KEYS.USER_MENU]: false,
+	[TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP]: false
+};
 
 const Toolbar = ({
 	activeSection = 'home',
@@ -30,22 +41,17 @@ const Toolbar = ({
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [userName, setUserName] = useState('User');
 	const [userAvatarUrl, setUserAvatarUrl] = useState('');
-	const [showUserMenu, setShowUserMenu] = useState(false);
-	const [showLibrariesPopup, setShowLibrariesPopup] = useState(false);
-	const [toolbarTheme, setToolbarTheme] = useState(TOOLBAR_THEME_CLASSIC);
+	const {disclosures, openDisclosure, closeDisclosure, setDisclosure} = useDisclosureMap(INITIAL_TOOLBAR_DISCLOSURES);
+	const showUserMenu = disclosures[TOOLBAR_DISCLOSURE_KEYS.USER_MENU] === true;
+	const showLibrariesPopup = disclosures[TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP] === true;
+	const [toolbarTheme, setToolbarTheme] = useState(TOOLBAR_THEME_ELEGANT);
 	const glassFilterId = useId();
 	const centerRef = useRef(null);
 	const userMenuScopeRef = useRef(null);
 	const libraryMenuScopeRef = useRef(null);
 	const userMenuCloseTimerRef = useRef(null);
 	const suppressUserMenuUntilRef = useRef(0);
-	const librariesById = useMemo(() => {
-		const map = new Map();
-		libraries.forEach((library) => {
-			map.set(String(library.Id), library);
-		});
-		return map;
-	}, [libraries]);
+	const librariesById = useMapById(libraries);
 	const isElegantTheme = toolbarTheme === TOOLBAR_THEME_ELEGANT;
 	const isHomeSection = activeSection === 'home';
 	const elegantPanelTitle = useMemo(() => {
@@ -61,7 +67,7 @@ const Toolbar = ({
 
 	const applyToolbarThemeFromSettings = useCallback((settingsPayload) => {
 		const nextTheme = settingsPayload?.navbarTheme;
-		setToolbarTheme(nextTheme === TOOLBAR_THEME_ELEGANT ? TOOLBAR_THEME_ELEGANT : TOOLBAR_THEME_CLASSIC);
+		setToolbarTheme(nextTheme === TOOLBAR_THEME_CLASSIC ? TOOLBAR_THEME_CLASSIC : TOOLBAR_THEME_ELEGANT);
 	}, []);
 	useBreezyfinSettingsSync(applyToolbarThemeFromSettings);
 
@@ -101,9 +107,9 @@ const Toolbar = ({
 
 	useEffect(() => {
 		if (!isElegantTheme && showLibrariesPopup) {
-			setShowLibrariesPopup(false);
+			closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		}
-	}, [isElegantTheme, showLibrariesPopup]);
+	}, [closeDisclosure, isElegantTheme, showLibrariesPopup]);
 
 	useEffect(() => {
 		return () => {
@@ -113,64 +119,6 @@ const Toolbar = ({
 			}
 		};
 	}, []);
-
-	useEffect(() => {
-		if (!showUserMenu) return undefined;
-
-		const closeMenuIfOutside = (target) => {
-			if (!target || typeof target.nodeType !== 'number') return;
-			const scope = userMenuScopeRef.current;
-			if (!scope) return;
-			if (scope.contains(target)) return;
-			setShowUserMenu(false);
-		};
-
-		const handleFocusIn = (event) => {
-			closeMenuIfOutside(event.target);
-		};
-		const handlePointerDown = (event) => {
-			closeMenuIfOutside(event.target);
-		};
-
-		document.addEventListener('focusin', handleFocusIn, true);
-		document.addEventListener('pointerdown', handlePointerDown, true);
-		document.addEventListener('mousedown', handlePointerDown, true);
-		document.addEventListener('touchstart', handlePointerDown, true);
-		return () => {
-			document.removeEventListener('focusin', handleFocusIn, true);
-			document.removeEventListener('pointerdown', handlePointerDown, true);
-			document.removeEventListener('mousedown', handlePointerDown, true);
-			document.removeEventListener('touchstart', handlePointerDown, true);
-		};
-	}, [showUserMenu]);
-
-	useEffect(() => {
-		if (!showLibrariesPopup || !isElegantTheme) return undefined;
-		const closeMenuIfOutside = (target) => {
-			if (!target || typeof target.nodeType !== 'number') return;
-			const scope = libraryMenuScopeRef.current;
-			if (!scope) return;
-			if (scope.contains(target)) return;
-			setShowLibrariesPopup(false);
-		};
-		const handleFocusIn = (event) => {
-			closeMenuIfOutside(event.target);
-		};
-		const handlePointerDown = (event) => {
-			closeMenuIfOutside(event.target);
-		};
-
-		document.addEventListener('focusin', handleFocusIn, true);
-		document.addEventListener('pointerdown', handlePointerDown, true);
-		document.addEventListener('mousedown', handlePointerDown, true);
-		document.addEventListener('touchstart', handlePointerDown, true);
-		return () => {
-			document.removeEventListener('focusin', handleFocusIn, true);
-			document.removeEventListener('pointerdown', handlePointerDown, true);
-			document.removeEventListener('mousedown', handlePointerDown, true);
-			document.removeEventListener('touchstart', handlePointerDown, true);
-		};
-	}, [isElegantTheme, showLibrariesPopup]);
 
 	const formatTime = () => {
 		return currentTime.toLocaleTimeString('en-US', {
@@ -195,39 +143,39 @@ const Toolbar = ({
 			userMenuCloseTimerRef.current = null;
 		}
 		if (Date.now() < suppressUserMenuUntilRef.current) return;
-		setShowUserMenu(true);
-	}, []);
+		openDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+	}, [openDisclosure]);
 
 	const handleUserMenuClose = useCallback(() => {
 		if (userMenuCloseTimerRef.current) {
 			clearTimeout(userMenuCloseTimerRef.current);
 			userMenuCloseTimerRef.current = null;
 		}
-		setShowUserMenu(false);
-	}, []);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+	}, [closeDisclosure]);
 
 	const handleElegantUserMouseLeave = useCallback(() => {
 		if (userMenuCloseTimerRef.current) {
 			clearTimeout(userMenuCloseTimerRef.current);
 		}
 		userMenuCloseTimerRef.current = setTimeout(() => {
-			setShowUserMenu(false);
+			closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 			userMenuCloseTimerRef.current = null;
 		}, 140);
-	}, []);
+	}, [closeDisclosure]);
 
 	const handleUserContainerFocus = useCallback(() => {
 		if (Date.now() < suppressUserMenuUntilRef.current) return;
-		setShowUserMenu(true);
-	}, []);
+		openDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+	}, [openDisclosure]);
 
 	const handleUserContainerBlur = useCallback((event) => {
 		const nextFocused = event.relatedTarget;
 		if (nextFocused && event.currentTarget.contains(nextFocused)) {
 			return;
 		}
-		setShowUserMenu(false);
-	}, []);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+	}, [closeDisclosure]);
 
 	const handleUserButtonClick = useCallback(() => {
 		if (userMenuCloseTimerRef.current) {
@@ -235,9 +183,9 @@ const Toolbar = ({
 			userMenuCloseTimerRef.current = null;
 		}
 		if (Date.now() < suppressUserMenuUntilRef.current) return;
-		setShowLibrariesPopup(false);
-		setShowUserMenu((prevOpen) => !prevOpen);
-	}, []);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
+		setDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU, !showUserMenu);
+	}, [closeDisclosure, setDisclosure, showUserMenu]);
 
 	const handleUserAvatarError = useCallback(() => {
 		setUserAvatarUrl('');
@@ -251,9 +199,15 @@ const Toolbar = ({
 		onNavigate('search');
 	}, [onNavigate]);
 
-	const handleNavigateShuffle = useCallback(() => {
-		onNavigate('shuffle');
-	}, [onNavigate]);
+	const handleClassicBack = useCallback(() => {
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
+		// Keep Home safe from accidental exit prompts via toolbar click.
+		if (activeSection === 'home') return;
+		if (typeof window !== 'undefined' && typeof window.history?.back === 'function') {
+			window.history.back();
+		}
+	}, [activeSection, closeDisclosure]);
 
 	const handleNavigateFavorites = useCallback(() => {
 		onNavigate('favorites');
@@ -264,10 +218,10 @@ const Toolbar = ({
 	}, [onNavigate]);
 
 	const handleElegantBack = useCallback(() => {
-		setShowUserMenu(false);
-		setShowLibrariesPopup(false);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		onNavigate('home');
-	}, [onNavigate]);
+	}, [closeDisclosure, onNavigate]);
 
 	const handleLibraryNavigate = useCallback((event) => {
 		const libraryId = event.currentTarget.dataset.libraryId;
@@ -278,65 +232,65 @@ const Toolbar = ({
 	}, [librariesById, onNavigate]);
 
 	const handleOpenLibrariesPopup = useCallback(() => {
-		setShowUserMenu(false);
-		setShowLibrariesPopup((prevOpen) => !prevOpen);
-	}, []);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+		setDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP, !showLibrariesPopup);
+	}, [closeDisclosure, setDisclosure, showLibrariesPopup]);
 
 	const handleCloseLibrariesPopup = useCallback(() => {
-		setShowLibrariesPopup(false);
-	}, []);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
+	}, [closeDisclosure]);
+
+	useDismissOnOutsideInteraction({
+		enabled: showUserMenu,
+		scopeRef: userMenuScopeRef,
+		onDismiss: handleUserMenuClose
+	});
+
+	useDismissOnOutsideInteraction({
+		enabled: isElegantTheme && showLibrariesPopup,
+		scopeRef: libraryMenuScopeRef,
+		onDismiss: handleCloseLibrariesPopup
+	});
 
 	const handleLibraryPopupSelect = useCallback((event) => {
 		const libraryId = event.currentTarget.dataset.libraryId;
 		const library = librariesById.get(libraryId);
 		if (!library) return;
-		setShowLibrariesPopup(false);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		onNavigate('library', library);
-	}, [librariesById, onNavigate]);
+	}, [closeDisclosure, librariesById, onNavigate]);
 
-	const handleLogoutClick = useCallback(() => {
+	const runUserMenuAction = useCallback((primaryAction, fallbackAction = null) => {
 		suppressUserMenuUntilRef.current = Date.now() + 500;
-		setShowUserMenu(false);
-		setShowLibrariesPopup(false);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		if (document.activeElement && typeof document.activeElement.blur === 'function') {
 			document.activeElement.blur();
 		}
-		if (typeof onLogout === 'function') {
-			onLogout();
-		}
-	}, [onLogout]);
-
-	const handleSwitchUserClick = useCallback(() => {
-		suppressUserMenuUntilRef.current = Date.now() + 500;
-		setShowUserMenu(false);
-		setShowLibrariesPopup(false);
-		if (document.activeElement && typeof document.activeElement.blur === 'function') {
-			document.activeElement.blur();
-		}
-		if (typeof onSwitchUser === 'function') {
-			onSwitchUser();
+		if (typeof primaryAction === 'function') {
+			primaryAction();
 			return;
 		}
-		if (typeof onLogout === 'function') {
-			onLogout();
+		if (typeof fallbackAction === 'function') {
+			fallbackAction();
 		}
-	}, [onLogout, onSwitchUser]);
+	}, [closeDisclosure]);
+
+	const handleLogoutClick = useCallback(() => {
+		runUserMenuAction(onLogout);
+	}, [onLogout, runUserMenuAction]);
+
+	const handleSwitchUserClick = useCallback(() => {
+		runUserMenuAction(onSwitchUser, onLogout);
+	}, [onLogout, onSwitchUser, runUserMenuAction]);
 
 	const handleExitClick = useCallback(() => {
-		suppressUserMenuUntilRef.current = Date.now() + 500;
-		setShowUserMenu(false);
-		setShowLibrariesPopup(false);
-		if (document.activeElement && typeof document.activeElement.blur === 'function') {
-			document.activeElement.blur();
-		}
-		if (typeof onExit === 'function') {
-			onExit();
-		}
-	}, [onExit]);
+		runUserMenuAction(onExit);
+	}, [onExit, runUserMenuAction]);
 
 	const handleInternalBack = useCallback(() => {
 		if (showLibrariesPopup) {
-			setShowLibrariesPopup(false);
+			closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 			return true;
 		}
 		if (showUserMenu) {
@@ -344,11 +298,11 @@ const Toolbar = ({
 				clearTimeout(userMenuCloseTimerRef.current);
 				userMenuCloseTimerRef.current = null;
 			}
-			setShowUserMenu(false);
+			closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 			return true;
 		}
 		return false;
-	}, [showLibrariesPopup, showUserMenu]);
+	}, [closeDisclosure, showLibrariesPopup, showUserMenu]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack);
 
@@ -569,12 +523,12 @@ const Toolbar = ({
 							</SpottableDiv>
 
 							<SpottableDiv
-								onClick={handleNavigateShuffle}
+								onClick={handleClassicBack}
 								className={css.iconButton}
-								aria-label="Shuffle"
-								spotlightId="toolbar-shuffle"
+								aria-label="Back"
+								spotlightId="toolbar-back"
 							>
-								<Icon size="small">arrowhookright</Icon>
+								<Icon size="small">arrowsmallleft</Icon>
 							</SpottableDiv>
 
 							<SpottableDiv
