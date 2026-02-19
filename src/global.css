@@ -1,20 +1,108 @@
 /* Global styles for stable Breezy wrapper classes (prod-safe). */
+html,
+body,
+#root {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+:root {
+	/* Shared layout tokens so panel offsets track navbar/header height changes */
+	--bf-header-height: 7.5rem;
+	--bf-toolbar-height-classic: 3.5rem;
+	--bf-toolbar-height-elegant: 5.5rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-top-chrome-height: calc(var(--bf-header-height) + var(--bf-toolbar-height));
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height));
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: 0rem;
+	--bf-search-panel-offset-adjust: -3.25rem;
+	--bf-panel-scroller-offset-nudge: 0rem;
+	--bf-home-hero-nudge: 0rem;
+	--bf-panel-content-bottom-padding-classic: 7rem;
+	--bf-panel-content-bottom-padding-elegant: 3.75rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
+
+	/* Shared theme tokens used by both Classic and Elegant */
+	--bf-theme-text-primary: rgba(244, 249, 255, 0.95);
+	--bf-theme-tab-bg: transparent;
+	--bf-theme-tab-hover-bg: rgba(255, 255, 255, 0.12);
+	--bf-theme-overlay-ultra-bg: rgba(9, 13, 19, 0.84);
+	--bf-theme-overlay-ultra-soft-bg: rgba(9, 13, 19, 0.42);
+	--bf-theme-liquid-overlay-bg: rgba(168, 188, 213, 0.08);
+	--bf-theme-backdrop-fallback:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+}
+
+/* Explicit classic token reset so switching away from Elegant always restores baseline layout geometry. */
+[data-bf-nav-theme='classic'] {
+	--bf-header-height: 0rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height) + 1rem);
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: 0rem;
+	--bf-search-panel-offset-adjust: 0rem;
+	/* Non-home panels need a small upward correction to align under classic toolbar chrome. */
+	--bf-panel-scroller-offset-nudge: -1rem;
+	--bf-home-hero-nudge: 0rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
+}
 
 /* Remove Panel body horizontal padding app-wide */
 .bf-panel-body {
 	padding-left: 0 !important;
 	padding-right: 0 !important;
+	overflow: hidden !important;
+}
+
+.bf-panel,
+.bf-panel-body {
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+/* Hide native scrollbar paint on Sandstone scrollers while keeping scroll behavior */
+[data-webos-voice-intent="Scroll"] {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+	overscroll-behavior: contain;
+}
+
+[data-webos-voice-intent="Scroll"]::-webkit-scrollbar {
+	width: 0 !important;
+	height: 0 !important;
+	display: none !important;
 }
 
 /* Make panel headers transparent so backdrop imagery remains visible */
 .bf-header {
-	background: rgba(0, 0, 0, 0.22) !important;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+	--bf-header-fade-color: var(--bf-theme-header-fade-color, rgba(0, 0, 0, 0.2));
+	background: var(--bf-theme-header-bg, rgba(0, 0, 0, 0.22)) !important;
+	border-bottom: none !important;
 	backdrop-filter: blur(0.15rem) !important;
 	-webkit-backdrop-filter: blur(0.15rem) !important;
 	box-shadow: none !important;
 	position: relative;
+	isolation: isolate;
 	z-index: 120 !important;
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: -1rem;
+		height: 1rem;
+		background: linear-gradient(to bottom, var(--bf-header-fade-color), transparent);
+		pointer-events: none;
+		z-index: 0;
+	}
 }
 
 /* Strip default Sandstone button chrome from Breezy button wrapper */
@@ -35,6 +123,37 @@
 	background: transparent !important;
 }
 
+.bf-button,
+.bf-button .client,
+.bf-button .icon {
+	color: var(--bf-button-fg, #ffffff) !important;
+}
+
+.bf-button:hover,
+.bf-button:hover .client,
+.bf-button:hover .icon,
+.bf-button:focus,
+.bf-button:focus .client,
+.bf-button:focus .icon,
+.bf-button[data-webos-voice-focused="true"],
+.bf-button[data-webos-voice-focused="true"] .client,
+.bf-button[data-webos-voice-focused="true"] .icon {
+	color: var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff)) !important;
+}
+
+.bf-button:active,
+.bf-button:active .client,
+.bf-button:active .icon {
+	color: var(--bf-button-fg-active, var(--bf-button-fg-hover, var(--bf-button-fg, #ffffff))) !important;
+}
+
+/* In 5-way mode, ignore stale mouse-hover paint so only Spotlight focus is visually active. */
+[data-bf-input-mode='5way'] .bf-button:hover,
+[data-bf-input-mode='5way'] .bf-button:hover .client,
+[data-bf-input-mode='5way'] .bf-button:hover .icon {
+	color: var(--bf-button-fg, #ffffff) !important;
+}
+
 /* Sandstone Input trigger (used in Login/Search panels) */
 .bf-input-trigger {
 	background: transparent !important;
@@ -44,6 +163,8 @@
 	filter: none !important;
 	color: #ffffff !important;
 	margin: 0 !important;
+	overflow: hidden !important;
+	transition: transform 0.14s ease, box-shadow 0.14s ease !important;
 }
 
 .bf-input-trigger.focusExpand {
@@ -52,8 +173,8 @@
 
 .bf-input-trigger::before,
 .bf-input-trigger::after,
-.bf-input-trigger [class*="bg"],
-.bf-input-trigger [class*="client"] {
+.bf-input-trigger > div:first-of-type,
+.bf-input-trigger > div:nth-of-type(2) {
 	box-shadow: none !important;
 	filter: none !important;
 }
@@ -64,41 +185,138 @@
 	display: none !important;
 }
 
-.bf-input-trigger [class*="bg"] {
+.bf-input-trigger > div:first-of-type {
 	background: rgba(255, 255, 255, 0.015) !important;
 	border: 1px solid rgba(255, 255, 255, 0.22) !important;
 	border-radius: 999px !important;
 	opacity: 1 !important;
-	transform: scale(1) !important;
+	transform: none !important;
+	transition: background 0.14s ease, border-color 0.14s ease !important;
 }
 
-.bf-input-trigger:hover [class*="bg"],
-.bf-input-trigger:focus [class*="bg"],
-.bf-input-trigger:active [class*="bg"] {
+.bf-input-trigger:hover > div:first-of-type,
+.bf-input-trigger:focus > div:first-of-type,
+.bf-input-trigger:active > div:first-of-type,
+.bf-input-trigger.spottable:focus > div:first-of-type {
 	background: rgba(255, 255, 255, 0.03) !important;
 	border-color: rgba(255, 255, 255, 0.32) !important;
 	opacity: 1 !important;
+	transform: none !important;
+}
+
+.bf-input-trigger:hover,
+.bf-input-trigger:focus,
+.bf-input-trigger:active,
+.bf-input-trigger.spottable:focus {
 	transform: scale(1.01) !important;
+}
+
+[data-bf-input-mode='5way'] .bf-input-trigger:hover > div:first-of-type {
+	background: rgba(255, 255, 255, 0.015) !important;
+	border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+[data-bf-input-mode='5way'] .bf-input-trigger:hover {
+	transform: none !important;
 }
 
 .bf-input-trigger * {
 	color: #ffffff !important;
 }
 
-/* Shared toast styling across panels */
-.toast,
-.playerToast,
-.error {
-	position: fixed;
-	top: 10rem;
-	left: 50%;
-	transform: translateX(-50%);
-	background: rgba(0, 0, 0, 0.8);
-	color: #fff;
-	padding: 12px 18px;
-	border-radius: 8px;
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-	z-index: 200;
-	pointer-events: none;
-	font-weight: 600;
+/* Performance mode for lower-end TVs: reduce expensive motion but keep nav/header blur. */
+
+[data-bf-animations='off'] .focusExpand,
+[data-bf-animations='off'] .spottable:focus,
+[data-bf-animations='off'] [data-webos-voice-focused='true'] {
+	transform: none !important;
+	filter: none !important;
+}
+
+[data-bf-animations='off'] .bf-input-trigger:hover,
+[data-bf-animations='off'] .bf-input-trigger:focus,
+[data-bf-animations='off'] .bf-input-trigger:active,
+[data-bf-animations='off'] .bf-input-trigger.spottable:focus {
+	transform: none !important;
+}
+
+[data-bf-animations='off'] .bf-button-bg,
+[data-bf-animations='off'] .bf-header {
+	box-shadow: none !important;
+}
+
+[data-bf-animations='off'] .bf-input-trigger > div:first-of-type {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+/* Strict mode: disable every animation/transition for maximum performance. */
+[data-bf-all-animations='off'],
+[data-bf-all-animations='off'] * {
+	scroll-behavior: auto !important;
+}
+
+[data-bf-all-animations='off'] *,
+[data-bf-all-animations='off'] *::before,
+[data-bf-all-animations='off'] *::after {
+	animation: none !important;
+	transition-property: none !important;
+	transition-duration: 0s !important;
+	transition-delay: 0s !important;
+}
+
+[data-bf-all-animations='off'] .focusExpand,
+[data-bf-all-animations='off'] .spottable:focus,
+[data-bf-all-animations='off'] [data-webos-voice-focused='true'] {
+	transform: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] .bf-input-trigger > div:first-of-type {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] .bf-header,
+[data-bf-all-animations='off'] [data-bf-navbar='true'] {
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='filter'] {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='overlay'] {
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='specular'] {
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+/* Elegant theme in ultra mode: keep a lightweight blur instead of full liquid glass or solid fill. */
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] {
+	background: transparent !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='filter'] {
+	backdrop-filter: blur(0.5rem) !important;
+	-webkit-backdrop-filter: blur(0.5rem) !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='overlay'] {
+	background: var(--bf-theme-overlay-ultra-soft-bg, rgba(9, 13, 19, 0.42)) !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {
+	background: transparent !important;
+	box-shadow: none !important;
 }

@@ -1,0 +1,354 @@
+.settingsContainer {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
+	--bf-settings-content-bottom-pad: 4rem;
+	--bf-settings-bottom-spacer: 0rem;
+	--settings-accent: var(--bf-theme-accent, #3fb8ff);
+	--settings-bg-base: var(--bf-theme-settings-bg-base, #0c1218);
+	--settings-bg-glow-a: var(--bf-theme-settings-bg-glow-a, rgba(63, 184, 255, 0.18));
+	--settings-bg-glow-b: var(--bf-theme-settings-bg-glow-b, rgba(0, 208, 156, 0.14));
+	--settings-surface: var(--bf-theme-settings-surface, rgba(14, 22, 30, 0.82));
+	--settings-surface-strong: var(--bf-theme-settings-surface-strong, rgba(20, 30, 40, 0.9));
+	--settings-border: var(--bf-theme-settings-border, rgba(138, 196, 255, 0.2));
+	--settings-focus: var(--bf-theme-settings-focus, rgba(63, 184, 255, 0.28));
+	--settings-title-color: var(--bf-theme-settings-title-color, #d9efff);
+	--settings-text-strong: var(--bf-theme-settings-text-strong, #e7f5ff);
+	--settings-row-divider: var(--bf-theme-settings-row-divider, rgba(255, 255, 255, 0.08));
+	--settings-row-divider-strong: var(--bf-theme-settings-row-divider-strong, rgba(255, 255, 255, 0.12));
+	--settings-log-surface: var(--bf-theme-settings-log-surface, rgba(0, 0, 0, 0.32));
+	--settings-server-card-bg: var(--bf-theme-settings-server-card-bg, rgba(7, 13, 20, 0.38));
+	--settings-server-card-active-bg: var(--bf-theme-settings-server-card-active-bg, rgba(63, 184, 255, 0.15));
+	--settings-danger-bg: var(--bf-theme-settings-danger-bg, rgba(244, 84, 84, 0.2));
+	--settings-danger-border: var(--bf-theme-settings-danger-border, rgba(244, 84, 84, 0.4));
+	--settings-danger-bg-hover: var(--bf-theme-settings-danger-bg-hover, rgba(244, 84, 84, 0.34));
+	background:
+		radial-gradient(120rem 50rem at 20% -10%, var(--settings-bg-glow-a), transparent 60%),
+		radial-gradient(100rem 60rem at 100% -20%, var(--settings-bg-glow-b), transparent 58%),
+		var(--settings-bg-base);
+	height: calc(100vh + var(--bf-panel-overlap-lift));
+	min-height: 0;
+	padding-top: 0;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
+	overflow: hidden;
+	overscroll-behavior: contain;
+}
+
+.content {
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 3rem) 4rem var(--bf-settings-content-bottom-pad);
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
+	gap: 1.25rem;
+	max-width: 100%;
+	margin: 0 auto;
+	position: relative;
+
+	&::after {
+		content: '';
+		display: block;
+		grid-column: 1 / -1;
+		height: var(--bf-settings-bottom-spacer);
+		pointer-events: none;
+	}
+}
+
+.section {
+	background: var(--settings-surface);
+	border-radius: 14px;
+	padding: 1.5rem;
+	min-width: 0;
+	border: 1px solid var(--settings-border);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+	contain: layout paint;
+}
+
+.sectionTitle {
+	font-size: 1.06em;
+	font-weight: 700;
+	margin-bottom: 1.1rem;
+	padding-bottom: 0.5rem;
+	border-bottom: 1px solid var(--settings-row-divider-strong);
+	color: var(--settings-title-color);
+	letter-spacing: 0.02em;
+}
+
+.infoItem {
+	background: transparent !important;
+	padding: 0.85rem 0;
+	border-bottom: 1px solid var(--settings-row-divider);
+	
+	&:last-of-type {
+		border-bottom: none;
+	}
+}
+
+.settingItem,
+.switchItem {
+	background: transparent !important;
+	padding: 0.85rem 0;
+	border-bottom: 1px solid var(--settings-row-divider);
+	transition: none;
+
+	&:last-of-type {
+		border-bottom: none;
+	}
+
+	&:global(.spottable):focus {
+		background: var(--settings-focus) !important;
+		border-radius: 8px;
+		border-bottom-color: rgba(143, 213, 255, 0.5);
+	}
+}
+
+.settingItem {
+	cursor: pointer;
+}
+
+.loadingItem {
+	display: flex;
+	justify-content: center;
+	padding: 2rem;
+}
+
+.logoutButton {
+	margin-top: 1rem;
+	width: 100%;
+	background: var(--settings-danger-bg);
+	border: 1px solid var(--settings-danger-border);
+	
+	&:hover,
+	&:focus {
+		background: var(--settings-danger-bg-hover);
+	}
+}
+
+.popupContent {
+	padding: 0.5rem;
+	min-width: 300px;
+}
+
+.logPopupContent {
+	padding: 0.5rem;
+	min-width: 980px;
+	max-width: 92vw;
+}
+
+.popupTitle {
+	font-size: 1.15em;
+	font-weight: 600;
+	margin-bottom: 1rem;
+	color: var(--settings-text-strong);
+}
+
+.popupMessage {
+	text-align: center;
+	margin-bottom: 1.5rem;
+	opacity: 0.8;
+}
+
+.popupOptions {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 0.5rem;
+}
+
+.popupOption {
+	--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95));
+	--bf-button-fg-hover: var(--settings-popup-option-fg-hover, var(--bf-theme-text-primary, rgba(244, 249, 255, 0.98)));
+	--bf-button-fg-active: var(--settings-popup-option-fg-hover, var(--bf-theme-text-primary, rgba(244, 249, 255, 0.98)));
+	justify-content: center;
+	padding: 0.52rem 0.75rem;
+	min-height: auto;
+	font-size: 0.9em;
+	border-radius: 999px !important;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	transition: background 0.14s ease, border-color 0.14s ease;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg),
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+		border: none !important;
+	}
+}
+
+.nativeThemePopupContent {
+	padding: 1rem;
+	min-width: 18rem;
+}
+
+.nativeThemePopupOptions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.popupActions {
+	display: flex;
+	gap: 1rem;
+	justify-content: center;
+	margin-top: 1rem;
+	
+	button {
+		flex: 1;
+	}
+}
+
+.dangerButton {
+	--bf-button-fg: rgba(255, 188, 179, 0.98);
+	--bf-button-fg-hover: #ffffff;
+	--bf-button-fg-active: #ffffff;
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(244, 67, 54, 0.42) !important;
+	}
+}
+
+.logActions {
+	display: flex;
+	gap: 0.75rem;
+	margin-bottom: 0.75rem;
+}
+
+.logScroller {
+	max-height: 60vh;
+	border: 1px solid rgba(153, 215, 255, 0.24);
+	border-radius: 10px;
+	padding: 0.75rem;
+	background: var(--settings-log-surface);
+}
+
+.logEntry {
+	padding: 0.6rem 0;
+	border-bottom: 1px solid var(--settings-row-divider);
+}
+
+.logEntry:last-child {
+	border-bottom: none;
+}
+
+.logMeta {
+	font-size: 0.82em;
+	opacity: 0.75;
+	margin-bottom: 0.2rem;
+}
+
+.logText {
+	font-size: 0.9em;
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+.rowOrderHeader {
+	margin-top: 1rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	color: var(--settings-title-color);
+}
+
+.rowOrderList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.rowOrderItem {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.6rem 0;
+	border-bottom: 1px solid var(--settings-row-divider-strong);
+}
+
+.rowOrderLabel {
+	flex: 1;
+}
+
+.rowOrderActions {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.serverList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.serverCard {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 0.75rem;
+	align-items: center;
+	padding: 0.9rem 1rem;
+	border: 1px solid rgba(170, 216, 255, 0.2);
+	border-radius: 10px;
+	background: var(--settings-server-card-bg);
+	transition: none;
+}
+
+.activeCard {
+	border-color: rgba(122, 214, 255, 0.6);
+	background: var(--settings-server-card-active-bg);
+}
+
+.serverCardMain {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	overflow: hidden;
+}
+
+.serverTitle {
+	font-weight: 700;
+	color: var(--settings-text-strong);
+}
+
+.serverMeta {
+	opacity: 0.75;
+	font-size: 0.95em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.serverCardActions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.mutedText {
+	opacity: 0.7;
+}
+
+.settingsContainer :global(.focusExpand) {
+	margin: 0 !important;
+	transform: none !important;
+}
+
+@media (max-width: 1600px) {
+	.content {
+		grid-template-columns: 1fr;
+		padding: calc(var(--bf-top-chrome-height, 12rem) + 1.5rem) 2.5rem var(--bf-settings-content-bottom-pad);
+	}
+}

@@ -1,0 +1,244 @@
+.scroller {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height, 12rem) - var(--bf-panel-scroller-offset-nudge, 0rem));
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh + var(--bf-panel-overlap-lift));
+	min-height: 0;
+	background: transparent;
+	overflow: hidden;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
+}
+
+.content {
+	--bf-styledebug-liquid-bg: var(--bf-theme-popup-bg, rgba(18, 24, 36, 0.86));
+	--bf-styledebug-liquid-border: var(--bf-theme-popup-border, rgba(255, 255, 255, 0.22));
+	--bf-styledebug-liquid-shadow: var(--bf-theme-popup-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
+	--bf-styledebug-liquid-hover-bg: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
+	--bf-styledebug-liquid-active-bg: rgba(255, 255, 255, 0.18);
+	min-height: 100%;
+	background: #121212;
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 1.4rem) 4rem calc(var(--bf-panel-content-bottom-padding, 4rem) + 1.5rem);
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-bottom: 2rem;
+}
+
+.sectionTitle {
+	font-size: 1.05em;
+	font-weight: 600;
+	color: rgba(250, 252, 255, 0.95);
+}
+
+.modeBadges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.modeBadge {
+	padding: 0.26rem 0.7rem;
+	border-radius: 999px;
+	font-size: 0.82em;
+	font-weight: 500;
+	color: rgba(230, 238, 247, 0.95);
+	background: rgba(255, 255, 255, 0.07);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.liquidCard {
+	position: relative;
+	overflow: hidden;
+	border-radius: 0.95rem;
+	padding: 1rem 1.1rem;
+	background: var(--bf-theme-popup-bg, rgba(18, 24, 36, 0.86));
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.22));
+	box-shadow: var(--bf-theme-popup-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+}
+
+.cardTitle {
+	margin-bottom: 0.35rem;
+	font-size: 0.98em;
+	font-weight: 600;
+	color: rgba(247, 252, 255, 0.96);
+}
+
+.cardBody {
+	font-size: 0.88em;
+	line-height: 1.45;
+	color: rgba(228, 237, 248, 0.86);
+}
+
+.backdropScenes {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+	gap: 0.9rem;
+}
+
+.backdropScene {
+	position: relative;
+	min-height: 15rem;
+	border-radius: 1rem;
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	background: #111822;
+}
+
+.backdropImage,
+.backdropTint,
+.backdropGlow,
+.backdropPattern,
+.backdropGradientOnly {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.backdropImage {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.52;
+	transform: scale(1.04);
+	filter: saturate(1.08) contrast(1.05);
+}
+
+.backdropTint {
+	background: linear-gradient(165deg, rgba(6, 12, 21, 0.28), rgba(8, 14, 24, 0.68));
+}
+
+.backdropGlow {
+	background:
+		radial-gradient(75% 58% at 16% 18%, rgba(150, 206, 255, 0.28), rgba(150, 206, 255, 0) 72%),
+		radial-gradient(90% 65% at 88% 86%, rgba(79, 134, 255, 0.28), rgba(79, 134, 255, 0) 68%);
+}
+
+.backdropPattern {
+	background:
+		repeating-linear-gradient(
+			140deg,
+			rgba(255, 255, 255, 0.028) 0,
+			rgba(255, 255, 255, 0.028) 6px,
+			transparent 6px,
+			transparent 15px
+		);
+	opacity: 0.65;
+	mix-blend-mode: screen;
+}
+
+.backdropSceneSecondary {
+	background: #0f1723;
+}
+
+.backdropGradientOnly {
+	background:
+		radial-gradient(78% 64% at 10% 16%, rgba(91, 161, 255, 0.42), rgba(91, 161, 255, 0) 72%),
+		radial-gradient(85% 62% at 90% 82%, rgba(43, 210, 178, 0.34), rgba(43, 210, 178, 0) 74%),
+		linear-gradient(155deg, rgba(14, 22, 35, 0.84), rgba(9, 16, 27, 0.94));
+}
+
+.backdropContent {
+	position: relative;
+	z-index: 2;
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+	padding: 0.9rem;
+}
+
+.sceneLabel {
+	align-self: flex-start;
+	padding: 0.22rem 0.62rem;
+	border-radius: 999px;
+	font-size: 0.78em;
+	font-weight: 600;
+	color: rgba(236, 244, 255, 0.95);
+	background: rgba(8, 15, 25, 0.52);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sceneCard {
+	max-width: min(26rem, 100%);
+}
+
+.sceneControls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.52rem;
+}
+
+.buttonRow,
+.iconRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.58rem;
+}
+
+.liquidButton,
+.liquidIconButton {
+	border-radius: 999px !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	transform: none !important;
+
+	:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+}
+
+.liquidButton :global(.bf-button-bg),
+.liquidButton :global(.bg),
+.liquidIconButton :global(.bf-button-bg),
+.liquidIconButton :global(.bg) {
+	background: var(--bf-styledebug-liquid-bg) !important;
+	border: 1px solid var(--bf-styledebug-liquid-border) !important;
+	border-radius: 999px !important;
+	box-shadow: var(--bf-styledebug-liquid-shadow) !important;
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+	transition: background 150ms ease, border-color 150ms ease;
+}
+
+.liquidButton:hover :global(.bf-button-bg),
+.liquidButton:focus :global(.bf-button-bg),
+.liquidButton:global(.spottable):focus :global(.bf-button-bg),
+.liquidButton:hover :global(.bg),
+.liquidButton:focus :global(.bg),
+.liquidButton:global(.spottable):focus :global(.bg),
+.liquidIconButton:hover :global(.bf-button-bg),
+.liquidIconButton:focus :global(.bf-button-bg),
+.liquidIconButton:global(.spottable):focus :global(.bf-button-bg),
+.liquidIconButton:hover :global(.bg),
+.liquidIconButton:focus :global(.bg),
+.liquidIconButton:global(.spottable):focus :global(.bg) {
+	background: var(--bf-styledebug-liquid-hover-bg) !important;
+}
+
+.liquidButton:active :global(.bf-button-bg),
+.liquidButton:active :global(.bg),
+.liquidIconButton:active :global(.bf-button-bg),
+.liquidIconButton:active :global(.bg) {
+	background: var(--bf-styledebug-liquid-active-bg) !important;
+}
+
+.liquidIconButton {
+	min-width: 2.35rem !important;
+	width: 2.35rem !important;
+	height: 2.35rem !important;
+	padding: 0 !important;
+}
+
+.liquidIconButton :global(.bf-button),
+.liquidIconButton :global(.client) {
+	min-width: 2.35rem !important;
+	width: 2.35rem !important;
+	height: 2.35rem !important;
+	padding: 0 !important;
+}

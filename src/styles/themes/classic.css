@@ -1,0 +1,61 @@
+/* Classic theme tokens (also used as app defaults before theme is applied). */
+:root,
+[data-bf-nav-theme='classic'] {
+	--bf-theme-accent: rgba(0, 164, 220, 0.95);
+	--bf-theme-panel-bg: #121212;
+
+	--bf-theme-surface-bg: rgba(18, 18, 18, 0.95);
+	--bf-theme-surface-border: rgba(255, 255, 255, 0.2);
+	--bf-theme-surface-shadow: 0 0.6rem 1.55rem rgba(0, 0, 0, 0.35);
+	--bf-theme-ultra-surface-bg: rgba(9, 13, 19, 0.84);
+	--bf-theme-popup-bg: linear-gradient(135deg, rgba(10, 28, 38, 0.88), rgba(8, 12, 20, 0.9));
+	--bf-theme-popup-border: rgba(122, 214, 255, 0.35);
+	--bf-theme-popup-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+	--bf-theme-popup-ultra-bg: rgba(9, 13, 19, 0.84);
+	--bf-theme-popup-radius: 0.85rem;
+	--bf-theme-popup-blur: 0.55rem;
+	--bf-theme-popup-saturate: 1.06;
+	--bf-theme-message-bg: rgba(18, 24, 36, 0.86);
+	--bf-theme-message-border: rgba(122, 214, 255, 0.35);
+	--bf-theme-message-color: rgba(245, 250, 255, 0.96);
+	--bf-theme-message-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4);
+	--bf-theme-notice-bg: rgba(80, 170, 255, 0.15);
+	--bf-theme-notice-border: rgba(80, 170, 255, 0.45);
+	--bf-theme-notice-color: rgba(217, 236, 255, 0.98);
+	--bf-theme-error-bg: rgba(90, 30, 40, 0.42);
+	--bf-theme-error-border: rgba(255, 122, 143, 0.45);
+	--bf-theme-error-color: rgba(255, 223, 229, 0.98);
+	--bf-theme-error-surface-bg: linear-gradient(145deg, rgba(52, 20, 30, 0.92), rgba(22, 12, 20, 0.95));
+
+	--bf-theme-input-surface-bg: rgba(255, 255, 255, 0.035);
+	--bf-theme-input-surface-border: rgba(255, 255, 255, 0.18);
+	--bf-theme-input-focus-bg: rgba(255, 255, 255, 0.055);
+	--bf-theme-input-focus-border: rgba(255, 255, 255, 0.24);
+	--bf-theme-input-hover-bg: rgba(255, 255, 255, 0.095);
+	--bf-theme-input-hover-border: rgba(255, 255, 255, 0.3);
+
+	--bf-theme-header-bg: rgba(0, 0, 0, 0.22);
+	--bf-theme-header-fade-color: rgba(0, 0, 0, 0.2);
+
+	--bf-theme-settings-surface: rgba(14, 22, 30, 0.82);
+	--bf-theme-settings-surface-strong: rgba(20, 30, 40, 0.9);
+	--bf-theme-settings-border: rgba(138, 196, 255, 0.2);
+	--bf-theme-settings-focus: rgba(63, 184, 255, 0.28);
+	--bf-theme-settings-bg-base: #0c1218;
+	--bf-theme-settings-bg-glow-a: rgba(63, 184, 255, 0.18);
+	--bf-theme-settings-bg-glow-b: rgba(0, 208, 156, 0.14);
+	--bf-theme-settings-title-color: #d9efff;
+	--bf-theme-settings-text-strong: #e7f5ff;
+	--bf-theme-settings-row-divider: rgba(255, 255, 255, 0.08);
+	--bf-theme-settings-row-divider-strong: rgba(255, 255, 255, 0.12);
+	--bf-theme-settings-log-surface: rgba(0, 0, 0, 0.32);
+	--bf-theme-settings-server-card-bg: rgba(7, 13, 20, 0.38);
+	--bf-theme-settings-server-card-active-bg: rgba(63, 184, 255, 0.15);
+	--bf-theme-settings-danger-bg: rgba(244, 84, 84, 0.2);
+	--bf-theme-settings-danger-border: rgba(244, 84, 84, 0.4);
+	--bf-theme-settings-danger-bg-hover: rgba(244, 84, 84, 0.34);
+}
+
+[data-bf-nav-theme='classic'] .bf-header {
+	display: none !important;
+}

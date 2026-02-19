@@ -1,0 +1,29 @@
+:global([data-bf-nav-theme='elegant'][data-bf-animations='off']) {
+	.liquidCard,
+	.liquidButton :global(.bf-button-bg),
+	.liquidButton :global(.bg),
+	.liquidIconButton :global(.bf-button-bg),
+	.liquidIconButton :global(.bg) {
+		box-shadow: none !important;
+		backdrop-filter: blur(0.56rem) !important;
+		-webkit-backdrop-filter: blur(0.56rem) !important;
+	}
+}
+
+:global([data-bf-nav-theme='elegant'][data-bf-all-animations='off']) {
+	.backdropPattern {
+		display: none;
+	}
+
+	.liquidCard,
+	.liquidButton :global(.bf-button-bg),
+	.liquidButton :global(.bg),
+	.liquidIconButton :global(.bf-button-bg),
+	.liquidIconButton :global(.bg) {
+		background: var(--bf-theme-ultra-surface-bg, rgba(9, 13, 19, 0.62)) !important;
+		border-color: var(--bf-theme-surface-border, rgba(255, 255, 255, 0.1)) !important;
+		box-shadow: none !important;
+		backdrop-filter: blur(0.5rem) !important;
+		-webkit-backdrop-filter: blur(0.5rem) !important;
+	}
+}

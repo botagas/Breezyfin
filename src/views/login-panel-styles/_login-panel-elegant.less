@@ -1,0 +1,138 @@
+/* LoginPanel: elegant-theme specific overrides. */
+:global([data-bf-nav-theme='elegant']) {
+	.page {
+		background-color: #070d14;
+		background-image:
+			radial-gradient(130% 120% at 50% 0%, rgba(152, 208, 255, 0.12), rgba(152, 208, 255, 0) 62%),
+			repeating-linear-gradient(
+				140deg,
+				rgba(255, 255, 255, 0.03),
+				rgba(255, 255, 255, 0.03) 2px,
+				transparent 2px,
+				transparent 96px
+			);
+		background-size: 100% 100%, 320px 320px;
+	}
+
+	.loginBox {
+		position: relative;
+		overflow: hidden;
+		background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
+		border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
+		box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45));
+		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	}
+
+	.loginBox::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.7);
+		opacity: 0.75;
+	}
+
+	.loginBox::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		background:
+			radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 56%),
+			radial-gradient(circle at 82% 78%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 52%);
+		mix-blend-mode: screen;
+		opacity: 0.72;
+	}
+
+	.loginBox > * {
+		position: relative;
+		z-index: 1;
+	}
+
+	.inputField {
+		border-radius: 0.65rem !important;
+		padding: 0 !important;
+	}
+
+	.inputField :global(.bf-input-trigger),
+	.inputField :global(.bf-input-trigger.focusExpand),
+	.inputField :global(.bf-input-trigger:hover),
+	.inputField :global(.bf-input-trigger:focus),
+	.inputField :global(.bf-input-trigger:active),
+	.inputField :global(.bf-input-trigger.spottable:focus) {
+		margin: 0 !important;
+		transform: none !important;
+		border-radius: 0.65rem !important;
+		background: transparent !important;
+	}
+
+	.inputField :global(.bf-input-trigger > div:first-of-type) {
+		background: rgba(255, 255, 255, 0.1) !important;
+		border: 1px solid rgba(255, 255, 255, 0.2) !important;
+		border-radius: 0.65rem !important;
+		box-shadow: none !important;
+		transition: border-color 0.3s ease, background 0.3s ease !important;
+	}
+
+	.inputField:hover :global(.bf-input-trigger > div:first-of-type) {
+		background: rgba(255, 255, 255, 0.16) !important;
+		border-color: rgba(255, 255, 255, 0.3) !important;
+	}
+
+	.inputField:focus-within :global(.bf-input-trigger > div:first-of-type),
+	.inputField:global(.spottable):focus :global(.bf-input-trigger > div:first-of-type) {
+		background: rgba(255, 255, 255, 0.3) !important;
+		border-color: rgba(255, 255, 255, 0.75) !important;
+	}
+
+	.inputField :global(input) {
+		color: rgba(255, 255, 255, 0.95) !important;
+	}
+
+	.inputField :global(input::placeholder) {
+		color: rgba(255, 255, 255, 0.62) !important;
+	}
+
+	.loginBox :global(.bf-button-bg) {
+		background: rgba(255, 255, 255, 0.075) !important;
+		border: 1px solid rgba(255, 255, 255, 0.15) !important;
+		border-radius: 0.65rem !important;
+		box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.18) !important;
+	}
+
+	.loginBox :global(.bf-button:hover .bf-button-bg),
+	.loginBox :global(.bf-button:focus .bf-button-bg),
+	.loginBox :global(.bf-button:active .bf-button-bg),
+	.loginBox :global(.spottable:focus .bf-button-bg) {
+		background: rgba(255, 255, 255, 0.12) !important;
+		border-color: rgba(255, 255, 255, 0.19) !important;
+	}
+
+	.savedItem {
+		background: transparent !important;
+		border: none !important;
+		border-color: transparent !important;
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+	}
+
+	.savedItem:hover,
+	.savedItem:global(.spottable):focus {
+		border: none !important;
+		border-color: transparent !important;
+		background: rgba(255, 255, 255, 0.1) !important;
+	}
+
+	.savedAvatar {
+		background: rgba(255, 255, 255, 0.16);
+		border-color: rgba(255, 255, 255, 0.28);
+	}
+
+	.activeSaved {
+		border: none !important;
+		border-color: transparent !important;
+	}
+}

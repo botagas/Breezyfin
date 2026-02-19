@@ -1,16 +1,19 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
-import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
+import PosterMediaCard from '../components/PosterMediaCard';
+import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import { useMapById } from '../hooks/useMapById';
+import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
+import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 
 import css from './FavoritesPanel.module.less';
 
-const SpottableDiv = Spottable('div');
 const FILTERS = [
 	{ id: 'all', label: 'All', types: ['Movie', 'Series', 'Episode'] },
 	{ id: 'movies', label: 'Movies', types: ['Movie'] },
@@ -18,17 +21,11 @@ const FILTERS = [
 	{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
 ];
 
-const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest }) => {
+const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
-	const favoritesById = useMemo(() => {
-		const map = new Map();
-		favorites.forEach((favorite) => {
-			map.set(String(favorite.Id), favorite);
-		});
-		return map;
-	}, [favorites]);
+	const favoritesById = useMapById(favorites);
 
 	const loadFavorites = useCallback(async () => {
 		setLoading(true);
@@ -52,7 +49,6 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 		e.stopPropagation();
 		try {
 			await jellyfinService.unmarkFavorite(item.Id);
-			// Remove from local state
 			setFavorites(prev => prev.filter(f => f.Id !== item.Id));
 		} catch (error) {
 			console.error('Failed to remove favorite:', error);
@@ -78,143 +74,90 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onLogout, onExit, ...rest })
 		if (!item) return;
 		handleRemoveFavorite(event, item);
 	}, [favoritesById]);
-
-	const handleCardImageError = useCallback((event) => {
-		event.target.style.display = 'none';
-		event.target.parentElement.classList.add(css.placeholder);
-	}, []);
-
-	const getImageUrl = (item) => {
-		if (!item || !jellyfinService.serverUrl || !jellyfinService.accessToken) return null;
-		const base = `${jellyfinService.serverUrl}/Items`;
-		// Primary with tag (best cache)
-		if (item.ImageTags?.Primary) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&tag=${item.ImageTags.Primary}&api_key=${jellyfinService.accessToken}`;
-		}
-		// Primary without tag (fallback even if ImageTags missing)
-		if (item.Id) {
-			return `${base}/${item.Id}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		// Backdrop
-		if (item.BackdropImageTags?.length) {
-			return `${base}/${item.Id}/Images/Backdrop/0?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		// For episodes/series with known series image
-		if (item.SeriesId) {
-			if (item.SeriesPrimaryImageTag) {
-				return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&tag=${item.SeriesPrimaryImageTag}&api_key=${jellyfinService.accessToken}`;
-			}
-			return `${base}/${item.SeriesId}/Images/Primary?maxWidth=400&api_key=${jellyfinService.accessToken}`;
-		}
-		return null;
-	};
-
-	const getItemSubtitle = (item) => {
-		switch (item.Type) {
-			case 'Episode':
-				return `${item.SeriesName || ''} - S${item.ParentIndexNumber || 0}:E${item.IndexNumber || 0}`;
-			case 'Movie':
-				return item.ProductionYear ? `${item.ProductionYear}` : '';
-			case 'Series':
-				return item.ProductionYear ? `${item.ProductionYear}` : '';
-			default:
-				return item.Type || '';
-		}
-	};
+	const posterCardClassProps = getPosterCardClassProps(css);
 
 	return (
 		<Panel {...rest}>
 			<Header title="Favorites" />
-			<Toolbar
-				activeSection="favorites"
-				onNavigate={onNavigate}
-				onLogout={onLogout}
-				onExit={onExit}
-			/>
+				<Toolbar
+					activeSection="favorites"
+					onNavigate={onNavigate}
+					onSwitchUser={onSwitchUser}
+					onLogout={onLogout}
+					onExit={onExit}
+					registerBackHandler={registerBackHandler}
+				/>
 			<div className={css.favoritesContainer}>
-					<div className={css.filters}>
-						{FILTERS.map(filter => (
-							<Button
-								key={filter.id}
-								data-filter-id={filter.id}
-								className={css.filterButton}
-								selected={activeFilter === filter.id}
-								onClick={handleFilterButtonClick}
-								size="small"
-							>
-							{filter.label}
-						</Button>
-					))}
-					<Button
-						className={css.refreshButton}
-						onClick={loadFavorites}
-						size="small"
-						icon="refresh"
-					/>
-				</div>
-
-				{loading ? (
-					<div className={css.loadingState}>
-						<Spinner />
-					</div>
-				) : favorites.length === 0 ? (
-					<div className={css.emptyState}>
-						<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
-						<BodyText className={css.emptyMessage}>
-							Mark items as favorites from the detail view to see them here
-						</BodyText>
-					</div>
-				) : (
-					<Scroller className={css.favoritesScroller}>
-						<div className={css.favoritesGrid}>
-								{favorites.map(item => (
-									<SpottableDiv
-										key={item.Id}
-										data-item-id={item.Id}
-										className={css.favoriteCard}
-										onClick={handleFavoriteCardClick}
-									>
-									<div className={css.cardImage}>
-										{getImageUrl(item) ? (
-												<img
-													src={getImageUrl(item)}
-													alt={item.Name}
-													onError={handleCardImageError}
-												/>
-										) : (
-											<div className={css.placeholderInner}>
-												<BodyText>{item.Name?.charAt(0) || '?'}</BodyText>
-											</div>
-										)}
-											<Button
-												className={css.unfavoriteButton}
-												icon="hearthollow"
-												size="small"
-												data-item-id={item.Id}
-												onClick={handleUnfavoriteClick}
-												title="Remove from favorites"
-											/>
-										{item.UserData?.Played && (
-											<div className={css.watchedBadge}>✓</div>
-										)}
-										{item.UserData?.PlayedPercentage > 0 && item.UserData?.PlayedPercentage < 100 && (
-											<div className={css.progressBar}>
-												<div
-													className={css.progress}
-													style={{ width: `${item.UserData.PlayedPercentage}%` }}
-												/>
-											</div>
-										)}
-									</div>
-									<div className={css.cardInfo}>
-										<BodyText className={css.cardTitle}>{item.Name}</BodyText>
-										<BodyText className={css.cardSubtitle}>{getItemSubtitle(item)}</BodyText>
-									</div>
-								</SpottableDiv>
+				<Scroller className={css.favoritesScroller}>
+					<div className={css.favoritesContent}>
+						<div className={css.filters}>
+							{FILTERS.map(filter => (
+								<Button
+									key={filter.id}
+									data-filter-id={filter.id}
+									className={css.filterButton}
+									selected={activeFilter === filter.id}
+									onClick={handleFilterButtonClick}
+									size="small"
+								>
+									{filter.label}
+								</Button>
 							))}
 						</div>
-					</Scroller>
-				)}
+
+						<div className={css.favoritesBody}>
+							{loading ? (
+								<div className={css.loadingState}>
+									<Spinner />
+								</div>
+							) : favorites.length === 0 ? (
+								<div className={css.emptyState}>
+									<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
+									<BodyText className={css.emptyMessage}>
+										Mark items as favorites from the detail view to see them here
+									</BodyText>
+								</div>
+							) : (
+								<div className={css.favoritesGrid}>
+									{favorites.map(item => {
+										const imageUrl = getPosterCardImageUrl(item);
+										return (
+											<PosterMediaCard
+												key={item.Id}
+												itemId={item.Id}
+												className={css.favoriteCard}
+												{...posterCardClassProps}
+												imageUrl={imageUrl}
+												title={item.Name}
+												subtitle={getMediaItemSubtitle(item)}
+												placeholderText={item.Name?.charAt(0) || '?'}
+												onClick={handleFavoriteCardClick}
+												overlayContent={(
+													<MediaCardStatusOverlay
+														showWatched={item.UserData?.Played === true}
+														watchedClassName={css.watchedBadge}
+														progressPercent={item.UserData?.PlayedPercentage}
+														progressBarClassName={css.progressBar}
+														progressClassName={css.progress}
+													>
+														<Button
+															className={css.unfavoriteButton}
+															icon="hearthollow"
+															size="small"
+															data-item-id={item.Id}
+															onClick={handleUnfavoriteClick}
+															title="Remove from favorites"
+														/>
+													</MediaCardStatusOverlay>
+												)}
+											/>
+										);
+									})}
+								</div>
+							)}
+						</div>
+					</div>
+				</Scroller>
 			</div>
 		</Panel>
 	);

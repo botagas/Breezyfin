@@ -1,15 +1,15 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Spottable from '@enact/spotlight/Spottable';
-import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
+import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './MediaRow.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) => {
+const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown, ...rest }) => {
 	const [imageError, setImageError] = useState(false);
 
 	const handleCardClick = useCallback(() => {
@@ -17,7 +17,10 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 	}, [item, onClick]);
 
 	const handleCardKeyDown = useCallback((e) => {
-		// Ensure left/right navigation moves focus predictably across cards
+		if (typeof onCardKeyDown === 'function') {
+			onCardKeyDown(e, item);
+		}
+		if (e.defaultPrevented) return;
 		if (e.keyCode === 37 && e.target.previousElementSibling) { // left
 			e.preventDefault();
 			e.target.previousElementSibling.focus();
@@ -25,13 +28,12 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 			e.preventDefault();
 			e.target.nextElementSibling.focus();
 		}
-	}, []);
+	}, [item, onCardKeyDown]);
 
 	const handleImageError = useCallback(() => {
 		setImageError(true);
 	}, []);
 
-	// Format title: for episodes show "Series Name" and "S1:E2" below
 	const getDisplayTitle = () => {
 		if (item.Type === 'Episode') {
 			return item.SeriesName || item.Name;
@@ -48,7 +50,6 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 		return null;
 	};
 
-	// Get remaining episodes count for series and episodes
 	const getRemainingCount = () => {
 		if (item.Type === 'Series' && item.UserData) {
 			const hasWatched = item.UserData.PlayedPercentage > 0 || item.UserData.PlaybackPositionTicks > 0 || item.UserData.Played;
@@ -57,10 +58,7 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 				return unwatchedCount;
 			}
 		}
-		// For episodes, check if there's a series unwatched count
 		if (item.Type === 'Episode') {
-			// Episodes from NextUp/Resume should have SeriesId and we can use the series' UnplayedItemCount
-			// This data might be embedded in the episode response from the server
 			const unwatchedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
 			if (unwatchedCount > 0) {
 				return unwatchedCount;
@@ -82,10 +80,8 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 		return null;
 	};
 
-	// Use series backdrop for episodes if they don't have their own
 	const getImageUrl = () => {
 		if (item.Type === 'Episode' && item.SeriesId && imageError) {
-			// Fallback to series backdrop
 			return imageUrl.replace(item.Id, item.SeriesId);
 		}
 		return imageUrl;
@@ -104,6 +100,9 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 							src={getImageUrl()}
 							alt={item.Name}
 							onError={handleImageError}
+							loading="lazy"
+							decoding="async"
+							draggable={false}
 						/>
 				) : (
 					<div className={css.placeholder}>
@@ -144,21 +143,35 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, ...rest }) =>
 	);
 };
 
-const Container = SpotlightContainerDecorator({
-	enterTo: 'last-focused',
+const Container = createLastFocusedSpotlightContainer('div', {
 	restrict: 'self-only'
-}, 'div');
+});
 
-const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, ...rest }) => {
+const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, rowIndex = 0, onCardKeyDown, ...rest }) => {
 	const scrollerRef = useRef(null);
+	const focusDebounceTimeoutRef = useRef(null);
 
-	// Handle focus to scroll item into view
+	useEffect(() => {
+		return () => {
+			if (focusDebounceTimeoutRef.current) {
+				window.clearTimeout(focusDebounceTimeoutRef.current);
+				focusDebounceTimeoutRef.current = null;
+			}
+		};
+	}, []);
+
 	const handleFocus = useCallback((e) => {
 		if (scrollerRef.current && scrollerRef.current.contains(e.target)) {
 			const scroller = scrollerRef.current;
 			const element = e.target.closest('.' + css.card);
 			if (element) {
-				scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
+				if (focusDebounceTimeoutRef.current) {
+					window.clearTimeout(focusDebounceTimeoutRef.current);
+				}
+				focusDebounceTimeoutRef.current = window.setTimeout(() => {
+					scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
+					focusDebounceTimeoutRef.current = null;
+				}, 45);
 			}
 		}
 	}, []);
@@ -194,6 +207,9 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 							onClick={onItemClick}
 							showEpisodeProgress={showEpisodeProgress}
 							spotlightId={`${title}-${index}`}
+							data-row-index={rowIndex}
+							data-card-index={index}
+							onCardKeyDown={onCardKeyDown}
 						/>
 					))}
 				</div>

@@ -1,6 +1,6 @@
 {
     "id": "com.breezyfin.app",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "vendor": "botagas",
     "type": "web",
     "main": "index.html",

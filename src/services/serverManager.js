@@ -63,7 +63,7 @@ const getActiveServer = (serverIdOverride, userIdOverride) => {
 	};
 };
 
-const addServer = ({ serverUrl, serverName, userId, username, accessToken }) => {
+const addServer = ({ serverUrl, serverName, userId, username, accessToken, avatarTag = null }) => {
 	if (!serverUrl || !userId || !accessToken) {
 		console.warn('[serverManager] Missing required fields to add server');
 		return null;
@@ -88,6 +88,7 @@ const addServer = ({ serverUrl, serverName, userId, username, accessToken }) => 
 		userId,
 		username: username || 'User',
 		accessToken,
+		avatarTag: avatarTag || servers[serverId]?.users?.[userId]?.avatarTag || null,
 		addedDate: servers[serverId]?.users?.[userId]?.addedDate || new Date().toISOString(),
 		lastConnected: new Date().toISOString()
 	};
@@ -98,6 +99,19 @@ const addServer = ({ serverUrl, serverName, userId, username, accessToken }) => 
 
 	saveServers(servers);
 	return { serverId, userId };
+};
+
+const updateUser = (serverId, userId, patch = {}) => {
+	const servers = loadServers();
+	if (!servers[serverId] || !servers[serverId].users[userId]) return false;
+
+	servers[serverId].users[userId] = {
+		...servers[serverId].users[userId],
+		...patch,
+		lastConnected: new Date().toISOString()
+	};
+	saveServers(servers);
+	return true;
 };
 
 const setActiveServer = (serverId, userId) => {
@@ -140,17 +154,18 @@ const listServers = () => {
 		const server = servers[sid];
 		Object.keys(server.users || {}).forEach((uid) => {
 			const user = server.users[uid];
-			result.push({
-				serverId: sid,
-				serverName: server.name,
-				url: server.url,
-				userId: uid,
-				username: user.username,
-				accessToken: user.accessToken,
-				addedDate: user.addedDate,
-				lastConnected: user.lastConnected,
-				isActive: sid === activeServerId && uid === activeUserId
-			});
+				result.push({
+					serverId: sid,
+					serverName: server.name,
+					url: server.url,
+					userId: uid,
+					username: user.username,
+					accessToken: user.accessToken,
+					avatarTag: user.avatarTag || null,
+					addedDate: user.addedDate,
+					lastConnected: user.lastConnected,
+					isActive: sid === activeServerId && uid === activeUserId
+				});
 		});
 	});
 
@@ -171,5 +186,6 @@ export default {
 	listServers,
 	loadServers,
 	removeUser,
-	setActiveServer
+	setActiveServer,
+	updateUser
 };

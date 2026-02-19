@@ -11,14 +11,15 @@ jest.mock('@jellyfin/sdk/lib/utils/api/playstate-api', () => ({
 jest.mock('../serverManager', () => ({
 	__esModule: true,
 	default: {
-		addServer: jest.fn(),
-		setActiveServer: jest.fn(),
-		getActiveServer: jest.fn(),
-		removeUser: jest.fn(),
-		clearActive: jest.fn(),
-		listServers: jest.fn()
-	}
-}));
+			addServer: jest.fn(),
+			setActiveServer: jest.fn(),
+			getActiveServer: jest.fn(),
+			updateUser: jest.fn(),
+			removeUser: jest.fn(),
+			clearActive: jest.fn(),
+			listServers: jest.fn()
+		}
+	}));
 
 import jellyfinService from '../jellyfinService';
 import serverManager from '../serverManager';
@@ -40,6 +41,7 @@ const resetServiceState = () => {
 
 describe('jellyfinService', () => {
 	let errorSpy;
+	let warnSpy;
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -47,10 +49,12 @@ describe('jellyfinService', () => {
 		resetServiceState();
 		global.fetch = jest.fn();
 		errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+		warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 	});
 
 	afterEach(() => {
 		errorSpy.mockRestore();
+		warnSpy.mockRestore();
 	});
 
 	it('connects to server and stores server metadata', async () => {
@@ -78,7 +82,7 @@ describe('jellyfinService', () => {
 		global.fetch.mockResolvedValue(
 			jsonResponse({
 				AccessToken: 'token-123',
-				User: {Id: 'user1', Name: 'Alice'},
+				User: {Id: 'user1', Name: 'Alice', PrimaryImageTag: 'avatar-tag-1'},
 				ServerName: 'Living Room'
 			})
 		);
@@ -92,7 +96,7 @@ describe('jellyfinService', () => {
 				body: JSON.stringify({Username: 'Alice', Pw: 'secret'})
 			})
 		);
-		expect(user).toEqual({Id: 'user1', Name: 'Alice'});
+		expect(user).toEqual({Id: 'user1', Name: 'Alice', PrimaryImageTag: 'avatar-tag-1'});
 		expect(jellyfinService.accessToken).toBe('token-123');
 		expect(jellyfinService.userId).toBe('user1');
 		expect(jellyfinService.username).toBe('Alice');
@@ -104,7 +108,8 @@ describe('jellyfinService', () => {
 				serverName: 'Living Room',
 				userId: 'user1',
 				username: 'Alice',
-				accessToken: 'token-123'
+				accessToken: 'token-123',
+				avatarTag: 'avatar-tag-1'
 			})
 		);
 		expect(serverManager.setActiveServer).toHaveBeenCalledWith('srv1', 'user1');
@@ -166,5 +171,92 @@ describe('jellyfinService', () => {
 			})
 		);
 		expect(serverManager.setActiveServer).toHaveBeenCalledWith('legacy-srv', 'legacy-user');
+	});
+
+	it('clears malformed legacy jellyfinAuth payload and does not restore session', () => {
+		serverManager.getActiveServer.mockReturnValue(null);
+		localStorage.setItem('jellyfinAuth', '{"serverUrl":"http://broken.local"');
+
+		const restored = jellyfinService.restoreSession();
+
+		expect(restored).toBe(false);
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+		expect(serverManager.addServer).not.toHaveBeenCalled();
+		expect(jellyfinService.serverUrl).toBe(null);
+		expect(jellyfinService.accessToken).toBe(null);
+		expect(jellyfinService.userId).toBe(null);
+	});
+
+	it('clears incomplete legacy jellyfinAuth payload and does not restore session', () => {
+		serverManager.getActiveServer.mockReturnValue(null);
+		localStorage.setItem(
+			'jellyfinAuth',
+			JSON.stringify({
+				serverUrl: 'http://legacy.local',
+				userId: 'legacy-user'
+			})
+		);
+
+		const restored = jellyfinService.restoreSession();
+
+		expect(restored).toBe(false);
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+		expect(serverManager.addServer).not.toHaveBeenCalled();
+		expect(jellyfinService.serverUrl).toBe(null);
+		expect(jellyfinService.accessToken).toBe(null);
+		expect(jellyfinService.userId).toBe(null);
+	});
+
+	it('updates saved user metadata when current user profile is loaded', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.userId = 'user1';
+		jellyfinService.accessToken = 'token-123';
+		serverManager.getActiveServer.mockReturnValue({
+			id: 'srv1',
+			activeUser: {userId: 'user1', username: 'Old Name'}
+		});
+		global.fetch.mockResolvedValue(jsonResponse({
+			Id: 'user1',
+			Name: 'Alice',
+			PrimaryImageTag: 'avatar-tag-2'
+		}));
+
+		const user = await jellyfinService.getCurrentUser();
+
+		expect(user).toEqual({
+			Id: 'user1',
+			Name: 'Alice',
+			PrimaryImageTag: 'avatar-tag-2'
+		});
+		expect(serverManager.updateUser).toHaveBeenCalledWith('srv1', 'user1', {
+			username: 'Alice',
+			avatarTag: 'avatar-tag-2'
+		});
+	});
+
+	it('switches user without removing saved accounts', () => {
+		jellyfinService.api = {accessToken: 'active-token'};
+		jellyfinService.userId = 'u-1';
+		jellyfinService.serverUrl = 'http://active.local';
+		jellyfinService.accessToken = 'active-token';
+		jellyfinService.serverName = 'Active Server';
+		jellyfinService.username = 'Current User';
+		localStorage.setItem('jellyfinAuth', JSON.stringify({
+			serverUrl: 'http://active.local',
+			accessToken: 'active-token',
+			userId: 'u-1'
+		}));
+
+		jellyfinService.switchUser();
+
+		expect(serverManager.clearActive).toHaveBeenCalled();
+		expect(serverManager.removeUser).not.toHaveBeenCalled();
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+		expect(jellyfinService.api).toBe(null);
+		expect(jellyfinService.userId).toBe(null);
+		expect(jellyfinService.serverUrl).toBe(null);
+		expect(jellyfinService.accessToken).toBe(null);
+		expect(jellyfinService.serverName).toBe(null);
+		expect(jellyfinService.username).toBe(null);
 	});
 });

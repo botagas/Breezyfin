@@ -1,0 +1,38 @@
+:global([data-bf-nav-theme='elegant']) {
+	.content {
+		--bf-styledebug-liquid-bg: rgba(255, 255, 255, 0.08);
+		--bf-styledebug-liquid-border: rgba(255, 255, 255, 0.24);
+		--bf-styledebug-liquid-shadow: none;
+		--bf-styledebug-liquid-hover-bg: rgba(255, 255, 255, 0.16);
+		--bf-styledebug-liquid-active-bg: rgba(255, 255, 255, 0.22);
+		background: radial-gradient(110rem 60rem at 50% -18rem, rgba(35, 62, 90, 0.33), #121212 55%);
+	}
+
+	.backdropScene {
+		border-color: var(--bf-theme-surface-border, rgba(255, 255, 255, 0.1));
+		box-shadow: var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(4, 10, 17, 0.34));
+	}
+
+	.liquidCard {
+		background: var(--bf-theme-surface-bg, rgba(8, 13, 20, 0.42));
+		border: 1px solid var(--bf-theme-surface-border, rgba(255, 255, 255, 0.1));
+		box-shadow: var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(4, 10, 17, 0.34));
+		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2));
+		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2));
+	}
+
+	.liquidButton,
+	.liquidIconButton {
+		--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95)) !important;
+		--bf-button-fg-hover: var(--bf-theme-accent, rgba(157, 207, 255, 0.98)) !important;
+		--bf-button-fg-active: var(--bf-theme-accent, rgba(157, 207, 255, 0.98)) !important;
+	}
+
+	.liquidButton :global(.bf-button-bg),
+	.liquidButton :global(.bg),
+	.liquidIconButton :global(.bf-button-bg),
+	.liquidIconButton :global(.bg) {
+		backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2)) !important;
+		-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2)) !important;
+	}
+}

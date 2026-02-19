@@ -1,0 +1,106 @@
+@import (reference) '../../styles/cardStyles.less';
+
+.libraryContainer {
+	display: flex;
+	flex-direction: column;
+	position: absolute;
+	inset: 0;
+	background: var(--bf-theme-panel-bg, #121212);
+	overflow: hidden;
+}
+
+.scroller {
+	flex: 1;
+	min-height: 0;
+	background: var(--bf-theme-panel-bg, #121212);
+	overscroll-behavior: contain;
+}
+
+.loading {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 80vh;
+}
+
+.gridContainer {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+	gap: 2rem;
+	/* Panel body already sits below native header; offset content by toolbar chrome only. */
+	padding: calc(var(--bf-panel-top-offset, 4.5rem) - 0.75rem) 4rem clamp(2rem, var(--bf-panel-content-bottom-padding, 4rem), 4rem);
+	background: var(--bf-theme-panel-bg, #121212);
+	.panel-grid-performance();
+	/* Keep scroll metrics stable from first render; deferred content-visibility causes late scrollbar updates. */
+	content-visibility: visible;
+	contain: layout style;
+	contain-intrinsic-size: auto;
+}
+
+.loadingMore {
+	grid-column: 1 / -1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.5rem 0 2rem;
+}
+
+.gridCard {
+	cursor: pointer;
+	.card-shell();
+	.card-focus-expand-reset();
+
+	&:hover,
+	&:global(.spottable):focus {
+		.card-focus-lift();
+
+		.cardImage {
+			.card-image-focus();
+		}
+	}
+}
+
+.cardImage {
+	.card-image-shell(16/9);
+	.card-image-overlays();
+
+	&.placeholder {
+		.card-placeholder-surface();
+
+		&::after {
+			.card-placeholder-no-image-label();
+			font-size: 1em;
+		}
+	}
+}
+
+.progressBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	padding: 0.35rem 0.5rem;
+	.status-badge-pill();
+}
+
+.progressBar {
+	.card-progress-bar-surface();
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.progress {
+	.card-progress-bar-fill();
+	background: #00a4dc;
+	transition: width 0.3s ease;
+}
+
+.cardTitle {
+	margin: 0.75rem 0 0 0;
+	.card-title-text();
+	text-align: left;
+}
+
+.cardSubtitle {
+	margin-top: 0.25rem;
+	.card-subtitle-text();
+	text-align: left;
+}

@@ -1,3 +1,5 @@
+@import (reference) '../styles/cardStyles.less';
+
 .heroBanner {
 	position: relative;
 	width: 100%;
@@ -12,13 +14,45 @@
 	left: 0;
 	right: 0;
 	bottom: 0;
-	
+}
+
+.backdropLayer {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	opacity: 0;
+
 	img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		animation: kenBurns 20s ease-in-out infinite alternate;
+		animation: kenBurns 20s ease-in-out infinite alternate !important;
 	}
+}
+
+.backdropLayerCurrent {
+	opacity: 1;
+}
+
+.backdropLayerIncoming {
+	animation: heroBackdropIn 420ms ease-out forwards !important;
+}
+
+.backdropLayerOutgoing {
+	opacity: 1;
+	animation: heroBackdropOut 420ms ease-out forwards !important;
+}
+
+.backdropFallback {
+	width: 100%;
+	height: 100%;
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
 }
 
 .gradient {
@@ -37,32 +71,22 @@
 	);
 }
 
-.gradientExtension {
-	position: absolute;
-	top: 100%;
-	left: 0;
-	right: 0;
-	height: 260px;
-	background: linear-gradient(
-		to bottom,
-		#121212 0%,
-		#121212 100%
-	);
-	z-index: 1;
-}
-
 .content {
 	position: relative;
 	height: 100%;
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-start;
-	padding: calc(80px + 4rem) 60px 60px 60px;
+	padding: calc(var(--bf-toolbar-height, 4.5rem) + 4.5rem + var(--bf-home-hero-nudge, 0rem)) 60px 60px 60px;
 	z-index: 10;
 }
 
 .info {
 	max-width: 100vw;
+}
+
+.infoTransition {
+	animation: heroTextIn 420ms ease-out !important;
 }
 
 .logoWrapper {
@@ -82,11 +106,19 @@
 	filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.7));
 }
 
+.logoTransition {
+	animation: heroTextIn 480ms ease-out !important;
+}
+
 .title {
 	font-size: 2.5em;
 	font-weight: 700;
 	margin-bottom: 12px;
 	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.textTransition {
+	animation: heroTextIn 480ms ease-out !important;
 }
 
 .overview {
@@ -123,6 +155,10 @@
 }
 
 .heroBannerButton {
+	--bf-button-fg: #ffffff;
+	--bf-button-fg-hover: #111111;
+	--bf-button-fg-active: #111111;
+
 	color: #ffffff !important;
 	font-size: 0.84em !important;
 	font-weight: 700 !important;
@@ -195,16 +231,196 @@
 	border-radius: 50%;
 	background: rgba(255, 255, 255, 0.4);
 	cursor: pointer;
-	transition: all 0.3s ease;
-	
+	transition: background-color 0.3s ease, transform 0.3s ease, width 0.3s ease, border-radius 0.3s ease;
+
 	&:hover {
 		background: rgba(255, 255, 255, 0.7);
 		transform: scale(1.2);
 	}
-	
+
 	&.active {
 		background: rgba(255, 255, 255, 1);
 		width: 24px;
 		border-radius: 4px;
 	}
+}
+
+:global([data-bf-animations='off']) .backdropLayer img,
+:global([data-bf-all-animations='off']) .backdropLayer img {
+	animation: none !important;
+	transform: none !important;
+}
+
+:global([data-bf-animations='off']) .backdropLayerIncoming,
+:global([data-bf-all-animations='off']) .backdropLayerIncoming,
+:global([data-bf-animations='off']) .backdropLayerOutgoing,
+:global([data-bf-all-animations='off']) .backdropLayerOutgoing,
+:global([data-bf-animations='off']) .infoTransition,
+:global([data-bf-all-animations='off']) .infoTransition,
+:global([data-bf-animations='off']) .logoTransition,
+:global([data-bf-all-animations='off']) .logoTransition,
+:global([data-bf-animations='off']) .textTransition,
+:global([data-bf-all-animations='off']) .textTransition {
+	animation: none !important;
+}
+
+:global([data-bf-animations='off']) .logo,
+:global([data-bf-all-animations='off']) .logo {
+	filter: none;
+}
+
+:global([data-bf-animations='off']) .indicator,
+:global([data-bf-all-animations='off']) .indicator,
+:global([data-bf-animations='off']) .heroBannerButton,
+:global([data-bf-all-animations='off']) .heroBannerButton {
+	transition: none !important;
+}
+
+:global([data-bf-animations='off']) .indicator:hover,
+:global([data-bf-all-animations='off']) .indicator:hover {
+	transform: none !important;
+}
+
+@keyframes heroBackdropIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes heroBackdropOut {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes heroTextIn {
+	from {
+		opacity: 0;
+		transform: translateY(18px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes kenBurns {
+	from {
+		transform: scale(1.02);
+	}
+	to {
+		transform: scale(1.08);
+	}
+}
+
+/* Elegant mode: feature-card media bar (full-width row card under navbar) */
+:global([data-bf-nav-theme='elegant']) .heroBanner {
+	width: 100%;
+	height: clamp(22rem, 37vw, 31rem);
+	margin: 0 0 2rem;
+	padding: 0 60px;
+	box-sizing: border-box;
+	overflow: visible;
+}
+
+:global([data-bf-nav-theme='elegant']) .backdrop {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	.card-image-shell(16/6);
+	.card-image-overlays();
+}
+
+:global([data-bf-nav-theme='elegant']) .backdrop::before {
+	opacity: 0.34;
+}
+
+:global([data-bf-nav-theme='elegant']) .backdropLayer img {
+	animation: none !important;
+}
+
+:global([data-bf-nav-theme='elegant']) .gradient {
+	background: linear-gradient(
+		to top,
+		var(--bf-theme-hero-elegant-gradient-top, rgba(7, 12, 19, 0.92)) 0%,
+		var(--bf-theme-hero-elegant-gradient-mid, rgba(7, 12, 19, 0.62)) 45%,
+		var(--bf-theme-hero-elegant-gradient-end, rgba(7, 12, 19, 0.2)) 100%
+	);
+}
+
+:global([data-bf-nav-theme='elegant']) .content {
+	position: absolute;
+	inset: 0;
+	height: auto;
+	justify-content: flex-end;
+	padding: 1.45rem 3.1rem 2.05rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .info {
+	width: 100%;
+	max-width: 100%;
+}
+
+:global([data-bf-nav-theme='elegant']) .logoWrapper {
+	max-width: min(54rem, 100%);
+	height: auto;
+	margin: 0 0 2rem 0;
+	padding: 0;
+	align-items: flex-start;
+}
+
+:global([data-bf-nav-theme='elegant']) .logo {
+	max-width: 100%;
+	max-height: 10rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .title {
+	font-size: 2em;
+	margin-bottom: 2rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .metadata {
+	margin: 0.15rem 0 0;
+	gap: 0.75rem;
+}
+
+:global([data-bf-nav-theme='elegant']) .overview {
+	margin: 0.72rem 0 1.35rem;
+	max-width: min(56rem, 100%);
+	flex: none;
+	min-height: 5.35rem;
+	max-height: 6.2rem;
+	-webkit-line-clamp: 4;
+	line-clamp: 4;
+}
+
+:global([data-bf-nav-theme='elegant']) .controls {
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 1rem;
+	flex-wrap: nowrap;
+	width: 100%;
+}
+
+:global([data-bf-nav-theme='elegant']) .buttons {
+	margin-left: 0;
+	order: initial;
+}
+
+:global([data-bf-nav-theme='elegant']) .indicators {
+	order: initial;
+	margin-left: 0;
+	flex-shrink: 0;
+}
+
+:global([data-bf-nav-theme='elegant']) .heroBannerButton {
+	font-size: 0.8em !important;
+	min-height: 1.9rem !important;
+	padding: 0 0.95rem !important;
 }

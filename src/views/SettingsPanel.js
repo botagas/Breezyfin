@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '@enact/sandstone/Scroller';
@@ -8,35 +8,41 @@ import Item from '@enact/sandstone/Item';
 import SwitchItem from '@enact/sandstone/SwitchItem';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
-import Toolbar from '../components/Toolbar';
-import {isBackKey} from '../utils/keyCodes';
+import SettingsToolbar from '../components/SettingsToolbar';
+import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
+import {isStyleDebugEnabled} from '../utils/featureFlags';
+import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useMapById } from '../hooks/useMapById';
+import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
+import { wipeAllAppCache } from '../utils/cacheMaintenance';
 
 import css from './SettingsPanel.module.less';
+import popupStyles from '../styles/popupStyles.module.less';
+import {popupShellCss} from '../styles/popupStyles';
 
-const HOME_ROW_ORDER = [
-	'myRequests',
-	'continueWatching',
-	'nextUp',
-	'recentlyAdded',
-	'latestMovies',
-	'latestShows'
-];
-
-// Settings defaults
 const DEFAULT_SETTINGS = {
 	maxBitrate: '40',
 	enableTranscoding: true,
 	forceTranscoding: false,
 	forceTranscodingWithSubtitles: true,
+	relaxedPlaybackProfile: false,
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
+	disableAnimations: true,
+	disableAllAnimations: false,
+	showMediaBar: true,
+	navbarTheme: 'elegant',
 	autoPlayNext: true,
 	showPlayNextPrompt: true,
 	playNextPromptMode: 'segmentsOrLast60',
 	skipIntro: true,
 	showBackdrops: true,
+	showSeasonImages: false,
+	useSidewaysEpisodeList: true,
+	showPerformanceOverlay: false,
 	homeRows: {
 		recentlyAdded: true,
 		continueWatching: true,
@@ -71,51 +77,93 @@ const LANGUAGE_OPTIONS = [
 	{ value: 'rus', label: 'Russian' }
 ];
 
-const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest }) => {
+const NAVBAR_THEME_OPTIONS = [
+	{ value: 'classic', label: 'Classic' },
+	{ value: 'elegant', label: 'Elegant' }
+];
+const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
+const SETTINGS_DISCLOSURE_KEYS = {
+	BITRATE: 'bitratePopup',
+	AUDIO_LANGUAGE: 'audioLanguagePopup',
+	SUBTITLE_LANGUAGE: 'subtitleLanguagePopup',
+	NAVBAR_THEME: 'navbarThemePopup',
+	PLAY_NEXT_PROMPT_MODE: 'playNextPromptModePopup',
+	LOGOUT_CONFIRM: 'logoutConfirmPopup',
+	LOGS: 'logsPopup',
+	WIPE_CACHE_CONFIRM: 'wipeCacheConfirmPopup'
+};
+const INITIAL_SETTINGS_DISCLOSURES = {
+	[SETTINGS_DISCLOSURE_KEYS.BITRATE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME]: false,
+	[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM]: false,
+	[SETTINGS_DISCLOSURE_KEYS.LOGS]: false,
+	[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM]: false
+};
+const DISCLOSURE_BACK_PRIORITY = [
+	SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM,
+	SETTINGS_DISCLOSURE_KEYS.LOGS,
+	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
+	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
+	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
+	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
+	SETTINGS_DISCLOSURE_KEYS.BITRATE
+];
+
+const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, registerBackHandler, isActive = false, ...rest }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
 	const [userInfo, setUserInfo] = useState(null);
 	const [loading, setLoading] = useState(true);
-	const [bitratePopupOpen, setBitratePopupOpen] = useState(false);
-	const [audioLangPopupOpen, setAudioLangPopupOpen] = useState(false);
-	const [subtitleLangPopupOpen, setSubtitleLangPopupOpen] = useState(false);
-	const [playNextPromptModePopupOpen, setPlayNextPromptModePopupOpen] = useState(false);
-	const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 	const [savedServers, setSavedServers] = useState([]);
 	const [switchingServerId, setSwitchingServerId] = useState(null);
-	const [logsPopupOpen, setLogsPopupOpen] = useState(false);
 	const [appLogs, setAppLogs] = useState([]);
-	const savedServersByKey = useMemo(() => {
-		const map = new Map();
-		savedServers.forEach((entry) => {
-			map.set(`${entry.serverId}:${entry.userId}`, entry);
-		});
-		return map;
-	}, [savedServers]);
+	const [appLogCount, setAppLogCount] = useState(0);
+	const [cacheWipeInProgress, setCacheWipeInProgress] = useState(false);
+	const [cacheWipeError, setCacheWipeError] = useState('');
+	const {
+		disclosures,
+		openDisclosure,
+		closeDisclosure
+	} = useDisclosureMap(INITIAL_SETTINGS_DISCLOSURES);
+	const toolbarBackHandlerRef = useRef(null);
+	const savedServerKeySelector = useCallback(
+		(entry) => `${entry.serverId}:${entry.userId}`,
+		[]
+	);
+	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
+	const bitratePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.BITRATE] === true;
+	const audioLangPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE] === true;
+	const subtitleLangPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE] === true;
+	const navbarThemePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME] === true;
+	const playNextPromptModePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE] === true;
+	const logoutConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM] === true;
+	const logsPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGS] === true;
+	const wipeCacheConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM] === true;
 
 	const loadSettings = useCallback(() => {
 		try {
-			const stored = localStorage.getItem('breezyfinSettings');
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				const normalizedOrder = Array.isArray(parsed.homeRowOrder)
-					? parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key))
-					: [];
-				const resolvedOrder = [
-					...normalizedOrder,
-					...HOME_ROW_ORDER.filter((key) => !normalizedOrder.includes(key))
-				];
-				setSettings({
-					...DEFAULT_SETTINGS,
-					...parsed,
-					homeRows: {
-						...DEFAULT_SETTINGS.homeRows,
-						...(parsed.homeRows || {})
-					},
-					homeRowOrder: resolvedOrder
-				});
-			}
+			const parsed = readBreezyfinSettings();
+			const normalizedOrder = Array.isArray(parsed.homeRowOrder)
+				? parsed.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key))
+				: [];
+			const resolvedOrder = [
+				...normalizedOrder,
+				...HOME_ROW_ORDER.filter((key) => !normalizedOrder.includes(key))
+			];
+			setSettings({
+				...DEFAULT_SETTINGS,
+				...parsed,
+				homeRows: {
+					...DEFAULT_SETTINGS.homeRows,
+					...(parsed.homeRows || {})
+				},
+				homeRowOrder: resolvedOrder
+			});
 		} catch (error) {
 			console.error('Failed to load settings:', error);
 		}
@@ -145,11 +193,16 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		}
 	}, []);
 
+	const refreshAppLogCount = useCallback(() => {
+		setAppLogCount(getAppLogs().length);
+	}, []);
+
 	useEffect(() => {
 		loadSettings();
 		loadServerInfo();
 		refreshSavedServers();
-	}, [loadServerInfo, loadSettings, refreshSavedServers]);
+		refreshAppLogCount();
+	}, [loadServerInfo, loadSettings, refreshSavedServers, refreshAppLogCount]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -166,10 +219,8 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 	const handleSettingChange = useCallback((key, value) => {
 		setSettings((prevSettings) => {
 			const newSettings = { ...prevSettings, [key]: value };
-			try {
-				localStorage.setItem('breezyfinSettings', JSON.stringify(newSettings));
-			} catch (error) {
-				console.error('Failed to save settings:', error);
+			if (!writeBreezyfinSettings(newSettings)) {
+				console.error('Failed to save settings');
 			}
 			return newSettings;
 		});
@@ -184,10 +235,8 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 					[rowKey]: !prevSettings.homeRows?.[rowKey]
 				}
 			};
-			try {
-				localStorage.setItem('breezyfinSettings', JSON.stringify(updated));
-			} catch (error) {
-				console.error('Failed to save settings:', error);
+			if (!writeBreezyfinSettings(updated)) {
+				console.error('Failed to save home row settings');
 			}
 			return updated;
 		});
@@ -202,10 +251,8 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 			if (swapIndex < 0 || swapIndex >= order.length) return prevSettings;
 			[order[index], order[swapIndex]] = [order[swapIndex], order[index]];
 			const updated = { ...prevSettings, homeRowOrder: order };
-			try {
-				localStorage.setItem('breezyfinSettings', JSON.stringify(updated));
-			} catch (error) {
-				console.error('Failed to save settings:', error);
+			if (!writeBreezyfinSettings(updated)) {
+				console.error('Failed to save home row order');
 			}
 			return updated;
 		});
@@ -251,18 +298,25 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 	}, [refreshSavedServers]);
 
 	const handleLogoutConfirm = useCallback(() => {
-		setLogoutConfirmOpen(false);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
+		if (typeof onSignOut === 'function') {
+			onSignOut();
+			return;
+		}
 		onLogout();
-	}, [onLogout]);
+	}, [closeDisclosure, onLogout, onSignOut]);
 
 	const openLogsPopup = useCallback(() => {
-		setAppLogs(getAppLogs().slice().reverse());
-		setLogsPopupOpen(true);
-	}, []);
+		const logs = getAppLogs();
+		setAppLogs(logs.slice().reverse());
+		setAppLogCount(logs.length);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGS);
+	}, [openDisclosure]);
 
 	const handleClearLogs = useCallback(() => {
 		clearAppLogs();
 		setAppLogs([]);
+		setAppLogCount(0);
 	}, []);
 
 	const toggleHomeRowRecentlyAdded = useCallback(() => {
@@ -316,109 +370,197 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 	}, [handleForgetServer, savedServersByKey]);
 
 	const openLogoutConfirm = useCallback(() => {
-		setLogoutConfirmOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
+	}, [openDisclosure]);
 
 	const closeLogoutConfirm = useCallback(() => {
-		setLogoutConfirmOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
+	}, [closeDisclosure]);
 
 	const openBitratePopup = useCallback(() => {
-		setBitratePopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
+	}, [openDisclosure]);
 
 	const closeBitratePopup = useCallback(() => {
-		setBitratePopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
+	}, [closeDisclosure]);
 
 	const openAudioLangPopup = useCallback(() => {
-		setAudioLangPopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
+	}, [openDisclosure]);
 
 	const closeAudioLangPopup = useCallback(() => {
-		setAudioLangPopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
+	}, [closeDisclosure]);
 
 	const openSubtitleLangPopup = useCallback(() => {
-		setSubtitleLangPopupOpen(true);
-	}, []);
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
+	}, [openDisclosure]);
 
 	const closeSubtitleLangPopup = useCallback(() => {
-		setSubtitleLangPopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
+	}, [closeDisclosure]);
+
+	const openNavbarThemePopup = useCallback(() => {
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
+	}, [openDisclosure]);
+
+	const closeNavbarThemePopup = useCallback(() => {
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
+	}, [closeDisclosure]);
 
 	const closePlayNextPromptModePopup = useCallback(() => {
-		setPlayNextPromptModePopupOpen(false);
-	}, []);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
+	}, [closeDisclosure]);
 
 	const closeLogsPopup = useCallback(() => {
-		setLogsPopupOpen(false);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGS);
+	}, [closeDisclosure]);
+
+	const openWipeCacheConfirm = useCallback(() => {
+		setCacheWipeError('');
+		openDisclosure(SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM);
+	}, [openDisclosure]);
+
+	const closeWipeCacheConfirm = useCallback(() => {
+		if (cacheWipeInProgress) return;
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM);
+	}, [cacheWipeInProgress, closeDisclosure]);
+
+	const handleWipeCacheConfirm = useCallback(async () => {
+		if (cacheWipeInProgress) return;
+		setCacheWipeInProgress(true);
+		setCacheWipeError('');
+
+		try {
+			const summary = await wipeAllAppCache();
+			console.info('[Settings] Cache wipe summary:', summary);
+			if (typeof window !== 'undefined') {
+				window.setTimeout(() => {
+					window.location.reload();
+				}, 160);
+			}
+		} catch (error) {
+			console.error('Failed to wipe application cache:', error);
+			setCacheWipeError('Failed to wipe app cache. Please restart the TV and try again.');
+			setCacheWipeInProgress(false);
+		}
+	}, [cacheWipeInProgress]);
+
+	const openStylingDebugPanel = useCallback(() => {
+		if (!STYLE_DEBUG_ENABLED) return;
+		if (typeof onNavigate === 'function') {
+			onNavigate('styleDebug');
+		}
+	}, [onNavigate]);
+
+	const registerToolbarBackHandler = useCallback((handler) => {
+		toolbarBackHandlerRef.current = handler;
 	}, []);
 
+	const toggleBooleanSetting = useCallback((key) => {
+		handleSettingChange(key, !settings[key]);
+	}, [handleSettingChange, settings]);
+
 	const toggleEnableTranscoding = useCallback(() => {
-		handleSettingChange('enableTranscoding', !settings.enableTranscoding);
-	}, [handleSettingChange, settings.enableTranscoding]);
+		toggleBooleanSetting('enableTranscoding');
+	}, [toggleBooleanSetting]);
 
 	const toggleAutoPlayNext = useCallback(() => {
-		handleSettingChange('autoPlayNext', !settings.autoPlayNext);
-	}, [handleSettingChange, settings.autoPlayNext]);
+		toggleBooleanSetting('autoPlayNext');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowPlayNextPrompt = useCallback(() => {
-		handleSettingChange('showPlayNextPrompt', !settings.showPlayNextPrompt);
-	}, [handleSettingChange, settings.showPlayNextPrompt]);
+		toggleBooleanSetting('showPlayNextPrompt');
+	}, [toggleBooleanSetting]);
 
 	const openPlayNextPromptModePopup = useCallback(() => {
 		if (settings.showPlayNextPrompt !== false) {
-			setPlayNextPromptModePopupOpen(true);
+			openDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
 		}
-	}, [settings.showPlayNextPrompt]);
+	}, [openDisclosure, settings.showPlayNextPrompt]);
 
 	const toggleSkipIntro = useCallback(() => {
-		handleSettingChange('skipIntro', !settings.skipIntro);
-	}, [handleSettingChange, settings.skipIntro]);
+		toggleBooleanSetting('skipIntro');
+	}, [toggleBooleanSetting]);
 
 	const toggleForceTranscoding = useCallback(() => {
-		handleSettingChange('forceTranscoding', !settings.forceTranscoding);
-	}, [handleSettingChange, settings.forceTranscoding]);
+		toggleBooleanSetting('forceTranscoding');
+	}, [toggleBooleanSetting]);
 
 	const toggleForceTranscodingWithSubtitles = useCallback(() => {
-		handleSettingChange('forceTranscodingWithSubtitles', !settings.forceTranscodingWithSubtitles);
-	}, [handleSettingChange, settings.forceTranscodingWithSubtitles]);
+		toggleBooleanSetting('forceTranscodingWithSubtitles');
+	}, [toggleBooleanSetting]);
+
+	const toggleRelaxedPlaybackProfile = useCallback(() => {
+		toggleBooleanSetting('relaxedPlaybackProfile');
+	}, [toggleBooleanSetting]);
 
 	const toggleShowBackdrops = useCallback(() => {
-		handleSettingChange('showBackdrops', !settings.showBackdrops);
-	}, [handleSettingChange, settings.showBackdrops]);
+		toggleBooleanSetting('showBackdrops');
+	}, [toggleBooleanSetting]);
+
+	const toggleShowSeasonImages = useCallback(() => {
+		toggleBooleanSetting('showSeasonImages');
+	}, [toggleBooleanSetting]);
+
+	const toggleSidewaysEpisodeList = useCallback(() => {
+		toggleBooleanSetting('useSidewaysEpisodeList');
+	}, [toggleBooleanSetting]);
+
+	const toggleDisableAnimations = useCallback(() => {
+		toggleBooleanSetting('disableAnimations');
+	}, [toggleBooleanSetting]);
+
+	const toggleDisableAllAnimations = useCallback(() => {
+		toggleBooleanSetting('disableAllAnimations');
+	}, [toggleBooleanSetting]);
+
+	const toggleShowMediaBar = useCallback(() => {
+		toggleBooleanSetting('showMediaBar');
+	}, [toggleBooleanSetting]);
+
+	const toggleShowPerformanceOverlay = useCallback(() => {
+		toggleBooleanSetting('showPerformanceOverlay');
+	}, [toggleBooleanSetting]);
+
+	const handleNavbarThemeSelect = useCallback((event) => {
+		const themeValue = event.currentTarget.dataset.theme;
+		if (!themeValue) return;
+		handleSettingChange('navbarTheme', themeValue);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const handleBitrateSelect = useCallback((event) => {
 		const bitrate = event.currentTarget.dataset.bitrate;
 		if (!bitrate) return;
 		handleSettingChange('maxBitrate', bitrate);
-		setBitratePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const handleAudioLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
 		handleSettingChange('preferredAudioLanguage', language);
-		setAudioLangPopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const handleSubtitleLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
 		handleSettingChange('preferredSubtitleLanguage', language);
-		setSubtitleLangPopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const setSegmentsOnlyPromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOnly');
-		setPlayNextPromptModePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const setSegmentsOrLast60PromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOrLast60');
-		setPlayNextPromptModePopupOpen(false);
-	}, [handleSettingChange]);
+		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
+	}, [closeDisclosure, handleSettingChange]);
 
 	const getBitrateLabel = (value) => {
 		const option = BITRATE_OPTIONS.find(o => o.value === value);
@@ -440,28 +582,44 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 		}
 	};
 
-	// Improve remote back handling so physical back/escape keys always leave settings
-	useEffect(() => {
-		if (!isActive) return undefined;
-		const handleKeyDown = (e) => {
-			const code = e.keyCode || e.which;
-			if (isBackKey(code)) {
-				e.preventDefault();
-				onNavigate('home');
+	const getNavbarThemeLabel = (value) => {
+		const option = NAVBAR_THEME_OPTIONS.find((theme) => theme.value === value);
+		return option ? option.label : 'Classic';
+	};
+
+	const handleInternalBack = useCallback(() => {
+		for (const disclosureKey of DISCLOSURE_BACK_PRIORITY) {
+			if (disclosures[disclosureKey] !== true) continue;
+			if (
+				disclosureKey === SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM &&
+				cacheWipeInProgress
+			) {
+				return true;
 			}
-		};
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [isActive, onNavigate]);
+			closeDisclosure(disclosureKey);
+			return true;
+		}
+		if (typeof toolbarBackHandlerRef.current === 'function') {
+			return toolbarBackHandlerRef.current() === true;
+		}
+		return false;
+	}, [
+		cacheWipeInProgress,
+		closeDisclosure,
+		disclosures
+	]);
+
+	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
 	return (
 		<Panel {...rest}>
 			<Header title="Settings" />
-			<Toolbar
-				activeSection="settings"
+			<SettingsToolbar
 				onNavigate={onNavigate}
+				onSwitchUser={onSwitchUser}
 				onLogout={onLogout}
 				onExit={onExit}
+				registerBackHandler={registerToolbarBackHandler}
 			/>
 			<Scroller className={css.settingsContainer}>
 				<div className={css.content}>
@@ -615,7 +773,7 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 					</section>
 
 					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Playback</BodyText>
+						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
 
 							<Item
 								className={css.settingItem}
@@ -705,12 +863,59 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Display</BodyText>
 
+							<Item
+								className={css.settingItem}
+								label="Navigation Theme"
+								slotAfter={getNavbarThemeLabel(settings.navbarTheme)}
+								onClick={openNavbarThemePopup}
+							/>
+
 							<SwitchItem
 								className={css.switchItem}
 								onToggle={toggleShowBackdrops}
 								selected={settings.showBackdrops}
 							>
 							Show Background Images
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowSeasonImages}
+								selected={settings.showSeasonImages === true}
+							>
+							Show Season Card Images (Elegant)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleSidewaysEpisodeList}
+								selected={settings.useSidewaysEpisodeList !== false}
+							>
+							Sideways Episode List (Elegant)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleDisableAnimations}
+								selected={settings.disableAnimations}
+							>
+							Disable Animations (Performance Mode)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleDisableAllAnimations}
+								selected={settings.disableAllAnimations}
+							>
+							Disable ALL Animations (Performance+ Mode)
+						</SwitchItem>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowMediaBar}
+								selected={settings.showMediaBar !== false}
+							>
+							Show Media Bar on Home
 						</SwitchItem>
 					</section>
 
@@ -720,24 +925,54 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 						<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
 					</section>
 
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
-						<Item
-							className={css.settingItem}
-							label="Logs"
-							slotAfter={`${getAppLogs().length} entries`}
-							onClick={openLogsPopup}
-						/>
-					</section>
+						<section className={css.section}>
+							<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleShowPerformanceOverlay}
+								selected={settings.showPerformanceOverlay === true}
+							>
+								Performance Overlay (FPS/Input)
+							</SwitchItem>
+							{STYLE_DEBUG_ENABLED ? (
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={toggleRelaxedPlaybackProfile}
+									selected={settings.relaxedPlaybackProfile === true}
+								>
+									Relaxed Playback Profile (Debug)
+								</SwitchItem>
+							) : null}
+							{STYLE_DEBUG_ENABLED ? (
+								<Item
+									className={css.settingItem}
+									label="Styling Debug Panel"
+									slotAfter="Open"
+									onClick={openStylingDebugPanel}
+								/>
+							) : null}
+							<Item
+								className={css.settingItem}
+								label="Logs"
+								slotAfter={`${appLogCount} entries`}
+								onClick={openLogsPopup}
+							/>
+							<Item
+								className={css.settingItem}
+								label="Wipe App Cache"
+								slotAfter={cacheWipeInProgress ? 'Wiping...' : 'Run'}
+								onClick={openWipeCacheConfirm}
+							/>
+						</section>
 				</div>
 			</Scroller>
 
 				<Popup
 					open={bitratePopupOpen}
 					onClose={closeBitratePopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Select Maximum Bitrate</BodyText>
 						{BITRATE_OPTIONS.map(option => (
 							<Button
@@ -756,9 +991,9 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				<Popup
 					open={audioLangPopupOpen}
 					onClose={closeAudioLangPopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Audio Language</BodyText>
 					<div className={css.popupOptions}>
 							{LANGUAGE_OPTIONS.map(option => (
@@ -779,9 +1014,9 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				<Popup
 					open={subtitleLangPopupOpen}
 					onClose={closeSubtitleLangPopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Subtitle Language</BodyText>
 					<div className={css.popupOptions}>
 							{LANGUAGE_OPTIONS.map(option => (
@@ -800,11 +1035,35 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 			</Popup>
 
 				<Popup
+					open={navbarThemePopupOpen}
+					onClose={closeNavbarThemePopup}
+					css={popupShellCss}
+				>
+				<div className={`${popupStyles.popupSurface} ${css.nativeThemePopupContent}`}>
+					<BodyText className={css.popupTitle}>Navigation Theme</BodyText>
+					<div className={css.nativeThemePopupOptions}>
+							{NAVBAR_THEME_OPTIONS.map((option) => (
+								<Button
+									key={option.value}
+									size="small"
+									data-theme={option.value}
+									selected={settings.navbarTheme === option.value}
+									onClick={handleNavbarThemeSelect}
+									className={css.popupOption}
+								>
+								{option.label}
+							</Button>
+						))}
+					</div>
+				</div>
+			</Popup>
+
+				<Popup
 					open={playNextPromptModePopupOpen}
 					onClose={closePlayNextPromptModePopup}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Play Next Prompt Mode</BodyText>
 						<Button
 							className={css.popupOption}
@@ -826,30 +1085,30 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 				<Popup
 					open={logoutConfirmOpen}
 					onClose={closeLogoutConfirm}
-					className={css.popup}
+					css={popupShellCss}
 				>
-				<div className={css.popupContent}>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Sign Out</BodyText>
 						<BodyText className={css.popupMessage}>
 							Are you sure you want to sign out from {serverInfo?.ServerName || 'this server'}?
 						</BodyText>
 						<div className={css.popupActions}>
-							<Button onClick={closeLogoutConfirm}>Cancel</Button>
-							<Button onClick={handleLogoutConfirm} className={css.dangerButton}>Sign Out</Button>
+							<Button onClick={closeLogoutConfirm} className={css.popupOption}>Cancel</Button>
+							<Button onClick={handleLogoutConfirm} className={`${css.popupOption} ${css.dangerButton}`}>Sign Out</Button>
 						</div>
 					</div>
 				</Popup>
 
-				<Popup
-					open={logsPopupOpen}
-					onClose={closeLogsPopup}
-					className={css.popup}
-				>
-				<div className={css.logPopupContent}>
+			<Popup
+				open={logsPopupOpen}
+				onClose={closeLogsPopup}
+				css={popupShellCss}
+			>
+				<div className={`${popupStyles.popupSurface} ${css.logPopupContent}`}>
 					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
 						<div className={css.logActions}>
-							<Button size="small" onClick={handleClearLogs}>Clear Logs</Button>
-							<Button size="small" onClick={closeLogsPopup}>Close</Button>
+							<Button size="small" onClick={handleClearLogs} className={css.popupOption}>Clear Logs</Button>
+							<Button size="small" onClick={closeLogsPopup} className={css.popupOption}>Close</Button>
 						</div>
 					<Scroller className={css.logScroller}>
 						{appLogs.length === 0 && (
@@ -862,6 +1121,39 @@ const SettingsPanel = ({ onNavigate, onLogout, onExit, isActive = false, ...rest
 							</div>
 						))}
 					</Scroller>
+				</div>
+			</Popup>
+
+			<Popup
+				open={wipeCacheConfirmOpen}
+				onClose={closeWipeCacheConfirm}
+				noAutoDismiss={cacheWipeInProgress}
+				css={popupShellCss}
+			>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Wipe App Cache</BodyText>
+					<BodyText className={css.popupMessage}>
+						This clears local storage, session storage, cache storage, and IndexedDB, then reloads the app.
+					</BodyText>
+					{cacheWipeError ? (
+						<BodyText className={css.popupMessage}>{cacheWipeError}</BodyText>
+					) : null}
+					<div className={css.popupActions}>
+						<Button
+							onClick={closeWipeCacheConfirm}
+							disabled={cacheWipeInProgress}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleWipeCacheConfirm}
+							className={css.dangerButton}
+							disabled={cacheWipeInProgress}
+							selected={cacheWipeInProgress}
+						>
+							{cacheWipeInProgress ? 'Wiping...' : 'Wipe & Reload'}
+						</Button>
+					</div>
 				</div>
 			</Popup>
 		</Panel>
