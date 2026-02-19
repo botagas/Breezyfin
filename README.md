@@ -2,7 +2,11 @@
 <img src="./images/Breezyfin_main.png">
 </p>
 
-# Breezyfin for webOS
+
+<h1>
+  <img src="./images/Breezyfin_logo_transparent.png" width="32px" alt="Logo of Breezyfin">
+  Breezyfin for webOS
+</h1>
 
 Breezyfin is a Jellyfin client for LG webOS TVs, built with Enact Sandstone.
 It focuses on TV-first navigation, themeable UI, and resilient playback handling for webOS constraints.
