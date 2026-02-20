@@ -1072,9 +1072,9 @@ class JellyfinService {
 		});
 	}
 
-	async search(searchTerm, itemTypes = null, limit = 25) {
+	async search(searchTerm, itemTypes = null, limit = 25, startIndex = 0) {
 		try {
-			let url = `${this.serverUrl}/Users/${this.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
+			let url = `${this.serverUrl}/Users/${this.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&startIndex=${Math.max(0, Number(startIndex) || 0)}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
 
 			if (itemTypes && itemTypes.length > 0) {
 				const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;

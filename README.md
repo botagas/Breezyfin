@@ -74,6 +74,9 @@ Before adding new panel logic, prefer shared building blocks first:
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
+- Scroll restoration + cached panel scroll state: `src/hooks/useScrollerScrollMemory.js`
+  - `useScrollerScrollMemory()` for `Scroller` restore/save wiring
+  - `useCachedScrollTopState()` for normalized cached scrollTop state
 - Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
 - Shared toolbar focus helper: `src/utils/toolbarFocus.js`
 - Shared home row order constant: `src/constants/homeRows.js`

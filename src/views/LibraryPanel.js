@@ -10,6 +10,7 @@ import {KeyCodes} from '../utils/keyCodes';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import { useMapById } from '../hooks/useMapById';
+import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
 import {
 	getPlaybackProgressPercent,
 	getPosterCardImageUrl,
@@ -23,17 +24,43 @@ const LIBRARY_PAGE_SIZE = 60;
 const FOCUS_PREFETCH_THRESHOLD = 12;
 const LibraryGridSpotlightContainer = createLastFocusedSpotlightContainer();
 
-const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
+const LibraryPanel = ({
+	library,
+	onItemSelect,
+	onNavigate,
+	onSwitchUser,
+	onLogout,
+	onExit,
+	registerBackHandler,
+	isActive = false,
+	cachedState = null,
+	onCacheState = null,
+	...rest
+}) => {
 	const [loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(false);
 	const [items, setItems] = useState([]);
+	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const libraryScrollToRef = useRef(null);
 	const gridRef = useRef(null);
 	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
 	const itemsById = useMapById(items);
+	const {
+		captureScrollTo: captureLibraryScrollRestore,
+		handleScrollStop: handleLibraryScrollMemoryStop
+	} = useScrollerScrollMemory({
+		isActive,
+		scrollTop,
+		onScrollTopChange: setScrollTop
+	});
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function' || !library?.Id) return;
+		onCacheState(library.Id, {scrollTop});
+	}, [library?.Id, onCacheState, scrollTop]);
 
 	const getItemTypesForLibrary = useCallback((libraryValue) => {
 		if (!libraryValue) return undefined;
@@ -136,7 +163,8 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 
 	const captureLibraryScrollTo = useCallback((fn) => {
 		libraryScrollToRef.current = fn;
-	}, []);
+		captureLibraryScrollRestore(fn);
+	}, [captureLibraryScrollRestore]);
 
 	const focusTopToolbarAction = useCallback(() => {
 		const preferredLibraryId = library?.Id ? `toolbar-library-${library.Id}` : null;
@@ -171,10 +199,11 @@ const LibraryPanel = ({ library, onItemSelect, onNavigate, onSwitchUser, onLogou
 	}, [hasMore, items.length, loadNextPage]);
 
 	const handleScrollerScrollStop = useCallback((event) => {
+		handleLibraryScrollMemoryStop(event);
 		if (event?.reachedEdgeInfo?.bottom) {
 			loadNextPage();
 		}
-	}, [loadNextPage]);
+	}, [handleLibraryScrollMemoryStop, loadNextPage]);
 	const topToolbar = (
 		<Toolbar
 			activeSection="library"

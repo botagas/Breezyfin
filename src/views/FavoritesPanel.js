@@ -9,6 +9,7 @@ import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import { useMapById } from '../hooks/useMapById';
+import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 
@@ -21,11 +22,36 @@ const FILTERS = [
 	{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
 ];
 
-const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
+const FavoritesPanel = ({
+	onItemSelect,
+	onNavigate,
+	onSwitchUser,
+	onLogout,
+	onExit,
+	registerBackHandler,
+	isActive = false,
+	cachedState = null,
+	onCacheState = null,
+	...rest
+}) => {
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
+	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const favoritesById = useMapById(favorites);
+	const {
+		captureScrollTo: captureFavoritesScrollRestore,
+		handleScrollStop: handleFavoritesScrollMemoryStop
+	} = useScrollerScrollMemory({
+		isActive,
+		scrollTop,
+		onScrollTopChange: setScrollTop
+	});
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function') return;
+		onCacheState({scrollTop});
+	}, [onCacheState, scrollTop]);
 
 	const loadFavorites = useCallback(async () => {
 		setLoading(true);
@@ -59,7 +85,8 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 		const filterId = event.currentTarget.dataset.filterId;
 		if (!filterId) return;
 		setActiveFilter(filterId);
-	}, []);
+		setScrollTop(0);
+	}, [setScrollTop]);
 
 	const handleFavoriteCardClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
@@ -88,7 +115,11 @@ const FavoritesPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onEx
 					registerBackHandler={registerBackHandler}
 				/>
 			<div className={css.favoritesContainer}>
-				<Scroller className={css.favoritesScroller}>
+				<Scroller
+					className={css.favoritesScroller}
+					cbScrollTo={captureFavoritesScrollRestore}
+					onScrollStop={handleFavoritesScrollMemoryStop}
+				>
 					<div className={css.favoritesContent}>
 						<div className={css.filters}>
 							{FILTERS.map(filter => (

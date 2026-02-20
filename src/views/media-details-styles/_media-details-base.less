@@ -13,6 +13,8 @@
 	--bf-media-details-base-rgb: 18, 18, 18;
 	--bf-media-details-control-radius: 0.9rem;
 	--bf-media-details-episode-radius: 1.75rem;
+	--bf-md-hero-top-padding: 0.5rem;
+	--bf-md-hero-top-padding-elegant: 26vh;
 	min-height: 100vh;
 	background-color: rgb(var(--bf-media-details-base-rgb));
 	background: linear-gradient(
@@ -21,6 +23,11 @@
 		rgb(var(--bf-media-details-base-rgb)) 120px
 	);
 	position: relative;
+}
+
+.episodeDetailsMode {
+	--bf-md-hero-top-padding: 0rem;
+	--bf-md-hero-top-padding-elegant: 18vh;
 }
 
 .mdControlSurface(@bg; @border; @radius: 999px) {
@@ -127,9 +134,30 @@
 }
 
 .content {
-	padding: 1rem 48px calc(120px + var(--bf-panel-content-bottom-padding, 4rem)) 48px;
+	--bf-md-content-top-padding: 1rem;
+	padding: var(--bf-md-content-top-padding) 48px calc(120px + var(--bf-panel-content-bottom-padding, 4rem)) 48px;
 	position: relative;
 	z-index: 2;
+}
+
+.firstSection {
+	min-height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
+	max-height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
+	height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.firstSection .detailsHeadingStack {
+	flex: 0 0 auto;
+}
+
+.firstSection .introSection {
+	flex: 1 1 auto;
+	min-height: 0 !important;
+	max-height: none !important;
+	height: auto !important;
 }
 
 .detailsHeadingStack {
@@ -212,30 +240,26 @@
 	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 1rem);
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-end;
 }
 
 .introContent {
 	flex: 0 0 auto;
 }
 
-.introSpacer {
-	flex: 1 1 auto;
-	min-height: clamp(4.8rem, 13vh, 10rem);
-	pointer-events: none;
-}
-
 .introHeaderRow {
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	gap: 1rem 1.4rem;
 }
 
 .introCredits {
-	flex: 0 1 min(36rem, 46%);
-	min-width: 16rem;
-	margin-top: clamp(0.8rem, 2.1vh, 1.3rem);
+	flex: 0 0 min(30rem, 34%);
+	max-width: min(30rem, 34%);
+	min-width: 14rem;
+	margin-top: 0;
 	padding: 0.2rem 0 0 0.5rem;
 	display: flex;
 	flex-direction: column;
@@ -245,6 +269,12 @@
 }
 
 .creditLine {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	row-gap: 0.08rem;
+	text-align: right;
+	width: 100%;
 	margin: 0;
 	font-size: 0.83em;
 	line-height: 1.35;
@@ -254,12 +284,25 @@
 }
 
 .creditLabel {
+	display: block;
+	min-width: 0;
+	text-align: right;
 	font-weight: 700;
 	color: rgba(243, 249, 255, 0.96);
 }
 
 .creditNames {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	text-align: right;
+	white-space: normal;
 	color: rgba(219, 230, 245, 0.88);
+}
+
+.creditNameItem {
+	display: block;
+	line-height: 1.25;
 }
 
 .contentSection {
@@ -275,20 +318,27 @@
 	align-items: flex-start;
 	justify-content: flex-start;
 	min-height: 1rem;
-	max-width: 80vw;
+	max-width: 70vw;
 }
 
 .headerLogo {
 	display: block;
 	max-width: 100%;
-	max-height: 8rem;
+	max-height: 10rem;
 	width: auto;
 	object-fit: contain;
 }
 
 .pageHeader {
-	padding: 2.1rem 0 1.5rem;
+	flex: 1 1 auto;
+	min-width: 0;
+	max-width: 60vw;
+	padding: var(--bf-md-hero-top-padding) 0 1.5rem;
 	margin-bottom: 24px;
+}
+
+.episodeDetailsMode .introSection {
+	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 2.8rem);
 }
 
 .pageHeaderTitle {

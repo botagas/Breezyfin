@@ -29,6 +29,7 @@
 }
 
 .contentElegant {
+	--bf-md-content-top-padding: 0.25rem;
 	padding-top: 0.25rem;
 }
 
@@ -37,8 +38,16 @@
 }
 
 .contentElegant .pageHeader {
-	padding-top: 26vh;
+	padding-top: var(--bf-md-hero-top-padding-elegant, 26vh);
 	margin-bottom: 1rem;
+}
+
+.episodeDetailsMode .contentElegant .pageHeader {
+	padding-top: var(--bf-md-hero-top-padding-elegant, 16vh);
+}
+
+.episodeDetailsMode .introSectionElegant {
+	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 1.8rem);
 }
 
 :global([data-bf-nav-theme='elegant']) {

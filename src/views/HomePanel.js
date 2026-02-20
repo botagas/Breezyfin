@@ -11,13 +11,25 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 
 import css from './HomePanel.module.less';
 
 const SERIES_UNPLAYED_CACHE_TTL_MS = 5 * 60 * 1000;
 
-const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, ...rest }) => {
+const HomePanel = ({
+	onItemSelect,
+	onNavigate,
+	onSwitchUser,
+	onLogout,
+	onExit,
+	registerBackHandler,
+	isActive = false,
+	cachedState = null,
+	onCacheState = null,
+	...rest
+}) => {
 	const [loading, setLoading] = useState(true);
 	const [heroItems, setHeroItems] = useState([]);
 	const [recentlyAdded, setRecentlyAdded] = useState([]);
@@ -36,9 +48,23 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 	});
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 	const [showMediaBar, setShowMediaBar] = useState(true);
+	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const homeScrollToRef = useRef(null);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
+	const {
+		captureScrollTo: captureHomeScrollRestore,
+		handleScrollStop: handleHomeScrollMemoryStop
+	} = useScrollerScrollMemory({
+		isActive,
+		scrollTop,
+		onScrollTopChange: setScrollTop
+	});
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function') return;
+		onCacheState({scrollTop});
+	}, [onCacheState, scrollTop]);
 
 	const hydrateEpisodeSeriesProgress = useCallback(async (episodeGroups = []) => {
 		const normalizedGroups = episodeGroups.map((group) => (Array.isArray(group) ? group : []));
@@ -207,7 +233,8 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 
 	const captureHomeScrollTo = useCallback((fn) => {
 		homeScrollToRef.current = fn;
-	}, []);
+		captureHomeScrollRestore(fn);
+	}, [captureHomeScrollRestore]);
 
 	const focusTopToolbarAction = useCallback(() => (
 		focusToolbarSpotlightTargets(['toolbar-home', 'toolbar-user'])
@@ -297,7 +324,11 @@ const HomePanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, r
 					</div>
 				</div>
 			)}
-			<Scroller className={css.scroller} cbScrollTo={captureHomeScrollTo}>
+			<Scroller
+				className={css.scroller}
+				cbScrollTo={captureHomeScrollTo}
+				onScrollStop={handleHomeScrollMemoryStop}
+			>
 				<div className={css.content}>
 					{hasHero && (
 						<HeroBanner

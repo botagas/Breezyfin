@@ -20,6 +20,7 @@ import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
 import { useItemMetadata } from '../hooks/useItemMetadata';
+import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
 
 import css from './MediaDetailsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -74,7 +75,17 @@ const INITIAL_MEDIA_DETAILS_DISCLOSURES = {
 	[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER]: false
 };
 
-const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = false, registerBackHandler, ...rest }) => {
+const MediaDetailsPanel = ({
+	item,
+	onBack,
+	onPlay,
+	onItemSelect,
+	isActive = false,
+	cachedState = null,
+	onCacheState = null,
+	registerBackHandler,
+	...rest
+}) => {
 	const [loading, setLoading] = useState(true);
 	const [playbackInfo, setPlaybackInfo] = useState(null);
 	const [selectedAudioTrack, setSelectedAudioTrack] = useState(null);
@@ -102,6 +113,7 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const [overviewExpanded, setOverviewExpanded] = useState(false);
 	const [hasOverviewOverflow, setHasOverviewOverflow] = useState(false);
 	const [backdropUnavailable, setBackdropUnavailable] = useState(false);
+	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const detailMetadata = useItemMetadata(item?.Id, {
 		enabled: Boolean(item?.Id),
 		errorContext: 'item metadata'
@@ -114,6 +126,19 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 		enabled: item?.Type === 'Series' && Boolean(selectedEpisode?.Id),
 		errorContext: 'selected episode metadata'
 	});
+	const {
+		captureScrollTo: captureDetailsScrollRestore,
+		handleScrollStop: handleDetailsScrollMemoryStop
+	} = useScrollerScrollMemory({
+		isActive,
+		scrollTop,
+		onScrollTopChange: setScrollTop
+	});
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function' || !item?.Id) return;
+		onCacheState(item.Id, {scrollTop});
+	}, [item?.Id, onCacheState, scrollTop]);
 	const castRowRef = useRef(null);
 	const castScrollerRef = useRef(null);
 	const seasonScrollerRef = useRef(null);
@@ -700,12 +725,19 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 	const toUniqueNames = useCallback((peopleList) => (
 		[...new Set(peopleList.map((person) => person?.Name).filter(Boolean))]
 	), []);
+	const renderCreditNames = useCallback((names, typeKey) => (
+		names.map((name, index) => (
+			<span key={`${typeKey}-${name}-${index}`} className={css.creditNameItem}>
+				{name}
+			</span>
+		))
+	), []);
 	const cast = people.filter(p => p.Type === 'Actor');
 	const directors = people.filter((person) => hasRole(person, 'director'));
 	const writers = people.filter((person) => hasRole(person, 'writer'));
-	const directorNames = toUniqueNames(directors).join(', ');
-	const writerNames = toUniqueNames(writers).join(', ');
-	const hasCreatorCredits = Boolean(directorNames || writerNames);
+	const directorNames = toUniqueNames(directors);
+	const writerNames = toUniqueNames(writers);
+	const hasCreatorCredits = directorNames.length > 0 || writerNames.length > 0;
 	const focusSeasonWatchedButton = (seasonCard) => {
 		const watchedTarget = seasonCard?.querySelector(
 			`.${css.seasonWatchedButton}, .${css.seasonWatchedButton} .spottable, .${css.seasonWatchedButton} [tabindex], .${css.seasonWatchedButton} button`
@@ -1317,7 +1349,12 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 
 	const captureDetailsScrollTo = useCallback((fn) => {
 		detailsScrollToRef.current = fn;
-	}, []);
+		captureDetailsScrollRestore(fn);
+	}, [captureDetailsScrollRestore]);
+
+	const handleDetailsScrollerScrollStop = useCallback((event) => {
+		handleDetailsScrollMemoryStop(event);
+	}, [handleDetailsScrollMemoryStop]);
 
 	const handleOpenEpisodeSeries = useCallback(() => {
 		openSeriesFromEpisode(item?.SeasonId || null);
@@ -1804,13 +1841,14 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 				<Scroller
 					className={`${css.scroller} ${isElegantTheme ? css.scrollerElegant : ''}`}
 					cbScrollTo={captureDetailsScrollTo}
+					onScrollStop={handleDetailsScrollerScrollStop}
 				>
-				<div
-					className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''}`}
-					ref={detailsContainerRef}
-					tabIndex={-1}
-					onMouseDownCapture={handleDetailsPointerDownCapture}
-					onClickCapture={handleDetailsPointerClickCapture}
+					<div
+						className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''} ${item.Type === 'Episode' ? css.episodeDetailsMode : ''}`}
+						ref={detailsContainerRef}
+						tabIndex={-1}
+						onMouseDownCapture={handleDetailsPointerDownCapture}
+						onClickCapture={handleDetailsPointerClickCapture}
 				>
 					{!loading && (
 						<div className={`${css.backdrop} ${hasBackdropImage ? '' : css.backdropFallback} ${isElegantTheme ? css.backdropElegant : ''}`}>
@@ -1830,54 +1868,55 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 						</div>
 					) : (
 						<>
-							<div className={`${css.content} ${isElegantTheme ? css.contentElegant : ''}`}>
-								<div className={css.detailsHeadingStack}>
-									<div className={css.detailsTopBar}>
-										<Button
-											size="small"
-											icon="arrowsmallleft"
-											onClick={handleBack}
-											className={css.detailsBackButton}
-											aria-label="Back"
-										/>
-										<BodyText className={css.detailsTopTitle}>{pageTitle}</BodyText>
-									</div>
-									{item.Type === 'Episode' && (
-										<div className={css.episodeBreadcrumb}>
-											<div className={css.episodeNavActions}>
+								<div className={`${css.content} ${isElegantTheme ? css.contentElegant : ''}`}>
+									<div className={css.firstSection}>
+										<div className={css.detailsHeadingStack}>
+											<div className={css.detailsTopBar}>
 												<Button
 													size="small"
-													className={`${css.episodeNavButton} ${css.episodeSeriesButton}`}
-													onClick={handleOpenEpisodeSeries}
-												>
-													{item.SeriesName}
-												</Button>
-												<span className={css.breadcrumbDivider} aria-hidden="true">/</span>
-												{item.ParentIndexNumber !== undefined && item.ParentIndexNumber !== null && (
-													<>
+													icon="arrowsmallleft"
+													onClick={handleBack}
+													className={css.detailsBackButton}
+													aria-label="Back"
+												/>
+												<BodyText className={css.detailsTopTitle}>{pageTitle}</BodyText>
+											</div>
+											{item.Type === 'Episode' && (
+												<div className={css.episodeBreadcrumb}>
+													<div className={css.episodeNavActions}>
 														<Button
 															size="small"
-															className={css.episodeNavButton}
+															className={`${css.episodeNavButton} ${css.episodeSeriesButton}`}
 															onClick={handleOpenEpisodeSeries}
 														>
-															Season {item.ParentIndexNumber}
+															{item.SeriesName}
 														</Button>
 														<span className={css.breadcrumbDivider} aria-hidden="true">/</span>
-													</>
-												)}
-												<Button
-													size="small"
-													className={`${css.episodeNavButton} ${css.episodeCurrentButton}`}
-													onClick={openEpisodePicker}
-												>
-													Episode {item.IndexNumber}
-												</Button>
-											</div>
+														{item.ParentIndexNumber !== undefined && item.ParentIndexNumber !== null && (
+															<>
+																<Button
+																	size="small"
+																	className={css.episodeNavButton}
+																	onClick={handleOpenEpisodeSeries}
+																>
+																	Season {item.ParentIndexNumber}
+																</Button>
+																<span className={css.breadcrumbDivider} aria-hidden="true">/</span>
+															</>
+														)}
+														<Button
+															size="small"
+															className={`${css.episodeNavButton} ${css.episodeCurrentButton}`}
+															onClick={openEpisodePicker}
+														>
+															Episode {item.IndexNumber}
+														</Button>
+													</div>
+												</div>
+											)}
 										</div>
-									)}
-								</div>
-								<div className={`${css.introSection} ${isElegantTheme ? css.introSectionElegant : ''}`}>
-									<div className={css.introContent}>
+										<div className={`${css.introSection} ${isElegantTheme ? css.introSectionElegant : ''}`}>
+										<div className={css.introContent}>
 										<div className={css.introHeaderRow}>
 											<div className={css.pageHeader}>
 												{useHeaderLogo ? (
@@ -1897,16 +1936,20 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 											</div>
 											{hasCreatorCredits && (
 												<div className={css.introCredits}>
-													{directorNames && (
+													{directorNames.length > 0 && (
 														<BodyText className={css.creditLine}>
-															<span className={css.creditLabel}>Directed by</span>{' '}
-															<span className={css.creditNames}>{directorNames}</span>
+															<span className={css.creditLabel}>Directed by</span>
+															<span className={css.creditNames}>
+																{renderCreditNames(directorNames, 'director')}
+															</span>
 														</BodyText>
 													)}
-													{writerNames && (
+													{writerNames.length > 0 && (
 														<BodyText className={css.creditLine}>
-															<span className={css.creditLabel}>Written by</span>{' '}
-															<span className={css.creditNames}>{writerNames}</span>
+															<span className={css.creditLabel}>Written by</span>
+															<span className={css.creditNames}>
+																{renderCreditNames(writerNames, 'writer')}
+															</span>
 														</BodyText>
 													)}
 												</div>
@@ -2019,11 +2062,11 @@ const MediaDetailsPanel = ({ item, onBack, onPlay, onItemSelect, isActive = fals
 												</div>
 											</div>
 										</div>
+										</div>
 									</div>
-									<div className={css.introSpacer} aria-hidden="true" />
-								</div>
+									</div>
 
-									<div className={css.contentSection}>
+										<div className={css.contentSection}>
 
 								{cast.length > 0 && (
 									<div className={css.castSection}>
