@@ -9,11 +9,19 @@ import Scroller from '../components/AppScroller';
 import Spotlight from '@enact/spotlight';
 import Hls from 'hls.js';
 import jellyfinService from '../services/jellyfinService';
-import {KeyCodes} from '../utils/keyCodes';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../utils/errorMessages';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
+import {
+	formatPlaybackTime,
+	getPlayerTrackLabel,
+	getPlayerErrorBackdropUrl,
+	getSkipSegmentLabel
+} from '../utils/playerPanelHelpers';
+import {getNextEpisodeForItem, getPreviousEpisodeForItem} from '../utils/episodeNavigation';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
+import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts';
 import { useTrackPreferences } from '../hooks/useTrackPreferences';
 import { useToastMessage } from '../hooks/useToastMessage';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
@@ -46,6 +54,10 @@ const INITIAL_PLAYER_DISCLOSURES = {
 	[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS]: false,
 	[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS]: false
 };
+const PLAYER_DISCLOSURE_KEY_LIST = [
+	PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS,
+	PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS
+];
 
 const PlayerPanel = ({
 	item,
@@ -123,8 +135,17 @@ const PlayerPanel = ({
 		openDisclosure,
 		closeDisclosure
 	} = useDisclosureMap(INITIAL_PLAYER_DISCLOSURES);
+	const disclosureHandlers = useDisclosureHandlers(
+		PLAYER_DISCLOSURE_KEY_LIST,
+		openDisclosure,
+		closeDisclosure
+	);
 	const showAudioPopup = disclosures[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS] === true;
 	const showSubtitlePopup = disclosures[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS] === true;
+	const openAudioPopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS].open;
+	const closeAudioPopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS].close;
+	const openSubtitlePopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS].open;
+	const closeSubtitlePopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS].close;
 	const [mediaSourceData, setMediaSourceData] = useState(null);
 	const [hasNextEpisode, setHasNextEpisode] = useState(false);
 	const [hasPreviousEpisode, setHasPreviousEpisode] = useState(false);
@@ -181,54 +202,11 @@ const PlayerPanel = ({
 	}), []);
 
 	const getNextEpisode = useCallback(async (currentItem) => {
-		if (!currentItem || currentItem.Type !== 'Episode' || !currentItem.SeriesId) return null;
-
-		const seasonId = currentItem.SeasonId || currentItem.ParentId;
-		if (!seasonId) return null;
-
-		const seasonEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, seasonId);
-		const currentIndex = seasonEpisodes.findIndex(ep => ep.Id === currentItem.Id);
-		if (currentIndex >= 0 && currentIndex < seasonEpisodes.length - 1) {
-			return seasonEpisodes[currentIndex + 1];
-		}
-
-		const seasons = await jellyfinService.getSeasons(currentItem.SeriesId);
-		if (!seasons || seasons.length === 0) return null;
-
-		seasons.sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
-		const currentSeasonIndex = seasons.findIndex(s => s.Id === seasonId);
-		if (currentSeasonIndex >= 0 && currentSeasonIndex < seasons.length - 1) {
-			const nextSeason = seasons[currentSeasonIndex + 1];
-			const nextEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, nextSeason.Id);
-			return nextEpisodes?.[0] || null;
-		}
-
-		return null;
+		return getNextEpisodeForItem(jellyfinService, currentItem);
 	}, []);
 
 	const getPreviousEpisode = useCallback(async (currentItem) => {
-		if (!currentItem || currentItem.Type !== 'Episode' || !currentItem.SeriesId) return null;
-
-		const seasonId = currentItem.SeasonId || currentItem.ParentId;
-		if (!seasonId) return null;
-
-		const seasonEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, seasonId);
-		const currentIndex = seasonEpisodes.findIndex(ep => ep.Id === currentItem.Id);
-		if (currentIndex > 0) {
-			return seasonEpisodes[currentIndex - 1];
-		}
-
-		const seasons = await jellyfinService.getSeasons(currentItem.SeriesId);
-		if (!seasons || seasons.length === 0) return null;
-		seasons.sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
-		const currentSeasonIndex = seasons.findIndex(s => s.Id === seasonId);
-		if (currentSeasonIndex > 0) {
-			const previousSeason = seasons[currentSeasonIndex - 1];
-			const previousEpisodes = await jellyfinService.getEpisodes(currentItem.SeriesId, previousSeason.Id);
-			return previousEpisodes?.[previousEpisodes.length - 1] || null;
-		}
-
-		return null;
+		return getPreviousEpisodeForItem(jellyfinService, currentItem);
 	}, []);
 
 	useEffect(() => {
@@ -1323,7 +1301,7 @@ const PlayerPanel = ({
 
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);
-		closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
+		closeAudioPopup();
 		saveAudioSelection(trackIndex, audioTracks);
 
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
@@ -1337,11 +1315,11 @@ const PlayerPanel = ({
 			}
 		}
 		reloadWithTrackSelection(trackIndex, currentSubtitleTrack);
-	}, [audioTracks, closeDisclosure, currentSubtitleTrack, reloadWithTrackSelection, saveAudioSelection]);
+	}, [audioTracks, closeAudioPopup, currentSubtitleTrack, reloadWithTrackSelection, saveAudioSelection]);
 
 	const handleSubtitleTrackChange = useCallback(async (trackIndex) => {
 		setCurrentSubtitleTrack(trackIndex);
-		closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
+		closeSubtitlePopup();
 		saveSubtitleSelection(trackIndex, subtitleTracks);
 
 		// For HLS streams, subtitle switching via source reload doesn't work well
@@ -1362,16 +1340,7 @@ const PlayerPanel = ({
 		}
 
 		reloadWithTrackSelection(currentAudioTrack, trackIndex);
-	}, [closeDisclosure, currentAudioTrack, reloadWithTrackSelection, saveSubtitleSelection, setToastMessage, subtitleTracks]);
-
-	const getTrackLabel = (track) => {
-		const parts = [];
-		if (track.Title) parts.push(track.Title);
-		if (track.Language) parts.push(track.Language.toUpperCase());
-		if (track.Codec) parts.push(track.Codec.toUpperCase());
-		if (track.Channels) parts.push(`${track.Channels}ch`);
-		return parts.join(' - ') || `Track ${track.Index}`;
-	};
+	}, [closeSubtitlePopup, currentAudioTrack, reloadWithTrackSelection, saveSubtitleSelection, setToastMessage, subtitleTracks]);
 
 	const handlePlayNextEpisode = useCallback(async () => {
 		if (!item || item.Type !== 'Episode' || !onPlay || !hasNextEpisode) return;
@@ -1425,6 +1394,10 @@ const PlayerPanel = ({
 		if (target.closest && target.closest('[data-seekable="true"]')) return true;
 		return false;
 	}, []);
+	const isProgressSliderTarget = useCallback((target) => {
+		if (!target) return false;
+		return Boolean(target.closest?.('[data-player-progress-slider="true"]'));
+	}, []);
 
 	const seekBySeconds = useCallback((deltaSeconds) => {
 		const video = videoRef.current;
@@ -1443,48 +1416,7 @@ const PlayerPanel = ({
 			seekFeedbackTimerRef.current = null;
 		}, 900);
 	}, [checkSkipSegments, duration]);
-
-	const formatTime = (seconds) => {
-		if (!isFinite(seconds) || seconds < 0) return '0:00';
-		const h = Math.floor(seconds / 3600);
-		const m = Math.floor((seconds % 3600) / 60);
-		const s = Math.floor(seconds % 60);
-
-		if (h > 0) {
-			return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-		}
-		return `${m}:${s.toString().padStart(2, '0')}`;
-	};
-
-	const getSkipButtonLabel = (segmentType) => {
-		switch (segmentType) {
-			case 'Intro':
-				return 'Skip Intro';
-			case 'Recap':
-				return 'Skip Recap';
-			case 'Preview':
-				return 'Skip Preview';
-			case 'Outro':
-			case 'Credits':
-				return nextEpisodeData ? 'Next Episode' : 'Skip Credits';
-			default:
-				return 'Skip';
-		}
-	};
-
-	const errorBackdropUrl = (() => {
-		if (!item) return '';
-		if (item?.BackdropImageTags?.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 1920);
-		}
-		if (item?.SeriesId) {
-			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 1920);
-		}
-		if (item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 1920);
-		}
-		return '';
-	})();
+	const errorBackdropUrl = getPlayerErrorBackdropUrl(item, jellyfinService);
 	const hasErrorBackdrop = Boolean(errorBackdropUrl);
 
 	const handleSkipSegment = useCallback(() => {
@@ -1524,34 +1456,6 @@ const PlayerPanel = ({
 		setError(null);
 	}, []);
 
-	const openAudioPopup = useCallback(() => {
-		openDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
-	}, [openDisclosure]);
-
-	const closeAudioPopup = useCallback(() => {
-		closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
-	}, [closeDisclosure]);
-
-	const openSubtitlePopup = useCallback(() => {
-		openDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
-	}, [openDisclosure]);
-
-	const closeSubtitlePopup = useCallback(() => {
-		closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
-	}, [closeDisclosure]);
-
-	const handleProgressSliderKeyDown = useCallback((e) => {
-		const SEEK_STEP = 15;
-		if (e.keyCode === KeyCodes.LEFT) {
-			e.preventDefault();
-			seekBySeconds(-SEEK_STEP);
-		} else if (e.keyCode === KeyCodes.RIGHT) {
-			e.preventDefault();
-			seekBySeconds(SEEK_STEP);
-		}
-		lastInteractionRef.current = Date.now();
-	}, [seekBySeconds]);
-
 	const handleAudioTrackItemClick = useCallback((event) => {
 		const trackIndex = Number(event.currentTarget.dataset.trackIndex);
 		if (!Number.isFinite(trackIndex)) return;
@@ -1585,11 +1489,11 @@ const PlayerPanel = ({
 
 	const handleInternalBack = useCallback(() => {
 		if (showAudioPopup) {
-			closeDisclosure(PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS);
+			closeAudioPopup();
 			return true;
 		}
 		if (showSubtitlePopup) {
-			closeDisclosure(PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS);
+			closeSubtitlePopup();
 			return true;
 		}
 		if (skipOverlayVisible) {
@@ -1601,7 +1505,7 @@ const PlayerPanel = ({
 			return true;
 		}
 		return false;
-	}, [closeDisclosure, handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
+	}, [closeAudioPopup, closeSubtitlePopup, handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
 
 	useEffect(() => {
 		if (item) {
@@ -1692,93 +1596,28 @@ const PlayerPanel = ({
 		};
 	}, [focusSkipOverlayAction, playing, showControls, skipOverlayVisible]);
 
-	useEffect(() => {
-		if (!isActive) return undefined;
-
-		const handleKeyDown = (e) => {
+	usePlayerKeyboardShortcuts({
+		isActive,
+		onUserInteraction: () => {
 			lastInteractionRef.current = Date.now();
-			const code = e.keyCode || e.which;
-			const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
-			const SEEK_STEP = 15; // seconds
-			const PLAY_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE, 179]; // enter/OK, space, media play/pause
-			const PLAY_ONLY_KEYS = [KeyCodes.PLAY];
-			const PAUSE_KEYS = [KeyCodes.PAUSE];
-
-			if ([KeyCodes.UP, KeyCodes.DOWN].includes(code) && !showControls) {
-				e.preventDefault();
-				setShowControls(true);
-			}
-
-			switch (code) {
-				case KeyCodes.LEFT:
-					if (showControls || skipOverlayVisible || showAudioPopup || showSubtitlePopup || !isSeekContext(e.target)) break;
-					e.preventDefault();
-					seekBySeconds(-SEEK_STEP);
-					break;
-				case KeyCodes.RIGHT:
-					if (showControls || skipOverlayVisible || showAudioPopup || showSubtitlePopup || !isSeekContext(e.target)) break;
-					e.preventDefault();
-					seekBySeconds(SEEK_STEP);
-					break;
-				case KeyCodes.UP:
-					e.preventDefault();
-					if (skipOverlayVisible) {
-						setShowControls(true);
-						focusSkipOverlayAction();
-						return;
-					}
-					setShowControls(true);
-					break;
-				case KeyCodes.DOWN:
-					e.preventDefault();
-					setShowControls(true);
-					break;
-				default:
-					break;
-			}
-
-			if (BACK_KEYS.includes(code)) {
-				e.preventDefault();
-				e.stopPropagation();
-				e.stopImmediatePropagation?.();
-				if (handleInternalBack()) return;
-				handleBackButton();
-				return;
-			}
-
-			if (PLAY_KEYS.includes(code)) {
-				// Avoid double-trigger when an actual button is focused
-				const activeEl = document.activeElement;
-				const isControlFocused = controlsRef.current && activeEl && controlsRef.current.contains(activeEl);
-				const isSkipFocused = skipOverlayRef.current && activeEl && skipOverlayRef.current.contains(activeEl);
-				if (isControlFocused || isSkipFocused) {
-					return;
-				}
-				e.preventDefault();
-				const keepHidden = !showControls;
-				if (playing) {
-					handlePause({keepHidden});
-				} else {
-					handlePlay({keepHidden});
-				}
-				return;
-			}
-
-			if (PLAY_ONLY_KEYS.includes(code)) {
-				e.preventDefault();
-				handlePlay({keepHidden: !showControls});
-				return;
-			}
-
-			if (PAUSE_KEYS.includes(code)) {
-				e.preventDefault();
-				handlePause({keepHidden: !showControls});
-			}
-		};
-
-		document.addEventListener('keydown', handleKeyDown, true);
-		return () => document.removeEventListener('keydown', handleKeyDown, true);
-	}, [focusSkipOverlayAction, handleBackButton, handleInternalBack, handlePause, handlePlay, isActive, isSeekContext, playing, seekBySeconds, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
+		},
+		showControls,
+		setShowControls,
+		skipOverlayVisible,
+		showAudioPopup,
+		showSubtitlePopup,
+		isSeekContext,
+		seekBySeconds,
+		handleInternalBack,
+		handleBackButton,
+		handlePause,
+		handlePlay,
+		playing,
+		controlsRef,
+		skipOverlayRef,
+		focusSkipOverlayAction,
+		isProgressSliderTarget
+	});
 
 	return (
 		<Panel {...rest} noCloseButton>
@@ -1840,11 +1679,11 @@ const PlayerPanel = ({
 						css={{popup: popupStyles.popupShell, body: css.errorPopupBody}}
 				>
 					<div
-						className={`${popupStyles.popupSurface} ${css.errorPopupContent}`}
+						className={`${popupStyles.popupSurface} ${css.errorPopupContent} bf-error-surface`}
 					>
-						<BodyText className={css.popupTitle}>Playback Error</BodyText>
-						<BodyText className={css.errorMessage}>{error}</BodyText>
-						<div className={css.errorActions}>
+						<BodyText className={`${css.popupTitle} bf-error-title`}>Playback Error</BodyText>
+						<BodyText className={`${css.errorMessage} bf-error-message`}>{error}</BodyText>
+						<div className={`${css.errorActions} bf-error-actions`}>
 							<Button onClick={handleRetryPlayback} autoFocus className={css.errorActionButton}>
 								Retry
 							</Button>
@@ -1866,7 +1705,7 @@ const PlayerPanel = ({
 								spotlightId="skip-overlay-action"
 								autoFocus
 							>
-								{showNextEpisodePrompt ? 'Play Next' : getSkipButtonLabel(currentSkipSegment.Type)}
+								{showNextEpisodePrompt ? 'Play Next' : getSkipSegmentLabel(currentSkipSegment.Type, Boolean(nextEpisodeData))}
 							</Button>
 							{skipCountdown !== null && (
 								<BodyText className={css.skipCountdownCompact}>{skipCountdown}s</BodyText>
@@ -1900,7 +1739,7 @@ const PlayerPanel = ({
 						<div className={css.bottomBar}>
 							<div className={css.progressContainer} data-seekable="true">
 								<BodyText className={css.time}>
-									{formatTime(currentTime)}
+									{formatPlaybackTime(currentTime)}
 								</BodyText>
 									<Slider
 										className={css.progressSlider}
@@ -1910,10 +1749,10 @@ const PlayerPanel = ({
 										value={Math.floor(currentTime)}
 										onChange={handleSeek}
 										data-seekable="true"
-										onKeyDown={handleProgressSliderKeyDown}
+										data-player-progress-slider="true"
 									/>
 								<BodyText className={css.time}>
-									-{formatTime(Math.max(0, duration - currentTime))}
+									-{formatPlaybackTime(Math.max(0, duration - currentTime))}
 								</BodyText>
 							</div>
 
@@ -1924,13 +1763,26 @@ const PlayerPanel = ({
 										size="large"
 										icon="jumpbackward"
 										disabled={!hasPreviousEpisode}
+										className={css.playerControlButton}
 									/>
 								)}
 
 								{playing ? (
-									<Button onClick={handlePause} size="large" icon="pause" componentRef={playPauseButtonRef} />
+									<Button
+										onClick={handlePause}
+										size="large"
+										icon="pause"
+										componentRef={playPauseButtonRef}
+										className={css.playerControlButton}
+									/>
 								) : (
-									<Button onClick={handlePlay} size="large" icon="play" componentRef={playPauseButtonRef} />
+									<Button
+										onClick={handlePlay}
+										size="large"
+										icon="play"
+										componentRef={playPauseButtonRef}
+										className={css.playerControlButton}
+									/>
 								)}
 
 								{item?.Type === 'Episode' && (
@@ -1939,6 +1791,7 @@ const PlayerPanel = ({
 										size="large"
 										icon="jumpforward"
 										disabled={!hasNextEpisode}
+										className={css.playerControlButton}
 									/>
 								)}
 
@@ -1948,6 +1801,7 @@ const PlayerPanel = ({
 												size="small"
 												icon="speaker"
 												onClick={openAudioPopup}
+												className={css.playerControlButton}
 											/>
 										)}
 										{subtitleTracks.length > 0 && (
@@ -1955,6 +1809,7 @@ const PlayerPanel = ({
 												size="small"
 												icon="subtitle"
 												onClick={openSubtitlePopup}
+												className={css.playerControlButton}
 											/>
 										)}
 								</div>
@@ -1964,6 +1819,7 @@ const PlayerPanel = ({
 										size="small"
 										icon={muted || volume === 0 ? 'soundmute' : 'sound'}
 										onClick={toggleMute}
+										className={css.playerControlButton}
 									/>
 									<Slider
 										className={css.volumeSlider}
@@ -1995,7 +1851,7 @@ const PlayerPanel = ({
 										selected={currentAudioTrack === track.Index}
 										onClick={handleAudioTrackItemClick}
 									>
-									{getTrackLabel(track)}
+									{getPlayerTrackLabel(track)}
 								</Item>
 							))}
 						</Scroller>
@@ -2027,7 +1883,7 @@ const PlayerPanel = ({
 										selected={currentSubtitleTrack === track.Index}
 										onClick={handleSubtitleTrackItemClick}
 									>
-									{getTrackLabel(track)}
+									{getPlayerTrackLabel(track)}
 								</Item>
 							))}
 						</Scroller>

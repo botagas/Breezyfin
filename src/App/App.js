@@ -15,6 +15,7 @@ import PerformanceOverlay from '../components/PerformanceOverlay';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import { useInputMode } from '../hooks/useInputMode';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
@@ -94,9 +95,7 @@ const App = (props) => {
 	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(initialVisualSettingsRef.current.allAnimationsDisabled);
 	const [navbarTheme, setNavbarTheme] = useState(initialVisualSettingsRef.current.navbarTheme);
 	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
-	const [inputMode, setInputMode] = useState(() => (
-		Spotlight?.getPointerMode?.() ? 'pointer' : '5way'
-	));
+	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
 	const playerBackHandlerRef = useRef(null);
@@ -285,47 +284,6 @@ const App = (props) => {
 			setCurrentView('settings');
 		}
 	}, [currentView]);
-
-	useEffect(() => {
-		const setMode = (nextMode) => {
-			setInputMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
-		};
-		const handlePointerInput = () => setMode('pointer');
-		const handleFiveWayInput = (event) => {
-			const code = event.keyCode || event.which;
-			const key = event.key;
-			const isFiveWayKey =
-				code === 37 ||
-				code === 38 ||
-				code === 39 ||
-				code === 40 ||
-				code === 13 ||
-				code === 8 ||
-				code === 27 ||
-				code === 461 ||
-				key === 'ArrowLeft' ||
-				key === 'ArrowRight' ||
-				key === 'ArrowUp' ||
-				key === 'ArrowDown' ||
-				key === 'Enter' ||
-				key === 'Backspace' ||
-				key === 'Escape';
-			if (isFiveWayKey) {
-				setMode('5way');
-			}
-		};
-
-		document.addEventListener('mousemove', handlePointerInput, true);
-		document.addEventListener('mousedown', handlePointerInput, true);
-		document.addEventListener('touchstart', handlePointerInput, true);
-		document.addEventListener('keydown', handleFiveWayInput, true);
-		return () => {
-			document.removeEventListener('mousemove', handlePointerInput, true);
-			document.removeEventListener('mousedown', handlePointerInput, true);
-			document.removeEventListener('touchstart', handlePointerInput, true);
-			document.removeEventListener('keydown', handleFiveWayInput, true);
-		};
-	}, []);
 
 	useEffect(() => {
 		if (typeof document === 'undefined') return undefined;

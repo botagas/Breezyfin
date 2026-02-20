@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '../components/AppScroller';
@@ -9,8 +9,8 @@ import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import { useMapById } from '../hooks/useMapById';
+import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToolbarActions } from '../hooks/useToolbarActions';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 
@@ -38,12 +38,14 @@ const FavoritesPanel = ({
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
-	const toolbarActions = useToolbarActions({
+	const loadRequestIdRef = useRef(0);
+	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
 		onLogout,
 		onExit,
-		registerBackHandler
+		registerBackHandler,
+		isActive
 	});
 	const favoritesById = useMapById(favorites);
 	const {
@@ -57,21 +59,30 @@ const FavoritesPanel = ({
 	});
 
 	const loadFavorites = useCallback(async () => {
+		const requestId = loadRequestIdRef.current + 1;
+		loadRequestIdRef.current = requestId;
 		setLoading(true);
 		try {
 			const filterTypes = FILTERS.find(f => f.id === activeFilter)?.types;
 			const items = await jellyfinService.getFavorites(filterTypes, 100);
+			if (requestId !== loadRequestIdRef.current) return;
 			setFavorites(items);
 		} catch (error) {
+			if (requestId !== loadRequestIdRef.current) return;
 			console.error('Failed to load favorites:', error);
 			setFavorites([]);
 		} finally {
-			setLoading(false);
+			if (requestId === loadRequestIdRef.current) {
+				setLoading(false);
+			}
 		}
 	}, [activeFilter]);
 
 	useEffect(() => {
 		loadFavorites();
+		return () => {
+			loadRequestIdRef.current += 1;
+		};
 	}, [loadFavorites]);
 
 	const handleRemoveFavorite = async (e, item) => {

@@ -10,8 +10,8 @@ import {KeyCodes} from '../utils/keyCodes';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import { useMapById } from '../hooks/useMapById';
+import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToolbarActions } from '../hooks/useToolbarActions';
 import {
 	getPlaybackProgressPercent,
 	getPosterCardImageUrl,
@@ -47,12 +47,13 @@ const LibraryPanel = ({
 	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
-	const toolbarActions = useToolbarActions({
+	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
 		onLogout,
 		onExit,
-		registerBackHandler
+		registerBackHandler,
+		isActive
 	});
 	const itemsById = useMapById(items);
 	const {

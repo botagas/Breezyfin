@@ -4,6 +4,7 @@ import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
+import {KeyCodes} from '../utils/keyCodes';
 
 import css from './MediaRow.module.less';
 
@@ -17,14 +18,15 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	}, [item, onClick]);
 
 	const handleCardKeyDown = useCallback((e) => {
+		const code = e.keyCode || e.which;
 		if (typeof onCardKeyDown === 'function') {
 			onCardKeyDown(e, item);
 		}
 		if (e.defaultPrevented) return;
-		if (e.keyCode === 37 && e.target.previousElementSibling) { // left
+		if (code === KeyCodes.LEFT && e.target.previousElementSibling) {
 			e.preventDefault();
 			e.target.previousElementSibling.focus();
-		} else if (e.keyCode === 39 && e.target.nextElementSibling) { // right
+		} else if (code === KeyCodes.RIGHT && e.target.nextElementSibling) {
 			e.preventDefault();
 			e.target.nextElementSibling.focus();
 		}

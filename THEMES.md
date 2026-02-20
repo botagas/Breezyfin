@@ -166,8 +166,8 @@ Use this sequence to keep maintainability high:
 2. Consume the token with `var(--token, fallback)` in panel/component styles.
 3. Put structural/default rules in `_base.less`.
 4. Put Elegant-only styling in `_elegant.less` behind `:global([data-bf-nav-theme='elegant'])` when necessary.
-5. Put performance reductions in `_shared-tail.less` for `data-bf-animations` / `data-bf-all-animations`.
-6. Add capability-specific fallbacks only in compat files keyed by `data-bf-webos-*` / `data-bf-flex-gap` / `data-bf-backdrop-filter`.
+5. Add capability-specific fallbacks only in compat files keyed by `data-bf-webos-*` / `data-bf-flex-gap` / `data-bf-backdrop-filter`.
+6. Put performance reductions in `_shared-tail.less` for `data-bf-animations` / `data-bf-all-animations` so they apply last.
 7. Avoid hardcoded colors in panel files when a token exists or should exist.
 
 ## 9) Validation procedures

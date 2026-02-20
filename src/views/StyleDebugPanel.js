@@ -7,9 +7,7 @@ import SettingsToolbar from '../components/SettingsToolbar';
 import jellyfinService from '../services/jellyfinService';
 import { shuffleArray } from '../utils/arrayUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { useToolbarActions } from '../hooks/useToolbarActions';
-import { useToolbarBackHandler } from '../hooks/useToolbarBackHandler';
+import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 
 import css from './StyleDebugPanel.module.less';
 
@@ -67,10 +65,6 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 		register: false
 	});
 	const [snipzyExactFormError, setSnipzyExactFormError] = useState('');
-	const {
-		registerToolbarBackHandler,
-		runToolbarBackHandler
-	} = useToolbarBackHandler();
 	const exactFormSpecularRef = useRef(null);
 	const exactFormDisplacementMapRef = useRef(null);
 	const exactSearchInputRef = useRef(null);
@@ -104,19 +98,14 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 
 	const handleSampleClick = useCallback(() => {}, []);
 
-	const toolbarActions = useToolbarActions({
+	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
 		onLogout,
 		onExit,
-		registerBackHandler: registerToolbarBackHandler
+		registerBackHandler,
+		isActive
 	});
-
-	const handleInternalBack = useCallback(() => {
-		return runToolbarBackHandler();
-	}, [runToolbarBackHandler]);
-
-	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
 	const loadRandomBackdropCandidate = useCallback(async () => {
 		if (!jellyfinService?.serverUrl || !jellyfinService?.accessToken || !jellyfinService?.userId) {

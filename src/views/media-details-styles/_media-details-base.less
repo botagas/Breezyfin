@@ -910,8 +910,10 @@
 	}
 
 	&:hover {
+		--seasonCardBorderColor: rgba(188, 213, 247, 0.7);
 		transform: translateY(-2px);
 		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
+		background: linear-gradient(160deg, rgba(44, 58, 79, 0.86) 0%, rgba(25, 35, 51, 0.83) 100%);
 	}
 
 	&:global(.spottable):focus,
@@ -919,6 +921,7 @@
 		transform: translateY(-2px);
 		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
 		--seasonCardBorderColor: rgba(212, 226, 255, 0.9);
+		background: linear-gradient(160deg, rgba(48, 64, 88, 0.88) 0%, rgba(28, 40, 60, 0.84) 100%);
 	}
 
 	&:hover .seasonPosterWrap::before,
@@ -1234,14 +1237,14 @@
 	border-radius: var(--bf-media-details-episode-radius);
 	overflow: hidden;
 	height: calc(100% - 32px);
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--bf-theme-card-border-rest, rgba(255, 255, 255, 0.16));
+	box-shadow: var(--bf-theme-card-shadow-rest, 0 10px 20px rgba(0, 0, 0, 0.35));
 
 	&::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
+		background: var(--bf-theme-card-hover-overlay-gradient, linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24)));
 		opacity: 0;
 		transition: opacity 220ms ease;
 		pointer-events: none;
@@ -1255,7 +1258,7 @@
 		right: 0;
 		bottom: 0;
 		height: 45%;
-		background: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
+		background: var(--bf-theme-card-bottom-fade-gradient, linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%));
 		pointer-events: none;
 		z-index: 1;
 	}
@@ -1381,6 +1384,15 @@
 	.seasonCard,
 	.episodeCard {
 		box-shadow: none !important;
+	}
+
+	.seasonCard {
+		&:hover,
+		&:focus,
+		&:global(.spottable):focus {
+			--seasonCardBorderColor: rgba(206, 223, 247, 0.9);
+			background: rgba(30, 40, 56, 0.9);
+		}
 	}
 
 	.episodeCard {

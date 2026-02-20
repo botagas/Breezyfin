@@ -71,23 +71,27 @@ Detailed helper documentation:
 Before adding new panel logic, prefer shared building blocks first:
 
 - Back handling: `src/hooks/usePanelBackHandler.js`
+- Input mode sync (`pointer`/`5way`): `src/hooks/useInputMode.js`
 - Popup/menu state: `src/hooks/useDisclosureMap.js`
+- Popup/menu handler map: `src/hooks/useDisclosureHandlers.js`
 - Map lookups by id/key: `src/hooks/useMapById.js`
 - Item metadata fetch/state: `src/hooks/useItemMetadata.js`
 - Toast lifecycle: `src/hooks/useToastMessage.js`
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
+- Player remote/media-key handler: `src/hooks/usePlayerKeyboardShortcuts.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
 - Preferred panel scroll cache wiring: `src/hooks/usePanelScrollState.js`
   - `usePanelScrollState()` for normalized scrollTop state, `Scroller` restore/save wiring, and optional cache persistence
 - Low-level scroll primitives (use only when panel needs custom behavior): `src/hooks/useScrollerScrollMemory.js`
   - `useScrollerScrollMemory()` for `Scroller` restore/save wiring
   - `useCachedScrollTopState()` for normalized cached scrollTop state
-- Shared toolbar callback bundle: `src/hooks/useToolbarActions.js`
-- Shared toolbar back-handler bridge: `src/hooks/useToolbarBackHandler.js`
+- Preferred panel toolbar/back wiring: `src/hooks/usePanelToolbarActions.js`
+- Shared toolbar callback bundle (low-level): `src/hooks/useToolbarActions.js`
+- Shared toolbar back-handler bridge (low-level): `src/hooks/useToolbarBackHandler.js`
 - Preferred toolbar wiring pattern:
-  - Use `useToolbarBackHandler()` in the panel to register/run toolbar back handlers.
-  - Use `useToolbarActions()` to pass a stable callback bundle into `Toolbar` / `SettingsToolbar`.
+  - Default to `usePanelToolbarActions()` for panel-level toolbar callbacks + layered back flow.
+  - Only use `useToolbarBackHandler()` + `useToolbarActions()` directly when panel behavior is custom.
 - Preferred panel scroll-state pattern:
   - Use `usePanelScrollState()` for panel `Scroller` restore/save and cached scrollTop persistence.
   - Only use `useScrollerScrollMemory()` directly when panel behavior is non-standard.
@@ -95,14 +99,23 @@ Before adding new panel logic, prefer shared building blocks first:
 - Shared toolbar focus helper: `src/utils/toolbarFocus.js`
 - Shared home row order constant: `src/constants/homeRows.js`
 - Shared poster card class helper: `src/utils/posterCardClassProps.js`
+- Shared player view helpers: `src/utils/playerPanelHelpers.js`
+- Shared episode next/previous helpers: `src/utils/episodeNavigation.js`
+- Shared media details formatting/image helpers: `src/utils/mediaDetailsHelpers.js`
 
 Styling and theme references:
 
 - Theme tokens: `src/styles/themes/classic.css`, `src/styles/themes/elegant.css`
+- Global shared tokens/classes (including shared error surfaces): `src/global.css`
 - Shared popup surface styles: `src/styles/popupStyles.module.less`, `src/styles/popupStyles.js`
 - Shared panel layout mixins: `src/styles/panelLayoutMixins.less`
 - webOS compatibility mixins: `src/styles/compatMixins.less`
 - Panel styling pattern: `src/views/*-panel-styles/` split files (base + per-theme + shared tail)
+
+Code comments guideline:
+
+- Keep comments minimal; prefer clear naming/structure so code explains itself.
+- Add comments only where behavior, constraints, or tradeoffs are non-obvious.
 
 ## Debug flags
 

@@ -8,10 +8,14 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 |---|---|
 | Save/restore panel scroll + cache scrollTop | `usePanelScrollState` |
 | Wire panel back handling | `usePanelBackHandler` |
+| Wire toolbar callbacks + layered panel back flow | `usePanelToolbarActions` |
 | Wire toolbar callbacks consistently | `useToolbarActions` |
 | Bridge toolbar-level back handler into panel back flow | `useToolbarBackHandler` |
 | Open/close multiple popups/menus | `useDisclosureMap` |
+| Build stable per-popup open/close handlers | `useDisclosureHandlers` |
 | Close popup when focus/pointer leaves scope | `useDismissOnOutsideInteraction` |
+| Centralize PlayerPanel remote/media-key handling | `usePlayerKeyboardShortcuts` |
+| Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
 | Keep component state synced to settings changes | `useBreezyfinSettingsSync` |
 | Fast lookup of items by id/key | `useMapById` |
 | Fetch item metadata with cancel-safe effect | `useItemMetadata` |
@@ -76,6 +80,27 @@ usePanelBackHandler(registerBackHandler, handler, { enabled = true })
 - Use when:
   - panel needs custom back behavior (close popup first, then fallback).
 
+### `usePanelToolbarActions`
+- File: `src/hooks/usePanelToolbarActions.js`
+- Purpose: high-level panel helper that combines:
+  - `useToolbarActions` callback bundling
+  - `useToolbarBackHandler` bridge
+  - `usePanelBackHandler` layered back registration
+- Signature:
+```js
+usePanelToolbarActions({
+  onNavigate,
+  onSwitchUser,
+  onLogout,
+  onExit,
+  registerBackHandler,
+  isActive = false,
+  onPanelBack = null
+})
+```
+- Use when:
+  - panel needs standard toolbar wiring and should run local back logic before toolbar back handling.
+
 ### `useToolbarActions`
 - File: `src/hooks/useToolbarActions.js`
 - Purpose: builds stable toolbar callback bundle for `Toolbar`/`SettingsToolbar`.
@@ -116,6 +141,16 @@ const handleInternalBack = useCallback(() => runToolbarBackHandler(), [runToolba
 - Use when:
   - a panel has multiple popups and back handling should close whichever is open.
 
+### `useDisclosureHandlers`
+- File: `src/hooks/useDisclosureHandlers.js`
+- Purpose: generate stable `open`/`close` handlers per disclosure key from `useDisclosureMap` methods.
+- Signature:
+```js
+useDisclosureHandlers(keys, openDisclosure, closeDisclosure)
+```
+- Use when:
+  - a panel has many popup callbacks and you want to avoid repetitive `useCallback(() => openDisclosure(...))` blocks.
+
 ### `useDismissOnOutsideInteraction`
 - File: `src/hooks/useDismissOnOutsideInteraction.js`
 - Purpose: close overlays when focus/pointer/touch happens outside a scope node.
@@ -127,6 +162,43 @@ useDismissOnOutsideInteraction({
   onDismiss
 })
 ```
+
+### `usePlayerKeyboardShortcuts`
+- File: `src/hooks/usePlayerKeyboardShortcuts.js`
+- Purpose: isolate global PlayerPanel key handling (seek, back layering, play/pause media keys).
+- Signature:
+```js
+usePlayerKeyboardShortcuts({
+  isActive,
+  onUserInteraction,
+  showControls,
+  setShowControls,
+  skipOverlayVisible,
+  showAudioPopup,
+  showSubtitlePopup,
+  isSeekContext,
+  seekBySeconds,
+  handleInternalBack,
+  handleBackButton,
+  handlePause,
+  handlePlay,
+  playing,
+  controlsRef,
+  skipOverlayRef,
+  focusSkipOverlayAction,
+  isProgressSliderTarget
+})
+```
+
+### `useInputMode`
+- File: `src/hooks/useInputMode.js`
+- Purpose: track and synchronize app input mode and Spotlight pointer mode (`pointer` vs `5way`) from pointer/keyboard events.
+- Signature:
+```js
+useInputMode(Spotlight)
+```
+- Returns:
+  - `'pointer' | '5way'`
 
 ### `useBreezyfinSettingsSync`
 - File: `src/hooks/useBreezyfinSettingsSync.js`
@@ -210,6 +282,20 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - File: `src/utils/horizontalScroll.js`
 - Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer.
 
+### Player and media detail helpers
+- `src/utils/playerPanelHelpers.js`
+  - `formatPlaybackTime(seconds)`
+  - `getPlayerTrackLabel(track)`
+  - `getSkipSegmentLabel(segmentType, hasNextEpisode?)`
+  - `getPlayerErrorBackdropUrl(item, imageApi)`
+- `src/utils/episodeNavigation.js`
+  - `getNextEpisodeForItem(service, item)`
+  - `getPreviousEpisodeForItem(service, item)`
+- `src/utils/mediaDetailsHelpers.js`
+  - language display mapping, track summary labels
+  - season/episode image fallback resolution
+  - episode badge/date/runtime + progress/played predicates
+
 ### Settings and track storage helpers
 - `src/utils/settingsStorage.js`
   - `readBreezyfinSettings(rawOverride?)`
@@ -233,7 +319,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 
 - Prefer the highest-level helper first (`usePanelScrollState` over raw scroll hooks).
 - Keep popup state in a disclosure map, not separate booleans.
-- Route toolbar callbacks through `useToolbarActions`.
+- Prefer `usePanelToolbarActions`; use `useToolbarActions` directly only for low-level/custom cases.
 - Keep panel back flow layered:
   1. close local disclosure(s)
   2. run toolbar back handler

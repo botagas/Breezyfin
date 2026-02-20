@@ -1,6 +1,6 @@
 {
 	"name": "breezyfin",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "Jellyfin client for LG webOS TVs, built with Enact Sandstone.",
 	"author": "",
 	"main": "src/index.js",
@@ -39,7 +39,6 @@
 		"@enact/ui": "^4.8.0",
 		"@enact/webos": "^5.3.2",
 		"@jellyfin/sdk": "^0.13.0",
-		"axios": "^1.13.2",
 		"hls.js": "^1.6.15",
 		"ilib": "^14.19.0",
 		"prop-types": "^15.8.1",

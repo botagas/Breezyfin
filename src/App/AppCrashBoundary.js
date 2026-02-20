@@ -86,12 +86,12 @@ class AppCrashBoundary extends Component {
 		if (error) {
 			return (
 				<div className={css.crashRoot}>
-					<div className={css.crashCard}>
-						<Heading size="large" spacing="none" className={css.crashTitle}>Something went wrong</Heading>
-						<BodyText className={css.crashMessage}>
+					<div className={`${css.crashCard} bf-error-surface`}>
+						<Heading size="large" spacing="none" className={`${css.crashTitle} bf-error-title`}>Something went wrong</Heading>
+						<BodyText className={`${css.crashMessage} bf-error-message`}>
 							{getCrashErrorMessage(error)}
 						</BodyText>
-						<div className={css.crashActions}>
+						<div className={`${css.crashActions} bf-error-actions`}>
 							<Button size="large" onClick={this.handleRecover} autoFocus>
 								Return Home
 							</Button>

@@ -2,6 +2,9 @@
 [data-bf-nav-theme='elegant'] {
 	--bf-theme-accent: rgba(157, 207, 255, 0.98);
 	--bf-theme-panel-bg: #0b111a;
+	--bf-theme-filter-badge-bg: rgba(157, 207, 255, 0.92);
+	--bf-theme-filter-badge-color: #07121f;
+	--bf-theme-filter-badge-shadow: 0 0.2rem 0.6rem rgba(4, 10, 17, 0.44);
 
 	--bf-theme-surface-bg: rgba(8, 13, 20, 0.42);
 	--bf-theme-surface-border: rgba(255, 255, 255, 0.1);
@@ -35,6 +38,14 @@
 
 	--bf-theme-header-bg: rgba(5, 10, 17, 0.5);
 	--bf-theme-header-fade-color: rgba(5, 10, 17, 0.28);
+	--bf-theme-toolbar-hover-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-toolbar-focus-bg: rgba(255, 255, 255, 0.12);
+	--bf-theme-toolbar-focus-outline: rgba(189, 226, 255, 0.42);
+	--bf-theme-toolbar-menu-surface-bg: rgba(8, 13, 20, 0.42);
+	--bf-theme-toolbar-menu-surface-border: rgba(255, 255, 255, 0.1);
+	--bf-theme-toolbar-menu-surface-shadow: 0 0.7rem 1.8rem rgba(4, 10, 17, 0.38);
+	--bf-theme-toolbar-menu-item-hover-bg: rgba(255, 255, 255, 0.1);
+	--bf-theme-toolbar-menu-item-focus-bg: rgba(255, 255, 255, 0.15);
 
 	--bf-theme-hero-elegant-gradient-top: rgba(7, 12, 19, 0.92);
 	--bf-theme-hero-elegant-gradient-mid: rgba(7, 12, 19, 0.62);

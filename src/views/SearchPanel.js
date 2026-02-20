@@ -11,14 +11,13 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import {KeyCodes} from '../utils/keyCodes';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
+import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToolbarActions } from '../hooks/useToolbarActions';
-import { useToolbarBackHandler } from '../hooks/useToolbarBackHandler';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './SearchPanel.module.less';
@@ -93,10 +92,6 @@ const SearchPanel = ({
 		term: typeof cachedState?.searchTerm === 'string' ? cachedState.searchTerm.trim() : '',
 		filterTypes: null
 	});
-	const {
-		registerToolbarBackHandler,
-		runToolbarBackHandler
-	} = useToolbarBackHandler();
 	const filtersById = useMapById(FILTER_OPTIONS, 'id');
 	const resultsById = useMapById(results);
 	const {
@@ -326,23 +321,23 @@ const SearchPanel = ({
 		closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
 	}, [closeDisclosure]);
 
-	const toolbarActions = useToolbarActions({
-		onNavigate,
-		onSwitchUser,
-		onLogout,
-		onExit,
-		registerBackHandler: registerToolbarBackHandler
-	});
-
-	const handleInternalBack = useCallback(() => {
+	const handlePanelBack = useCallback(() => {
 		if (filterPopupOpen) {
 			closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
 			return true;
 		}
-		return runToolbarBackHandler();
-	}, [closeDisclosure, filterPopupOpen, runToolbarBackHandler]);
+		return false;
+	}, [closeDisclosure, filterPopupOpen]);
 
-	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
+	const toolbarActions = usePanelToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler,
+		isActive,
+		onPanelBack: handlePanelBack
+	});
 
 	const handleFilterToggleClick = useCallback((event) => {
 		const filterId = event.currentTarget.dataset.filterId;
@@ -373,21 +368,31 @@ const SearchPanel = ({
 	const posterCardClassProps = getPosterCardClassProps(css);
 
 	const handleResultCardKeyDown = useCallback((e) => {
+		const code = e.keyCode || e.which;
 		const card = e.currentTarget;
 		const cards = Array.from(card.parentElement.querySelectorAll(`.${css.resultCard}`));
 		const idx = cards.indexOf(card);
 		const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
-		if (e.keyCode === 37 && idx > 0) { // left
-			e.preventDefault();
+		const consumeDirectionalEvent = () => {
+			e.preventDefault?.();
+			if (typeof e.stopPropagation === 'function') {
+				e.stopPropagation();
+			}
+			if (typeof e.stopImmediatePropagation === 'function') {
+				e.stopImmediatePropagation();
+			}
+		};
+		if (code === KeyCodes.LEFT && idx > 0) {
+			consumeDirectionalEvent();
 			cards[idx - 1].focus();
-		} else if (e.keyCode === 39 && idx < cards.length - 1) { // right
-			e.preventDefault();
+		} else if (code === KeyCodes.RIGHT && idx < cards.length - 1) {
+			consumeDirectionalEvent();
 			cards[idx + 1].focus();
-		} else if (e.keyCode === 38 && idx - columns >= 0) { // up
-			e.preventDefault();
+		} else if (code === KeyCodes.UP && idx - columns >= 0) {
+			consumeDirectionalEvent();
 			cards[idx - columns].focus();
-		} else if (e.keyCode === 40 && idx + columns < cards.length) { // down
-			e.preventDefault();
+		} else if (code === KeyCodes.DOWN && idx + columns < cards.length) {
+			consumeDirectionalEvent();
 			cards[idx + columns].focus();
 		}
 	}, []);

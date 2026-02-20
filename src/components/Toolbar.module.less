@@ -73,14 +73,14 @@
 	}
 
 	&:focus {
-		background: rgba(240, 235, 235, 0.1) !important;
+		background: var(--bf-theme-toolbar-focus-bg, rgba(240, 235, 235, 0.1)) !important;
 		transform: scale(1.05);
-		outline: 2px solid rgba(255, 255, 255, 0.3) !important;
+		outline: 2px solid var(--bf-theme-toolbar-focus-outline, rgba(255, 255, 255, 0.3)) !important;
 		outline-offset: 2px;
 	}
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.08) !important;
+		background: var(--bf-theme-toolbar-hover-bg, rgba(255, 255, 255, 0.08)) !important;
 	}
 }
 
@@ -89,12 +89,12 @@
 	top: 100%;
 	left: 0;
 	margin-top: 8px;
-	background: rgba(18, 18, 18, 0.95);
+	background: var(--bf-theme-toolbar-menu-surface-bg, rgba(18, 18, 18, 0.95));
 	backdrop-filter: blur(20px);
-	border: 1px solid rgba(255, 255, 255, 0.2);
+	border: 1px solid var(--bf-theme-toolbar-menu-surface-border, rgba(255, 255, 255, 0.2));
 	border-radius: 8px;
 	padding: 4px;
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+	box-shadow: var(--bf-theme-toolbar-menu-surface-shadow, 0 4px 16px rgba(0, 0, 0, 0.5));
 	z-index: 1000;
 	min-width: 100px;
 	display: flex;
@@ -132,12 +132,12 @@
 	}
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.1) !important;
+		background: var(--bf-theme-toolbar-menu-item-hover-bg, rgba(255, 255, 255, 0.1)) !important;
 	}
 
 	&:focus {
-		background: rgba(255, 255, 255, 0.15) !important;
-		outline: 2px solid rgba(255, 255, 255, 0.3) !important;
+		background: var(--bf-theme-toolbar-menu-item-focus-bg, rgba(255, 255, 255, 0.15)) !important;
+		outline: 2px solid var(--bf-theme-toolbar-focus-outline, rgba(255, 255, 255, 0.3)) !important;
 	}
 }
 
@@ -210,7 +210,7 @@
 	}
 
 	&:global(.selected) {
-		background: rgba(255, 255, 255, 0.15) !important;
+		background: var(--bf-theme-toolbar-focus-bg, rgba(240, 235, 235, 0.1)) !important;
 	}
 
 	&:focus {
@@ -219,7 +219,7 @@
 	}
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.08) !important;
+		background: var(--bf-theme-toolbar-hover-bg, rgba(255, 255, 255, 0.08)) !important;
 		box-shadow: none !important;
 	}
 }
@@ -240,16 +240,16 @@
 	box-shadow: none !important;
 
 	&.selected {
-		background: rgba(255, 255, 255, 0.15) !important;
+		background: var(--bf-theme-toolbar-focus-bg, rgba(240, 235, 235, 0.1)) !important;
 	}
 
 	&:focus {
-		background: rgba(255, 255, 255, 0.1) !important;
+		background: var(--bf-theme-toolbar-focus-bg, rgba(240, 235, 235, 0.1)) !important;
 		transform: scale(1.05);
 	}
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.08) !important;
+		background: var(--bf-theme-toolbar-hover-bg, rgba(255, 255, 255, 0.08)) !important;
 	}
 }
 

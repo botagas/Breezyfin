@@ -1,15 +1,15 @@
-@card-surface-gradient: linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%);
-@card-hover-overlay-gradient: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
-@card-bottom-fade-gradient: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
-@card-placeholder-gradient: linear-gradient(145deg, rgba(42, 54, 72, 0.85), rgba(24, 32, 47, 0.85));
-@card-border-rest: rgba(255, 255, 255, 0.16);
-@card-border-focus: rgba(212, 226, 255, 0.9);
-@card-shadow-rest: 0 10px 20px rgba(0, 0, 0, 0.35);
-@card-shadow-focus: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
+@card-surface-gradient: var(--bf-theme-card-surface-gradient, linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%));
+@card-hover-overlay-gradient: var(--bf-theme-card-hover-overlay-gradient, linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24)));
+@card-bottom-fade-gradient: var(--bf-theme-card-bottom-fade-gradient, linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%));
+@card-placeholder-gradient: var(--bf-theme-card-placeholder-gradient, linear-gradient(145deg, rgba(42, 54, 72, 0.85), rgba(24, 32, 47, 0.85)));
+@card-border-rest: var(--bf-theme-card-border-rest, rgba(255, 255, 255, 0.16));
+@card-border-focus: var(--bf-theme-card-border-focus, rgba(212, 226, 255, 0.9));
+@card-shadow-rest: var(--bf-theme-card-shadow-rest, 0 10px 20px rgba(0, 0, 0, 0.35));
+@card-shadow-focus: var(--bf-theme-card-shadow-focus, 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6));
 
-@status-badge-bg: rgba(37, 108, 186, 0.92);
-@status-badge-border: rgba(198, 226, 255, 0.44);
-@status-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+@status-badge-bg: var(--bf-theme-card-status-badge-bg, rgba(37, 108, 186, 0.92));
+@status-badge-border: var(--bf-theme-card-status-badge-border, rgba(198, 226, 255, 0.44));
+@status-badge-shadow: var(--bf-theme-card-status-badge-shadow, 0 2px 8px rgba(0, 0, 0, 0.4));
 
 .card-shell() {
 	border-radius: 1.1rem;
@@ -208,13 +208,13 @@
 	left: 0;
 	right: 0;
 	height: 4px;
-	background: rgba(255, 255, 255, 0.22);
+	background: var(--bf-theme-card-progress-track, rgba(255, 255, 255, 0.22));
 	z-index: 3;
 }
 
 .card-progress-bar-fill() {
 	height: 100%;
-	background: #3cb2f0;
+	background: var(--bf-theme-card-progress-fill, #3cb2f0);
 }
 
 .status-badge-pill() {
@@ -246,13 +246,13 @@
 .filter-chip-button() {
 	min-width: 7rem !important;
 	padding: 0.5rem 1.25rem !important;
-	background: rgba(255, 255, 255, 0.08) !important;
-	border: 1px solid rgba(255, 255, 255, 0.2) !important;
+	background: var(--bf-theme-card-filter-chip-bg, rgba(255, 255, 255, 0.08)) !important;
+	border: 1px solid var(--bf-theme-card-filter-chip-border, rgba(255, 255, 255, 0.2)) !important;
 
 	&:global(.selected),
 	&[aria-pressed='true'] {
-		background: rgba(138, 180, 248, 0.3) !important;
-		border-color: rgba(138, 180, 248, 0.8) !important;
+		background: var(--bf-theme-card-filter-chip-active-bg, rgba(138, 180, 248, 0.3)) !important;
+		border-color: var(--bf-theme-card-filter-chip-active-border, rgba(138, 180, 248, 0.8)) !important;
 	}
 }
 
@@ -266,10 +266,10 @@
 	overflow: hidden;
 	line-height: 1.35;
 	min-height: 2.34em;
-	color: rgba(236, 241, 247, 0.96);
+	color: var(--bf-theme-card-title-color, rgba(236, 241, 247, 0.96));
 }
 
 .card-subtitle-text() {
 	font-size: 0.82em;
-	color: rgba(173, 185, 203, 0.88);
+	color: var(--bf-theme-card-subtitle-color, rgba(173, 185, 203, 0.88));
 }

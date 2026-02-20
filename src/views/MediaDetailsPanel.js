@@ -12,8 +12,21 @@ import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import {KeyCodes} from '../utils/keyCodes';
+import {
+	getEpisodeActionBadge,
+	getEpisodeAirDate,
+	getEpisodeBadge,
+	getEpisodeImageUrl as resolveEpisodeImageUrl,
+	getEpisodeRuntime,
+	getSeasonImageUrl as resolveSeasonImageUrl,
+	getTrackSummaryLabel,
+	isEpisodeInProgress,
+	isEpisodePlayed,
+	toLanguageDisplayName
+} from '../utils/mediaDetailsHelpers';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useTrackPreferences } from '../hooks/useTrackPreferences';
 import { useToastMessage } from '../hooks/useToastMessage';
 import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
@@ -28,42 +41,6 @@ import {popupShellCss} from '../styles/popupStyles';
 
 const SpottableDiv = Spottable('div');
 
-const LANGUAGE_NAME_MAP = {
-	eng: 'English',
-	en: 'English',
-	spa: 'Spanish',
-	es: 'Spanish',
-	fra: 'French',
-	fr: 'French',
-	deu: 'German',
-	de: 'German',
-	ita: 'Italian',
-	it: 'Italian',
-	jpn: 'Japanese',
-	ja: 'Japanese',
-	kor: 'Korean',
-	ko: 'Korean',
-	por: 'Portuguese',
-	pt: 'Portuguese',
-	rus: 'Russian',
-	ru: 'Russian',
-	ara: 'Arabic',
-	ar: 'Arabic',
-	zho: 'Chinese',
-	zh: 'Chinese'
-};
-
-const toLanguageDisplayName = (language) => {
-	if (!language) return 'Unknown';
-	const normalized = String(language).trim().toLowerCase();
-	if (!normalized) return 'Unknown';
-	if (LANGUAGE_NAME_MAP[normalized]) return LANGUAGE_NAME_MAP[normalized];
-	if (normalized.length === 2 || normalized.length === 3) {
-		return normalized.toUpperCase();
-	}
-	return String(language);
-};
-
 const MEDIA_DETAILS_DISCLOSURE_KEYS = {
 	AUDIO_PICKER: 'audioPickerPopup',
 	SUBTITLE_PICKER: 'subtitlePickerPopup',
@@ -74,6 +51,11 @@ const INITIAL_MEDIA_DETAILS_DISCLOSURES = {
 	[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER]: false,
 	[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER]: false
 };
+const MEDIA_DETAILS_DISCLOSURE_KEY_LIST = [
+	MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER,
+	MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER,
+	MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER
+];
 const DETAILS_REQUEST_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const MediaDetailsPanel = ({
@@ -100,9 +82,20 @@ const MediaDetailsPanel = ({
 		openDisclosure,
 		closeDisclosure
 	} = useDisclosureMap(INITIAL_MEDIA_DETAILS_DISCLOSURES);
+	const disclosureHandlers = useDisclosureHandlers(
+		MEDIA_DETAILS_DISCLOSURE_KEY_LIST,
+		openDisclosure,
+		closeDisclosure
+	);
 	const showAudioPicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER] === true;
 	const showSubtitlePicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER] === true;
 	const showEpisodePicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER] === true;
+	const openAudioPicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER].open;
+	const closeAudioPicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER].close;
+	const openSubtitlePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER].open;
+	const closeSubtitlePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER].close;
+	const openEpisodePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER].open;
+	const closeEpisodePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER].close;
 	const [headerLogoUnavailable, setHeaderLogoUnavailable] = useState(false);
 	const [episodeNavList, setEpisodeNavList] = useState([]);
 	const [isFavorite, setIsFavorite] = useState(false);
@@ -553,20 +546,20 @@ const MediaDetailsPanel = ({
 
 	const handleInternalBack = useCallback(() => {
 		if (showEpisodePicker) {
-			closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
+			closeEpisodePicker();
 			return true;
 		}
 		if (showAudioPicker) {
-			closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER);
+			closeAudioPicker();
 			return true;
 		}
 		if (showSubtitlePicker) {
-			closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER);
+			closeSubtitlePicker();
 			return true;
 		}
 		handleBack();
 		return true;
-	}, [closeDisclosure, handleBack, showAudioPicker, showEpisodePicker, showSubtitlePicker]);
+	}, [closeAudioPicker, closeEpisodePicker, closeSubtitlePicker, handleBack, showAudioPicker, showEpisodePicker, showSubtitlePicker]);
 
 	const handleEpisodeClick = useCallback(async (episode) => {
 		setSelectedEpisode(episode);
@@ -728,15 +721,17 @@ const MediaDetailsPanel = ({
 	const handleCastImageError = useImageErrorFallback();
 	const hideImageOnError = useImageErrorFallback();
 
-	const audioTracks = playbackInfo?.MediaSources?.[0]?.MediaStreams
-		.filter(s => s.Type === 'Audio')
-		.map((track) => ({
-			children: `${toLanguageDisplayName(track.Language)} - ${track.DisplayTitle || track.Codec}`,
-			summary: toLanguageDisplayName(track.Language),
-			key: track.Index
-		})) || [];
+	const audioTracks = useMemo(() => (
+		playbackInfo?.MediaSources?.[0]?.MediaStreams
+			.filter(s => s.Type === 'Audio')
+			.map((track) => ({
+				children: `${toLanguageDisplayName(track.Language)} - ${track.DisplayTitle || track.Codec}`,
+				summary: toLanguageDisplayName(track.Language),
+				key: track.Index
+			})) || []
+	), [playbackInfo]);
 
-	const subtitleTracks = [
+	const subtitleTracks = useMemo(() => ([
 		{ children: 'None', summary: 'None', key: -1 },
 		...(playbackInfo?.MediaSources?.[0]?.MediaStreams
 			.filter(s => s.Type === 'Subtitle')
@@ -745,7 +740,7 @@ const MediaDetailsPanel = ({
 				summary: toLanguageDisplayName(track.Language),
 				key: track.Index
 			})) || [])
-	];
+	]), [playbackInfo]);
 
 	const people = useMemo(() => {
 		const mergedPeople = [
@@ -1196,16 +1191,19 @@ const MediaDetailsPanel = ({
 		syncPointerFocusToTarget(event);
 	}, [syncPointerFocusToTarget]);
 
-	const getAudioSummary = () => {
-		const track = audioTracks.find(t => t.key === selectedAudioTrack);
-		return track?.summary || 'Default';
-	};
+	const audioSummary = useMemo(() => {
+		return getTrackSummaryLabel(audioTracks, selectedAudioTrack, {
+			defaultLabel: 'Default'
+		});
+	}, [audioTracks, selectedAudioTrack]);
 
-	const getSubtitleSummary = () => {
-		if (selectedSubtitleTrack === -1) return 'None';
-		const track = subtitleTracks.find(t => t.key === selectedSubtitleTrack);
-		return track?.summary || 'Default';
-	};
+	const subtitleSummary = useMemo(() => {
+		return getTrackSummaryLabel(subtitleTracks, selectedSubtitleTrack, {
+			noneKey: -1,
+			noneLabel: 'None',
+			defaultLabel: 'Default'
+		});
+	}, [selectedSubtitleTrack, subtitleTracks]);
 
 	const renderToast = () => {
 		if (!toastMessage) return null;
@@ -1220,77 +1218,13 @@ const MediaDetailsPanel = ({
 		);
 	};
 
-	const getSeasonImageUrl = (season) => {
-		if (season?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(season.Id, 'Primary', 360);
-		}
-		if (season?.ImageTags?.Thumb) {
-			return jellyfinService.getImageUrl(season.Id, 'Thumb', 360);
-		}
-		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 640);
-		}
-		if (item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 360);
-		}
-		return '';
-	};
-	const getEpisodeImageUrl = (episode) => {
-		if (episode?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(episode.Id, 'Primary', 760);
-		}
-		if (episode?.ImageTags?.Thumb) {
-			return jellyfinService.getImageUrl(episode.Id, 'Thumb', 760);
-		}
-		if (episode?.SeriesId) {
-			return jellyfinService.getBackdropUrl(episode.SeriesId, 0, 960);
-		}
-		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 960);
-		}
-		if (item?.ImageTags?.Primary) {
-			return jellyfinService.getImageUrl(item.Id, 'Primary', 760);
-		}
-		return '';
-	};
+	const getSeasonImageUrl = useCallback((season) => {
+		return resolveSeasonImageUrl(season, item, jellyfinService);
+	}, [item]);
 
-	const getEpisodeBadge = (episode) => {
-		const seasonNumber = Number.isInteger(episode?.ParentIndexNumber) ? episode.ParentIndexNumber : '?';
-		const episodeNumber = Number.isInteger(episode?.IndexNumber) ? episode.IndexNumber : '?';
-		return `S${seasonNumber}E${episodeNumber}`;
-	};
-
-	const getEpisodeAirDate = (episode) => {
-		if (!episode?.PremiereDate) return '';
-		const parsed = new Date(episode.PremiereDate);
-		if (Number.isNaN(parsed.getTime())) return '';
-		return parsed.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
-	};
-
-	const getEpisodeRuntime = (episode) => {
-		if (!episode?.RunTimeTicks) return '';
-		return `${Math.floor(episode.RunTimeTicks / 600000000)} min`;
-	};
-
-	const isEpisodeInProgress = useCallback((episode) => {
-		if (!episode?.UserData) return false;
-		if ((episode.UserData.PlaybackPositionTicks || 0) > 0) return true;
-		const percentage = episode.UserData.PlayedPercentage || 0;
-		return percentage > 0 && percentage < 100;
-	}, []);
-
-	const isEpisodePlayed = useCallback((episode) => {
-		if (!episode?.UserData) return false;
-		if (episode.UserData.Played === true) return true;
-		return (episode.UserData.PlayedPercentage || 0) >= 100;
-	}, []);
-
-	const getEpisodeActionBadge = useCallback((episode) => {
-		const seasonNumber = Number.isInteger(episode?.ParentIndexNumber) ? episode.ParentIndexNumber : null;
-		const episodeNumber = Number.isInteger(episode?.IndexNumber) ? episode.IndexNumber : null;
-		if (seasonNumber === null || episodeNumber === null) return '';
-		return `S${seasonNumber}E${episodeNumber}`;
-	}, []);
+	const getEpisodeImageUrl = useCallback((episode) => {
+		return resolveEpisodeImageUrl(episode, item, jellyfinService);
+	}, [item]);
 
 	useEffect(() => {
 		if (!isElegantTheme || !hasOverviewText) {
@@ -1346,7 +1280,7 @@ const MediaDetailsPanel = ({
 		if ((userData.PlaybackPositionTicks || 0) > 0) return true;
 		if ((userData.PlayedPercentage || 0) > 0) return true;
 		return userData.Played === true;
-	}, [episodes, isEpisodeInProgress, isEpisodePlayed, item]);
+	}, [episodes, item]);
 
 	const seriesPlayLabel = useMemo(() => {
 		if (item?.Type !== 'Series') return 'Play';
@@ -1368,35 +1302,11 @@ const MediaDetailsPanel = ({
 			return withBadge('Play');
 		}
 		return withBadge('Play');
-	}, [episodes, getEpisodeActionBadge, isEpisodeInProgress, isEpisodePlayed, item?.Type, selectedEpisode, seriesHasWatchHistory]);
+	}, [episodes, item?.Type, selectedEpisode, seriesHasWatchHistory]);
 
 	const overviewPlayLabel = item?.Type === 'Series'
 		? seriesPlayLabel
 		: (shouldShowContinue ? 'Continue' : 'Play');
-
-	const closeAudioPicker = useCallback(() => {
-		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER);
-	}, [closeDisclosure]);
-
-	const openAudioPicker = useCallback(() => {
-		openDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER);
-	}, [openDisclosure]);
-
-	const closeSubtitlePicker = useCallback(() => {
-		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER);
-	}, [closeDisclosure]);
-
-	const openSubtitlePicker = useCallback(() => {
-		openDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER);
-	}, [openDisclosure]);
-
-	const closeEpisodePicker = useCallback(() => {
-		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
-	}, [closeDisclosure]);
-
-	const openEpisodePicker = useCallback(() => {
-		openDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
-	}, [openDisclosure]);
 
 	const captureDetailsScrollTo = useCallback((fn) => {
 		detailsScrollToRef.current = fn;
@@ -1457,8 +1367,8 @@ const MediaDetailsPanel = ({
 		} else if (onItemSelect) {
 			onItemSelect(episode, item);
 		}
-		closeDisclosure(MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER);
-	}, [closeDisclosure, handleEpisodeClick, item, onItemSelect, popupEpisodesById]);
+		closeEpisodePicker();
+	}, [closeEpisodePicker, handleEpisodeClick, item, onItemSelect, popupEpisodesById]);
 
 	const handleCastCardFocus = useCallback((e) => {
 		scrollCastIntoView(e.currentTarget);
@@ -2083,9 +1993,9 @@ const MediaDetailsPanel = ({
 																className={`${css.compactSelectorButton} ${css.trackSelectorPrimary}`}
 																componentRef={audioSelectorButtonRef}
 																onKeyDown={handleAudioSelectorKeyDown}
-																aria-label={`Audio track ${getAudioSummary()}`}
+																aria-label={`Audio track ${audioSummary}`}
 															>
-																{getAudioSummary()}
+																{audioSummary}
 															</Button>
 														)}
 														{subtitleTracks.length > 1 && (
@@ -2096,9 +2006,9 @@ const MediaDetailsPanel = ({
 																className={`${css.compactSelectorButton} ${css.trackSelectorPrimary}`}
 																componentRef={subtitleSelectorButtonRef}
 																onKeyDown={handleSubtitleSelectorKeyDown}
-																aria-label={`Subtitle track ${getSubtitleSummary()}`}
+																aria-label={`Subtitle track ${subtitleSummary}`}
 															>
-																{getSubtitleSummary()}
+																{subtitleSummary}
 															</Button>
 														)}
 													<Button
@@ -2237,9 +2147,9 @@ const MediaDetailsPanel = ({
 																icon="speaker"
 																onClick={openAudioPicker}
 																className={`${css.compactSelectorButton} ${css.trackSelectorPrimary}`}
-																aria-label={`Audio track ${getAudioSummary()}`}
+																aria-label={`Audio track ${audioSummary}`}
 															>
-																{getAudioSummary()}
+																{audioSummary}
 															</Button>
 														)}
 
@@ -2249,9 +2159,9 @@ const MediaDetailsPanel = ({
 																icon="subtitle"
 																onClick={openSubtitlePicker}
 																className={`${css.compactSelectorButton} ${css.trackSelectorPrimary}`}
-																aria-label={`Subtitle track ${getSubtitleSummary()}`}
+																aria-label={`Subtitle track ${subtitleSummary}`}
 															>
-																{getSubtitleSummary()}
+																{subtitleSummary}
 															</Button>
 														)}
 												</div>

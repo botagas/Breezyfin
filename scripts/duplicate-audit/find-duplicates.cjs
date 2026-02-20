@@ -18,14 +18,18 @@ const MAX_REPORTS = 60;
 
 const normalizeLine = (line) => line.replace(/\s+/g, ' ').trim();
 
-const JS_LOW_SIGNAL_LINE_REGEX = /^(?:\.\.\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\s*=\s*[^,]+)?,?$/;
+const JS_LOW_SIGNAL_LINE_REGEX = /^(?:\.\.\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\s*:\s*[^,]+)?(?:\s*=\s*[^,]+)?,?$/;
+const JS_LOW_SIGNAL_SCAFFOLD_REGEX = /^(?:const\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*use[A-Za-z0-9_$]+\(\{|}\);|}\) => \{)$/;
 
 const isLowSignalSnippet = (extension, snippetKey) => {
 	if (extension !== '.js') return false;
 	const lines = snippetKey.split('\n').map((line) => line.trim()).filter(Boolean);
 	if (lines.length === 0) return true;
-	// Ignore windows that are just prop lists / argument lists and carry little structural value.
-	return lines.every((line) => JS_LOW_SIGNAL_LINE_REGEX.test(line));
+	const lowSignalLineCount = lines.filter((line) => (
+		JS_LOW_SIGNAL_LINE_REGEX.test(line) || JS_LOW_SIGNAL_SCAFFOLD_REGEX.test(line)
+	)).length;
+	// Ignore windows that are primarily prop lists / hook-scaffolding and carry little structural value.
+	return lowSignalLineCount / lines.length >= 0.85;
 };
 
 const getFiles = () => {

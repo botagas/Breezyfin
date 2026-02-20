@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '../components/AppScroller';
@@ -13,12 +13,10 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
+import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToolbarActions } from '../hooks/useToolbarActions';
-import { useToolbarBackHandler } from '../hooks/useToolbarBackHandler';
 import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
 import { wipeAllAppCache } from '../utils/cacheMaintenance';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
@@ -146,10 +144,6 @@ const SettingsPanel = ({
 		openDisclosure,
 		closeDisclosure
 	} = useDisclosureMap(INITIAL_SETTINGS_DISCLOSURES);
-	const {
-		registerToolbarBackHandler,
-		runToolbarBackHandler
-	} = useToolbarBackHandler();
 	const savedServerKeySelector = useCallback(
 		(entry) => `${entry.serverId}:${entry.userId}`,
 		[]
@@ -350,29 +344,14 @@ const SettingsPanel = ({
 		setAppLogCount(0);
 	}, []);
 
-	const toggleHomeRowRecentlyAdded = useCallback(() => {
-		handleHomeRowToggle('recentlyAdded');
-	}, [handleHomeRowToggle]);
-
-	const toggleHomeRowContinueWatching = useCallback(() => {
-		handleHomeRowToggle('continueWatching');
-	}, [handleHomeRowToggle]);
-
-	const toggleHomeRowNextUp = useCallback(() => {
-		handleHomeRowToggle('nextUp');
-	}, [handleHomeRowToggle]);
-
-	const toggleHomeRowLatestMovies = useCallback(() => {
-		handleHomeRowToggle('latestMovies');
-	}, [handleHomeRowToggle]);
-
-	const toggleHomeRowLatestShows = useCallback(() => {
-		handleHomeRowToggle('latestShows');
-	}, [handleHomeRowToggle]);
-
-	const toggleHomeRowMyRequests = useCallback(() => {
-		handleHomeRowToggle('myRequests');
-	}, [handleHomeRowToggle]);
+	const homeRowToggleHandlers = useMemo(() => ({
+		recentlyAdded: () => handleHomeRowToggle('recentlyAdded'),
+		continueWatching: () => handleHomeRowToggle('continueWatching'),
+		nextUp: () => handleHomeRowToggle('nextUp'),
+		latestMovies: () => handleHomeRowToggle('latestMovies'),
+		latestShows: () => handleHomeRowToggle('latestShows'),
+		myRequests: () => handleHomeRowToggle('myRequests')
+	}), [handleHomeRowToggle]);
 
 	const moveHomeRowUp = useCallback((event) => {
 		const rowKey = event.currentTarget.dataset.rowKey;
@@ -485,79 +464,32 @@ const SettingsPanel = ({
 		}
 	}, [onNavigate]);
 
-	const toolbarActions = useToolbarActions({
-		onNavigate,
-		onSwitchUser,
-		onLogout,
-		onExit,
-		registerBackHandler: registerToolbarBackHandler
-	});
-
 	const toggleBooleanSetting = useCallback((key) => {
 		handleSettingChange(key, !settings[key]);
 	}, [handleSettingChange, settings]);
 
-	const toggleEnableTranscoding = useCallback(() => {
-		toggleBooleanSetting('enableTranscoding');
-	}, [toggleBooleanSetting]);
-
-	const toggleAutoPlayNext = useCallback(() => {
-		toggleBooleanSetting('autoPlayNext');
-	}, [toggleBooleanSetting]);
-
-	const toggleShowPlayNextPrompt = useCallback(() => {
-		toggleBooleanSetting('showPlayNextPrompt');
-	}, [toggleBooleanSetting]);
+	const settingToggleHandlers = useMemo(() => ({
+		enableTranscoding: () => toggleBooleanSetting('enableTranscoding'),
+		autoPlayNext: () => toggleBooleanSetting('autoPlayNext'),
+		showPlayNextPrompt: () => toggleBooleanSetting('showPlayNextPrompt'),
+		skipIntro: () => toggleBooleanSetting('skipIntro'),
+		forceTranscoding: () => toggleBooleanSetting('forceTranscoding'),
+		forceTranscodingWithSubtitles: () => toggleBooleanSetting('forceTranscodingWithSubtitles'),
+		relaxedPlaybackProfile: () => toggleBooleanSetting('relaxedPlaybackProfile'),
+		showBackdrops: () => toggleBooleanSetting('showBackdrops'),
+		showSeasonImages: () => toggleBooleanSetting('showSeasonImages'),
+		useSidewaysEpisodeList: () => toggleBooleanSetting('useSidewaysEpisodeList'),
+		disableAnimations: () => toggleBooleanSetting('disableAnimations'),
+		disableAllAnimations: () => toggleBooleanSetting('disableAllAnimations'),
+		showMediaBar: () => toggleBooleanSetting('showMediaBar'),
+		showPerformanceOverlay: () => toggleBooleanSetting('showPerformanceOverlay')
+	}), [toggleBooleanSetting]);
 
 	const openPlayNextPromptModePopup = useCallback(() => {
 		if (settings.showPlayNextPrompt !== false) {
 			openDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
 		}
 	}, [openDisclosure, settings.showPlayNextPrompt]);
-
-	const toggleSkipIntro = useCallback(() => {
-		toggleBooleanSetting('skipIntro');
-	}, [toggleBooleanSetting]);
-
-	const toggleForceTranscoding = useCallback(() => {
-		toggleBooleanSetting('forceTranscoding');
-	}, [toggleBooleanSetting]);
-
-	const toggleForceTranscodingWithSubtitles = useCallback(() => {
-		toggleBooleanSetting('forceTranscodingWithSubtitles');
-	}, [toggleBooleanSetting]);
-
-	const toggleRelaxedPlaybackProfile = useCallback(() => {
-		toggleBooleanSetting('relaxedPlaybackProfile');
-	}, [toggleBooleanSetting]);
-
-	const toggleShowBackdrops = useCallback(() => {
-		toggleBooleanSetting('showBackdrops');
-	}, [toggleBooleanSetting]);
-
-	const toggleShowSeasonImages = useCallback(() => {
-		toggleBooleanSetting('showSeasonImages');
-	}, [toggleBooleanSetting]);
-
-	const toggleSidewaysEpisodeList = useCallback(() => {
-		toggleBooleanSetting('useSidewaysEpisodeList');
-	}, [toggleBooleanSetting]);
-
-	const toggleDisableAnimations = useCallback(() => {
-		toggleBooleanSetting('disableAnimations');
-	}, [toggleBooleanSetting]);
-
-	const toggleDisableAllAnimations = useCallback(() => {
-		toggleBooleanSetting('disableAllAnimations');
-	}, [toggleBooleanSetting]);
-
-	const toggleShowMediaBar = useCallback(() => {
-		toggleBooleanSetting('showMediaBar');
-	}, [toggleBooleanSetting]);
-
-	const toggleShowPerformanceOverlay = useCallback(() => {
-		toggleBooleanSetting('showPerformanceOverlay');
-	}, [toggleBooleanSetting]);
 
 	const handleNavbarThemeSelect = useCallback((event) => {
 		const themeValue = event.currentTarget.dataset.theme;
@@ -622,7 +554,7 @@ const SettingsPanel = ({
 		return option ? option.label : 'Classic';
 	};
 
-	const handleInternalBack = useCallback(() => {
+	const handlePanelBack = useCallback(() => {
 		for (const disclosureKey of DISCLOSURE_BACK_PRIORITY) {
 			if (disclosures[disclosureKey] !== true) continue;
 			if (
@@ -634,15 +566,22 @@ const SettingsPanel = ({
 			closeDisclosure(disclosureKey);
 			return true;
 		}
-		return runToolbarBackHandler();
+		return false;
 	}, [
 		cacheWipeInProgress,
 		closeDisclosure,
-		disclosures,
-		runToolbarBackHandler
+		disclosures
 	]);
 
-	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
+	const toolbarActions = usePanelToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler,
+		isActive,
+		onPanelBack: handlePanelBack
+	});
 
 	return (
 		<Panel {...rest}>
@@ -712,48 +651,48 @@ const SettingsPanel = ({
 
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Home Rows</BodyText>
-							<SwitchItem
-								className={css.switchItem}
-								selected={settings.homeRows?.recentlyAdded !== false}
-								onToggle={toggleHomeRowRecentlyAdded}
-							>
-							Recently Added
-						</SwitchItem>
-							<SwitchItem
-								className={css.switchItem}
-								selected={settings.homeRows?.continueWatching !== false}
-								onToggle={toggleHomeRowContinueWatching}
-							>
-							Continue Watching
-						</SwitchItem>
-							<SwitchItem
-								className={css.switchItem}
-								selected={settings.homeRows?.nextUp !== false}
-								onToggle={toggleHomeRowNextUp}
-							>
-							Next Up
-						</SwitchItem>
-							<SwitchItem
-								className={css.switchItem}
-								selected={settings.homeRows?.latestMovies !== false}
-								onToggle={toggleHomeRowLatestMovies}
-							>
-							Latest Movies
-						</SwitchItem>
-							<SwitchItem
-								className={css.switchItem}
-								selected={settings.homeRows?.latestShows !== false}
-								onToggle={toggleHomeRowLatestShows}
-							>
-							Latest TV Shows
-						</SwitchItem>
-							<SwitchItem
-								className={css.switchItem}
-								selected={settings.homeRows?.myRequests !== false}
-								onToggle={toggleHomeRowMyRequests}
-							>
-							My Requests
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									selected={settings.homeRows?.recentlyAdded !== false}
+									onToggle={homeRowToggleHandlers.recentlyAdded}
+								>
+								Recently Added
+							</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									selected={settings.homeRows?.continueWatching !== false}
+									onToggle={homeRowToggleHandlers.continueWatching}
+								>
+								Continue Watching
+							</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									selected={settings.homeRows?.nextUp !== false}
+									onToggle={homeRowToggleHandlers.nextUp}
+								>
+								Next Up
+							</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									selected={settings.homeRows?.latestMovies !== false}
+									onToggle={homeRowToggleHandlers.latestMovies}
+								>
+								Latest Movies
+							</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									selected={settings.homeRows?.latestShows !== false}
+									onToggle={homeRowToggleHandlers.latestShows}
+								>
+								Latest TV Shows
+							</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									selected={settings.homeRows?.myRequests !== false}
+									onToggle={homeRowToggleHandlers.myRequests}
+								>
+								My Requests
+							</SwitchItem>
 						<div className={css.rowOrderHeader}>Row Order</div>
 						<div className={css.rowOrderList}>
 							{(settings.homeRowOrder || HOME_ROW_ORDER).map((rowKey, index, list) => (
@@ -808,21 +747,21 @@ const SettingsPanel = ({
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Playback</BodyText>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleAutoPlayNext}
-								selected={settings.autoPlayNext}
-							>
-							Auto-play Next Episode
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.autoPlayNext}
+									selected={settings.autoPlayNext}
+								>
+								Auto-play Next Episode
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleShowPlayNextPrompt}
-								selected={settings.showPlayNextPrompt !== false}
-							>
-							Show Play Next Prompt
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.showPlayNextPrompt}
+									selected={settings.showPlayNextPrompt !== false}
+								>
+								Show Play Next Prompt
+							</SwitchItem>
 
 							<Item
 								className={css.settingItem}
@@ -831,13 +770,13 @@ const SettingsPanel = ({
 								onClick={openPlayNextPromptModePopup}
 							/>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleSkipIntro}
-								selected={settings.skipIntro}
-							>
-							Show Skip Intro/Recap Prompt
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.skipIntro}
+									selected={settings.skipIntro}
+								>
+								Show Skip Intro/Recap Prompt
+							</SwitchItem>
 					</section>
 
 					<section className={css.section}>
@@ -868,29 +807,29 @@ const SettingsPanel = ({
 								onClick={openBitratePopup}
 							/>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleEnableTranscoding}
-								selected={settings.enableTranscoding}
-							>
-							Enable Transcoding
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.enableTranscoding}
+									selected={settings.enableTranscoding}
+								>
+								Enable Transcoding
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleForceTranscoding}
-								selected={settings.forceTranscoding}
-							>
-							Force Transcoding (always)
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.forceTranscoding}
+									selected={settings.forceTranscoding}
+								>
+								Force Transcoding (always)
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleForceTranscodingWithSubtitles}
-								selected={settings.forceTranscodingWithSubtitles}
-							>
-							Force Transcoding with Subtitles (burn-in subs)
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.forceTranscodingWithSubtitles}
+									selected={settings.forceTranscodingWithSubtitles}
+								>
+								Force Transcoding with Subtitles (burn-in subs)
+							</SwitchItem>
 					</section>
 
 					<section className={css.section}>
@@ -903,53 +842,53 @@ const SettingsPanel = ({
 								onClick={openNavbarThemePopup}
 							/>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleShowBackdrops}
-								selected={settings.showBackdrops}
-							>
-							Show Background Images
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.showBackdrops}
+									selected={settings.showBackdrops}
+								>
+								Show Background Images
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleShowSeasonImages}
-								selected={settings.showSeasonImages === true}
-							>
-							Show Season Card Images (Elegant)
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.showSeasonImages}
+									selected={settings.showSeasonImages === true}
+								>
+								Show Season Card Images (Elegant)
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleSidewaysEpisodeList}
-								selected={settings.useSidewaysEpisodeList !== false}
-							>
-							Sideways Episode List (Elegant)
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.useSidewaysEpisodeList}
+									selected={settings.useSidewaysEpisodeList !== false}
+								>
+								Sideways Episode List (Elegant)
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleDisableAnimations}
-								selected={settings.disableAnimations}
-							>
-							Disable Animations (Performance Mode)
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.disableAnimations}
+									selected={settings.disableAnimations}
+								>
+								Disable Animations (Performance Mode)
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleDisableAllAnimations}
-								selected={settings.disableAllAnimations}
-							>
-							Disable ALL Animations (Performance+ Mode)
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.disableAllAnimations}
+									selected={settings.disableAllAnimations}
+								>
+								Disable ALL Animations (Performance+ Mode)
+							</SwitchItem>
 
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleShowMediaBar}
-								selected={settings.showMediaBar !== false}
-							>
-							Show Media Bar on Home
-						</SwitchItem>
+								<SwitchItem
+									className={css.switchItem}
+									onToggle={settingToggleHandlers.showMediaBar}
+									selected={settings.showMediaBar !== false}
+								>
+								Show Media Bar on Home
+							</SwitchItem>
 					</section>
 
 					<section className={css.section}>
@@ -961,19 +900,19 @@ const SettingsPanel = ({
 
 						<section className={css.section}>
 							<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleShowPerformanceOverlay}
-								selected={settings.showPerformanceOverlay === true}
-							>
-								Performance Overlay (FPS/Input)
-							</SwitchItem>
-							{STYLE_DEBUG_ENABLED ? (
 								<SwitchItem
 									className={css.switchItem}
-									onToggle={toggleRelaxedPlaybackProfile}
-									selected={settings.relaxedPlaybackProfile === true}
+									onToggle={settingToggleHandlers.showPerformanceOverlay}
+									selected={settings.showPerformanceOverlay === true}
 								>
+									Performance Overlay (FPS/Input)
+								</SwitchItem>
+								{STYLE_DEBUG_ENABLED ? (
+									<SwitchItem
+										className={css.switchItem}
+										onToggle={settingToggleHandlers.relaxedPlaybackProfile}
+										selected={settings.relaxedPlaybackProfile === true}
+									>
 									Relaxed Playback Profile (Debug)
 								</SwitchItem>
 							) : null}

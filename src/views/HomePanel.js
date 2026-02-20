@@ -11,8 +11,8 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToolbarActions } from '../hooks/useToolbarActions';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 
 import css from './HomePanel.module.less';
@@ -53,6 +53,19 @@ const HomePanel = ({
 	const homeScrollToRef = useRef(null);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
+	const handleNavigation = useCallback((section, data) => {
+		if (onNavigate) {
+			onNavigate(section, data);
+		}
+	}, [onNavigate]);
+	const toolbarActions = usePanelToolbarActions({
+		onNavigate: handleNavigation,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler,
+		isActive
+	});
 	const {
 		captureScrollTo: captureHomeScrollRestore,
 		handleScrollStop: handleHomeScrollMemoryStop
@@ -220,19 +233,6 @@ const HomePanel = ({
 	const getMediaRowImageUrl = useCallback((id, mediaItem) => {
 		return getCardImageUrl(mediaItem);
 	}, [getCardImageUrl]);
-
-	const handleNavigation = useCallback((section, data) => {
-		if (onNavigate) {
-			onNavigate(section, data);
-		}
-	}, [onNavigate]);
-	const toolbarActions = useToolbarActions({
-		onNavigate: handleNavigation,
-		onSwitchUser,
-		onLogout,
-		onExit,
-		registerBackHandler
-	});
 
 	const captureHomeScrollTo = useCallback((fn) => {
 		homeScrollToRef.current = fn;
