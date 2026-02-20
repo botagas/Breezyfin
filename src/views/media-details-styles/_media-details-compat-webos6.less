@@ -1,0 +1,20 @@
+@import (reference) '../../styles/compatMixins.less';
+
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .metadata", 0.85rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .actionsRow", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .introControlsRow", 0.58rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .episodeNavActions", 0.45rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .castRow", 12px);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .seasonCards", 1rem);
+
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways {
+	min-height: 21rem !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeInfo {
+	flex: 0 0 auto !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeActions {
+	margin-top: 0 !important;
+}

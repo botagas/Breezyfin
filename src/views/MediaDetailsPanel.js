@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import Icon from '@enact/sandstone/Icon';
 import Popup from '@enact/sandstone/Popup';
@@ -20,7 +20,7 @@ import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
 import { useItemMetadata } from '../hooks/useItemMetadata';
-import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
+import { usePanelScrollState } from '../hooks/usePanelScrollState';
 
 import css from './MediaDetailsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -74,6 +74,7 @@ const INITIAL_MEDIA_DETAILS_DISCLOSURES = {
 	[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER]: false,
 	[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER]: false
 };
+const DETAILS_REQUEST_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const MediaDetailsPanel = ({
 	item,
@@ -113,7 +114,6 @@ const MediaDetailsPanel = ({
 	const [overviewExpanded, setOverviewExpanded] = useState(false);
 	const [hasOverviewOverflow, setHasOverviewOverflow] = useState(false);
 	const [backdropUnavailable, setBackdropUnavailable] = useState(false);
-	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const detailMetadata = useItemMetadata(item?.Id, {
 		enabled: Boolean(item?.Id),
 		errorContext: 'item metadata'
@@ -129,16 +129,13 @@ const MediaDetailsPanel = ({
 	const {
 		captureScrollTo: captureDetailsScrollRestore,
 		handleScrollStop: handleDetailsScrollMemoryStop
-	} = useScrollerScrollMemory({
+	} = usePanelScrollState({
+		cachedState,
 		isActive,
-		scrollTop,
-		onScrollTopChange: setScrollTop
+		onCacheState,
+		cacheKey: item?.Id || null,
+		requireCacheKey: true
 	});
-
-	useEffect(() => {
-		if (typeof onCacheState !== 'function' || !item?.Id) return;
-		onCacheState(item.Id, {scrollTop});
-	}, [item?.Id, onCacheState, scrollTop]);
 	const castRowRef = useRef(null);
 	const castScrollerRef = useRef(null);
 	const seasonScrollerRef = useRef(null);
@@ -157,6 +154,9 @@ const MediaDetailsPanel = ({
 	const playbackInfoRequestRef = useRef(0);
 	const episodesRequestRef = useRef(0);
 	const seasonsRequestRef = useRef(0);
+	const seriesItemCacheRef = useRef(new Map());
+	const seasonsCacheRef = useRef(new Map());
+	const episodesCacheRef = useRef(new Map());
 	const castFocusScrollTimeoutRef = useRef(null);
 	const seasonFocusScrollTimeoutRef = useRef(null);
 	const episodeFocusScrollTimeoutRef = useRef(null);
@@ -234,6 +234,54 @@ const MediaDetailsPanel = ({
 	const isPlaybackRequestCurrent = useCallback((token) => {
 		return playbackInfoRequestRef.current === token;
 	}, []);
+	const readDetailsCache = useCallback((cacheRef, key) => {
+		if (!key) return null;
+		const entry = cacheRef.current.get(String(key));
+		if (!entry) return null;
+		if (Date.now() - entry.timestamp > DETAILS_REQUEST_CACHE_TTL_MS) {
+			cacheRef.current.delete(String(key));
+			return null;
+		}
+		return entry.value;
+	}, []);
+	const writeDetailsCache = useCallback((cacheRef, key, value) => {
+		if (!key || value == null) return value;
+		cacheRef.current.set(String(key), {
+			value,
+			timestamp: Date.now()
+		});
+		return value;
+	}, []);
+	const getSeriesItemCached = useCallback(async (seriesId) => {
+		if (!seriesId) return null;
+		const cached = readDetailsCache(seriesItemCacheRef, seriesId);
+		if (cached) return cached;
+		const value = await jellyfinService.getItem(seriesId);
+		return writeDetailsCache(seriesItemCacheRef, seriesId, value);
+	}, [readDetailsCache, writeDetailsCache]);
+	const getSeasonsCached = useCallback(async (seriesId) => {
+		if (!seriesId) return [];
+		const cached = readDetailsCache(seasonsCacheRef, seriesId);
+		if (Array.isArray(cached)) return cached;
+		const value = await jellyfinService.getSeasons(seriesId);
+		const normalized = Array.isArray(value) ? value : [];
+		if (normalized.length > 0) {
+			return writeDetailsCache(seasonsCacheRef, seriesId, normalized);
+		}
+		return normalized;
+	}, [readDetailsCache, writeDetailsCache]);
+	const getEpisodesCached = useCallback(async (seriesId, seasonId) => {
+		if (!seriesId || !seasonId) return [];
+		const cacheKey = `${seriesId}:${seasonId}`;
+		const cached = readDetailsCache(episodesCacheRef, cacheKey);
+		if (Array.isArray(cached)) return cached;
+		const value = await jellyfinService.getEpisodes(seriesId, seasonId);
+		const normalized = Array.isArray(value) ? value : [];
+		if (normalized.length > 0) {
+			return writeDetailsCache(episodesCacheRef, cacheKey, normalized);
+		}
+		return normalized;
+	}, [readDetailsCache, writeDetailsCache]);
 	const seasonsById = useMapById(seasons);
 	const episodesById = useMapById(episodes);
 	const popupEpisodesById = useMemo(() => {
@@ -253,7 +301,7 @@ const MediaDetailsPanel = ({
 				return;
 			}
 			try {
-				const seasonEpisodes = await jellyfinService.getEpisodes(item.SeriesId, item.SeasonId);
+				const seasonEpisodes = await getEpisodesCached(item.SeriesId, item.SeasonId);
 				if (!cancelled) {
 					setEpisodeNavList(seasonEpisodes || []);
 				}
@@ -268,7 +316,16 @@ const MediaDetailsPanel = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [item]);
+	}, [getEpisodesCached, item]);
+
+	useEffect(() => {
+		if (item?.Type !== 'Episode' || !item.SeriesId) return;
+		void getSeriesItemCached(item.SeriesId).catch(() => {});
+		void getSeasonsCached(item.SeriesId).catch(() => {});
+		if (item.SeasonId) {
+			void getEpisodesCached(item.SeriesId, item.SeasonId).catch(() => {});
+		}
+	}, [getEpisodesCached, getSeasonsCached, getSeriesItemCached, item]);
 
 	useEffect(() => {
 		setHeaderLogoUnavailable(false);
@@ -318,11 +375,33 @@ const MediaDetailsPanel = ({
 		setSelectedSubtitleTrack(nextSubtitleTrack);
 	}, [resolveDefaultTrackSelection]);
 
+	const loadPlaybackInfoForItem = useCallback(async (targetItemId, options = {}) => {
+		const {clearLoading = false, episodeRequestToken = null} = options;
+		if (!targetItemId) return;
+		const playbackRequestToken = createPlaybackRequestToken();
+		try {
+			const info = await jellyfinService.getPlaybackInfo(targetItemId);
+			const staleEpisodeRequest = episodeRequestToken !== null && episodeRequestToken !== episodesRequestRef.current;
+			if (!isPlaybackRequestCurrent(playbackRequestToken) || staleEpisodeRequest) return;
+			setPlaybackInfo(info || null);
+			applyDefaultTracks(info?.MediaSources?.[0]?.MediaStreams);
+		} catch (error) {
+			const staleEpisodeRequest = episodeRequestToken !== null && episodeRequestToken !== episodesRequestRef.current;
+			if (!isPlaybackRequestCurrent(playbackRequestToken) || staleEpisodeRequest) return;
+			console.error('Failed to load playback info:', error);
+			setPlaybackInfo(null);
+			applyDefaultTracks(null);
+		} finally {
+			if (clearLoading && isPlaybackRequestCurrent(playbackRequestToken)) {
+				setLoading(false);
+			}
+		}
+	}, [applyDefaultTracks, createPlaybackRequestToken, isPlaybackRequestCurrent]);
+
 	const loadPlaybackInfo = useCallback(async () => {
 		if (!item) return;
-		const playbackRequestToken = createPlaybackRequestToken();
-
 		if (item.Type === 'Series') {
+			const playbackRequestToken = createPlaybackRequestToken();
 			if (isPlaybackRequestCurrent(playbackRequestToken)) {
 				setPlaybackInfo(null);
 				applyDefaultTracks(null);
@@ -330,31 +409,16 @@ const MediaDetailsPanel = ({
 			}
 			return;
 		}
-
 		setLoading(true);
-		try {
-			const info = await jellyfinService.getPlaybackInfo(item.Id);
-			if (!isPlaybackRequestCurrent(playbackRequestToken)) return;
-			setPlaybackInfo(info || null);
-			applyDefaultTracks(info?.MediaSources?.[0]?.MediaStreams);
-		} catch (error) {
-			if (!isPlaybackRequestCurrent(playbackRequestToken)) return;
-			console.error('Failed to load playback info:', error);
-			setPlaybackInfo(null);
-			applyDefaultTracks(null);
-		} finally {
-			if (isPlaybackRequestCurrent(playbackRequestToken)) {
-				setLoading(false);
-			}
-		}
-	}, [applyDefaultTracks, createPlaybackRequestToken, isPlaybackRequestCurrent, item]);
+		await loadPlaybackInfoForItem(item.Id, {clearLoading: true});
+	}, [applyDefaultTracks, createPlaybackRequestToken, isPlaybackRequestCurrent, item, loadPlaybackInfoForItem]);
 
 	const loadEpisodes = useCallback(async (seasonId) => {
 		if (!item || !seasonId) return;
 		episodesRequestRef.current += 1;
 		const episodeRequestToken = episodesRequestRef.current;
 		try {
-			const episodesDataRaw = await jellyfinService.getEpisodes(item.Id, seasonId);
+			const episodesDataRaw = await getEpisodesCached(item.Id, seasonId);
 			if (episodeRequestToken !== episodesRequestRef.current) return;
 			const episodesData = Array.isArray(episodesDataRaw) ? episodesDataRaw : [];
 			setEpisodes(episodesData);
@@ -365,11 +429,9 @@ const MediaDetailsPanel = ({
 					episodesData.find((episode) => episode?.UserData?.Played !== true) ||
 					episodesData[0];
 				setSelectedEpisode(resumeEpisode);
-				const playbackRequestToken = createPlaybackRequestToken();
-				const info = await jellyfinService.getPlaybackInfo(resumeEpisode.Id);
-				if (episodeRequestToken !== episodesRequestRef.current || !isPlaybackRequestCurrent(playbackRequestToken)) return;
-				setPlaybackInfo(info || null);
-				applyDefaultTracks(info?.MediaSources?.[0]?.MediaStreams);
+				setPlaybackInfo(null);
+				applyDefaultTracks(null);
+				void loadPlaybackInfoForItem(resumeEpisode.Id, {episodeRequestToken});
 				return;
 			}
 			setSelectedEpisode(null);
@@ -383,7 +445,7 @@ const MediaDetailsPanel = ({
 			setPlaybackInfo(null);
 			applyDefaultTracks(null);
 		}
-	}, [applyDefaultTracks, createPlaybackRequestToken, isPlaybackRequestCurrent, item]);
+	}, [applyDefaultTracks, getEpisodesCached, item, loadPlaybackInfoForItem]);
 
 	const loadSeasons = useCallback(async () => {
 		if (!item) return;
@@ -391,7 +453,7 @@ const MediaDetailsPanel = ({
 		const seasonRequestToken = seasonsRequestRef.current;
 		setLoading(true);
 		try {
-			const seasonsDataRaw = await jellyfinService.getSeasons(item.Id);
+			const seasonsDataRaw = await getSeasonsCached(item.Id);
 			if (seasonRequestToken !== seasonsRequestRef.current) return;
 			const seasonsData = Array.isArray(seasonsDataRaw) ? seasonsDataRaw : [];
 			setSeasons(seasonsData);
@@ -421,12 +483,12 @@ const MediaDetailsPanel = ({
 				setLoading(false);
 			}
 		}
-	}, [applyDefaultTracks, item, loadEpisodes]);
+	}, [applyDefaultTracks, getSeasonsCached, item, loadEpisodes]);
 
 	const openSeriesFromEpisode = useCallback(async (seasonId = null) => {
 		if (item?.Type !== 'Episode' || !item.SeriesId || !onItemSelect) return false;
 		try {
-			const series = await jellyfinService.getItem(item.SeriesId);
+			const series = await getSeriesItemCached(item.SeriesId);
 			if (!series) return false;
 			const target = seasonId ? {...series, __initialSeasonId: seasonId} : series;
 			onItemSelect(target, item);
@@ -435,7 +497,7 @@ const MediaDetailsPanel = ({
 			console.error('Error opening series from episode details:', error);
 			return false;
 		}
-	}, [item, onItemSelect]);
+	}, [getSeriesItemCached, item, onItemSelect]);
 
 	const handlePlay = useCallback(() => {
 		const mediaSourceId = playbackInfo?.MediaSources?.[0]?.Id || null;
@@ -508,19 +570,8 @@ const MediaDetailsPanel = ({
 
 	const handleEpisodeClick = useCallback(async (episode) => {
 		setSelectedEpisode(episode);
-		const playbackRequestToken = createPlaybackRequestToken();
-		try {
-			const info = await jellyfinService.getPlaybackInfo(episode.Id);
-			if (!isPlaybackRequestCurrent(playbackRequestToken)) return;
-			setPlaybackInfo(info || null);
-			applyDefaultTracks(info?.MediaSources?.[0]?.MediaStreams);
-		} catch (error) {
-			if (!isPlaybackRequestCurrent(playbackRequestToken)) return;
-			console.error('Failed to load episode playback info:', error);
-			setPlaybackInfo(null);
-			applyDefaultTracks(null);
-		}
-	}, [applyDefaultTracks, createPlaybackRequestToken, isPlaybackRequestCurrent]);
+		await loadPlaybackInfoForItem(episode.Id);
+	}, [loadPlaybackInfoForItem]);
 
 	const handleToggleFavorite = useCallback(async () => {
 		if (!item) return;
@@ -1915,9 +1966,10 @@ const MediaDetailsPanel = ({
 												</div>
 											)}
 										</div>
-										<div className={`${css.introSection} ${isElegantTheme ? css.introSectionElegant : ''}`}>
-										<div className={css.introContent}>
-										<div className={css.introHeaderRow}>
+											<div className={`${css.introSection} ${isElegantTheme ? css.introSectionElegant : ''}`}>
+											<div className={css.introContent}>
+											<div className={css.introTopSpacer} />
+											<div className={css.introHeaderRow}>
 											<div className={css.pageHeader}>
 												{useHeaderLogo ? (
 													<div className={css.headerLogoWrap}>

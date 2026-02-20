@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Item from '@enact/sandstone/Item';
@@ -16,9 +16,12 @@ import {isStyleDebugEnabled} from '../utils/featureFlags';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
-import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
+import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useToolbarActions } from '../hooks/useToolbarActions';
+import { useToolbarBackHandler } from '../hooks/useToolbarBackHandler';
 import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
 import { wipeAllAppCache } from '../utils/cacheMaintenance';
+import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 
 import css from './SettingsPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -127,6 +130,7 @@ const SettingsPanel = ({
 	...rest
 }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
+	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
 	const [userInfo, setUserInfo] = useState(null);
@@ -137,13 +141,15 @@ const SettingsPanel = ({
 	const [appLogCount, setAppLogCount] = useState(0);
 	const [cacheWipeInProgress, setCacheWipeInProgress] = useState(false);
 	const [cacheWipeError, setCacheWipeError] = useState('');
-	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const {
 		disclosures,
 		openDisclosure,
 		closeDisclosure
 	} = useDisclosureMap(INITIAL_SETTINGS_DISCLOSURES);
-	const toolbarBackHandlerRef = useRef(null);
+	const {
+		registerToolbarBackHandler,
+		runToolbarBackHandler
+	} = useToolbarBackHandler();
 	const savedServerKeySelector = useCallback(
 		(entry) => `${entry.serverId}:${entry.userId}`,
 		[]
@@ -157,19 +163,18 @@ const SettingsPanel = ({
 	const logoutConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM] === true;
 	const logsPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGS] === true;
 	const wipeCacheConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM] === true;
+	const hasRuntimeVersionInfo = runtimeCapabilities.version != null || runtimeCapabilities.chrome != null;
+	const webosVersionLabel = hasRuntimeVersionInfo
+		? `${runtimeCapabilities.version ?? 'Unknown'}${runtimeCapabilities.chrome ? ` (Chrome ${runtimeCapabilities.chrome})` : ''}`
+		: 'Unknown';
 	const {
 		captureScrollTo: captureSettingsScrollRestore,
 		handleScrollStop: handleSettingsScrollMemoryStop
-	} = useScrollerScrollMemory({
+	} = usePanelScrollState({
+		cachedState,
 		isActive,
-		scrollTop,
-		onScrollTopChange: setScrollTop
+		onCacheState
 	});
-
-	useEffect(() => {
-		if (typeof onCacheState !== 'function') return;
-		onCacheState({scrollTop});
-	}, [onCacheState, scrollTop]);
 
 	const loadSettings = useCallback(() => {
 		try {
@@ -480,9 +485,13 @@ const SettingsPanel = ({
 		}
 	}, [onNavigate]);
 
-	const registerToolbarBackHandler = useCallback((handler) => {
-		toolbarBackHandlerRef.current = handler;
-	}, []);
+	const toolbarActions = useToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler: registerToolbarBackHandler
+	});
 
 	const toggleBooleanSetting = useCallback((key) => {
 		handleSettingChange(key, !settings[key]);
@@ -625,14 +634,12 @@ const SettingsPanel = ({
 			closeDisclosure(disclosureKey);
 			return true;
 		}
-		if (typeof toolbarBackHandlerRef.current === 'function') {
-			return toolbarBackHandlerRef.current() === true;
-		}
-		return false;
+		return runToolbarBackHandler();
 	}, [
 		cacheWipeInProgress,
 		closeDisclosure,
-		disclosures
+		disclosures,
+		runToolbarBackHandler
 	]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
@@ -641,11 +648,7 @@ const SettingsPanel = ({
 		<Panel {...rest}>
 			<Header title="Settings" />
 			<SettingsToolbar
-				onNavigate={onNavigate}
-				onSwitchUser={onSwitchUser}
-				onLogout={onLogout}
-				onExit={onExit}
-				registerBackHandler={registerToolbarBackHandler}
+				{...toolbarActions}
 			/>
 			<Scroller
 				className={css.settingsContainer}
@@ -803,22 +806,7 @@ const SettingsPanel = ({
 					</section>
 
 					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
-
-							<Item
-								className={css.settingItem}
-								label="Maximum Bitrate"
-								slotAfter={getBitrateLabel(settings.maxBitrate)}
-								onClick={openBitratePopup}
-							/>
-
-							<SwitchItem
-								className={css.switchItem}
-								onToggle={toggleEnableTranscoding}
-								selected={settings.enableTranscoding}
-							>
-							Enable Transcoding
-						</SwitchItem>
+						<BodyText className={css.sectionTitle}>Playback</BodyText>
 
 							<SwitchItem
 								className={css.switchItem}
@@ -871,7 +859,22 @@ const SettingsPanel = ({
 					</section>
 
 					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Playback</BodyText>
+						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
+
+							<Item
+								className={css.settingItem}
+								label="Maximum Bitrate"
+								slotAfter={getBitrateLabel(settings.maxBitrate)}
+								onClick={openBitratePopup}
+							/>
+
+							<SwitchItem
+								className={css.switchItem}
+								onToggle={toggleEnableTranscoding}
+								selected={settings.enableTranscoding}
+							>
+							Enable Transcoding
+						</SwitchItem>
 
 							<SwitchItem
 								className={css.switchItem}
@@ -953,6 +956,7 @@ const SettingsPanel = ({
 						<BodyText className={css.sectionTitle}>About</BodyText>
 						<Item className={css.infoItem} label="App Version" slotAfter={appVersion} />
 						<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
+						<Item className={css.infoItem} label="webOS Version" slotAfter={webosVersionLabel} />
 					</section>
 
 						<section className={css.section}>

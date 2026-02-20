@@ -18,6 +18,7 @@ import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
+import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import AppCrashBoundary from './AppCrashBoundary';
 
 import css from './App.module.less';
@@ -75,6 +76,7 @@ const resolveInitialVisualSettings = () => {
 
 const App = (props) => {
 	const initialVisualSettingsRef = useRef(resolveInitialVisualSettings());
+	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [currentView, setCurrentView] = useState('login');
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
@@ -760,15 +762,23 @@ const App = (props) => {
 	);
 
 	return (
-		<div
-			className={css.app}
-			data-bf-animations={animationsDisabled ? 'off' : 'on'}
-			data-bf-all-animations={allAnimationsDisabled ? 'off' : 'on'}
-			data-bf-nav-theme={navbarTheme}
-			data-bf-performance-overlay={performanceOverlayEnabled ? 'on' : 'off'}
-			data-bf-input-mode={inputMode}
-			{...props}
-			>
+			<div
+				className={css.app}
+				data-bf-animations={animationsDisabled ? 'off' : 'on'}
+				data-bf-all-animations={allAnimationsDisabled ? 'off' : 'on'}
+				data-bf-nav-theme={navbarTheme}
+				data-bf-performance-overlay={performanceOverlayEnabled ? 'on' : 'off'}
+				data-bf-input-mode={inputMode}
+				data-bf-platform-webos={runtimeCapabilities.webos ? 'on' : 'off'}
+				data-bf-webos-version={runtimeCapabilities.version ?? 'unknown'}
+				data-bf-webos-v6-compat={runtimeCapabilities.webosV6Compat ? 'on' : 'off'}
+				data-bf-webos-v22-compat={runtimeCapabilities.webosV22Compat ? 'on' : 'off'}
+				data-bf-webos-legacy={runtimeCapabilities.legacyWebOS ? 'on' : 'off'}
+				data-bf-flex-gap={runtimeCapabilities.supportsFlexGap ? 'on' : 'off'}
+				data-bf-aspect-ratio={runtimeCapabilities.supportsAspectRatio ? 'on' : 'off'}
+				data-bf-backdrop-filter={runtimeCapabilities.supportsBackdropFilter ? 'on' : 'off'}
+				{...props}
+				>
 				<Panels
 					index={getPanelIndex()}
 					onBack={handleBack}

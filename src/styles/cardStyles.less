@@ -58,6 +58,25 @@
 	align-items: center;
 	justify-content: center;
 
+	/* Runtime compatibility switch for engines without aspect-ratio support (webOS 22 / 6). */
+	:global([data-bf-aspect-ratio='off']) & {
+		aspect-ratio: auto;
+		height: 0;
+		padding-top: calc(100% / (@ratio));
+		display: block;
+
+		> img,
+		> [class*='placeholderInner'] {
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+	}
+
 	:global([data-bf-animations='off']) &,
 	:global([data-bf-all-animations='off']) & {
 		box-shadow: none;
@@ -69,7 +88,10 @@
 	&::before {
 		content: '';
 		position: absolute;
-		inset: 0;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
 		background: @card-hover-overlay-gradient;
 		opacity: 0;
 		transition: opacity 220ms ease;

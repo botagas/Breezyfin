@@ -5,7 +5,7 @@ import Slider from '@enact/sandstone/Slider';
 import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
 import Item from '@enact/sandstone/Item';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spotlight from '@enact/spotlight';
 import Hls from 'hls.js';
 import jellyfinService from '../services/jellyfinService';

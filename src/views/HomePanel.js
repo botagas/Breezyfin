@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import jellyfinService from '../services/jellyfinService';
 import MediaRow from '../components/MediaRow';
@@ -11,12 +11,14 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
+import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useToolbarActions } from '../hooks/useToolbarActions';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 
 import css from './HomePanel.module.less';
 
 const SERIES_UNPLAYED_CACHE_TTL_MS = 5 * 60 * 1000;
+const MY_REQUESTS_TAG_SCAN_LIMIT = 240;
 
 const HomePanel = ({
 	onItemSelect,
@@ -48,23 +50,17 @@ const HomePanel = ({
 	});
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 	const [showMediaBar, setShowMediaBar] = useState(true);
-	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const homeScrollToRef = useRef(null);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
 	const {
 		captureScrollTo: captureHomeScrollRestore,
 		handleScrollStop: handleHomeScrollMemoryStop
-	} = useScrollerScrollMemory({
+	} = usePanelScrollState({
+		cachedState,
 		isActive,
-		scrollTop,
-		onScrollTopChange: setScrollTop
+		onCacheState
 	});
-
-	useEffect(() => {
-		if (typeof onCacheState !== 'function') return;
-		onCacheState({scrollTop});
-	}, [onCacheState, scrollTop]);
 
 	const hydrateEpisodeSeriesProgress = useCallback(async (episodeGroups = []) => {
 		const normalizedGroups = episodeGroups.map((group) => (Array.isArray(group) ? group : []));
@@ -135,7 +131,7 @@ const HomePanel = ({
 					console.error('Failed to load latest shows:', err);
 					return [];
 				}),
-				jellyfinService.getLatestMedia(['Movie', 'Series'], 60).catch(err => {
+				jellyfinService.getLatestMedia(['Movie', 'Series'], MY_REQUESTS_TAG_SCAN_LIMIT).catch(err => {
 					console.error('Failed to load tagged latest media:', err);
 					return [];
 				})
@@ -145,7 +141,7 @@ const HomePanel = ({
 			const userNeedle = userName.trim();
 			const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			const userTagPattern = userNeedle
-				? new RegExp(`^\\s*\\d+\\s*-\\s*${escapeRegex(userNeedle)}\\s*$`, 'i')
+				? new RegExp(`^\\s*.+?\\s*-\\s*${escapeRegex(userNeedle)}\\s*$`, 'i')
 				: null;
 			const tagMatchesUser = (item) => {
 				if (!userTagPattern) return false;
@@ -230,6 +226,13 @@ const HomePanel = ({
 			onNavigate(section, data);
 		}
 	}, [onNavigate]);
+	const toolbarActions = useToolbarActions({
+		onNavigate: handleNavigation,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler
+	});
 
 	const captureHomeScrollTo = useCallback((fn) => {
 		homeScrollToRef.current = fn;
@@ -295,11 +298,7 @@ const HomePanel = ({
 	const topToolbar = (
 		<Toolbar
 			activeSection="home"
-			onNavigate={handleNavigation}
-			onSwitchUser={onSwitchUser}
-			onLogout={onLogout}
-			onExit={onExit}
-			registerBackHandler={registerBackHandler}
+			{...toolbarActions}
 		/>
 	);
 

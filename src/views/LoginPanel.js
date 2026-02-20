@@ -3,7 +3,7 @@ import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
 import BodyText from '@enact/sandstone/BodyText';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import Input from '@enact/sandstone/Input';
 import Spottable from '@enact/spotlight/Spottable';

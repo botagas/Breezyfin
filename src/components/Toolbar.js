@@ -11,6 +11,7 @@ import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDismissOnOutsideInteraction } from '../hooks/useDismissOnOutsideInteraction';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
+import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 
 import css from './Toolbar.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -45,6 +46,7 @@ const Toolbar = ({
 	const showUserMenu = disclosures[TOOLBAR_DISCLOSURE_KEYS.USER_MENU] === true;
 	const showLibrariesPopup = disclosures[TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP] === true;
 	const [toolbarTheme, setToolbarTheme] = useState(TOOLBAR_THEME_ELEGANT);
+	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const glassFilterId = useId();
 	const centerRef = useRef(null);
 	const userMenuScopeRef = useRef(null);
@@ -328,8 +330,12 @@ const Toolbar = ({
 		onMouseEnter: handleUserMenuOpen,
 		onMouseLeave: handleElegantUserMouseLeave
 	};
+	const isWebOS6Compat = runtimeCapabilities.webosV6Compat;
+	const shouldRenderElegantDistortion =
+		!isWebOS6Compat &&
+		runtimeCapabilities.supportsBackdropFilter;
 	const toolbarStyle = isElegantTheme
-		? {'--bf-glass-distortion-filter': `url(#${glassFilterId})`}
+		? {'--bf-glass-distortion-filter': shouldRenderElegantDistortion ? `url(#${glassFilterId})` : 'none'}
 		: undefined;
 	const renderLibraryPicker = (useElegantGlass = false) => (
 		<div className={`${popupStyles.popupSurface} ${css.libraryNativeContent} ${useElegantGlass ? css.libraryNativeContentGlass : ''}`}>
@@ -369,9 +375,10 @@ const Toolbar = ({
 			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''}`}
 			data-bf-navbar="true"
 			data-bf-navbar-theme={toolbarTheme}
+			data-bf-navbar-legacy={isWebOS6Compat ? 'on' : 'off'}
 			style={toolbarStyle}
 		>
-			{isElegantTheme && (
+			{isElegantTheme && shouldRenderElegantDistortion && (
 				<svg className={css.glassFilterSvg} aria-hidden="true" focusable="false" width="0" height="0">
 					<defs>
 						<filter id={glassFilterId}>

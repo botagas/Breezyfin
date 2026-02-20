@@ -18,6 +18,16 @@ const MAX_REPORTS = 60;
 
 const normalizeLine = (line) => line.replace(/\s+/g, ' ').trim();
 
+const JS_LOW_SIGNAL_LINE_REGEX = /^(?:\.\.\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\s*=\s*[^,]+)?,?$/;
+
+const isLowSignalSnippet = (extension, snippetKey) => {
+	if (extension !== '.js') return false;
+	const lines = snippetKey.split('\n').map((line) => line.trim()).filter(Boolean);
+	if (lines.length === 0) return true;
+	// Ignore windows that are just prop lists / argument lists and carry little structural value.
+	return lines.every((line) => JS_LOW_SIGNAL_LINE_REGEX.test(line));
+};
+
 const getFiles = () => {
 	const files = [];
 	for (const glob of FILE_GLOBS) {
@@ -80,8 +90,9 @@ const buildReport = (store) => {
 		});
 	}
 
-	report.sort((a, b) => b.fileCount - a.fileCount || b.rawOccurrenceCount - a.rawOccurrenceCount);
-	return report.slice(0, MAX_REPORTS);
+	const filteredReport = report.filter((entry) => !isLowSignalSnippet(entry.extension, entry.snippet));
+	filteredReport.sort((a, b) => b.fileCount - a.fileCount || b.rawOccurrenceCount - a.rawOccurrenceCount);
+	return filteredReport.slice(0, MAX_REPORTS);
 };
 
 const printReport = (report) => {

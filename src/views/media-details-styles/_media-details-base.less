@@ -13,8 +13,9 @@
 	--bf-media-details-base-rgb: 18, 18, 18;
 	--bf-media-details-control-radius: 0.9rem;
 	--bf-media-details-episode-radius: 1.75rem;
-	--bf-md-hero-top-padding: 0.5rem;
-	--bf-md-hero-top-padding-elegant: 26vh;
+	--bf-md-hero-top-padding: 0rem;
+	--bf-md-hero-top-padding-elegant: 22vh;
+	--bf-md-intro-control-size: 2rem;
 	min-height: 100vh;
 	background-color: rgb(var(--bf-media-details-base-rgb));
 	background: linear-gradient(
@@ -27,7 +28,7 @@
 
 .episodeDetailsMode {
 	--bf-md-hero-top-padding: 0rem;
-	--bf-md-hero-top-padding-elegant: 18vh;
+	--bf-md-hero-top-padding-elegant: 14vh;
 }
 
 .mdControlSurface(@bg; @border; @radius: 999px) {
@@ -135,12 +136,18 @@
 
 .content {
 	--bf-md-content-top-padding: 1rem;
+	--bf-md-intro-top-gap: clamp(
+		0rem,
+		calc(var(--bf-md-hero-top-padding, 0rem) - (var(--bf-md-intro-control-size, 2rem) - 2rem)),
+		var(--bf-md-hero-top-padding, 0rem)
+	);
 	padding: var(--bf-md-content-top-padding) 48px calc(120px + var(--bf-panel-content-bottom-padding, 4rem)) 48px;
 	position: relative;
 	z-index: 2;
 }
 
 .firstSection {
+	--bf-md-intro-control-size: 4rem;
 	min-height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
 	max-height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
 	height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
@@ -233,18 +240,27 @@
 }
 
 .header {
-	margin-bottom: 32px;
+	margin-bottom: 1.25rem;
 }
 
 .introSection {
-	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 1rem);
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.introContent {
+	flex: 1 1 auto;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-end;
 }
 
-.introContent {
-	flex: 0 0 auto;
+.introTopSpacer {
+	flex: 1 1 var(--bf-md-intro-top-gap, 0rem);
+	min-height: 0;
 }
 
 .introHeaderRow {
@@ -333,12 +349,12 @@
 	flex: 1 1 auto;
 	min-width: 0;
 	max-width: 60vw;
-	padding: var(--bf-md-hero-top-padding) 0 1.5rem;
-	margin-bottom: 24px;
+	padding: 0 0 1rem;
+	margin-bottom: 0.75rem;
 }
 
 .episodeDetailsMode .introSection {
-	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 2.8rem);
+	min-height: 0;
 }
 
 .pageHeaderTitle {
@@ -1203,7 +1219,8 @@
 }
 
 .episodeCard.episodeCardSideways .episodeActions {
-	margin-top: auto;
+	margin-top: 0.45rem;
+	align-self: flex-start;
 }
 
 .episodePlayed {
@@ -1757,5 +1774,55 @@
 		white-space: nowrap !important;
 		font-size: 0.84em !important;
 		font-weight: 700 !important;
+	}
+}
+
+/* Larger hit area for first-section audio/subtitle/play controls without changing text scale. */
+.firstSection .introControlsRow .compactSelectorButton,
+.firstSection .introControlsRow .trackSelectorPrimary,
+.firstSection .introControlsRow .primaryButton,
+.firstSection .introControlsRow .overviewPlayButton {
+	min-height: var(--bf-md-intro-control-size) !important;
+	height: var(--bf-md-intro-control-size) !important;
+	line-height: var(--bf-md-intro-control-size) !important;
+	display: inline-flex !important;
+	align-items: stretch !important;
+	vertical-align: middle !important;
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.bg),
+	:global(.client) {
+		min-height: var(--bf-md-intro-control-size) !important;
+		height: var(--bf-md-intro-control-size) !important;
+	}
+
+	:global(.bf-button) {
+		padding: 0 !important;
+		display: inline-flex !important;
+		align-items: stretch !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		display: inline-flex !important;
+		align-items: stretch !important;
+	}
+
+	:global(.client) {
+		padding: 0 1.35rem !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		gap: 0.42rem;
+		line-height: 1 !important;
+		text-align: center !important;
+	}
+
+	:global(.icon) {
+		line-height: 1 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
 	}
 }

@@ -3,7 +3,7 @@ import { Panel, Header } from '../components/BreezyPanels';
 import Input from '@enact/sandstone/Input';
 import Button from '../components/BreezyButton';
 import SandstoneButton from '@enact/sandstone/Button';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
@@ -16,7 +16,9 @@ import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
-import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
+import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useToolbarActions } from '../hooks/useToolbarActions';
+import { useToolbarBackHandler } from '../hooks/useToolbarBackHandler';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './SearchPanel.module.less';
@@ -80,7 +82,6 @@ const SearchPanel = ({
 		sanitizeSelectedFilterIds(cachedState?.selectedFilterIds)
 	));
 	const [hasMore, setHasMore] = useState(() => cachedState?.hasMore === true);
-	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const searchDebounceRef = useRef(null);
 	const activeSearchRequestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
@@ -92,17 +93,18 @@ const SearchPanel = ({
 		term: typeof cachedState?.searchTerm === 'string' ? cachedState.searchTerm.trim() : '',
 		filterTypes: null
 	});
-	const toolbarBackHandlerRef = useRef(null);
+	const {
+		registerToolbarBackHandler,
+		runToolbarBackHandler
+	} = useToolbarBackHandler();
 	const filtersById = useMapById(FILTER_OPTIONS, 'id');
 	const resultsById = useMapById(results);
 	const {
+		scrollTop,
+		setScrollTop,
 		captureScrollTo: captureSearchScrollRestore,
 		handleScrollStop: handleSearchScrollMemoryStop
-	} = useScrollerScrollMemory({
-		isActive,
-		scrollTop,
-		onScrollTopChange: setScrollTop
-	});
+	} = usePanelScrollState({cachedState, isActive});
 	const appliedFilterCount = useMemo(
 		() => (selectedFilterIds.length < FILTER_OPTIONS.length ? selectedFilterIds.length : 0),
 		[selectedFilterIds]
@@ -324,20 +326,21 @@ const SearchPanel = ({
 		closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
 	}, [closeDisclosure]);
 
-	const registerToolbarBackHandler = useCallback((handler) => {
-		toolbarBackHandlerRef.current = handler;
-	}, []);
+	const toolbarActions = useToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler: registerToolbarBackHandler
+	});
 
 	const handleInternalBack = useCallback(() => {
 		if (filterPopupOpen) {
 			closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
 			return true;
 		}
-		if (typeof toolbarBackHandlerRef.current === 'function') {
-			return toolbarBackHandlerRef.current() === true;
-		}
-		return false;
-	}, [closeDisclosure, filterPopupOpen]);
+		return runToolbarBackHandler();
+	}, [closeDisclosure, filterPopupOpen, runToolbarBackHandler]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
@@ -411,11 +414,7 @@ const SearchPanel = ({
 			<Header title="Search" />
 				<Toolbar
 					activeSection="search"
-					onNavigate={onNavigate}
-					onSwitchUser={onSwitchUser}
-					onLogout={onLogout}
-					onExit={onExit}
-					registerBackHandler={registerToolbarBackHandler}
+					{...toolbarActions}
 				/>
 			<div className={css.searchContainer}>
 				<div className={css.searchBox}>

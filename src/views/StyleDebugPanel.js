@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../components/BreezyButton';
 import SettingsToolbar from '../components/SettingsToolbar';
@@ -8,6 +8,8 @@ import jellyfinService from '../services/jellyfinService';
 import { shuffleArray } from '../utils/arrayUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
+import { useToolbarActions } from '../hooks/useToolbarActions';
+import { useToolbarBackHandler } from '../hooks/useToolbarBackHandler';
 
 import css from './StyleDebugPanel.module.less';
 
@@ -65,7 +67,10 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 		register: false
 	});
 	const [snipzyExactFormError, setSnipzyExactFormError] = useState('');
-	const toolbarBackHandlerRef = useRef(null);
+	const {
+		registerToolbarBackHandler,
+		runToolbarBackHandler
+	} = useToolbarBackHandler();
 	const exactFormSpecularRef = useRef(null);
 	const exactFormDisplacementMapRef = useRef(null);
 	const exactSearchInputRef = useRef(null);
@@ -99,16 +104,17 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 
 	const handleSampleClick = useCallback(() => {}, []);
 
-	const registerToolbarBackHandler = useCallback((handler) => {
-		toolbarBackHandlerRef.current = handler;
-	}, []);
+	const toolbarActions = useToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler: registerToolbarBackHandler
+	});
 
 	const handleInternalBack = useCallback(() => {
-		if (typeof toolbarBackHandlerRef.current === 'function') {
-			return toolbarBackHandlerRef.current() === true;
-		}
-		return false;
-	}, []);
+		return runToolbarBackHandler();
+	}, [runToolbarBackHandler]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
@@ -347,11 +353,7 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 		<Panel {...rest}>
 			<Header title="Styling Debug Panel" />
 			<SettingsToolbar
-				onNavigate={onNavigate}
-				onSwitchUser={onSwitchUser}
-				onLogout={onLogout}
-				onExit={onExit}
-				registerBackHandler={registerToolbarBackHandler}
+				{...toolbarActions}
 			/>
 			<Scroller className={css.scroller}>
 				<div className={css.content}>

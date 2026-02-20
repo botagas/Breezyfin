@@ -1,12 +1,8 @@
 @import (reference) '../../styles/cardStyles.less';
+@import (reference) '../../styles/panelLayoutMixins.less';
 
 .libraryContainer {
-	display: flex;
-	flex-direction: column;
-	position: absolute;
-	inset: 0;
-	background: var(--bf-theme-panel-bg, #121212);
-	overflow: hidden;
+	.panel-fill-container(var(--bf-theme-panel-bg, #121212));
 }
 
 .scroller {
@@ -31,10 +27,6 @@
 	padding: calc(var(--bf-panel-top-offset, 4.5rem) - 0.75rem) 4rem clamp(2rem, var(--bf-panel-content-bottom-padding, 4rem), 4rem);
 	background: var(--bf-theme-panel-bg, #121212);
 	.panel-grid-performance();
-	/* Keep scroll metrics stable from first render; deferred content-visibility causes late scrollbar updates. */
-	content-visibility: visible;
-	contain: layout style;
-	contain-intrinsic-size: auto;
 }
 
 .loadingMore {

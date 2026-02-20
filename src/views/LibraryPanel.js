@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
@@ -10,7 +10,8 @@ import {KeyCodes} from '../utils/keyCodes';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import { useMapById } from '../hooks/useMapById';
-import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
+import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useToolbarActions } from '../hooks/useToolbarActions';
 import {
 	getPlaybackProgressPercent,
 	getPosterCardImageUrl,
@@ -41,26 +42,29 @@ const LibraryPanel = ({
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(false);
 	const [items, setItems] = useState([]);
-	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const libraryScrollToRef = useRef(null);
 	const gridRef = useRef(null);
 	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const toolbarActions = useToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler
+	});
 	const itemsById = useMapById(items);
 	const {
 		captureScrollTo: captureLibraryScrollRestore,
 		handleScrollStop: handleLibraryScrollMemoryStop
-	} = useScrollerScrollMemory({
+	} = usePanelScrollState({
+		cachedState,
 		isActive,
-		scrollTop,
-		onScrollTopChange: setScrollTop
+		onCacheState,
+		cacheKey: library?.Id || null,
+		requireCacheKey: true
 	});
-
-	useEffect(() => {
-		if (typeof onCacheState !== 'function' || !library?.Id) return;
-		onCacheState(library.Id, {scrollTop});
-	}, [library?.Id, onCacheState, scrollTop]);
 
 	const getItemTypesForLibrary = useCallback((libraryValue) => {
 		if (!libraryValue) return undefined;
@@ -208,11 +212,7 @@ const LibraryPanel = ({
 		<Toolbar
 			activeSection="library"
 			activeLibraryId={library?.Id}
-			onNavigate={onNavigate}
-			onSwitchUser={onSwitchUser}
-			onLogout={onLogout}
-			onExit={onExit}
-			registerBackHandler={registerBackHandler}
+			{...toolbarActions}
 		/>
 	);
 

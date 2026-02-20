@@ -74,9 +74,13 @@ Before adding new panel logic, prefer shared building blocks first:
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
-- Scroll restoration + cached panel scroll state: `src/hooks/useScrollerScrollMemory.js`
+- Preferred panel scroll cache wiring: `src/hooks/usePanelScrollState.js`
+  - `usePanelScrollState()` for normalized scrollTop state, `Scroller` restore/save wiring, and optional cache persistence
+- Low-level scroll primitives (use only when panel needs custom behavior): `src/hooks/useScrollerScrollMemory.js`
   - `useScrollerScrollMemory()` for `Scroller` restore/save wiring
   - `useCachedScrollTopState()` for normalized cached scrollTop state
+- Shared toolbar callback bundle: `src/hooks/useToolbarActions.js`
+- Shared toolbar back-handler bridge: `src/hooks/useToolbarBackHandler.js`
 - Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
 - Shared toolbar focus helper: `src/utils/toolbarFocus.js`
 - Shared home row order constant: `src/constants/homeRows.js`
@@ -86,6 +90,8 @@ Styling and theme references:
 
 - Theme tokens: `src/styles/themes/classic.css`, `src/styles/themes/elegant.css`
 - Shared popup surface styles: `src/styles/popupStyles.module.less`, `src/styles/popupStyles.js`
+- Shared panel layout mixins: `src/styles/panelLayoutMixins.less`
+- webOS compatibility mixins: `src/styles/compatMixins.less`
 - Panel styling pattern: `src/views/*-panel-styles/` split files (base + per-theme + shared tail)
 
 ## Debug flags

@@ -5,8 +5,24 @@ import Heading from '@enact/sandstone/Heading';
 
 import {getCrashErrorMessage} from '../utils/errorMessages';
 import {appendAppLog} from '../utils/appLogger';
+import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 
 import css from './AppCrashBoundary.module.less';
+
+const shouldIgnoreResizeObserverLoopErrors = () => {
+	const runtimeCapabilities = getRuntimePlatformCapabilities();
+	return Boolean(runtimeCapabilities.webosV6Compat || runtimeCapabilities.webosV22Compat);
+};
+
+const isIgnorableObserverError = (value) => {
+	if (!shouldIgnoreResizeObserverLoopErrors()) return false;
+	if (!value) return false;
+	const message = String(value);
+	return (
+		message.includes('ResizeObserver loop limit exceeded') ||
+		message.includes('ResizeObserver loop completed with undelivered notifications')
+	);
+};
 
 class AppCrashBoundary extends Component {
 	constructor(props) {
@@ -34,6 +50,10 @@ class AppCrashBoundary extends Component {
 	}
 
 	handleWindowError = (event) => {
+		if (isIgnorableObserverError(event?.message) || isIgnorableObserverError(event?.error?.message)) {
+			appendAppLog('warn', '[AppCrashBoundary] Ignored non-fatal ResizeObserver warning', event?.message || '');
+			return;
+		}
 		const error = event?.error || new Error(event?.message || 'Unexpected runtime error');
 		console.error('[AppCrashBoundary] Global error event:', error);
 		appendAppLog('error', '[AppCrashBoundary] window.error', error);
@@ -42,6 +62,10 @@ class AppCrashBoundary extends Component {
 
 	handleUnhandledRejection = (event) => {
 		const reason = event?.reason;
+		if (isIgnorableObserverError(reason?.message) || isIgnorableObserverError(reason)) {
+			appendAppLog('warn', '[AppCrashBoundary] Ignored non-fatal ResizeObserver rejection', reason?.message || reason || '');
+			return;
+		}
 		const error = reason instanceof Error ? reason : new Error(String(reason || 'Unhandled promise rejection'));
 		console.error('[AppCrashBoundary] Unhandled promise rejection:', error);
 		appendAppLog('error', '[AppCrashBoundary] unhandledrejection', error);

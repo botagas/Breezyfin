@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
@@ -9,7 +9,8 @@ import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import { useMapById } from '../hooks/useMapById';
-import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
+import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useToolbarActions } from '../hooks/useToolbarActions';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 
@@ -37,21 +38,23 @@ const FavoritesPanel = ({
 	const [favorites, setFavorites] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState('all');
-	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
+	const toolbarActions = useToolbarActions({
+		onNavigate,
+		onSwitchUser,
+		onLogout,
+		onExit,
+		registerBackHandler
+	});
 	const favoritesById = useMapById(favorites);
 	const {
+		setScrollTop,
 		captureScrollTo: captureFavoritesScrollRestore,
 		handleScrollStop: handleFavoritesScrollMemoryStop
-	} = useScrollerScrollMemory({
+	} = usePanelScrollState({
+		cachedState,
 		isActive,
-		scrollTop,
-		onScrollTopChange: setScrollTop
+		onCacheState
 	});
-
-	useEffect(() => {
-		if (typeof onCacheState !== 'function') return;
-		onCacheState({scrollTop});
-	}, [onCacheState, scrollTop]);
 
 	const loadFavorites = useCallback(async () => {
 		setLoading(true);
@@ -108,11 +111,7 @@ const FavoritesPanel = ({
 			<Header title="Favorites" />
 				<Toolbar
 					activeSection="favorites"
-					onNavigate={onNavigate}
-					onSwitchUser={onSwitchUser}
-					onLogout={onLogout}
-					onExit={onExit}
-					registerBackHandler={registerBackHandler}
+					{...toolbarActions}
 				/>
 			<div className={css.favoritesContainer}>
 				<Scroller

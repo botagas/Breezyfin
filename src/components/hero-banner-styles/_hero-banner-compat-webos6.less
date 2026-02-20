@@ -1,0 +1,10 @@
+@import (reference) '../../styles/compatMixins.less';
+
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on']) .metadata", 1rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on']) .buttons", 1rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on']) .controls", 12px);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on']) .indicators", 8px);
+
+:global([data-bf-webos-v6-compat='on'][data-bf-nav-theme='elegant']) .metadata > * + * {
+	margin-left: 0.75rem;
+}

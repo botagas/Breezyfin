@@ -80,6 +80,25 @@ const parseUsedClassesForAlias = (source, alias) => {
 	return used;
 };
 
+const POSTER_CARD_CLASS_PROP_KEYS = [
+	'cardImage',
+	'placeholder',
+	'placeholderInner',
+	'cardInfo',
+	'cardTitle',
+	'cardSubtitle'
+];
+
+const parseHelperMappedClassesForAlias = (source, alias) => {
+	const used = new Set();
+	const safeAlias = escapeRegExp(alias);
+	const posterCardClassPropsRegex = new RegExp(`getPosterCardClassProps\\(\\s*${safeAlias}\\s*\\)`);
+	if (posterCardClassPropsRegex.test(source)) {
+		POSTER_CARD_CLASS_PROP_KEYS.forEach((className) => used.add(className));
+	}
+	return used;
+};
+
 const resolveLessFile = (importerFile, importPath) => {
 	const resolved = path.resolve(path.dirname(importerFile), importPath);
 	if (fs.existsSync(resolved)) return resolved;
@@ -133,6 +152,7 @@ for (const jsFile of jsFiles) {
 		const resolvedModule = path.resolve(path.dirname(jsFile), imported.importPath);
 		if (!fs.existsSync(resolvedModule)) continue;
 		const usedClasses = parseUsedClassesForAlias(source, imported.alias);
+		const helperMappedClasses = parseHelperMappedClassesForAlias(source, imported.alias);
 		if (!moduleImportUsage.has(resolvedModule)) {
 			moduleImportUsage.set(resolvedModule, {
 				importers: new Set(),
@@ -142,6 +162,7 @@ for (const jsFile of jsFiles) {
 		const usage = moduleImportUsage.get(resolvedModule);
 		usage.importers.add(jsFile);
 		usedClasses.forEach((className) => usage.usedClasses.add(className));
+		helperMappedClasses.forEach((className) => usage.usedClasses.add(className));
 	}
 }
 
@@ -206,4 +227,3 @@ for (const entry of report) {
 	}
 	console.log('');
 }
-

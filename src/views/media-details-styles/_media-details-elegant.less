@@ -30,24 +30,20 @@
 
 .contentElegant {
 	--bf-md-content-top-padding: 0.25rem;
+	--bf-md-hero-top-padding: var(--bf-md-hero-top-padding-elegant, 22vh);
 	padding-top: 0.25rem;
 }
 
 .introSectionElegant {
-	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 0.35rem);
+	min-height: 0;
 }
 
-.contentElegant .pageHeader {
-	padding-top: var(--bf-md-hero-top-padding-elegant, 26vh);
-	margin-bottom: 1rem;
-}
-
-.episodeDetailsMode .contentElegant .pageHeader {
-	padding-top: var(--bf-md-hero-top-padding-elegant, 16vh);
+.episodeDetailsMode .contentElegant {
+	--bf-md-hero-top-padding: var(--bf-md-hero-top-padding-elegant, 14vh);
 }
 
 .episodeDetailsMode .introSectionElegant {
-	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 1.8rem);
+	min-height: 0;
 }
 
 :global([data-bf-nav-theme='elegant']) {

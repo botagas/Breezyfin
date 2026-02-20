@@ -1,15 +1,11 @@
 @import (reference) '../../styles/cardStyles.less';
+@import (reference) '../../styles/panelLayoutMixins.less';
 
 .searchContainer {
 	--bf-search-offset: calc(var(--bf-panel-top-offset, 4.5rem) + var(--bf-search-panel-offset-adjust, -3.25rem));
 	--bf-search-controls-height: 4.2rem;
 	--bf-search-overlay-height: calc(var(--bf-search-offset) + var(--bf-search-controls-height));
-	display: flex;
-	flex-direction: column;
-	position: absolute;
-	inset: 0;
-	background: transparent;
-	overflow: hidden;
+	.panel-fill-container(transparent);
 }
 
 .resultsContent {
@@ -44,7 +40,15 @@
 .searchControls {
 	display: flex;
 	align-items: center;
-	gap: 0.7rem;
+	gap: 0.52rem;
+	padding: 0.34rem 0.38rem;
+	border-radius: 999px;
+	background: var(--bf-theme-surface-bg, rgba(8, 13, 20, 0.42));
+	border: 1px solid var(--bf-theme-surface-border, rgba(255, 255, 255, 0.1));
+	backdrop-filter: blur(0.65rem);
+	-webkit-backdrop-filter: blur(0.65rem);
+	box-shadow: var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(4, 10, 17, 0.34));
+	box-sizing: border-box;
 	position: relative;
 	z-index: 1;
 	pointer-events: auto;
@@ -53,24 +57,29 @@
 .searchFieldShell {
 	flex: 1 1 auto;
 	min-width: 0;
+	min-height: 2.35rem;
+	padding: 0 0.22rem;
+	display: flex;
+	align-items: center;
 	border-radius: 999px;
-	background: var(--bf-theme-input-surface-bg, rgba(255, 255, 255, 0.035));
-	border: 1px solid var(--bf-theme-input-surface-border, rgba(255, 255, 255, 0.18));
-	backdrop-filter: blur(0.5rem);
-	-webkit-backdrop-filter: blur(0.5rem);
-	box-shadow: 0 0.45rem 1.5rem rgba(0, 0, 0, 0.25);
+	background: var(--bf-theme-input-surface-bg, rgba(255, 255, 255, 0.03));
+	border: 1px solid var(--bf-theme-input-surface-border, rgba(255, 255, 255, 0.1));
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	box-shadow: none;
+	box-sizing: border-box;
 	overflow: hidden;
 	transition: background 140ms ease, border-color 140ms ease;
 
 	&:focus-within {
-		background: var(--bf-theme-input-focus-bg, rgba(255, 255, 255, 0.055));
-		border-color: var(--bf-theme-input-focus-border, rgba(255, 255, 255, 0.24));
+		background: var(--bf-theme-input-focus-bg, rgba(255, 255, 255, 0.052));
+		border-color: var(--bf-theme-input-focus-border, rgba(255, 255, 255, 0.18));
 	}
 
 	&:hover,
 	&:hover:focus-within {
-		background: var(--bf-theme-input-hover-bg, rgba(255, 255, 255, 0.095));
-		border-color: var(--bf-theme-input-hover-border, rgba(255, 255, 255, 0.3));
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
+		border-color: var(--bf-theme-input-hover-border, rgba(255, 255, 255, 0.24));
 	}
 
 	/* Keep the search field shape stable; disable Sandstone focusExpand growth here. */
@@ -80,6 +89,8 @@
 	:global(.bf-input-trigger:focus),
 	:global(.bf-input-trigger:active),
 	:global(.bf-input-trigger.spottable:focus) {
+		height: 2.05rem !important;
+		min-height: 2.05rem !important;
 		margin: 0 !important;
 		transform: none !important;
 		border-radius: 999px !important;
@@ -120,22 +131,54 @@
 }
 
 .filterTriggerButton {
-	--bf-search-filter-size: 3rem;
+	--bf-search-filter-size: 2.35rem;
 	position: relative;
 	min-width: var(--bf-search-filter-size) !important;
 	width: var(--bf-search-filter-size) !important;
 	height: var(--bf-search-filter-size) !important;
 	padding: 0 !important;
 	flex-shrink: 0;
-	overflow: visible !important;
+	overflow: hidden !important;
 	border-radius: 999px !important;
-	border: 1px solid rgba(255, 255, 255, 0.2) !important;
-	background: rgba(255, 255, 255, 0.08) !important;
-	backdrop-filter: blur(0.45rem) !important;
-	-webkit-backdrop-filter: blur(0.45rem) !important;
+	border: none !important;
+	background: transparent !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-sizing: border-box !important;
+	box-shadow: none !important;
 	display: inline-flex !important;
 	align-items: center !important;
 	justify-content: center !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 999px !important;
+		width: 100% !important;
+		height: 100% !important;
+		min-height: var(--bf-search-filter-size) !important;
+	}
+
+	:global(.bf-button) {
+		border-radius: 999px !important;
+		width: 100% !important;
+		height: 100% !important;
+		min-height: var(--bf-search-filter-size) !important;
+		padding: 0 !important;
+	}
+
+	:global(.client) {
+		line-height: 1 !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12)) !important;
+		border: none !important;
+	}
 
 	:global(.icon) {
 		font-size: 1.05rem !important;
@@ -214,10 +257,6 @@
 	gap: 1.5rem;
 	padding: 0.75rem 4rem clamp(2rem, var(--bf-panel-content-bottom-padding, 4rem), 4rem);
 	.panel-grid-performance();
-	/* Keep scroll metrics stable from first render; deferred content-visibility causes late scrollbar updates. */
-	content-visibility: visible;
-	contain: layout style;
-	contain-intrinsic-size: auto;
 }
 
 .resultCard {

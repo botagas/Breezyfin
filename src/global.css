@@ -71,7 +71,8 @@ body,
 [data-webos-voice-intent="Scroll"] {
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
-	overscroll-behavior: contain;
+	overscroll-behavior: none !important;
+	overscroll-behavior-y: none !important;
 }
 
 [data-webos-voice-intent="Scroll"]::-webkit-scrollbar {
@@ -299,21 +300,21 @@ body,
 	box-shadow: none !important;
 }
 
-/* Elegant theme in ultra mode: keep a lightweight blur instead of full liquid glass or solid fill. */
+/* Elegant theme in ultra mode: use the same solid semi-transparent surface as classic (no blur). */
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] {
-	background: transparent !important;
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
 	backdrop-filter: none !important;
 	-webkit-backdrop-filter: none !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='filter'] {
-	backdrop-filter: blur(0.5rem) !important;
-	-webkit-backdrop-filter: blur(0.5rem) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
 	filter: none !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='overlay'] {
-	background: var(--bf-theme-overlay-ultra-soft-bg, rgba(9, 13, 19, 0.42)) !important;
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {

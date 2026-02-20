@@ -356,6 +356,10 @@
 
 :global([data-bf-nav-theme='elegant']) .content {
 	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	inset: 0;
 	height: auto;
 	justify-content: flex-end;
@@ -418,6 +422,8 @@
 	margin-left: 0;
 	flex-shrink: 0;
 }
+
+@import './hero-banner-styles/_hero-banner-compat-webos6.less';
 
 :global([data-bf-nav-theme='elegant']) .heroBannerButton {
 	font-size: 0.8em !important;

@@ -1,0 +1,27 @@
+.compat-gap-row-fallback(@selector; @spacing) {
+	@{selector} {
+		gap: 0 !important;
+	}
+
+	@{selector} > * + * {
+		margin-left: @spacing !important;
+	}
+}
+
+.compat-gap-column-fallback(@selector; @spacing) {
+	@{selector} {
+		gap: 0 !important;
+	}
+
+	@{selector} > * + * {
+		margin-top: @spacing !important;
+	}
+}
+
+.compat-scroll-metrics-stable(@selector) {
+	@{selector} {
+		content-visibility: visible;
+		contain: layout style;
+		contain-intrinsic-size: auto;
+	}
+}

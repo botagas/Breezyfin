@@ -1,12 +1,8 @@
 @import (reference) '../../styles/cardStyles.less';
+@import (reference) '../../styles/panelLayoutMixins.less';
 
 .favoritesContainer {
-	display: flex;
-	flex-direction: column;
-	position: absolute;
-	inset: 0;
-	background: transparent;
-	overflow: hidden;
+	.panel-fill-container(transparent);
 }
 
 .favoritesContent {
