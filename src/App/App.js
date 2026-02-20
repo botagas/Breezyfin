@@ -24,6 +24,39 @@ import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
 const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
+const KEYED_PANEL_STATE_CACHE_LIMIT = 180;
+const normalizePanelStatePayload = (nextState) => nextState || null;
+const upsertKeyedPanelState = (previousState, key, nextState) => {
+	const normalizedKey = String(key);
+	const normalizedState = normalizePanelStatePayload(nextState);
+	const nextStateMap = {
+		...previousState
+	};
+	if (Object.prototype.hasOwnProperty.call(nextStateMap, normalizedKey)) {
+		delete nextStateMap[normalizedKey];
+	}
+	nextStateMap[normalizedKey] = normalizedState;
+	const keys = Object.keys(nextStateMap);
+	if (keys.length <= KEYED_PANEL_STATE_CACHE_LIMIT) {
+		return nextStateMap;
+	}
+	const keysToDrop = keys.slice(0, keys.length - KEYED_PANEL_STATE_CACHE_LIMIT);
+	keysToDrop.forEach((oldKey) => {
+		delete nextStateMap[oldKey];
+	});
+	return nextStateMap;
+};
+const clearKeyedPanelState = (previousState, key) => {
+	const normalizedKey = String(key);
+	if (!Object.prototype.hasOwnProperty.call(previousState, normalizedKey)) {
+		return previousState;
+	}
+	const nextStateMap = {
+		...previousState
+	};
+	delete nextStateMap[normalizedKey];
+	return nextStateMap;
+};
 let StyleDebugPanel = null;
 if (STYLE_DEBUG_ENABLED) {
 	// Keep debug-only panel and assets out of stable production bundles.
@@ -47,6 +80,12 @@ const App = (props) => {
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [previousItem, setPreviousItem] = useState(null);
+	const [homePanelState, setHomePanelState] = useState(null);
+	const [libraryPanelStateById, setLibraryPanelStateById] = useState({});
+	const [searchPanelState, setSearchPanelState] = useState(null);
+	const [favoritesPanelState, setFavoritesPanelState] = useState(null);
+	const [settingsPanelState, setSettingsPanelState] = useState(null);
+	const [detailsPanelStateByItemId, setDetailsPanelStateByItemId] = useState({});
 	const [detailsReturnView, setDetailsReturnView] = useState('home');
 	const [playerControlsVisible, setPlayerControlsVisible] = useState(true);
 	const [animationsDisabled, setAnimationsDisabled] = useState(initialVisualSettingsRef.current.animationsDisabled);
@@ -120,6 +159,12 @@ const App = (props) => {
 		setSelectedLibrary(null);
 		setPlaybackOptions(null);
 		setPreviousItem(null);
+		setHomePanelState(null);
+		setLibraryPanelStateById({});
+		setSearchPanelState(null);
+		setFavoritesPanelState(null);
+		setSettingsPanelState(null);
+		setDetailsPanelStateByItemId({});
 		setDetailsReturnView('home');
 		setPlayerControlsVisible(true);
 		clearPanelHistory();
@@ -406,6 +451,8 @@ const App = (props) => {
 		if (DETAIL_RETURN_VIEWS.has(currentView) && currentView !== 'details') {
 			setDetailsReturnView(currentView);
 			pushPanelHistory();
+		} else if (currentView === 'details') {
+			pushPanelHistory();
 		}
 		if (fromItem) {
 			setPreviousItem(fromItem);
@@ -434,6 +481,29 @@ const App = (props) => {
 				: false;
 		if (shouldTrackHistory) {
 			pushPanelHistory();
+		}
+		switch (section) {
+			case 'home':
+				setHomePanelState(null);
+				break;
+			case 'library':
+				if (nextLibraryId) {
+					setLibraryPanelStateById((previousState) => clearKeyedPanelState(previousState, nextLibraryId));
+				} else {
+					setLibraryPanelStateById({});
+				}
+				break;
+			case 'search':
+				setSearchPanelState(null);
+				break;
+			case 'favorites':
+				setFavoritesPanelState(null);
+				break;
+			case 'settings':
+				setSettingsPanelState(null);
+				break;
+			default:
+				break;
 		}
 		switch (section) {
 			case 'home':
@@ -523,6 +593,36 @@ const App = (props) => {
 		styleDebugBackHandlerRef.current = handler;
 	}, []);
 
+	const handleSearchPanelStateChange = useCallback((nextState) => {
+		setSearchPanelState(normalizePanelStatePayload(nextState));
+	}, []);
+
+	const handleHomePanelStateChange = useCallback((nextState) => {
+		setHomePanelState(normalizePanelStatePayload(nextState));
+	}, []);
+
+	const handleLibraryPanelStateChange = useCallback((libraryId, nextState) => {
+		if (!libraryId) return;
+		setLibraryPanelStateById((previousState) => (
+			upsertKeyedPanelState(previousState, libraryId, nextState)
+		));
+	}, []);
+
+	const handleFavoritesPanelStateChange = useCallback((nextState) => {
+		setFavoritesPanelState(normalizePanelStatePayload(nextState));
+	}, []);
+
+	const handleSettingsPanelStateChange = useCallback((nextState) => {
+		setSettingsPanelState(normalizePanelStatePayload(nextState));
+	}, []);
+
+	const handleDetailsPanelStateChange = useCallback((itemId, nextState) => {
+		if (!itemId) return;
+		setDetailsPanelStateByItemId((previousState) => (
+			upsertKeyedPanelState(previousState, itemId, nextState)
+		));
+	}, []);
+
 	const getPanelIndex = () => {
 		const detailsPanelIndex = STYLE_DEBUG_ENABLED ? 7 : 6;
 		const playerPanelIndex = STYLE_DEBUG_ENABLED ? 8 : 7;
@@ -548,16 +648,20 @@ const App = (props) => {
 		/>,
 		<HomePanel
 			key="home"
+			isActive={currentView === 'home'}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
 			onLogout={handleLogout}
 			onExit={handleExit}
+			cachedState={homePanelState}
+			onCacheState={handleHomePanelStateChange}
 			registerBackHandler={registerHomeBackHandler}
 			noCloseButton
 		/>,
 		<LibraryPanel
 			key="library"
+			isActive={currentView === 'library'}
 			library={selectedLibrary}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
@@ -565,6 +669,8 @@ const App = (props) => {
 			onLogout={handleLogout}
 			onExit={handleExit}
 			onBack={handleBackToHome}
+			cachedState={selectedLibrary?.Id ? libraryPanelStateById[String(selectedLibrary.Id)] || null : null}
+			onCacheState={handleLibraryPanelStateChange}
 			registerBackHandler={registerLibraryBackHandler}
 			noCloseButton
 		/>,
@@ -576,16 +682,21 @@ const App = (props) => {
 			onSwitchUser={handleSwitchUser}
 			onLogout={handleLogout}
 			onExit={handleExit}
+			cachedState={searchPanelState}
+			onCacheState={handleSearchPanelStateChange}
 			registerBackHandler={registerSearchBackHandler}
 			noCloseButton
 		/>,
 		<FavoritesPanel
 			key="favorites"
+			isActive={currentView === 'favorites'}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
 			onLogout={handleLogout}
 			onExit={handleExit}
+			cachedState={favoritesPanelState}
+			onCacheState={handleFavoritesPanelStateChange}
 			registerBackHandler={registerFavoritesBackHandler}
 			noCloseButton
 		/>,
@@ -597,6 +708,8 @@ const App = (props) => {
 			onLogout={handleLogout}
 			onSignOut={handleSignOut}
 			onExit={handleExit}
+			cachedState={settingsPanelState}
+			onCacheState={handleSettingsPanelStateChange}
 			registerBackHandler={registerSettingsBackHandler}
 			noCloseButton
 		/>
@@ -625,6 +738,8 @@ const App = (props) => {
 			onBack={navigateBackFromDetails}
 			onPlay={handlePlay}
 			onItemSelect={handleItemSelect}
+			cachedState={selectedItem?.Id ? detailsPanelStateByItemId[String(selectedItem.Id)] || null : null}
+			onCacheState={handleDetailsPanelStateChange}
 			registerBackHandler={registerDetailsBackHandler}
 			noCloseButton
 		/>

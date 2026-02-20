@@ -16,6 +16,7 @@ import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
+import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './SearchPanel.module.less';
@@ -35,25 +36,103 @@ const INITIAL_SEARCH_DISCLOSURES = {
 	[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP]: false
 };
 const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
+const SEARCH_PAGE_SIZE = 60;
+const SEARCH_FOCUS_PREFETCH_THRESHOLD = 12;
 const SearchResultsSpotlightContainer = createLastFocusedSpotlightContainer();
+const sanitizeSelectedFilterIds = (candidateIds) => {
+	if (!Array.isArray(candidateIds) || candidateIds.length === 0) return ALL_FILTER_IDS;
+	const allowed = new Set(ALL_FILTER_IDS);
+	const normalized = candidateIds.filter((id) => allowed.has(id));
+	return normalized.length > 0 ? normalized : ALL_FILTER_IDS;
+};
+const getCachedNextStartIndex = (cachedValue) => {
+	const numericValue = Number(cachedValue);
+	if (Number.isFinite(numericValue) && numericValue >= 0) {
+		return numericValue;
+	}
+	return null;
+};
 
-const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, isActive = false, ...rest }) => {
-	const [searchTerm, setSearchTerm] = useState('');
-	const [results, setResults] = useState([]);
+const SearchPanel = ({
+	onItemSelect,
+	onNavigate,
+	onSwitchUser,
+	onLogout,
+	onExit,
+	registerBackHandler,
+	isActive = false,
+	cachedState = null,
+	onCacheState = null,
+	...rest
+}) => {
+	const [searchTerm, setSearchTerm] = useState(() => (
+		typeof cachedState?.searchTerm === 'string' ? cachedState.searchTerm : ''
+	));
+	const [results, setResults] = useState(() => (
+		Array.isArray(cachedState?.results) ? cachedState.results : []
+	));
 	const [loading, setLoading] = useState(false);
-	const [hasSearched, setHasSearched] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasSearched, setHasSearched] = useState(() => cachedState?.hasSearched === true);
 	const {disclosures, openDisclosure, closeDisclosure} = useDisclosureMap(INITIAL_SEARCH_DISCLOSURES);
 	const filterPopupOpen = disclosures[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP] === true;
-	const [selectedFilterIds, setSelectedFilterIds] = useState(ALL_FILTER_IDS);
+	const [selectedFilterIds, setSelectedFilterIds] = useState(() => (
+		sanitizeSelectedFilterIds(cachedState?.selectedFilterIds)
+	));
+	const [hasMore, setHasMore] = useState(() => cachedState?.hasMore === true);
+	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const searchDebounceRef = useRef(null);
 	const activeSearchRequestIdRef = useRef(0);
+	const loadingMoreRef = useRef(false);
+	const lastCachedStateRef = useRef(cachedState);
+	const paginationRef = useRef({
+		nextStartIndex: getCachedNextStartIndex(cachedState?.nextStartIndex) ?? (
+			Array.isArray(cachedState?.results) ? cachedState.results.length : 0
+		),
+		term: typeof cachedState?.searchTerm === 'string' ? cachedState.searchTerm.trim() : '',
+		filterTypes: null
+	});
 	const toolbarBackHandlerRef = useRef(null);
 	const filtersById = useMapById(FILTER_OPTIONS, 'id');
 	const resultsById = useMapById(results);
+	const {
+		captureScrollTo: captureSearchScrollRestore,
+		handleScrollStop: handleSearchScrollMemoryStop
+	} = useScrollerScrollMemory({
+		isActive,
+		scrollTop,
+		onScrollTopChange: setScrollTop
+	});
 	const appliedFilterCount = useMemo(
 		() => (selectedFilterIds.length < FILTER_OPTIONS.length ? selectedFilterIds.length : 0),
 		[selectedFilterIds]
 	);
+
+	useEffect(() => {
+		const hadCachedState = lastCachedStateRef.current !== null;
+		lastCachedStateRef.current = cachedState;
+		if (!hadCachedState || cachedState !== null) return;
+		if (searchDebounceRef.current) {
+			clearTimeout(searchDebounceRef.current);
+			searchDebounceRef.current = null;
+		}
+		activeSearchRequestIdRef.current += 1;
+		loadingMoreRef.current = false;
+		closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
+		paginationRef.current = {
+			nextStartIndex: 0,
+			term: '',
+			filterTypes: null
+		};
+		setSearchTerm('');
+		setResults([]);
+		setLoading(false);
+		setLoadingMore(false);
+		setHasSearched(false);
+		setSelectedFilterIds(ALL_FILTER_IDS);
+		setHasMore(false);
+		setScrollTop(0);
+	}, [cachedState, closeDisclosure, setScrollTop]);
 
 	const buildFilterTypes = useCallback((filterIds) => {
 		if (!Array.isArray(filterIds) || filterIds.length === 0) return null;
@@ -68,31 +147,95 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 
 	const performSearch = useCallback(async (term, filterTypes, requestId) => {
 		if (requestId !== activeSearchRequestIdRef.current) return;
-		if (!term || term.trim().length < 2) {
+		const normalizedTerm = term?.trim() || '';
+		if (normalizedTerm.length < 2) {
 			if (requestId !== activeSearchRequestIdRef.current) return;
 			setResults([]);
 			setHasSearched(false);
 			setLoading(false);
+			setLoadingMore(false);
+			setHasMore(false);
+			setScrollTop(0);
+			loadingMoreRef.current = false;
+			paginationRef.current = {
+				nextStartIndex: 0,
+				term: '',
+				filterTypes: null
+			};
 			return;
 		}
 
 		if (requestId !== activeSearchRequestIdRef.current) return;
 		setLoading(true);
+		setLoadingMore(false);
 		setHasSearched(true);
+		setHasMore(false);
+		setScrollTop(0);
+		loadingMoreRef.current = false;
 		try {
-			const items = await jellyfinService.search(term.trim(), filterTypes, 50);
+			const items = await jellyfinService.search(normalizedTerm, filterTypes, SEARCH_PAGE_SIZE, 0);
 			if (requestId !== activeSearchRequestIdRef.current) return;
-			setResults(Array.isArray(items) ? items : []);
+			const safeItems = Array.isArray(items) ? items : [];
+			setResults(safeItems);
+			setHasMore(safeItems.length === SEARCH_PAGE_SIZE);
+			paginationRef.current = {
+				nextStartIndex: safeItems.length,
+				term: normalizedTerm,
+				filterTypes
+			};
 		} catch (error) {
 			if (requestId !== activeSearchRequestIdRef.current) return;
 			console.error('Search failed:', error);
 			setResults([]);
+			setHasMore(false);
+			paginationRef.current = {
+				nextStartIndex: 0,
+				term: normalizedTerm,
+				filterTypes
+			};
 		} finally {
 			if (requestId === activeSearchRequestIdRef.current) {
 				setLoading(false);
 			}
 		}
-	}, []);
+	}, [setScrollTop]);
+
+	const loadNextPage = useCallback(async () => {
+		if (loading || loadingMoreRef.current || !hasSearched || !hasMore) return;
+		const {nextStartIndex, term, filterTypes} = paginationRef.current;
+		if (!term || term.length < 2) return;
+
+		const requestId = activeSearchRequestIdRef.current;
+		loadingMoreRef.current = true;
+		setLoadingMore(true);
+		try {
+			const nextBatch = await jellyfinService.search(term, filterTypes, SEARCH_PAGE_SIZE, nextStartIndex);
+			if (requestId !== activeSearchRequestIdRef.current) return;
+
+			const safeBatch = Array.isArray(nextBatch) ? nextBatch : [];
+			if (safeBatch.length === 0) {
+				setHasMore(false);
+				return;
+			}
+
+			paginationRef.current.nextStartIndex = nextStartIndex + safeBatch.length;
+			setResults((prevResults) => {
+				const existingIds = new Set(prevResults.map((item) => String(item.Id)));
+				const dedupedBatch = safeBatch.filter((item) => !existingIds.has(String(item.Id)));
+				return dedupedBatch.length ? [...prevResults, ...dedupedBatch] : prevResults;
+			});
+			if (safeBatch.length < SEARCH_PAGE_SIZE) {
+				setHasMore(false);
+			}
+		} catch (error) {
+			console.error('Failed to load additional search results:', error);
+		} finally {
+			if (requestId === activeSearchRequestIdRef.current) {
+				setLoadingMore(false);
+			}
+			loadingMoreRef.current = false;
+		}
+	}, [hasMore, hasSearched, loading]);
 
 	const scheduleSearch = useCallback((term, filterTypes) => {
 		if (searchDebounceRef.current) {
@@ -104,12 +247,21 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 			setResults([]);
 			setHasSearched(false);
 			setLoading(false);
+			setLoadingMore(false);
+			setHasMore(false);
+			setScrollTop(0);
+			loadingMoreRef.current = false;
+			paginationRef.current = {
+				nextStartIndex: 0,
+				term: '',
+				filterTypes: null
+			};
 			return;
 		}
 		searchDebounceRef.current = setTimeout(() => {
 			performSearch(term, filterTypes, requestId);
 		}, 500);
-	}, [performSearch]);
+	}, [performSearch, setScrollTop]);
 
 	useEffect(() => () => {
 		if (searchDebounceRef.current) {
@@ -117,7 +269,31 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 			searchDebounceRef.current = null;
 		}
 		activeSearchRequestIdRef.current += 1;
+		loadingMoreRef.current = false;
 	}, []);
+
+	useEffect(() => {
+		const normalizedTerm = searchTerm.trim();
+		const cachedFilterTypes = buildFilterTypes(selectedFilterIds);
+		paginationRef.current.term = normalizedTerm;
+		paginationRef.current.filterTypes = cachedFilterTypes;
+		if (paginationRef.current.nextStartIndex < results.length) {
+			paginationRef.current.nextStartIndex = results.length;
+		}
+	}, [buildFilterTypes, results.length, searchTerm, selectedFilterIds]);
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function') return;
+		onCacheState({
+			searchTerm,
+			results,
+			hasSearched,
+			selectedFilterIds,
+			hasMore,
+			nextStartIndex: paginationRef.current.nextStartIndex,
+			scrollTop
+		});
+	}, [hasMore, hasSearched, onCacheState, results, scrollTop, searchTerm, selectedFilterIds]);
 
 	const handleSearchChange = useCallback((e) => {
 		const value = e.value;
@@ -213,6 +389,23 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 		}
 	}, []);
 
+	const handleResultCardFocus = useCallback((event) => {
+		if (!hasMore || loadingMoreRef.current) return;
+		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
+		if (!Number.isInteger(itemIndex)) return;
+		const remainingItems = results.length - itemIndex - 1;
+		if (remainingItems <= SEARCH_FOCUS_PREFETCH_THRESHOLD) {
+			loadNextPage();
+		}
+	}, [hasMore, loadNextPage, results.length]);
+
+	const handleScrollerScrollStop = useCallback((event) => {
+		handleSearchScrollMemoryStop(event);
+		if (event?.reachedEdgeInfo?.bottom) {
+			loadNextPage();
+		}
+	}, [handleSearchScrollMemoryStop, loadNextPage]);
+
 	return (
 		<Panel {...rest}>
 			<Header title="Search" />
@@ -250,7 +443,11 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 						</Button>
 					</div>
 				</div>
-				<Scroller className={css.resultsScroller}>
+				<Scroller
+					className={css.resultsScroller}
+					cbScrollTo={captureSearchScrollRestore}
+					onScrollStop={handleScrollerScrollStop}
+				>
 					<div className={css.resultsContent}>
 						<div className={css.resultsBody}>
 							{loading ? (
@@ -266,39 +463,48 @@ const SearchPanel = ({ onItemSelect, onNavigate, onSwitchUser, onLogout, onExit,
 									<BodyText>Enter a search term to find movies, shows, and more</BodyText>
 								</div>
 							) : (
-								<SearchResultsSpotlightContainer className={css.resultsGrid} spotlightId="search-results-grid">
-									{results.map(item => {
-										const imageUrl = getPosterCardImageUrl(item, {
-											maxWidth: 400,
-											personMaxWidth: 200,
-											includeBackdrop: true,
-											includeSeriesFallback: true
-										});
-										return (
-											<PosterMediaCard
-												key={item.Id}
-												itemId={item.Id}
-												className={css.resultCard}
-												{...posterCardClassProps}
-												imageUrl={imageUrl}
-												title={item.Name}
-												subtitle={getMediaItemSubtitle(item, {includePersonRole: true})}
-												placeholderText={item.Name?.charAt(0) || '?'}
-												onClick={handleResultCardClick}
-												onKeyDown={handleResultCardKeyDown}
-												overlayContent={(
-													<MediaCardStatusOverlay
-														showWatched={item.UserData?.Played === true}
-														watchedClassName={css.watchedBadge}
-														progressPercent={item.UserData?.PlayedPercentage}
-														progressBarClassName={css.progressBar}
-														progressClassName={css.progress}
-													/>
-												)}
-											/>
-										);
-									})}
-								</SearchResultsSpotlightContainer>
+								<>
+									<SearchResultsSpotlightContainer className={css.resultsGrid} spotlightId="search-results-grid">
+										{results.map((item, index) => {
+											const imageUrl = getPosterCardImageUrl(item, {
+												maxWidth: 400,
+												personMaxWidth: 200,
+												includeBackdrop: true,
+												includeSeriesFallback: true
+											});
+											return (
+												<PosterMediaCard
+													key={item.Id}
+													itemId={item.Id}
+													data-item-index={index}
+													className={css.resultCard}
+													{...posterCardClassProps}
+													imageUrl={imageUrl}
+													title={item.Name}
+													subtitle={getMediaItemSubtitle(item, {includePersonRole: true})}
+													placeholderText={item.Name?.charAt(0) || '?'}
+													onClick={handleResultCardClick}
+													onKeyDown={handleResultCardKeyDown}
+													onFocus={handleResultCardFocus}
+													overlayContent={(
+														<MediaCardStatusOverlay
+															showWatched={item.UserData?.Played === true}
+															watchedClassName={css.watchedBadge}
+															progressPercent={item.UserData?.PlayedPercentage}
+															progressBarClassName={css.progressBar}
+															progressClassName={css.progress}
+														/>
+													)}
+												/>
+											);
+										})}
+									</SearchResultsSpotlightContainer>
+									{loadingMore && (
+										<div className={css.loadingMore}>
+											<Spinner size="small" />
+										</div>
+									)}
+								</>
 							)}
 							</div>
 					</div>

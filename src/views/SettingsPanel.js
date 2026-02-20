@@ -16,6 +16,7 @@ import {isStyleDebugEnabled} from '../utils/featureFlags';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
+import { useCachedScrollTopState, useScrollerScrollMemory } from '../hooks/useScrollerScrollMemory';
 import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
 import { wipeAllAppCache } from '../utils/cacheMaintenance';
 
@@ -113,7 +114,18 @@ const DISCLOSURE_BACK_PRIORITY = [
 	SETTINGS_DISCLOSURE_KEYS.BITRATE
 ];
 
-const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, registerBackHandler, isActive = false, ...rest }) => {
+const SettingsPanel = ({
+	onNavigate,
+	onSwitchUser,
+	onLogout,
+	onSignOut,
+	onExit,
+	registerBackHandler,
+	isActive = false,
+	cachedState = null,
+	onCacheState = null,
+	...rest
+}) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
@@ -125,6 +137,7 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const [appLogCount, setAppLogCount] = useState(0);
 	const [cacheWipeInProgress, setCacheWipeInProgress] = useState(false);
 	const [cacheWipeError, setCacheWipeError] = useState('');
+	const [scrollTop, setScrollTop] = useCachedScrollTopState(cachedState?.scrollTop);
 	const {
 		disclosures,
 		openDisclosure,
@@ -144,6 +157,19 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 	const logoutConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM] === true;
 	const logsPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGS] === true;
 	const wipeCacheConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM] === true;
+	const {
+		captureScrollTo: captureSettingsScrollRestore,
+		handleScrollStop: handleSettingsScrollMemoryStop
+	} = useScrollerScrollMemory({
+		isActive,
+		scrollTop,
+		onScrollTopChange: setScrollTop
+	});
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function') return;
+		onCacheState({scrollTop});
+	}, [onCacheState, scrollTop]);
 
 	const loadSettings = useCallback(() => {
 		try {
@@ -621,7 +647,11 @@ const SettingsPanel = ({ onNavigate, onSwitchUser, onLogout, onSignOut, onExit, 
 				onExit={onExit}
 				registerBackHandler={registerToolbarBackHandler}
 			/>
-			<Scroller className={css.settingsContainer}>
+			<Scroller
+				className={css.settingsContainer}
+				cbScrollTo={captureSettingsScrollRestore}
+				onScrollStop={handleSettingsScrollMemoryStop}
+			>
 				<div className={css.content}>
 					<section className={css.section}>
 						<BodyText className={css.sectionTitle}>Server Information</BodyText>
