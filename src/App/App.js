@@ -732,7 +732,7 @@ const App = (props) => {
 
 	panelChildren.push(
 		<MediaDetailsPanel
-			key="details"
+			key={`details-${selectedItem?.Id || 'none'}`}
 			isActive={currentView === 'details'}
 			item={selectedItem}
 			onBack={navigateBackFromDetails}
