@@ -64,6 +64,10 @@ Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## Developer guidelines
 
+Detailed helper documentation:
+- [`HELPERS.md`](./HELPERS.md)
+- [`THEMES.md`](./THEMES.md)
+
 Before adding new panel logic, prefer shared building blocks first:
 
 - Back handling: `src/hooks/usePanelBackHandler.js`
@@ -81,6 +85,12 @@ Before adding new panel logic, prefer shared building blocks first:
   - `useCachedScrollTopState()` for normalized cached scrollTop state
 - Shared toolbar callback bundle: `src/hooks/useToolbarActions.js`
 - Shared toolbar back-handler bridge: `src/hooks/useToolbarBackHandler.js`
+- Preferred toolbar wiring pattern:
+  - Use `useToolbarBackHandler()` in the panel to register/run toolbar back handlers.
+  - Use `useToolbarActions()` to pass a stable callback bundle into `Toolbar` / `SettingsToolbar`.
+- Preferred panel scroll-state pattern:
+  - Use `usePanelScrollState()` for panel `Scroller` restore/save and cached scrollTop persistence.
+  - Only use `useScrollerScrollMemory()` directly when panel behavior is non-standard.
 - Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
 - Shared toolbar focus helper: `src/utils/toolbarFocus.js`
 - Shared home row order constant: `src/constants/homeRows.js`
