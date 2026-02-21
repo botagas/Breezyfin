@@ -32,11 +32,59 @@ body,
 	--bf-theme-overlay-ultra-bg: rgba(9, 13, 19, 0.84);
 	--bf-theme-overlay-ultra-soft-bg: rgba(9, 13, 19, 0.42);
 	--bf-theme-liquid-overlay-bg: rgba(168, 188, 213, 0.08);
+	--bf-theme-filter-badge-bg: rgba(63, 184, 255, 0.95);
+	--bf-theme-filter-badge-color: #04111e;
+	--bf-theme-filter-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.35);
+	--bf-theme-toolbar-hover-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-toolbar-focus-bg: rgba(240, 235, 235, 0.1);
+	--bf-theme-toolbar-focus-outline: rgba(255, 255, 255, 0.3);
+	--bf-theme-toolbar-menu-surface-bg: rgba(18, 18, 18, 0.95);
+	--bf-theme-toolbar-menu-surface-border: rgba(255, 255, 255, 0.2);
+	--bf-theme-toolbar-menu-surface-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+	--bf-theme-toolbar-menu-item-hover-bg: rgba(255, 255, 255, 0.1);
+	--bf-theme-toolbar-menu-item-focus-bg: rgba(255, 255, 255, 0.15);
+
+	--bf-theme-card-surface-gradient: linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%);
+	--bf-theme-card-hover-overlay-gradient: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
+	--bf-theme-card-bottom-fade-gradient: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
+	--bf-theme-card-placeholder-gradient: linear-gradient(145deg, rgba(42, 54, 72, 0.85), rgba(24, 32, 47, 0.85));
+	--bf-theme-card-border-rest: rgba(255, 255, 255, 0.16);
+	--bf-theme-card-border-focus: rgba(212, 226, 255, 0.9);
+	--bf-theme-card-shadow-rest: 0 10px 20px rgba(0, 0, 0, 0.35);
+	--bf-theme-card-shadow-focus: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
+	--bf-theme-card-status-badge-bg: rgba(37, 108, 186, 0.92);
+	--bf-theme-card-status-badge-border: rgba(198, 226, 255, 0.44);
+	--bf-theme-card-status-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+	--bf-theme-card-success-badge-bg: rgba(148, 233, 183, 0.94);
+	--bf-theme-card-success-badge-color: #03140e;
+	--bf-theme-card-success-badge-border: rgba(148, 233, 183, 0.65);
+	--bf-theme-card-success-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	--bf-theme-card-favorite-badge-bg: rgba(255, 107, 127, 0.92);
+	--bf-theme-card-favorite-badge-color: #fff4f6;
+	--bf-theme-card-favorite-badge-border: rgba(255, 166, 181, 0.7);
+	--bf-theme-card-favorite-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	--bf-theme-card-progress-track: rgba(255, 255, 255, 0.22);
+	--bf-theme-card-progress-fill: #3cb2f0;
+	--bf-theme-card-filter-chip-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-card-filter-chip-border: rgba(255, 255, 255, 0.2);
+	--bf-theme-card-filter-chip-active-bg: rgba(138, 180, 248, 0.3);
+	--bf-theme-card-filter-chip-active-border: rgba(138, 180, 248, 0.8);
+	--bf-theme-card-title-color: rgba(236, 241, 247, 0.96);
+	--bf-theme-card-subtitle-color: rgba(173, 185, 203, 0.88);
+
+	--bf-theme-player-loading-ring-primary: rgba(255, 255, 255, 0.8);
+	--bf-theme-player-loading-ring-secondary: rgba(255, 255, 255, 0.6);
+	--bf-theme-player-loading-core-bg: rgba(255, 255, 255, 0.9);
+	--bf-theme-player-seek-ring: rgba(255, 255, 255, 0.75);
+	--bf-theme-player-seek-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 8px 18px rgba(0, 0, 0, 0.3);
 	--bf-theme-backdrop-fallback:
 		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
 		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
 		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
 		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+	--bf-theme-error-surface-max-width: 64rem;
+	--bf-theme-error-surface-padding: 1.85rem 1.6rem 1.3rem;
+	--bf-theme-error-surface-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
 }
 
 /* Explicit classic token reset so switching away from Elegant always restores baseline layout geometry. */
@@ -51,6 +99,42 @@ body,
 	--bf-panel-scroller-offset-nudge: -1rem;
 	--bf-home-hero-nudge: 0rem;
 	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
+}
+
+.bf-error-surface {
+	width: min(var(--bf-theme-error-surface-max-width, 64rem), 94vw);
+	max-width: 94vw;
+	padding: var(--bf-theme-error-surface-padding, 1.85rem 1.6rem 1.3rem);
+	border-radius: var(--bf-theme-popup-radius, 1rem);
+	background: var(--bf-theme-error-surface-bg, var(--bf-theme-popup-bg, rgba(18, 18, 18, 0.95))) !important;
+	border: 1px solid var(--bf-theme-error-border, var(--bf-theme-popup-border, rgba(255, 255, 255, 0.24))) !important;
+	box-shadow: var(--bf-theme-error-surface-shadow, var(--bf-theme-popup-shadow, 0 0.6rem 1.55rem rgba(0, 0, 0, 0.35))) !important;
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.65rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.65rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+}
+
+.bf-error-title {
+	display: block;
+	width: 100%;
+	text-align: center;
+	line-height: 1.25;
+	margin: 0 0 0.9rem;
+}
+
+.bf-error-message {
+	display: block;
+	width: 100%;
+	text-align: center;
+	line-height: 1.45;
+	margin: 0 0 1rem;
+	color: var(--bf-theme-error-color, var(--bf-theme-text-primary, rgba(244, 249, 255, 0.95)));
+}
+
+.bf-error-actions {
+	display: flex;
+	justify-content: center;
+	gap: 12px;
+	flex-wrap: wrap;
 }
 
 /* Remove Panel body horizontal padding app-wide */
@@ -71,7 +155,8 @@ body,
 [data-webos-voice-intent="Scroll"] {
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
-	overscroll-behavior: contain;
+	overscroll-behavior: none !important;
+	overscroll-behavior-y: none !important;
 }
 
 [data-webos-voice-intent="Scroll"]::-webkit-scrollbar {
@@ -299,21 +384,21 @@ body,
 	box-shadow: none !important;
 }
 
-/* Elegant theme in ultra mode: keep a lightweight blur instead of full liquid glass or solid fill. */
+/* Elegant theme in ultra mode: use the same solid semi-transparent surface as classic (no blur). */
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] {
-	background: transparent !important;
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
 	backdrop-filter: none !important;
 	-webkit-backdrop-filter: none !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='filter'] {
-	backdrop-filter: blur(0.5rem) !important;
-	-webkit-backdrop-filter: blur(0.5rem) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
 	filter: none !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='overlay'] {
-	background: var(--bf-theme-overlay-ultra-soft-bg, rgba(9, 13, 19, 0.42)) !important;
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
 }
 
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {

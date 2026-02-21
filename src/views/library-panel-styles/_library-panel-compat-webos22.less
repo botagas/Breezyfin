@@ -1,0 +1,4 @@
+@import (reference) '../../styles/compatMixins.less';
+
+/* Keep scroll metrics stable from first render on webOS 22 engines. */
+.compat-scroll-metrics-stable(~":global([data-bf-webos-v22-compat='on']) .gridContainer");

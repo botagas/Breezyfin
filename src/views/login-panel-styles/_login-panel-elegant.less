@@ -17,6 +17,7 @@
 	.loginBox {
 		position: relative;
 		overflow: hidden;
+		isolation: isolate;
 		background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
 		border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
 		box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45));
@@ -28,6 +29,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
+		z-index: 0;
 		border-radius: inherit;
 		pointer-events: none;
 		box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.7);
@@ -38,6 +40,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
+		z-index: 0;
 		border-radius: inherit;
 		pointer-events: none;
 		background:
@@ -98,6 +101,15 @@
 
 	.loginBox :global(.bf-button-bg) {
 		background: rgba(255, 255, 255, 0.075) !important;
+		background-image: none !important;
+		border: 1px solid rgba(255, 255, 255, 0.15) !important;
+		border-radius: 0.65rem !important;
+		box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.18) !important;
+	}
+
+	.loginBox :global(.bg) {
+		background: rgba(255, 255, 255, 0.075) !important;
+		background-image: none !important;
 		border: 1px solid rgba(255, 255, 255, 0.15) !important;
 		border-radius: 0.65rem !important;
 		box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.18) !important;
@@ -107,6 +119,14 @@
 	.loginBox :global(.bf-button:focus .bf-button-bg),
 	.loginBox :global(.bf-button:active .bf-button-bg),
 	.loginBox :global(.spottable:focus .bf-button-bg) {
+		background: rgba(255, 255, 255, 0.12) !important;
+		border-color: rgba(255, 255, 255, 0.19) !important;
+	}
+
+	.loginBox :global(.bf-button:hover .bg),
+	.loginBox :global(.bf-button:focus .bg),
+	.loginBox :global(.bf-button:active .bg),
+	.loginBox :global(.spottable:focus .bg) {
 		background: rgba(255, 255, 255, 0.12) !important;
 		border-color: rgba(255, 255, 255, 0.19) !important;
 	}

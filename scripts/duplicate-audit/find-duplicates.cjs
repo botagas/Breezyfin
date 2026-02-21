@@ -18,6 +18,20 @@ const MAX_REPORTS = 60;
 
 const normalizeLine = (line) => line.replace(/\s+/g, ' ').trim();
 
+const JS_LOW_SIGNAL_LINE_REGEX = /^(?:\.\.\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\s*:\s*[^,]+)?(?:\s*=\s*[^,]+)?,?$/;
+const JS_LOW_SIGNAL_SCAFFOLD_REGEX = /^(?:const\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*use[A-Za-z0-9_$]+\(\{|}\);|}\) => \{)$/;
+
+const isLowSignalSnippet = (extension, snippetKey) => {
+	if (extension !== '.js') return false;
+	const lines = snippetKey.split('\n').map((line) => line.trim()).filter(Boolean);
+	if (lines.length === 0) return true;
+	const lowSignalLineCount = lines.filter((line) => (
+		JS_LOW_SIGNAL_LINE_REGEX.test(line) || JS_LOW_SIGNAL_SCAFFOLD_REGEX.test(line)
+	)).length;
+	// Ignore windows that are primarily prop lists / hook-scaffolding and carry little structural value.
+	return lowSignalLineCount / lines.length >= 0.85;
+};
+
 const getFiles = () => {
 	const files = [];
 	for (const glob of FILE_GLOBS) {
@@ -80,8 +94,9 @@ const buildReport = (store) => {
 		});
 	}
 
-	report.sort((a, b) => b.fileCount - a.fileCount || b.rawOccurrenceCount - a.rawOccurrenceCount);
-	return report.slice(0, MAX_REPORTS);
+	const filteredReport = report.filter((entry) => !isLowSignalSnippet(entry.extension, entry.snippet));
+	filteredReport.sort((a, b) => b.fileCount - a.fileCount || b.rawOccurrenceCount - a.rawOccurrenceCount);
+	return filteredReport.slice(0, MAX_REPORTS);
 };
 
 const printReport = (report) => {

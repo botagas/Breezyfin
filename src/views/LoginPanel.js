@@ -3,7 +3,7 @@ import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
 import BodyText from '@enact/sandstone/BodyText';
-import Scroller from '@enact/sandstone/Scroller';
+import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import Input from '@enact/sandstone/Input';
 import Spottable from '@enact/spotlight/Spottable';
@@ -21,6 +21,50 @@ const LOGIN_BACKDROP_WIDTH = 1920;
 const LOGIN_BACKDROP_MAX_IMAGES = 24;
 const LOGIN_BACKDROP_ROTATE_INTERVAL_MS = 9000;
 const LOGIN_BACKDROP_TRANSITION_MS = 500;
+const LOGIN_BACKDROP_IMAGE_FIELDS = [
+	'BackdropImageTags',
+	'ImageTags',
+	'PrimaryImageTag',
+	'SeriesId',
+	'SeriesPrimaryImageTag',
+	'ParentBackdropItemId',
+	'ParentBackdropImageTags'
+].join(',');
+
+const getFirstImageTag = (value) => (
+	Array.isArray(value) && typeof value[0] === 'string' && value[0]
+		? value[0]
+		: null
+);
+
+const buildItemImageUrl = ({ baseUrl, itemId, imageType, accessToken, width, tag = null, index = null }) => {
+	if (!baseUrl || !itemId || !imageType || !accessToken) return '';
+	const normalizedBase = baseUrl.replace(/\/+$/, '');
+	const params = new URLSearchParams({
+		width: String(width),
+		api_key: accessToken
+	});
+	if (tag) {
+		params.set('tag', tag);
+	}
+	const imageSuffix = index == null ? imageType : `${imageType}/${index}`;
+	return `${normalizedBase}/Items/${itemId}/Images/${imageSuffix}?${params.toString()}`;
+};
+
+const buildUserPrimaryImageUrl = ({ baseUrl, userId, accessToken, width, tag = null }) => {
+	if (!baseUrl || !userId || !accessToken || !tag) return '';
+	const normalizedBase = baseUrl.replace(/\/+$/, '');
+	const params = new URLSearchParams({
+		width: String(width),
+		api_key: accessToken,
+		tag
+	});
+	return `${normalizedBase}/Users/${userId}/Images/Primary?${params.toString()}`;
+};
+
+const normalizeImageTag = (value) => (
+	typeof value === 'string' && value ? value : null
+);
 
 const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
@@ -113,38 +157,110 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	const fetchBackdropsForSavedServer = useCallback(async (entry, signal) => {
 		if (!entry?.url || !entry?.userId || !entry?.accessToken) return [];
 		const baseUrl = entry.url.replace(/\/+$/, '');
-		const requestUrl = `${baseUrl}/Users/${entry.userId}/Items?includeItemTypes=Movie,Series&recursive=true&limit=${LOGIN_BACKDROP_ITEM_LIMIT}&sortBy=DateCreated&sortOrder=Descending&fields=BackdropImageTags&imageTypeLimit=1`;
+		const requestUrls = [
+			`${baseUrl}/Users/${entry.userId}/Items?includeItemTypes=Movie,Series,Episode&recursive=true&limit=${LOGIN_BACKDROP_ITEM_LIMIT}&sortBy=DateCreated&sortOrder=Descending&fields=${LOGIN_BACKDROP_IMAGE_FIELDS}&imageTypeLimit=1&enableTotalRecordCount=false`,
+			`${baseUrl}/Users/${entry.userId}/Items/Resume?limit=${LOGIN_BACKDROP_ITEM_LIMIT}&fields=${LOGIN_BACKDROP_IMAGE_FIELDS}&imageTypeLimit=1`
+		];
 
 		try {
-			const response = await fetch(requestUrl, {
-				headers: {
-					'X-Emby-Token': entry.accessToken
-				},
-				signal
-			});
-			if (!response.ok) return [];
-			const data = await response.json();
-			const items = Array.isArray(data?.Items) ? data.Items : [];
-			const urls = [];
-			items.forEach((item) => {
-				if (!item?.Id) return;
-				if (Array.isArray(item.BackdropImageTags) && item.BackdropImageTags.length > 0) {
-					const tag = item.BackdropImageTags[0];
-					const params = new URLSearchParams({
-						maxWidth: String(LOGIN_BACKDROP_WIDTH),
-						api_key: entry.accessToken
-					});
-					if (tag) {
-						params.set('tag', tag);
-					}
-					urls.push(`${baseUrl}/Items/${item.Id}/Images/Backdrop/0?${params.toString()}`);
+			const responses = await Promise.all(
+				requestUrls.map((requestUrl) => (
+					fetch(requestUrl, {
+						headers: {
+							'X-Emby-Token': entry.accessToken
+						},
+						signal
+					}).catch(() => null)
+				))
+			);
+			const payloads = await Promise.all(
+				responses
+					.filter((response) => response?.ok)
+					.map((response) => response.json().catch(() => null))
+			);
+			const items = [];
+			payloads.forEach((data) => {
+				if (Array.isArray(data?.Items)) {
+					items.push(...data.Items);
 				}
 			});
-			return urls;
+			if (items.length === 0) return [];
+			const urls = [];
+			const addImageUrl = (itemId, imageType, tag = null, index = null) => {
+				const imageUrl = buildItemImageUrl({
+					baseUrl,
+					itemId,
+					imageType,
+					accessToken: entry.accessToken,
+					width: LOGIN_BACKDROP_WIDTH,
+					tag,
+					index
+				});
+				if (imageUrl) {
+					urls.push(imageUrl);
+				}
+			};
+
+			items.forEach((item) => {
+				if (!item?.Id) return;
+				const backdropTag = getFirstImageTag(item.BackdropImageTags)
+					|| (typeof item.ImageTags?.Backdrop === 'string' && item.ImageTags.Backdrop ? item.ImageTags.Backdrop : null);
+				if (backdropTag) {
+					addImageUrl(item.Id, 'Backdrop', backdropTag, 0);
+				}
+
+				const primaryTag = item.PrimaryImageTag || item.ImageTags?.Primary || null;
+				if (primaryTag) {
+					addImageUrl(item.Id, 'Primary', primaryTag);
+				}
+
+				if (item.SeriesId && item.SeriesPrimaryImageTag) {
+					addImageUrl(item.SeriesId, 'Primary', item.SeriesPrimaryImageTag);
+				}
+
+				if (item.ParentBackdropItemId) {
+					const parentBackdropTag = getFirstImageTag(item.ParentBackdropImageTags);
+					if (parentBackdropTag) {
+						addImageUrl(item.ParentBackdropItemId, 'Backdrop', parentBackdropTag, 0);
+					}
+				}
+			});
+			return [...new Set(urls)];
 		} catch (err) {
 			if (err?.name === 'AbortError') return [];
 			return [];
 		}
+	}, []);
+
+	const resolveSavedUserBackdrop = useCallback(async (entry, signal) => {
+		if (!entry?.url || !entry?.userId || !entry?.accessToken) return '';
+		const baseUrl = entry.url.replace(/\/+$/, '');
+		let tag = normalizeImageTag(entry.avatarTag);
+
+		if (!tag) {
+			try {
+				const response = await fetch(`${baseUrl}/Users/${entry.userId}`, {
+					headers: {
+						'X-Emby-Token': entry.accessToken
+					},
+					signal
+				});
+				if (response?.ok) {
+					const data = await response.json().catch(() => null);
+					tag = normalizeImageTag(data?.PrimaryImageTag);
+				}
+			} catch (err) {
+				if (err?.name === 'AbortError') return '';
+			}
+		}
+
+		return buildUserPrimaryImageUrl({
+			baseUrl: entry.url,
+			userId: entry.userId,
+			accessToken: entry.accessToken,
+			width: LOGIN_BACKDROP_WIDTH,
+			tag
+		});
 	}, []);
 
 	useEffect(() => {
@@ -168,12 +284,21 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 
 		const loadBackdrops = async () => {
 			try {
-				const perServerBackdrops = await Promise.all(
-					availableServers.map((entry) => fetchBackdropsForSavedServer(entry, controller.signal))
-				);
+				const [perServerBackdrops, fallbackUserBackdrops] = await Promise.all([
+					Promise.all(
+						availableServers.map((entry) => fetchBackdropsForSavedServer(entry, controller.signal))
+					),
+					Promise.all(
+						availableServers.map((entry) => resolveSavedUserBackdrop(entry, controller.signal))
+					)
+				]);
 				if (isCancelled) return;
 				const uniqueBackdrops = [...new Set(perServerBackdrops.flat().filter(Boolean))];
-				const nextBackdrops = shuffleArray(uniqueBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
+				const candidateBackdrops = [...new Set([
+					...uniqueBackdrops,
+					...fallbackUserBackdrops.filter(Boolean)
+				])];
+				const nextBackdrops = shuffleArray(candidateBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
 				setLoginBackdropUrls(nextBackdrops);
 				setBackdropImageErrors({});
 			} catch (err) {
@@ -189,7 +314,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 			isCancelled = true;
 			controller.abort();
 		};
-	}, [fetchBackdropsForSavedServer, isActive, savedServers]);
+	}, [fetchBackdropsForSavedServer, isActive, resolveSavedUserBackdrop, savedServers]);
 
 	useEffect(() => {
 		setActiveBackdropIndex(0);
@@ -248,6 +373,11 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		if (!source) return;
 		setBackdropImageErrors((previous) => (
 			previous[source] ? previous : { ...previous, [source]: true }
+		));
+		setLoginBackdropUrls((previous) => (
+			previous.includes(source)
+				? previous.filter((url) => url !== source)
+				: previous
 		));
 	}, []);
 
@@ -378,16 +508,13 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	}, [handleLogin]);
 
 	const getSavedUserAvatarUrl = useCallback((entry) => {
-		if (!entry?.url || !entry?.userId || !entry?.accessToken) return '';
-		const base = `${entry.url}/Users/${entry.userId}/Images/Primary`;
-		const params = new URLSearchParams({
-			width: '88',
-			api_key: entry.accessToken
+		return buildUserPrimaryImageUrl({
+			baseUrl: entry?.url,
+			userId: entry?.userId,
+			accessToken: entry?.accessToken,
+			width: 88,
+			tag: entry?.avatarTag || null
 		});
-		if (entry.avatarTag) {
-			params.set('tag', entry.avatarTag);
-		}
-		return `${base}?${params.toString()}`;
 	}, []);
 
 	const handleSavedAvatarError = useCallback((event) => {

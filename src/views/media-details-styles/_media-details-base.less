@@ -13,8 +13,9 @@
 	--bf-media-details-base-rgb: 18, 18, 18;
 	--bf-media-details-control-radius: 0.9rem;
 	--bf-media-details-episode-radius: 1.75rem;
-	--bf-md-hero-top-padding: 0.5rem;
-	--bf-md-hero-top-padding-elegant: 26vh;
+	--bf-md-hero-top-padding: 0rem;
+	--bf-md-hero-top-padding-elegant: 22vh;
+	--bf-md-intro-control-size: 2rem;
 	min-height: 100vh;
 	background-color: rgb(var(--bf-media-details-base-rgb));
 	background: linear-gradient(
@@ -27,7 +28,7 @@
 
 .episodeDetailsMode {
 	--bf-md-hero-top-padding: 0rem;
-	--bf-md-hero-top-padding-elegant: 18vh;
+	--bf-md-hero-top-padding-elegant: 14vh;
 }
 
 .mdControlSurface(@bg; @border; @radius: 999px) {
@@ -135,12 +136,18 @@
 
 .content {
 	--bf-md-content-top-padding: 1rem;
+	--bf-md-intro-top-gap: clamp(
+		0rem,
+		calc(var(--bf-md-hero-top-padding, 0rem) - (var(--bf-md-intro-control-size, 2rem) - 2rem)),
+		var(--bf-md-hero-top-padding, 0rem)
+	);
 	padding: var(--bf-md-content-top-padding) 48px calc(120px + var(--bf-panel-content-bottom-padding, 4rem)) 48px;
 	position: relative;
 	z-index: 2;
 }
 
 .firstSection {
+	--bf-md-intro-control-size: 4rem;
 	min-height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
 	max-height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
 	height: calc(100vh - var(--bf-md-content-top-padding, 1rem));
@@ -179,7 +186,7 @@
 	z-index: 1;
 	display: flex;
 	align-items: center;
-	gap: 0.52rem;
+	gap: var(--bf-details-topbar-gap, 0.52rem);
 	min-height: var(--bf-details-topbar-height);
 	padding: 0.22rem 0;
 	margin-bottom: 0;
@@ -233,18 +240,27 @@
 }
 
 .header {
-	margin-bottom: 32px;
+	margin-bottom: 1.25rem;
 }
 
 .introSection {
-	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 1rem);
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.introContent {
+	flex: 1 1 auto;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-end;
 }
 
-.introContent {
-	flex: 0 0 auto;
+.introTopSpacer {
+	flex: 1 1 var(--bf-md-intro-top-gap, 0rem);
+	min-height: 0;
 }
 
 .introHeaderRow {
@@ -333,12 +349,12 @@
 	flex: 1 1 auto;
 	min-width: 0;
 	max-width: 60vw;
-	padding: var(--bf-md-hero-top-padding) 0 1.5rem;
-	margin-bottom: 24px;
+	padding: 0 0 1rem;
+	margin-bottom: 0.75rem;
 }
 
 .episodeDetailsMode .introSection {
-	min-height: calc(100vh - var(--bf-details-topbar-height, 2.35rem) - var(--bf-details-topbar-gap, 0.65rem) - 2.8rem);
+	min-height: 0;
 }
 
 .pageHeaderTitle {
@@ -516,34 +532,7 @@
 }
 
 .actionButton {
-	min-width: 2.35rem !important;
-	width: 2.35rem !important;
-	height: 2.35rem !important;
-	padding: 0 !important;
-
-	:global(.bf-button) {
-		min-width: 2.35rem !important;
-		width: 2.35rem !important;
-		height: 2.35rem !important;
-		min-height: 2.35rem !important;
-		margin: 0 !important;
-		padding: 0 !important;
-		line-height: 2.35rem !important;
-		display: inline-flex !important;
-		align-items: center !important;
-		justify-content: center !important;
-		overflow: visible !important;
-	}
-
-	:global(.client) {
-		width: 100% !important;
-		height: 100% !important;
-		padding: 0 !important;
-		display: flex !important;
-		align-items: center !important;
-		justify-content: center !important;
-		overflow: visible !important;
-	}
+	.icon-circle-button-dimensions(2.35rem);
 
 	.mdControlSurface(rgba(255, 255, 255, 0.06); 1px solid rgba(255, 255, 255, 0.24); 999px);
 
@@ -894,8 +883,10 @@
 	}
 
 	&:hover {
+		--seasonCardBorderColor: rgba(188, 213, 247, 0.7);
 		transform: translateY(-2px);
 		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
+		background: linear-gradient(160deg, rgba(44, 58, 79, 0.86) 0%, rgba(25, 35, 51, 0.83) 100%);
 	}
 
 	&:global(.spottable):focus,
@@ -903,6 +894,7 @@
 		transform: translateY(-2px);
 		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
 		--seasonCardBorderColor: rgba(212, 226, 255, 0.9);
+		background: linear-gradient(160deg, rgba(48, 64, 88, 0.88) 0%, rgba(28, 40, 60, 0.84) 100%);
 	}
 
 	&:hover .seasonPosterWrap::before,
@@ -1192,18 +1184,19 @@
 
 .episodeCard.episodeCardSideways {
 	height: auto !important;
-	min-height: clamp(24rem, 55vh, 34rem);
+	min-height: 0;
 	overflow: visible;
 	flex-direction: column;
 	align-items: stretch;
 }
 
 .episodeCard.episodeCardSideways .episodeInfo {
-	flex: 1 1 auto;
+	flex: 0 0 auto;
 }
 
 .episodeCard.episodeCardSideways .episodeActions {
-	margin-top: auto;
+	margin-top: 0.45rem;
+	align-self: flex-start;
 }
 
 .episodePlayed {
@@ -1217,14 +1210,14 @@
 	border-radius: var(--bf-media-details-episode-radius);
 	overflow: hidden;
 	height: calc(100% - 32px);
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--bf-theme-card-border-rest, rgba(255, 255, 255, 0.16));
+	box-shadow: var(--bf-theme-card-shadow-rest, 0 10px 20px rgba(0, 0, 0, 0.35));
 
 	&::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
+		background: var(--bf-theme-card-hover-overlay-gradient, linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24)));
 		opacity: 0;
 		transition: opacity 220ms ease;
 		pointer-events: none;
@@ -1238,7 +1231,7 @@
 		right: 0;
 		bottom: 0;
 		height: 45%;
-		background: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
+		background: var(--bf-theme-card-bottom-fade-gradient, linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%));
 		pointer-events: none;
 		z-index: 1;
 	}
@@ -1259,23 +1252,25 @@
 	border: 1px solid rgba(174, 221, 255, 0.38);
 }
 
-.episodeWatchedBadge {
+.episodeStatusBadges {
 	position: absolute;
 	top: 0.5rem;
 	right: 0.5rem;
 	z-index: 3;
-	min-width: 1.4rem;
-	height: 1.4rem;
-	padding: 0 0.25rem;
-	border-radius: 999px;
-	font-size: 0.75em;
-	font-weight: 800;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	color: #03140e;
-	background: rgba(148, 233, 183, 0.94);
-	box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.35rem;
+}
+
+.episodeFavoriteBadge {
+	.status-badge-favorite();
+	font-size: 0.86em;
+	letter-spacing: 0;
+}
+
+.episodeWatchedBadge {
+	.status-badge-success();
 }
 
 .episodeImageMetaBadges {
@@ -1366,6 +1361,15 @@
 		box-shadow: none !important;
 	}
 
+	.seasonCard {
+		&:hover,
+		&:focus,
+		&:global(.spottable):focus {
+			--seasonCardBorderColor: rgba(206, 223, 247, 0.9);
+			background: rgba(30, 40, 56, 0.9);
+		}
+	}
+
 	.episodeCard {
 		background: rgba(18, 24, 36, 0.34);
 		border-color: rgba(255, 255, 255, 0.14);
@@ -1442,6 +1446,7 @@
 }
 
 .episodeInfoButton,
+.episodeFavoriteButton,
 .episodeWatchedButton {
 	min-width: 3rem !important;
 	width: 3rem !important;
@@ -1456,6 +1461,12 @@
 
 	.mdControlSurface(rgba(255, 255, 255, 0.08); 1px solid rgba(255, 255, 255, 0.24); 999px);
 	.mdControlHoverSurface(rgba(0, 164, 220, 0.22));
+}
+
+.episodeFavoriteButtonActive :global(.bf-button-bg),
+.episodeFavoriteButtonActive :global(.bg) {
+	background: rgba(255, 107, 127, 0.2) !important;
+	border-color: rgba(255, 177, 193, 0.9) !important;
 }
 
 .episodeWatchedButtonActive :global(.bf-button-bg),
@@ -1757,5 +1768,55 @@
 		white-space: nowrap !important;
 		font-size: 0.84em !important;
 		font-weight: 700 !important;
+	}
+}
+
+/* Larger hit area for first-section audio/subtitle/play controls without changing text scale. */
+.firstSection .introControlsRow .compactSelectorButton,
+.firstSection .introControlsRow .trackSelectorPrimary,
+.firstSection .introControlsRow .primaryButton,
+.firstSection .introControlsRow .overviewPlayButton {
+	min-height: var(--bf-md-intro-control-size) !important;
+	height: var(--bf-md-intro-control-size) !important;
+	line-height: var(--bf-md-intro-control-size) !important;
+	display: inline-flex !important;
+	align-items: stretch !important;
+	vertical-align: middle !important;
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.bg),
+	:global(.client) {
+		min-height: var(--bf-md-intro-control-size) !important;
+		height: var(--bf-md-intro-control-size) !important;
+	}
+
+	:global(.bf-button) {
+		padding: 0 !important;
+		display: inline-flex !important;
+		align-items: stretch !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		display: inline-flex !important;
+		align-items: stretch !important;
+	}
+
+	:global(.client) {
+		padding: 0 1.35rem !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		gap: 0.42rem;
+		line-height: 1 !important;
+		text-align: center !important;
+	}
+
+	:global(.icon) {
+		line-height: 1 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
 	}
 }

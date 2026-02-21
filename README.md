@@ -17,6 +17,11 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 
 ## Current capabilities
 
+> [!NOTE]
+> The app has undergone major refactoring efforts, so please do report any issues if you encounter any.
+>
+> [Read more in the v0.1.5 announcement](https://github.com/botagas/Breezyfin/discussions/6)
+
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
 - Home, Library, Search, Favorites, Media Details, and Player panels
@@ -26,6 +31,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Player with direct play, direct stream, and transcode handling
 - Subtitle/audio compatibility fallbacks for webOS playback paths
 - Diagnostics tools (logs, performance overlay, cache wipe, style debug panel)
+- Modular Jellyfin service architecture (session/library/item-state/playback domain split)
 
 ## Install on TV (IPK)
 
@@ -64,29 +70,23 @@ Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## Developer guidelines
 
-Before adding new panel logic, prefer shared building blocks first:
+Start with these principles:
+- Reuse existing hooks/components before adding new abstractions.
+- Keep panel logic modular by using panel-local `components/`, `hooks/`, and `utils/`.
+- Keep large behavior flows in dedicated panel hooks (e.g. player load/skip/seek/commands, media details focus/actions).
+- Keep `jellyfinService` as a thin facade; place domain logic in `src/services/jellyfin/*`.
+- Keep styling token-driven and consistent across themes.
+- Reuse shared status badge primitives for watched/favorite/count states instead of panel-specific badge variants.
+- For webOS 6 / legacy compat, prefer concrete dimensions in compat files when implicit sizing causes unstable layout.
+- Keep comments minimal; document only non-obvious constraints/tradeoffs.
 
-- Back handling: `src/hooks/usePanelBackHandler.js`
-- Popup/menu state: `src/hooks/useDisclosureMap.js`
-- Map lookups by id/key: `src/hooks/useMapById.js`
-- Item metadata fetch/state: `src/hooks/useItemMetadata.js`
-- Toast lifecycle: `src/hooks/useToastMessage.js`
-- Track preference persistence: `src/hooks/useTrackPreferences.js`
-- Image fallback handling: `src/hooks/useImageErrorFallback.js`
-- Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
-- Scroll restoration + cached panel scroll state: `src/hooks/useScrollerScrollMemory.js`
-  - `useScrollerScrollMemory()` for `Scroller` restore/save wiring
-  - `useCachedScrollTopState()` for normalized cached scrollTop state
-- Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
-- Shared toolbar focus helper: `src/utils/toolbarFocus.js`
-- Shared home row order constant: `src/constants/homeRows.js`
-- Shared poster card class helper: `src/utils/posterCardClassProps.js`
-
-Styling and theme references:
-
-- Theme tokens: `src/styles/themes/classic.css`, `src/styles/themes/elegant.css`
-- Shared popup surface styles: `src/styles/popupStyles.module.less`, `src/styles/popupStyles.js`
-- Panel styling pattern: `src/views/*-panel-styles/` split files (base + per-theme + shared tail)
+For the full development guide (shared building blocks, panel patterns, style references, and conventions), see:
+- [`DEVELOPING.md`](./DEVELOPING.md)
+- [`HELPERS.md`](./HELPERS.md)
+- [`THEMES.md`](./THEMES.md)
+- [`COMPONENTS.md`](./COMPONENTS.md)
+- [`VIEWS.md`](./VIEWS.md)
+- [`TODOS.md`](./TODOS.md)
 
 ## Debug flags
 
@@ -161,6 +161,8 @@ Output will be in the `dist/` folder.
 - Add CI quality gates for lint/test/build plus release artifact checks.
 - Improve accessibility/readability options (larger text mode, stronger contrast presets, clearer focus indicators).
 
+See [`TODOS.md`](./TODOS.md) for the prioritized implementation backlog.
+
 ## Release automation
 
 This repository supports automated prerelease/stable publishing for webOS Homebrew distribution:
@@ -172,7 +174,7 @@ See `docs/homebrew-release-flow.md` for the full branch/release/version workflow
 
 ## Contributing
 
-Pull requests and issues are welcome! Please follow the code style and add tests for new features. See the [components/README.md](src/components/README.md) for reusable UI guidelines.
+Pull requests and issues are welcome! Please follow the code style and add tests for new features. See [`COMPONENTS.md`](./COMPONENTS.md) and [`VIEWS.md`](./VIEWS.md) for architecture and UI conventions.
 
 ## Credits
 

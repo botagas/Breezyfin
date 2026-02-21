@@ -18,6 +18,7 @@ export const KeyCodes = {
 	YELLOW: 405,
 	BLUE: 406,
 	PLAY: 415,
+	MEDIA_PLAY_PAUSE: 179, // keyboard media key on some remotes/devices
 	PAUSE: 19,
 	STOP: 413,
 	REWIND: 412,

@@ -3,6 +3,9 @@
 [data-bf-nav-theme='classic'] {
 	--bf-theme-accent: rgba(0, 164, 220, 0.95);
 	--bf-theme-panel-bg: #121212;
+	--bf-theme-filter-badge-bg: rgba(63, 184, 255, 0.95);
+	--bf-theme-filter-badge-color: #04111e;
+	--bf-theme-filter-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.35);
 
 	--bf-theme-surface-bg: rgba(18, 18, 18, 0.95);
 	--bf-theme-surface-border: rgba(255, 255, 255, 0.2);
@@ -36,6 +39,14 @@
 
 	--bf-theme-header-bg: rgba(0, 0, 0, 0.22);
 	--bf-theme-header-fade-color: rgba(0, 0, 0, 0.2);
+	--bf-theme-toolbar-hover-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-toolbar-focus-bg: rgba(240, 235, 235, 0.1);
+	--bf-theme-toolbar-focus-outline: rgba(255, 255, 255, 0.3);
+	--bf-theme-toolbar-menu-surface-bg: rgba(18, 18, 18, 0.95);
+	--bf-theme-toolbar-menu-surface-border: rgba(255, 255, 255, 0.2);
+	--bf-theme-toolbar-menu-surface-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+	--bf-theme-toolbar-menu-item-hover-bg: rgba(255, 255, 255, 0.1);
+	--bf-theme-toolbar-menu-item-focus-bg: rgba(255, 255, 255, 0.15);
 
 	--bf-theme-settings-surface: rgba(14, 22, 30, 0.82);
 	--bf-theme-settings-surface-strong: rgba(20, 30, 40, 0.9);

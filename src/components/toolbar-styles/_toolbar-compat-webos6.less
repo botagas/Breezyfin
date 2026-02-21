@@ -1,0 +1,110 @@
+@import (reference) '../../styles/compatMixins.less';
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassNav {
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
+	background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45));
+	overflow: visible;
+	isolation: auto;
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassFilter {
+	display: none;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	filter: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassOverlay {
+	background: transparent;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassSpecular {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.02));
+	box-shadow: none;
+}
+
+:global([data-bf-all-animations='off'][data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassNav {
+	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .libraryNativeContentGlass {
+	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerFilter,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerOverlay,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerSpecular,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .liquidLayerFilter,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .liquidLayerOverlay,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .liquidLayerSpecular {
+	display: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .userMenu .liquidLayerOverlay,
+:global([data-bf-webos-v6-compat='on']) .userMenu .liquidLayerFilter,
+:global([data-bf-webos-v6-compat='on']) .userMenu .liquidLayerSpecular {
+	display: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .userMenu,
+:global([data-bf-webos-v6-compat='on']) .userMenuElegant {
+	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	isolation: auto !important;
+	contain: none !important;
+	transform: translateZ(0);
+}
+
+:global([data-bf-webos-v6-compat='on']) .libraryNativeContent {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	isolation: auto !important;
+	transform: translateZ(0);
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .libraryNativeContentGlass {
+	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+	isolation: auto !important;
+	transform: translateZ(0);
+}
+
+:global([data-bf-webos-v6-compat='on']) .userMenu::before {
+	display: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .libraryNativeContentGlass::before {
+	display: none !important;
+}
+
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .start", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .center", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .centerPinned", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .centerScroller", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .end", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .elegantBackArea", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .elegantTabs", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .elegantActions", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .libraryNativeGrid", 0.5rem);
+
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .elegantContainer", clamp(0.6rem, 1vw, 1rem));
+.compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .libraryNativeInner", 0.7rem);
+.compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .userMenuInner", 0.7rem);

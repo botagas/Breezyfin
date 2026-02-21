@@ -153,6 +153,15 @@
 
 .loginBox :global(.bf-button-bg) {
 	background: rgba(255, 255, 255, 0.08) !important;
+	background-image: none !important;
+	border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	border-radius: 999px !important;
+	box-shadow: none !important;
+}
+
+.loginBox :global(.bg) {
+	background: rgba(255, 255, 255, 0.08) !important;
+	background-image: none !important;
 	border: 1px solid rgba(255, 255, 255, 0.18) !important;
 	border-radius: 999px !important;
 	box-shadow: none !important;
@@ -161,6 +170,13 @@
 .loginBox :global(.bf-button:hover .bf-button-bg),
 .loginBox :global(.bf-button:focus .bf-button-bg),
 .loginBox :global(.bf-button:active .bf-button-bg) {
+	background: rgba(255, 255, 255, 0.16) !important;
+	border-color: rgba(255, 255, 255, 0.32) !important;
+}
+
+.loginBox :global(.bf-button:hover .bg),
+.loginBox :global(.bf-button:focus .bg),
+.loginBox :global(.bf-button:active .bg) {
 	background: rgba(255, 255, 255, 0.16) !important;
 	border-color: rgba(255, 255, 255, 0.32) !important;
 }
