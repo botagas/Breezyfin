@@ -17,6 +17,11 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 
 ## Current capabilities
 
+> [!NOTE]
+> The app is undergoing refactoring efforts, so please do report any issues if you encounter any.
+>
+> [Read more in the v0.1.5 announcement](https://github.com/botagas/Breezyfin/discussions/6)
+
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
 - Home, Library, Search, Favorites, Media Details, and Player panels
@@ -26,6 +31,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Player with direct play, direct stream, and transcode handling
 - Subtitle/audio compatibility fallbacks for webOS playback paths
 - Diagnostics tools (logs, performance overlay, cache wipe, style debug panel)
+- Modular Jellyfin service architecture (session/library/item-state/playback domain split)
 
 ## Install on TV (IPK)
 
@@ -64,58 +70,22 @@ Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## Developer guidelines
 
-Detailed helper documentation:
+Start with these principles:
+- Reuse existing hooks/components before adding new abstractions.
+- Keep panel logic modular by using panel-local `components/`, `hooks/`, and `utils/`.
+- Keep large behavior flows in dedicated panel hooks (e.g. player load/skip/seek/commands, media details focus/actions).
+- Keep `jellyfinService` as a thin facade; place domain logic in `src/services/jellyfin/*`.
+- Keep styling token-driven and consistent across themes.
+- For webOS 6 / legacy compat, prefer concrete dimensions in compat files when implicit sizing causes unstable layout.
+- Keep comments minimal; document only non-obvious constraints/tradeoffs.
+
+For the full development guide (shared building blocks, panel patterns, style references, and conventions), see:
+- [`DEVELOPING.md`](./DEVELOPING.md)
 - [`HELPERS.md`](./HELPERS.md)
 - [`THEMES.md`](./THEMES.md)
-
-Before adding new panel logic, prefer shared building blocks first:
-
-- Back handling: `src/hooks/usePanelBackHandler.js`
-- Input mode sync (`pointer`/`5way`): `src/hooks/useInputMode.js`
-- Popup/menu state: `src/hooks/useDisclosureMap.js`
-- Popup/menu handler map: `src/hooks/useDisclosureHandlers.js`
-- Map lookups by id/key: `src/hooks/useMapById.js`
-- Item metadata fetch/state: `src/hooks/useItemMetadata.js`
-- Toast lifecycle: `src/hooks/useToastMessage.js`
-- Track preference persistence: `src/hooks/useTrackPreferences.js`
-- Image fallback handling: `src/hooks/useImageErrorFallback.js`
-- Player remote/media-key handler: `src/hooks/usePlayerKeyboardShortcuts.js`
-- Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
-- Preferred panel scroll cache wiring: `src/hooks/usePanelScrollState.js`
-  - `usePanelScrollState()` for normalized scrollTop state, `Scroller` restore/save wiring, and optional cache persistence
-- Low-level scroll primitives (use only when panel needs custom behavior): `src/hooks/useScrollerScrollMemory.js`
-  - `useScrollerScrollMemory()` for `Scroller` restore/save wiring
-  - `useCachedScrollTopState()` for normalized cached scrollTop state
-- Preferred panel toolbar/back wiring: `src/hooks/usePanelToolbarActions.js`
-- Shared toolbar callback bundle (low-level): `src/hooks/useToolbarActions.js`
-- Shared toolbar back-handler bridge (low-level): `src/hooks/useToolbarBackHandler.js`
-- Preferred toolbar wiring pattern:
-  - Default to `usePanelToolbarActions()` for panel-level toolbar callbacks + layered back flow.
-  - Only use `useToolbarBackHandler()` + `useToolbarActions()` directly when panel behavior is custom.
-- Preferred panel scroll-state pattern:
-  - Use `usePanelScrollState()` for panel `Scroller` restore/save and cached scrollTop persistence.
-  - Only use `useScrollerScrollMemory()` directly when panel behavior is non-standard.
-- Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
-- Shared toolbar focus helper: `src/utils/toolbarFocus.js`
-- Shared home row order constant: `src/constants/homeRows.js`
-- Shared poster card class helper: `src/utils/posterCardClassProps.js`
-- Shared player view helpers: `src/utils/playerPanelHelpers.js`
-- Shared episode next/previous helpers: `src/utils/episodeNavigation.js`
-- Shared media details formatting/image helpers: `src/utils/mediaDetailsHelpers.js`
-
-Styling and theme references:
-
-- Theme tokens: `src/styles/themes/classic.css`, `src/styles/themes/elegant.css`
-- Global shared tokens/classes (including shared error surfaces): `src/global.css`
-- Shared popup surface styles: `src/styles/popupStyles.module.less`, `src/styles/popupStyles.js`
-- Shared panel layout mixins: `src/styles/panelLayoutMixins.less`
-- webOS compatibility mixins: `src/styles/compatMixins.less`
-- Panel styling pattern: `src/views/*-panel-styles/` split files (base + per-theme + shared tail)
-
-Code comments guideline:
-
-- Keep comments minimal; prefer clear naming/structure so code explains itself.
-- Add comments only where behavior, constraints, or tradeoffs are non-obvious.
+- [`COMPONENTS.md`](./COMPONENTS.md)
+- [`VIEWS.md`](./VIEWS.md)
+- [`TODOS.md`](./TODOS.md)
 
 ## Debug flags
 
@@ -190,6 +160,8 @@ Output will be in the `dist/` folder.
 - Add CI quality gates for lint/test/build plus release artifact checks.
 - Improve accessibility/readability options (larger text mode, stronger contrast presets, clearer focus indicators).
 
+See [`TODOS.md`](./TODOS.md) for the prioritized implementation backlog.
+
 ## Release automation
 
 This repository supports automated prerelease/stable publishing for webOS Homebrew distribution:
@@ -201,7 +173,7 @@ See `docs/homebrew-release-flow.md` for the full branch/release/version workflow
 
 ## Contributing
 
-Pull requests and issues are welcome! Please follow the code style and add tests for new features. See the [components/README.md](src/components/README.md) for reusable UI guidelines.
+Pull requests and issues are welcome! Please follow the code style and add tests for new features. See [`COMPONENTS.md`](./COMPONENTS.md) and [`VIEWS.md`](./VIEWS.md) for architecture and UI conventions.
 
 ## Credits
 

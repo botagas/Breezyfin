@@ -5,6 +5,7 @@ import Spinner from '@enact/sandstone/Spinner';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
+import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 
 import css from './MediaRow.module.less';
 
@@ -150,6 +151,10 @@ const Container = createLastFocusedSpotlightContainer('div', {
 });
 
 const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, rowIndex = 0, onCardKeyDown, ...rest }) => {
+	const runtimeCapabilities = getRuntimePlatformCapabilities();
+	const isLegacyCompactLayout = runtimeCapabilities.webosV6Compat
+		|| runtimeCapabilities.legacyWebOS
+		|| (!runtimeCapabilities.supportsAspectRatio && !runtimeCapabilities.supportsFlexGap);
 	const scrollerRef = useRef(null);
 	const focusDebounceTimeoutRef = useRef(null);
 
@@ -180,8 +185,8 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 
 	if (loading) {
 		return (
-			<div className={css.row} {...rest}>
-				<BodyText className={css.rowTitle}>{title}</BodyText>
+			<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
+				<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
 				<div className={css.loading}>
 					<Spinner />
 				</div>
@@ -194,13 +199,13 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 	}
 
 	return (
-		<div className={css.row} {...rest}>
-			<BodyText className={css.rowTitle}>{title}</BodyText>
+		<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
+			<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
 			<Container
 				className={css.rowContent}
 				onFocus={handleFocus}
 			>
-				<div className={css.cardContainer} ref={scrollerRef}>
+				<div className={`${css.cardContainer} ${isLegacyCompactLayout ? css.cardContainerCompactWebos6 : ''}`} ref={scrollerRef}>
 					{items.map((item, index) => (
 						<MediaCard
 							key={item.Id}

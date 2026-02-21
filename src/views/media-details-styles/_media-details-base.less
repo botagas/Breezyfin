@@ -186,7 +186,7 @@
 	z-index: 1;
 	display: flex;
 	align-items: center;
-	gap: 0.52rem;
+	gap: var(--bf-details-topbar-gap, 0.52rem);
 	min-height: var(--bf-details-topbar-height);
 	padding: 0.22rem 0;
 	margin-bottom: 0;
@@ -532,34 +532,7 @@
 }
 
 .actionButton {
-	min-width: 2.35rem !important;
-	width: 2.35rem !important;
-	height: 2.35rem !important;
-	padding: 0 !important;
-
-	:global(.bf-button) {
-		min-width: 2.35rem !important;
-		width: 2.35rem !important;
-		height: 2.35rem !important;
-		min-height: 2.35rem !important;
-		margin: 0 !important;
-		padding: 0 !important;
-		line-height: 2.35rem !important;
-		display: inline-flex !important;
-		align-items: center !important;
-		justify-content: center !important;
-		overflow: visible !important;
-	}
-
-	:global(.client) {
-		width: 100% !important;
-		height: 100% !important;
-		padding: 0 !important;
-		display: flex !important;
-		align-items: center !important;
-		justify-content: center !important;
-		overflow: visible !important;
-	}
+	.icon-circle-button-dimensions(2.35rem);
 
 	.mdControlSurface(rgba(255, 255, 255, 0.06); 1px solid rgba(255, 255, 255, 0.24); 999px);
 
@@ -1211,14 +1184,14 @@
 
 .episodeCard.episodeCardSideways {
 	height: auto !important;
-	min-height: clamp(24rem, 55vh, 34rem);
+	min-height: 0;
 	overflow: visible;
 	flex-direction: column;
 	align-items: stretch;
 }
 
 .episodeCard.episodeCardSideways .episodeInfo {
-	flex: 1 1 auto;
+	flex: 0 0 auto;
 }
 
 .episodeCard.episodeCardSideways .episodeActions {
@@ -1284,18 +1257,7 @@
 	top: 0.5rem;
 	right: 0.5rem;
 	z-index: 3;
-	min-width: 1.4rem;
-	height: 1.4rem;
-	padding: 0 0.25rem;
-	border-radius: 999px;
-	font-size: 0.75em;
-	font-weight: 800;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	color: #03140e;
-	background: rgba(148, 233, 183, 0.94);
-	box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	.status-badge-success();
 }
 
 .episodeImageMetaBadges {

@@ -1,3 +1,61 @@
 @import (reference) '../../styles/compatMixins.less';
 
-.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on']) .cardContainer", 1.15rem);
+.rowCompactWebos6 {
+	margin-top: 0.08rem;
+	margin-bottom: 0.24rem;
+}
+
+.rowTitleCompactWebos6 {
+	margin-bottom: 0.1rem;
+	padding: 0 0.6rem;
+}
+
+.cardContainerCompactWebos6 {
+	gap: 0.12rem;
+	padding: 0.08rem 0.6rem 0.12rem;
+}
+
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on']) .cardContainer", 0.2rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on']) .cardContainer", 0.2rem);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .cardContainer", 0.2rem);
+
+:global([data-bf-webos-v6-compat='on']) .row,
+:global([data-bf-webos-legacy='on']) .row,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .row {
+	margin-top: 0.1rem;
+	margin-bottom: 0.3rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .rowTitle,
+:global([data-bf-webos-legacy='on']) .rowTitle,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .rowTitle {
+	margin-bottom: 0.12rem;
+	padding: 0 0.75rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .cardContainer,
+:global([data-bf-webos-legacy='on']) .cardContainer,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .cardContainer {
+	gap: 0.16rem;
+	padding: 0.12rem 0.75rem 0.16rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .card,
+:global([data-bf-webos-legacy='on']) .card,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .card {
+	width: 20rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .cardImage,
+:global([data-bf-webos-legacy='on']) .cardImage,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .cardImage {
+	width: 20rem;
+	height: 11.25rem;
+	aspect-ratio: auto;
+}
+
+:global([data-bf-webos-v6-compat='on']) .cardInfo,
+:global([data-bf-webos-legacy='on']) .cardInfo,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .cardInfo {
+	max-width: 20rem;
+}

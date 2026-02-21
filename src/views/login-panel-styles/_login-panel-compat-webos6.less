@@ -1,7 +1,7 @@
 @import (reference) '../../styles/compatMixins.less';
 
-.compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on']) .loginBox", 0.75rem);
-.compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on']) .form", 0.75rem);
+.compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on']) .loginBox", 0.42rem);
+.compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on']) .form", 0.42rem);
 
 .compat-gap-row-fallback(
 	~":global([data-bf-webos-v6-compat='on']) .header";
@@ -10,7 +10,7 @@
 
 .compat-gap-row-fallback(
 	~":global([data-bf-webos-v6-compat='on']) .buttonRow";
-	0.5rem
+	0.12rem
 );
 
 .compat-gap-column-fallback(
@@ -23,11 +23,46 @@
 	flex-wrap: wrap;
 	justify-content: center;
 	align-items: stretch;
-	margin: -0.5rem 0 0;
+	margin: -0.12rem 0 0;
 }
 
 :global([data-bf-webos-v6-compat='on']) .savedList > .savedItem {
-	width: 8.5rem;
-	flex: 0 1 8.5rem;
-	margin: 0.5rem 0.5rem 0;
+	width: 8.1rem;
+	flex: 0 1 8.1rem;
+	margin: 0.12rem 0.16rem 0;
+}
+
+:global([data-bf-webos-v6-compat='on']) .page {
+	padding: 0.72rem 0.55rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .loginBox {
+	width: min(98vw, 41rem);
+	padding: 1.35rem 1.2rem 1.25rem;
+	border-radius: 0.95rem;
+	gap: 0.4rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .lead {
+	margin-bottom: 0.38rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .savedServers {
+	margin-bottom: 0.1rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .savedList {
+	margin: -0.08rem 0 0;
+}
+
+:global([data-bf-webos-v6-compat='on']) .savedList > .savedItem {
+	margin: 0.08rem 0.12rem 0;
+}
+
+:global([data-bf-webos-v6-compat='on']) .buttonRow {
+	gap: 0.12rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .manualLoginButton {
+	margin-top: 0.35rem !important;
 }

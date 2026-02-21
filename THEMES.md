@@ -61,6 +61,8 @@ Version/capability detection is implemented in `/Users/patrikas/Desktop/IT/Devel
   - Shared popup surface skin with Classic/Elegant token usage.
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popupStyles.js`
   - JS export for popup style class wiring.
+- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popup-styles/_popup-styles-compat-webos6.less`
+  - webOS 6 popup fallback behaviors (solid-surface compatibility path).
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/panelLayoutMixins.less`
   - Shared panel fill container mixin.
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/compatMixins.less`
@@ -127,6 +129,9 @@ Compatibility is capability-driven and scoped by root attributes.
 - Gap fallbacks for engines without reliable `gap` support.
 - Legacy navbar rendering path in toolbar compat file.
 - Panel-specific spacing/layout fallbacks.
+- Prefer concrete dimensions for unstable card/media layouts on legacy engines:
+  - define explicit `width`/`height` in compat files when `aspect-ratio` and implicit flex sizing produce whitespace or stretched media.
+  - keep these overrides scoped to webOS6/legacy selectors only.
 
 Key files:
 
@@ -135,6 +140,7 @@ Key files:
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/login-panel-styles/_login-panel-compat-webos6.less`
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/media-row-styles/_media-row-compat-webos6.less`
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
+- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popup-styles/_popup-styles-compat-webos6.less`
 
 ### webOS 22 compatibility
 
@@ -191,3 +197,6 @@ Also verify:
 
 - [`README.md`](./README.md)
 - [`HELPERS.md`](./HELPERS.md)
+- [`DEVELOPING.md`](./DEVELOPING.md)
+- [`COMPONENTS.md`](./COMPONENTS.md)
+- [`VIEWS.md`](./VIEWS.md)

@@ -36,16 +36,62 @@
 }
 
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .libraryNativeContentGlass {
-	background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26)) !important;
-	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1)) !important;
-	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
-	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06)) !important;
+	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
 	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
 }
 
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerFilter,
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerOverlay,
-:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerSpecular {
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerSpecular,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .liquidLayerFilter,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .liquidLayerOverlay,
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .liquidLayerSpecular {
+	display: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .userMenu .liquidLayerOverlay,
+:global([data-bf-webos-v6-compat='on']) .userMenu .liquidLayerFilter,
+:global([data-bf-webos-v6-compat='on']) .userMenu .liquidLayerSpecular {
+	display: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .userMenu,
+:global([data-bf-webos-v6-compat='on']) .userMenuElegant {
+	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	isolation: auto !important;
+	contain: none !important;
+	transform: translateZ(0);
+}
+
+:global([data-bf-webos-v6-compat='on']) .libraryNativeContent {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	isolation: auto !important;
+	transform: translateZ(0);
+}
+
+:global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .libraryNativeContentGlass {
+	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
+	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+	isolation: auto !important;
+	transform: translateZ(0);
+}
+
+:global([data-bf-webos-v6-compat='on']) .userMenu::before {
+	display: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .libraryNativeContentGlass::before {
 	display: none !important;
 }
 

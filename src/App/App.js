@@ -21,44 +21,15 @@ import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import AppCrashBoundary from './AppCrashBoundary';
+import {normalizePanelStatePayload, upsertKeyedPanelState, clearKeyedPanelState} from './utils/panelStateCache';
+import {getPanelIndexForView} from './utils/panelIndex';
+import {usePanelHistory} from './hooks/usePanelHistory';
+import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
 const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
-const KEYED_PANEL_STATE_CACHE_LIMIT = 180;
-const normalizePanelStatePayload = (nextState) => nextState || null;
-const upsertKeyedPanelState = (previousState, key, nextState) => {
-	const normalizedKey = String(key);
-	const normalizedState = normalizePanelStatePayload(nextState);
-	const nextStateMap = {
-		...previousState
-	};
-	if (Object.prototype.hasOwnProperty.call(nextStateMap, normalizedKey)) {
-		delete nextStateMap[normalizedKey];
-	}
-	nextStateMap[normalizedKey] = normalizedState;
-	const keys = Object.keys(nextStateMap);
-	if (keys.length <= KEYED_PANEL_STATE_CACHE_LIMIT) {
-		return nextStateMap;
-	}
-	const keysToDrop = keys.slice(0, keys.length - KEYED_PANEL_STATE_CACHE_LIMIT);
-	keysToDrop.forEach((oldKey) => {
-		delete nextStateMap[oldKey];
-	});
-	return nextStateMap;
-};
-const clearKeyedPanelState = (previousState, key) => {
-	const normalizedKey = String(key);
-	if (!Object.prototype.hasOwnProperty.call(previousState, normalizedKey)) {
-		return previousState;
-	}
-	const nextStateMap = {
-		...previousState
-	};
-	delete nextStateMap[normalizedKey];
-	return nextStateMap;
-};
 let StyleDebugPanel = null;
 if (STYLE_DEBUG_ENABLED) {
 	// Keep debug-only panel and assets out of stable production bundles.
@@ -98,62 +69,49 @@ const App = (props) => {
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
-	const playerBackHandlerRef = useRef(null);
-	const detailsBackHandlerRef = useRef(null);
-	const homeBackHandlerRef = useRef(null);
-	const libraryBackHandlerRef = useRef(null);
-	const searchBackHandlerRef = useRef(null);
-	const favoritesBackHandlerRef = useRef(null);
-	const settingsBackHandlerRef = useRef(null);
-	const styleDebugBackHandlerRef = useRef(null);
 	const handleBackRef = useRef(null);
-	const panelHistoryRef = useRef([]);
-
-	const createPanelSnapshot = useCallback(() => ({
-		view: currentView,
+	const {
+		refs: {
+			playerBackHandlerRef,
+			detailsBackHandlerRef,
+			homeBackHandlerRef,
+			libraryBackHandlerRef,
+			searchBackHandlerRef,
+			favoritesBackHandlerRef,
+			settingsBackHandlerRef,
+			styleDebugBackHandlerRef
+		},
+		runPanelBackHandler,
+		registerDetailsBackHandler,
+		registerPlayerBackHandler,
+		registerHomeBackHandler,
+		registerLibraryBackHandler,
+		registerSearchBackHandler,
+		registerFavoritesBackHandler,
+		registerSettingsBackHandler,
+		registerStyleDebugBackHandler
+	} = usePanelBackHandlerRegistry();
+	const {
+		pushPanelHistory,
+		clearPanelHistory,
+		navigateBackInHistory,
+		getHistoryFallbackItem
+	} = usePanelHistory({
+		currentView,
 		selectedItem,
 		selectedLibrary,
 		playbackOptions,
 		previousItem,
 		detailsReturnView,
-		playerControlsVisible
-	}), [
-		currentView,
-		detailsReturnView,
-		playbackOptions,
 		playerControlsVisible,
-		previousItem,
-		selectedItem,
-		selectedLibrary
-	]);
-
-	const pushPanelHistory = useCallback(() => {
-		panelHistoryRef.current = [...panelHistoryRef.current, createPanelSnapshot()];
-	}, [createPanelSnapshot]);
-
-	const clearPanelHistory = useCallback(() => {
-		panelHistoryRef.current = [];
-	}, []);
-
-	const restorePanelSnapshot = useCallback((snapshot) => {
-		if (!snapshot) return false;
-		setCurrentView(snapshot.view || 'home');
-		setSelectedItem(snapshot.selectedItem || null);
-		setSelectedLibrary(snapshot.selectedLibrary || null);
-		setPlaybackOptions(snapshot.playbackOptions || null);
-		setPreviousItem(snapshot.previousItem || null);
-		setDetailsReturnView(snapshot.detailsReturnView || 'home');
-		setPlayerControlsVisible(snapshot.playerControlsVisible !== false);
-		return true;
-	}, []);
-
-	const navigateBackInHistory = useCallback(() => {
-		const history = panelHistoryRef.current;
-		if (!history.length) return false;
-		const previousSnapshot = history[history.length - 1];
-		panelHistoryRef.current = history.slice(0, -1);
-		return restorePanelSnapshot(previousSnapshot);
-	}, [restorePanelSnapshot]);
+		setCurrentView,
+		setSelectedItem,
+		setSelectedLibrary,
+		setPlaybackOptions,
+		setPreviousItem,
+		setDetailsReturnView,
+		setPlayerControlsVisible
+	});
 
 	const resetSessionState = useCallback(() => {
 		setSelectedItem(null);
@@ -178,11 +136,6 @@ const App = (props) => {
 		if (clearLibrary) {
 			setSelectedLibrary(null);
 		}
-	}, []);
-
-	const runPanelBackHandler = useCallback((handlerRef) => {
-		if (typeof handlerRef?.current !== 'function') return false;
-		return handlerRef.current() === true;
 	}, []);
 
 	const navigateToViewAndClearSelection = useCallback((view, options = {}) => {
@@ -214,14 +167,7 @@ const App = (props) => {
 		return true;
 	}, [navigateBackInHistory, navigateToViewAndClearSelection, resolveDetailsReturnView]);
 	const fallbackToDetailsFromPlayer = useCallback(() => {
-		let historyFallbackItem = null;
-		for (let index = panelHistoryRef.current.length - 1; index >= 0; index -= 1) {
-			const snapshotItem = panelHistoryRef.current[index]?.selectedItem;
-			if (snapshotItem) {
-				historyFallbackItem = snapshotItem;
-				break;
-			}
-		}
+		const historyFallbackItem = getHistoryFallbackItem();
 		const fallbackItem = selectedItem || previousItem || historyFallbackItem || null;
 		if (fallbackItem) {
 			setSelectedItem(fallbackItem);
@@ -229,7 +175,7 @@ const App = (props) => {
 		setPlayerControlsVisible(true);
 		setCurrentView('details');
 		return true;
-	}, [previousItem, selectedItem]);
+	}, [getHistoryFallbackItem, previousItem, selectedItem]);
 
 	const applyVisualSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -288,21 +234,46 @@ const App = (props) => {
 	useEffect(() => {
 		if (typeof document === 'undefined') return undefined;
 		const roots = [document.documentElement, document.body].filter(Boolean);
+		const rootAttributes = {
+			'data-bf-nav-theme': navbarTheme,
+			'data-bf-animations': animationsDisabled ? 'off' : 'on',
+			'data-bf-all-animations': allAnimationsDisabled ? 'off' : 'on',
+			'data-bf-input-mode': inputMode,
+			'data-bf-platform-webos': runtimeCapabilities.webos ? 'on' : 'off',
+			'data-bf-webos-version': runtimeCapabilities.version ?? 'unknown',
+			'data-bf-webos-v6-compat': runtimeCapabilities.webosV6Compat ? 'on' : 'off',
+			'data-bf-webos-v22-compat': runtimeCapabilities.webosV22Compat ? 'on' : 'off',
+			'data-bf-webos-legacy': runtimeCapabilities.legacyWebOS ? 'on' : 'off',
+			'data-bf-flex-gap': runtimeCapabilities.supportsFlexGap ? 'on' : 'off',
+			'data-bf-aspect-ratio': runtimeCapabilities.supportsAspectRatio ? 'on' : 'off',
+			'data-bf-backdrop-filter': runtimeCapabilities.supportsBackdropFilter ? 'on' : 'off'
+		};
 		roots.forEach((root) => {
-			root.setAttribute('data-bf-nav-theme', navbarTheme);
-			root.setAttribute('data-bf-animations', animationsDisabled ? 'off' : 'on');
-			root.setAttribute('data-bf-all-animations', allAnimationsDisabled ? 'off' : 'on');
-			root.setAttribute('data-bf-input-mode', inputMode);
+			Object.entries(rootAttributes).forEach(([attribute, value]) => {
+				root.setAttribute(attribute, String(value));
+			});
 		});
 		return () => {
 			roots.forEach((root) => {
-				root.removeAttribute('data-bf-nav-theme');
-				root.removeAttribute('data-bf-animations');
-				root.removeAttribute('data-bf-all-animations');
-				root.removeAttribute('data-bf-input-mode');
+				Object.keys(rootAttributes).forEach((attribute) => {
+					root.removeAttribute(attribute);
+				});
 			});
 		};
-	}, [allAnimationsDisabled, animationsDisabled, inputMode, navbarTheme]);
+	}, [
+		allAnimationsDisabled,
+		animationsDisabled,
+		inputMode,
+		navbarTheme,
+		runtimeCapabilities.legacyWebOS,
+		runtimeCapabilities.supportsAspectRatio,
+		runtimeCapabilities.supportsBackdropFilter,
+		runtimeCapabilities.supportsFlexGap,
+		runtimeCapabilities.version,
+		runtimeCapabilities.webos,
+		runtimeCapabilities.webosV22Compat,
+		runtimeCapabilities.webosV6Compat
+	]);
 
 	const handleBack = useCallback(() => {
 		switch (currentView) {
@@ -334,15 +305,23 @@ const App = (props) => {
 			default:
 				return false;
 		}
-	}, [
-		currentView,
-		fallbackToDetailsFromPlayer,
-		handleSectionBack,
-		navigateBackFromDetails,
-		navigateBackInHistory,
-		playerControlsVisible,
-		runPanelBackHandler
-	]);
+		}, [
+			currentView,
+			detailsBackHandlerRef,
+			fallbackToDetailsFromPlayer,
+			favoritesBackHandlerRef,
+			handleSectionBack,
+			homeBackHandlerRef,
+			libraryBackHandlerRef,
+			navigateBackFromDetails,
+			navigateBackInHistory,
+			playerBackHandlerRef,
+			playerControlsVisible,
+			searchBackHandlerRef,
+			runPanelBackHandler,
+			settingsBackHandlerRef,
+			styleDebugBackHandlerRef
+		]);
 
 	useEffect(() => {
 		handleBackRef.current = handleBack;
@@ -521,38 +500,6 @@ const App = (props) => {
 		}
 	}, []);
 
-	const registerDetailsBackHandler = useCallback((handler) => {
-		detailsBackHandlerRef.current = handler;
-	}, []);
-
-	const registerPlayerBackHandler = useCallback((handler) => {
-		playerBackHandlerRef.current = handler;
-	}, []);
-
-	const registerHomeBackHandler = useCallback((handler) => {
-		homeBackHandlerRef.current = handler;
-	}, []);
-
-	const registerLibraryBackHandler = useCallback((handler) => {
-		libraryBackHandlerRef.current = handler;
-	}, []);
-
-	const registerSearchBackHandler = useCallback((handler) => {
-		searchBackHandlerRef.current = handler;
-	}, []);
-
-	const registerFavoritesBackHandler = useCallback((handler) => {
-		favoritesBackHandlerRef.current = handler;
-	}, []);
-
-	const registerSettingsBackHandler = useCallback((handler) => {
-		settingsBackHandlerRef.current = handler;
-	}, []);
-
-	const registerStyleDebugBackHandler = useCallback((handler) => {
-		styleDebugBackHandlerRef.current = handler;
-	}, []);
-
 	const handleSearchPanelStateChange = useCallback((nextState) => {
 		setSearchPanelState(normalizePanelStatePayload(nextState));
 	}, []);
@@ -582,21 +529,6 @@ const App = (props) => {
 			upsertKeyedPanelState(previousState, itemId, nextState)
 		));
 	}, []);
-
-	const getPanelIndex = () => {
-		const detailsPanelIndex = STYLE_DEBUG_ENABLED ? 7 : 6;
-		const playerPanelIndex = STYLE_DEBUG_ENABLED ? 8 : 7;
-		if (currentView === 'login') return 0;
-		if (currentView === 'home') return 1;
-		if (currentView === 'library') return 2;
-		if (currentView === 'search') return 3;
-		if (currentView === 'favorites') return 4;
-		if (currentView === 'settings') return 5;
-		if (currentView === 'styleDebug' && STYLE_DEBUG_ENABLED) return 6;
-		if (currentView === 'details') return detailsPanelIndex;
-		if (currentView === 'player') return playerPanelIndex;
-		return 0;
-	};
 
 	const panelChildren = [
 		<LoginPanel
@@ -737,10 +669,10 @@ const App = (props) => {
 				data-bf-backdrop-filter={runtimeCapabilities.supportsBackdropFilter ? 'on' : 'off'}
 				{...props}
 				>
-				<Panels
-					index={getPanelIndex()}
-					onBack={handleBack}
-				>
+					<Panels
+						index={getPanelIndexForView(currentView, STYLE_DEBUG_ENABLED)}
+						onBack={handleBack}
+					>
 					{panelChildren}
 				</Panels>
 				<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />

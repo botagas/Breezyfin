@@ -55,6 +55,10 @@ body,
 	--bf-theme-card-status-badge-bg: rgba(37, 108, 186, 0.92);
 	--bf-theme-card-status-badge-border: rgba(198, 226, 255, 0.44);
 	--bf-theme-card-status-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+	--bf-theme-card-success-badge-bg: rgba(148, 233, 183, 0.94);
+	--bf-theme-card-success-badge-color: #03140e;
+	--bf-theme-card-success-badge-border: rgba(148, 233, 183, 0.65);
+	--bf-theme-card-success-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
 	--bf-theme-card-progress-track: rgba(255, 255, 255, 0.22);
 	--bf-theme-card-progress-fill: #3cb2f0;
 	--bf-theme-card-filter-chip-bg: rgba(255, 255, 255, 0.08);

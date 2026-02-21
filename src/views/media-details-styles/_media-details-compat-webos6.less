@@ -6,15 +6,91 @@
 .compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .episodeNavActions", 0.45rem);
 .compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .castRow", 12px);
 .compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .seasonCards", 1rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .episodeCards", 12px);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .metadata", 0.85rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .actionsRow", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .introControlsRow", 0.58rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .episodeNavActions", 0.45rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .castRow", 12px);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .seasonCards", 1rem);
+.compat-gap-row-fallback(~":global([data-bf-webos-legacy='on'][data-bf-flex-gap='off']) .episodeCards", 12px);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .metadata", 0.85rem);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .actionsRow", 0.5rem);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .introControlsRow", 0.58rem);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .episodeNavActions", 0.45rem);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .castRow", 12px);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .seasonCards", 1rem);
+.compat-gap-row-fallback(~":global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off'][data-bf-flex-gap='off']) .episodeCards", 12px);
 
-:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways {
-	min-height: 21rem !important;
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways,
+:global([data-bf-webos-legacy='on']) .episodeCard.episodeCardSideways,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCard.episodeCardSideways {
+	width: min(24rem, 78vw) !important;
+	min-width: min(24rem, 78vw) !important;
+	max-width: min(24rem, 78vw) !important;
+	min-height: 0 !important;
+	height: auto !important;
+	max-height: none !important;
+	justify-content: flex-start !important;
+	padding-top: 0.72rem !important;
+	padding-bottom: 0.42rem !important;
 }
 
-:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeInfo {
-	flex: 0 0 auto !important;
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeInfo,
+:global([data-bf-webos-legacy='on']) .episodeCard.episodeCardSideways .episodeInfo,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCard.episodeCardSideways .episodeInfo {
+	flex: 0 1 auto !important;
+	min-height: 0 !important;
+	gap: 0.38rem !important;
 }
 
-:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeActions {
-	margin-top: 0 !important;
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeActions,
+:global([data-bf-webos-legacy='on']) .episodeCard.episodeCardSideways .episodeActions,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCard.episodeCardSideways .episodeActions {
+	margin-top: 0.2rem !important;
+	align-items: center !important;
+	align-self: flex-start !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeImageContainer,
+:global([data-bf-webos-legacy='on']) .episodeCard.episodeCardSideways .episodeImageContainer,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCard.episodeCardSideways .episodeImageContainer {
+	width: min(24rem, 78vw) !important;
+	max-width: 100% !important;
+	min-height: 13.5rem !important;
+	height: 13.5rem !important;
+	aspect-ratio: auto !important;
+	align-self: stretch !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeImage,
+:global([data-bf-webos-legacy='on']) .episodeCard.episodeCardSideways .episodeImage,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCard.episodeCardSideways .episodeImage {
+	width: 100% !important;
+	height: 100% !important;
+	aspect-ratio: auto !important;
+	object-fit: cover !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCard.episodeCardSideways .episodeOverview,
+:global([data-bf-webos-legacy='on']) .episodeCard.episodeCardSideways .episodeOverview,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCard.episodeCardSideways .episodeOverview {
+	min-height: 0 !important;
+	max-height: 3.2em !important;
+	margin-bottom: 0 !important;
+	-webkit-line-clamp: 2 !important;
+	line-clamp: 2 !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCardsSideways,
+:global([data-bf-webos-legacy='on']) .episodeCardsSideways,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCardsSideways {
+	gap: 0 !important;
+	padding-bottom: 0.5rem !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .episodeCardsSideways > .episodeCard + .episodeCard,
+:global([data-bf-webos-legacy='on']) .episodeCardsSideways > .episodeCard + .episodeCard,
+:global([data-bf-platform-webos='on'][data-bf-aspect-ratio='off']) .episodeCardsSideways > .episodeCard + .episodeCard {
+	margin-left: 0.8rem;
 }

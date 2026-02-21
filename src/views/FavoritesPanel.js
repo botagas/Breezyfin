@@ -183,7 +183,8 @@ const FavoritesPanel = ({
 													>
 														<Button
 															className={css.unfavoriteButton}
-															icon="hearthollow"
+															icon="heart"
+															css={{icon: css.favoriteActionIcon}}
 															size="small"
 															data-item-id={item.Id}
 															onClick={handleUnfavoriteClick}

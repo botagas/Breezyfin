@@ -10,6 +10,10 @@
 @status-badge-bg: var(--bf-theme-card-status-badge-bg, rgba(37, 108, 186, 0.92));
 @status-badge-border: var(--bf-theme-card-status-badge-border, rgba(198, 226, 255, 0.44));
 @status-badge-shadow: var(--bf-theme-card-status-badge-shadow, 0 2px 8px rgba(0, 0, 0, 0.4));
+@status-success-badge-bg: var(--bf-theme-card-success-badge-bg, rgba(148, 233, 183, 0.94));
+@status-success-badge-color: var(--bf-theme-card-success-badge-color, #03140e);
+@status-success-badge-border: var(--bf-theme-card-success-badge-border, rgba(148, 233, 183, 0.65));
+@status-success-badge-shadow: var(--bf-theme-card-success-badge-shadow, 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3));
 
 .card-shell() {
 	border-radius: 1.1rem;
@@ -240,6 +244,57 @@
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 		box-shadow: none;
+	}
+}
+
+.status-badge-success() {
+	background: @status-success-badge-bg;
+	color: @status-success-badge-color;
+	border: 1px solid @status-success-badge-border;
+	box-shadow: @status-success-badge-shadow;
+	padding: 0 0.25rem;
+	border-radius: 999px;
+	font-weight: 800;
+	font-size: 0.75em;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+	line-height: 1.2;
+	min-width: 1.4rem;
+	height: 1.4rem;
+	min-height: 1.4rem;
+}
+
+.icon-circle-button-dimensions(@size: 2.35rem) {
+	min-width: @size !important;
+	width: @size !important;
+	height: @size !important;
+	min-height: @size !important;
+	padding: 0 !important;
+
+	:global(.bf-button) {
+		min-width: @size !important;
+		width: @size !important;
+		height: @size !important;
+		min-height: @size !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		line-height: @size !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: visible !important;
+	}
+
+	:global(.client) {
+		width: 100% !important;
+		height: 100% !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: visible !important;
 	}
 }
 

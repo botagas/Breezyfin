@@ -15,6 +15,14 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Build stable per-popup open/close handlers | `useDisclosureHandlers` |
 | Close popup when focus/pointer leaves scope | `useDismissOnOutsideInteraction` |
 | Centralize PlayerPanel remote/media-key handling | `usePlayerKeyboardShortcuts` |
+| Centralize PlayerPanel video loading/session selection flow | `usePlayerVideoLoader` |
+| Centralize PlayerPanel skip overlay + next-episode prompt state machine | `usePlayerSkipOverlayState` |
+| Centralize PlayerPanel seek + track-switching flow | `usePlayerSeekAndTrackSwitching` |
+| Centralize PlayerPanel play/pause/retry/end command handlers | `usePlayerPlaybackCommands` |
+| Centralize Media Details focus debug tracing | `useMediaDetailsFocusDebug` |
+| Centralize Media Details focus orchestration (pointer + 5-way seed/focus) | `useMediaDetailsFocusOrchestrator` |
+| Centralize Media Details watched/favorite mutations | `useMediaDetailsItemActions` |
+| Centralize Media Details popup picker handlers | `useMediaDetailsPickerHandlers` |
 | Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
 | Keep component state synced to settings changes | `useBreezyfinSettingsSync` |
 | Fast lookup of items by id/key | `useMapById` |
@@ -164,7 +172,7 @@ useDismissOnOutsideInteraction({
 ```
 
 ### `usePlayerKeyboardShortcuts`
-- File: `src/hooks/usePlayerKeyboardShortcuts.js`
+- File: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
 - Purpose: isolate global PlayerPanel key handling (seek, back layering, play/pause media keys).
 - Signature:
 ```js
@@ -189,6 +197,128 @@ usePlayerKeyboardShortcuts({
   isProgressSliderTarget
 })
 ```
+
+### `usePlayerVideoLoader`
+- File: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
+- Purpose: encapsulate the PlayerPanel playback load pipeline:
+  - settings + playback profile resolution
+  - media source/session selection
+  - audio/subtitle initialization
+  - stream URL construction (direct/hls/transcode)
+  - startup and stall recovery wiring
+- Signature:
+```js
+const loadVideo = usePlayerVideoLoader({
+  item,
+  videoRef,
+  hlsRef,
+  loadVideoRef,
+  resetRecoveryGuards,
+  setLoading,
+  reloadAttemptedRef,
+  subtitleCompatibilityFallbackAttemptedRef,
+  lastProgressRef,
+  setError,
+  seekOffsetRef,
+  loadTrackPreferences,
+  playbackOverrideRef,
+  playbackOptions,
+  playbackSettingsRef,
+  setToastMessage,
+  setMediaSourceData,
+  setDuration,
+  setAudioTracks,
+  setSubtitleTracks,
+  pickPreferredAudio,
+  pickPreferredSubtitle,
+  setCurrentAudioTrack,
+  setCurrentSubtitleTrack,
+  startupFallbackTimerRef,
+  attemptTranscodeFallback,
+  attachHlsPlayback,
+  pendingOverrideClearRef,
+  showPlaybackError,
+  startWatchTimerRef,
+  playing,
+  attemptPlaybackSessionRebuild,
+  playbackFailureLockedRef,
+  failStartTimerRef,
+  playbackSessionRef
+});
+```
+
+### `usePlayerSkipOverlayState`
+- File: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
+- Purpose: encapsulate Player skip-intro/credits + next-episode prompt state transitions and dismiss/skip handlers.
+- Returns:
+  - `checkSkipSegments(positionSeconds)`
+  - `handleSkipSegment()`
+  - `handleDismissNextEpisodePrompt()`
+  - `handleDismissSkipOverlay()`
+
+### `usePlayerSeekAndTrackSwitching`
+- File: `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
+- Purpose: centralize seek behavior and track switching reload/session-override behavior for HLS/direct/transcode flows.
+- Returns:
+  - `isSeekContext(target)`
+  - `isProgressSliderTarget(target)`
+  - `seekBySeconds(deltaSeconds)`
+  - `handleSeek(event)`
+  - `handleAudioTrackChange(trackIndex)`
+  - `handleSubtitleTrackChange(trackIndex)`
+
+### `usePlayerPlaybackCommands`
+- File: `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
+- Purpose: centralize playback command callbacks that sit above low-level stop/recovery wiring:
+  - `play`/`pause`
+  - `retry playback`
+  - `back from player`
+  - `on-ended` autoplay-next flow
+  - canplay fatal fallback decision helper
+- Returns:
+  - `handleEnded()`
+  - `handlePlay(options?)`
+  - `handlePause(options?)`
+  - `handleRetryPlayback()`
+  - `handleBackButton()`
+  - `tryPlaybackFallbackOnCanPlayError(errorMessage)`
+
+### `useMediaDetailsFocusDebug`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
+- Purpose: encapsulate opt-in focus/scroll debug tracing (`bfFocusDebug`) and attach focus/scroll debug listeners.
+- Returns:
+  - `detailsDebugEnabled`
+  - `describeNode(node)`
+  - `logDetailsDebug(message, payload?)`
+
+### `useMediaDetailsFocusOrchestrator`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
+- Purpose: centralize Media Details focus routing/orchestration:
+  - pointer-to-focus sync and guard behavior
+  - initial focus seeding for series/non-series
+  - focus target helper methods used by interaction handlers
+  - cast/season focus scrolling behavior
+- Returns key methods:
+  - `scrollCastIntoView()`, `scrollSeasonIntoView()`
+  - `focusTopHeaderAction()`, `focusEpisodeSelector()`
+  - `focusEpisodeCardByIndex()`, `focusEpisodeInfoButtonByIndex()`, `focusEpisodeWatchedButtonByIndex()`
+  - `focusSeasonCardByIndex()`, `focusSeasonWatchedButton()`, `focusBelowSeasons()`
+  - `focusNonSeriesAudioSelector()`, `focusNonSeriesSubtitleSelector()`, `focusNonSeriesPrimaryPlay()`
+  - `handleDetailsPointerDownCapture()`, `handleDetailsPointerClickCapture()`
+
+### `useMediaDetailsItemActions`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
+- Purpose: centralize favorite/watched mutation flows and related local refresh behavior for item/episode/season contexts.
+- Returns:
+  - `handleToggleFavorite()`
+  - `handleToggleWatched(itemId?, currentWatchedState?)`
+
+### `useMediaDetailsPickerHandlers`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
+- Purpose: centralize audio/subtitle picker selection and episode picker selection behavior.
+- Returns:
+  - `handleTrackSelect(event)`
+  - `handleEpisodePopupSelect(event)`
 
 ### `useInputMode`
 - File: `src/hooks/useInputMode.js`
@@ -283,18 +413,92 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer.
 
 ### Player and media detail helpers
-- `src/utils/playerPanelHelpers.js`
+- `src/views/player-panel/utils/playerPanelHelpers.js`
   - `formatPlaybackTime(seconds)`
   - `getPlayerTrackLabel(track)`
   - `getSkipSegmentLabel(segmentType, hasNextEpisode?)`
   - `getPlayerErrorBackdropUrl(item, imageApi)`
-- `src/utils/episodeNavigation.js`
+- `src/views/player-panel/utils/episodeNavigation.js`
   - `getNextEpisodeForItem(service, item)`
   - `getPreviousEpisodeForItem(service, item)`
-- `src/utils/mediaDetailsHelpers.js`
+- `src/views/media-details-panel/utils/mediaDetailsHelpers.js`
   - language display mapping, track summary labels
   - season/episode image fallback resolution
   - episode badge/date/runtime + progress/played predicates
+
+### Player panel local components
+- `src/views/player-panel/components/PlayerErrorPopup.js`
+  - shared playback error popup surface/actions.
+- `src/views/player-panel/components/PlayerTrackPopup.js`
+  - shared audio/subtitle popup list shell.
+- `src/views/player-panel/components/PlayerLoadingOverlay.js`
+  - loading glass spinner shell.
+- `src/views/player-panel/components/PlayerSeekFeedback.js`
+  - transient seek feedback label overlay.
+- `src/views/player-panel/components/PlayerSkipOverlay.js`
+  - skip-intro/next-episode pill overlay shell.
+- `src/views/player-panel/components/PlayerToast.js`
+  - lightweight player toast shell.
+- `src/views/player-panel/components/PlayerControlsOverlay.js`
+  - top/bottom player controls shell (back, progress, transport, tracks, volume).
+
+### Player panel local hooks
+- `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
+  - centralizes player keyboard/media key handling with seek/context guards.
+- `src/views/player-panel/hooks/usePlayerVideoLoader.js`
+  - centralizes playback source/session selection and video load orchestration.
+- `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
+  - centralizes skip-intro/next-episode prompt transitions and skip/dismiss handlers.
+- `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
+  - centralizes seek logic and audio/subtitle switching behavior across HLS/direct/transcode paths.
+- `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
+  - centralizes player command handlers (`play/pause/retry/end/back`) above low-level stop/recovery.
+- `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
+  - centralizes playback recovery/session rebuild + fallback/transcode/HLS fatal recovery logic.
+- `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
+  - centralizes player lifecycle effects (item bootstrap, control hide timers, stall watchdog, focus/cleanup timers).
+
+### Media details panel local hooks
+- `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
+  - centralizes optional focus/scroll debug tracing lifecycle.
+- `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
+  - centralizes pointer/5-way focus routing and initial focus seeding.
+- `src/views/media-details-panel/hooks/useMediaDetailsKeyboardShortcuts.js`
+  - centralizes details panel BACK/PLAY key handling and pointer-mode guard behavior.
+- `src/views/media-details-panel/hooks/useMediaDetailsTrackOptions.js`
+  - centralizes audio/subtitle option lists and summary labels.
+- `src/views/media-details-panel/hooks/useMediaCredits.js`
+  - merges/normalizes cast + creator credits from item/season/episode metadata.
+- `src/views/media-details-panel/hooks/useMediaDetailsDataLoader.js`
+  - centralizes media details cache-backed data loading and series/episode selection orchestration.
+- `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
+  - centralizes favorite/watched mutation flows and related refresh behavior.
+- `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
+  - centralizes audio/subtitle and episode picker selection handlers.
+- `src/views/media-details-panel/hooks/useMediaDetailsInteractionHandlers.js`
+  - centralizes cast/season/episode focus-navigation + key interaction handlers.
+
+### Media details panel local components
+- `src/views/media-details-panel/components/MediaDetailsToast.js`
+  - shared details toast rendering shell.
+- `src/views/media-details-panel/components/MediaTrackPickerPopup.js`
+  - shared audio/subtitle picker popup structure.
+- `src/views/media-details-panel/components/MediaEpisodePickerPopup.js`
+  - shared episode picker popup structure.
+- `src/views/media-details-panel/components/MediaTrackSelectorButton.js`
+  - shared compact audio/subtitle selector button shell.
+- `src/views/media-details-panel/components/MediaTrackSelectorRow.js`
+  - shared compact audio/subtitle selector pair layout.
+- `src/views/media-details-panel/components/MediaDetailsIntroSection.js`
+  - details heading/breadcrumb + intro metadata/overview/action controls shell.
+- `src/views/media-details-panel/components/MediaCastSection.js`
+  - cast toggle + cast card row section.
+- `src/views/media-details-panel/components/MediaSeasonsSection.js`
+  - season cards section with watched toggle and poster fallbacks.
+- `src/views/media-details-panel/components/MediaSeriesStickyControls.js`
+  - sticky episode selector + track selectors + primary play controls.
+- `src/views/media-details-panel/components/MediaEpisodesSection.js`
+  - episodes grid/sideways layout rendering and episode action buttons.
 
 ### Settings and track storage helpers
 - `src/utils/settingsStorage.js`
@@ -311,7 +515,11 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 ## Related Docs
 
 - [`README.md`](./README.md)
+- [`DEVELOPING.md`](./DEVELOPING.md)
 - [`THEMES.md`](./THEMES.md)
+- [`COMPONENTS.md`](./COMPONENTS.md)
+- [`VIEWS.md`](./VIEWS.md)
+- [`TODOS.md`](./TODOS.md)
 
 ---
 

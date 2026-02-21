@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
-import Button from '../components/BreezyButton';
 import Scroller from '../components/AppScroller';
-import Spinner from '@enact/sandstone/Spinner';
-import BodyText from '@enact/sandstone/BodyText';
-import Item from '@enact/sandstone/Item';
-import SwitchItem from '@enact/sandstone/SwitchItem';
-import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import SettingsToolbar from '../components/SettingsToolbar';
 import {HOME_ROW_ORDER} from '../constants/homeRows';
@@ -14,106 +8,35 @@ import {getAppLogs, clearAppLogs} from '../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 import {isStyleDebugEnabled} from '../utils/featureFlags';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
 import { wipeAllAppCache } from '../utils/cacheMaintenance';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {
+	BITRATE_OPTIONS,
+	DISCLOSURE_BACK_PRIORITY,
+	DEFAULT_SETTINGS,
+	INITIAL_SETTINGS_DISCLOSURES,
+	LANGUAGE_OPTIONS,
+	NAVBAR_THEME_OPTIONS,
+	SETTINGS_DISCLOSURE_KEYS,
+	SETTINGS_DISCLOSURE_KEY_LIST
+} from './settings-panel/constants';
+import {
+	getHomeRowLabel,
+	getOptionLabel,
+	getPlayNextPromptModeLabel
+} from './settings-panel/labels';
 
 import css from './SettingsPanel.module.less';
-import popupStyles from '../styles/popupStyles.module.less';
 import {popupShellCss} from '../styles/popupStyles';
+import SettingsSections from './settings-panel/components/SettingsSections';
+import SettingsPopups from './settings-panel/components/SettingsPopups';
 
-const DEFAULT_SETTINGS = {
-	maxBitrate: '40',
-	enableTranscoding: true,
-	forceTranscoding: false,
-	forceTranscodingWithSubtitles: true,
-	relaxedPlaybackProfile: false,
-	preferredAudioLanguage: 'eng',
-	preferredSubtitleLanguage: 'eng',
-	disableAnimations: true,
-	disableAllAnimations: false,
-	showMediaBar: true,
-	navbarTheme: 'elegant',
-	autoPlayNext: true,
-	showPlayNextPrompt: true,
-	playNextPromptMode: 'segmentsOrLast60',
-	skipIntro: true,
-	showBackdrops: true,
-	showSeasonImages: false,
-	useSidewaysEpisodeList: true,
-	showPerformanceOverlay: false,
-	homeRows: {
-		recentlyAdded: true,
-		continueWatching: true,
-		nextUp: true,
-		latestMovies: true,
-		latestShows: true,
-		myRequests: true
-	},
-	homeRowOrder: HOME_ROW_ORDER
-};
-
-const BITRATE_OPTIONS = [
-	{ value: '10', label: '10 Mbps' },
-	{ value: '20', label: '20 Mbps' },
-	{ value: '40', label: '40 Mbps (Default)' },
-	{ value: '60', label: '60 Mbps' },
-	{ value: '80', label: '80 Mbps' },
-	{ value: '100', label: '100 Mbps' },
-	{ value: '120', label: '120 Mbps' }
-];
-
-const LANGUAGE_OPTIONS = [
-	{ value: 'eng', label: 'English' },
-	{ value: 'spa', label: 'Spanish' },
-	{ value: 'fre', label: 'French' },
-	{ value: 'ger', label: 'German' },
-	{ value: 'ita', label: 'Italian' },
-	{ value: 'jpn', label: 'Japanese' },
-	{ value: 'kor', label: 'Korean' },
-	{ value: 'chi', label: 'Chinese' },
-	{ value: 'por', label: 'Portuguese' },
-	{ value: 'rus', label: 'Russian' }
-];
-
-const NAVBAR_THEME_OPTIONS = [
-	{ value: 'classic', label: 'Classic' },
-	{ value: 'elegant', label: 'Elegant' }
-];
 const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
-const SETTINGS_DISCLOSURE_KEYS = {
-	BITRATE: 'bitratePopup',
-	AUDIO_LANGUAGE: 'audioLanguagePopup',
-	SUBTITLE_LANGUAGE: 'subtitleLanguagePopup',
-	NAVBAR_THEME: 'navbarThemePopup',
-	PLAY_NEXT_PROMPT_MODE: 'playNextPromptModePopup',
-	LOGOUT_CONFIRM: 'logoutConfirmPopup',
-	LOGS: 'logsPopup',
-	WIPE_CACHE_CONFIRM: 'wipeCacheConfirmPopup'
-};
-const INITIAL_SETTINGS_DISCLOSURES = {
-	[SETTINGS_DISCLOSURE_KEYS.BITRATE]: false,
-	[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE]: false,
-	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE]: false,
-	[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME]: false,
-	[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE]: false,
-	[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM]: false,
-	[SETTINGS_DISCLOSURE_KEYS.LOGS]: false,
-	[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM]: false
-};
-const DISCLOSURE_BACK_PRIORITY = [
-	SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM,
-	SETTINGS_DISCLOSURE_KEYS.LOGS,
-	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
-	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
-	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
-	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
-	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
-	SETTINGS_DISCLOSURE_KEYS.BITRATE
-];
 
 const SettingsPanel = ({
 	onNavigate,
@@ -144,6 +67,11 @@ const SettingsPanel = ({
 		openDisclosure,
 		closeDisclosure
 	} = useDisclosureMap(INITIAL_SETTINGS_DISCLOSURES);
+	const disclosureHandlers = useDisclosureHandlers(
+		SETTINGS_DISCLOSURE_KEY_LIST,
+		openDisclosure,
+		closeDisclosure
+	);
 	const savedServerKeySelector = useCallback(
 		(entry) => `${entry.serverId}:${entry.userId}`,
 		[]
@@ -157,6 +85,18 @@ const SettingsPanel = ({
 	const logoutConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM] === true;
 	const logsPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.LOGS] === true;
 	const wipeCacheConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM] === true;
+	const openBitratePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.BITRATE].open;
+	const closeBitratePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.BITRATE].close;
+	const openAudioLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE].open;
+	const closeAudioLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE].close;
+	const openSubtitleLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE].open;
+	const closeSubtitleLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE].close;
+	const openNavbarThemePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME].open;
+	const closeNavbarThemePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME].close;
+	const openLogoutConfirm = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM].open;
+	const closeLogoutConfirm = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM].close;
+	const closePlayNextPromptModePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE].close;
+	const closeLogsPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.LOGS].close;
 	const hasRuntimeVersionInfo = runtimeCapabilities.version != null || runtimeCapabilities.chrome != null;
 	const webosVersionLabel = hasRuntimeVersionInfo
 		? `${runtimeCapabilities.version ?? 'Unknown'}${runtimeCapabilities.chrome ? ` (Chrome ${runtimeCapabilities.chrome})` : ''}`
@@ -283,25 +223,6 @@ const SettingsPanel = ({
 		});
 	}, []);
 
-	const getHomeRowLabel = (rowKey) => {
-		switch (rowKey) {
-			case 'recentlyAdded':
-				return 'Recently Added';
-			case 'continueWatching':
-				return 'Continue Watching';
-			case 'nextUp':
-				return 'Next Up';
-			case 'latestMovies':
-				return 'Latest Movies';
-			case 'latestShows':
-				return 'Latest TV Shows';
-			case 'myRequests':
-				return 'My Requests';
-			default:
-				return rowKey;
-		}
-	};
-
 	const handleSwitchServer = useCallback(async (entry) => {
 		if (!entry) return;
 		setSwitchingServerId(entry.serverId + ':' + entry.userId);
@@ -379,54 +300,6 @@ const SettingsPanel = ({
 		handleForgetServer(entry);
 	}, [handleForgetServer, savedServersByKey]);
 
-	const openLogoutConfirm = useCallback(() => {
-		openDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
-	}, [openDisclosure]);
-
-	const closeLogoutConfirm = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);
-	}, [closeDisclosure]);
-
-	const openBitratePopup = useCallback(() => {
-		openDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
-	}, [openDisclosure]);
-
-	const closeBitratePopup = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
-	}, [closeDisclosure]);
-
-	const openAudioLangPopup = useCallback(() => {
-		openDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
-	}, [openDisclosure]);
-
-	const closeAudioLangPopup = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
-	}, [closeDisclosure]);
-
-	const openSubtitleLangPopup = useCallback(() => {
-		openDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
-	}, [openDisclosure]);
-
-	const closeSubtitleLangPopup = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
-	}, [closeDisclosure]);
-
-	const openNavbarThemePopup = useCallback(() => {
-		openDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
-	}, [openDisclosure]);
-
-	const closeNavbarThemePopup = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
-	}, [closeDisclosure]);
-
-	const closePlayNextPromptModePopup = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
-	}, [closeDisclosure]);
-
-	const closeLogsPopup = useCallback(() => {
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGS);
-	}, [closeDisclosure]);
-
 	const openWipeCacheConfirm = useCallback(() => {
 		setCacheWipeError('');
 		openDisclosure(SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM);
@@ -495,64 +368,54 @@ const SettingsPanel = ({
 		const themeValue = event.currentTarget.dataset.theme;
 		if (!themeValue) return;
 		handleSettingChange('navbarTheme', themeValue);
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME);
-	}, [closeDisclosure, handleSettingChange]);
+		closeNavbarThemePopup();
+	}, [closeNavbarThemePopup, handleSettingChange]);
 
 	const handleBitrateSelect = useCallback((event) => {
 		const bitrate = event.currentTarget.dataset.bitrate;
 		if (!bitrate) return;
 		handleSettingChange('maxBitrate', bitrate);
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.BITRATE);
-	}, [closeDisclosure, handleSettingChange]);
+		closeBitratePopup();
+	}, [closeBitratePopup, handleSettingChange]);
 
 	const handleAudioLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
 		handleSettingChange('preferredAudioLanguage', language);
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE);
-	}, [closeDisclosure, handleSettingChange]);
+		closeAudioLangPopup();
+	}, [closeAudioLangPopup, handleSettingChange]);
 
 	const handleSubtitleLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
 		handleSettingChange('preferredSubtitleLanguage', language);
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE);
-	}, [closeDisclosure, handleSettingChange]);
+		closeSubtitleLangPopup();
+	}, [closeSubtitleLangPopup, handleSettingChange]);
 
 	const setSegmentsOnlyPromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOnly');
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
-	}, [closeDisclosure, handleSettingChange]);
+		closePlayNextPromptModePopup();
+	}, [closePlayNextPromptModePopup, handleSettingChange]);
 
 	const setSegmentsOrLast60PromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOrLast60');
-		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE);
-	}, [closeDisclosure, handleSettingChange]);
+		closePlayNextPromptModePopup();
+	}, [closePlayNextPromptModePopup, handleSettingChange]);
 
-	const getBitrateLabel = (value) => {
-		const option = BITRATE_OPTIONS.find(o => o.value === value);
-		return option ? option.label : `${value} Mbps`;
-	};
+	const getBitrateLabel = useCallback(
+		(value) => getOptionLabel(BITRATE_OPTIONS, value, `${value} Mbps`),
+		[]
+	);
 
-	const getLanguageLabel = (value) => {
-		const option = LANGUAGE_OPTIONS.find(o => o.value === value);
-		return option ? option.label : value;
-	};
+	const getLanguageLabel = useCallback(
+		(value) => getOptionLabel(LANGUAGE_OPTIONS, value, value),
+		[]
+	);
 
-	const getPlayNextPromptModeLabel = (value) => {
-		switch (value) {
-			case 'segmentsOnly':
-				return 'Outro/Credits Only';
-			case 'segmentsOrLast60':
-			default:
-				return 'Segments or Last 60s';
-		}
-	};
-
-	const getNavbarThemeLabel = (value) => {
-		const option = NAVBAR_THEME_OPTIONS.find((theme) => theme.value === value);
-		return option ? option.label : 'Classic';
-	};
+	const getNavbarThemeLabel = useCallback(
+		(value) => getOptionLabel(NAVBAR_THEME_OPTIONS, value, 'Classic'),
+		[]
+	);
 
 	const handlePanelBack = useCallback(() => {
 		for (const disclosureKey of DISCLOSURE_BACK_PRIORITY) {
@@ -583,554 +446,90 @@ const SettingsPanel = ({
 		onPanelBack: handlePanelBack
 	});
 
-	return (
-		<Panel {...rest}>
-			<Header title="Settings" />
-			<SettingsToolbar
-				{...toolbarActions}
-			/>
-			<Scroller
-				className={css.settingsContainer}
-				cbScrollTo={captureSettingsScrollRestore}
-				onScrollStop={handleSettingsScrollMemoryStop}
-			>
-				<div className={css.content}>
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Server Information</BodyText>
-						{loading ? (
-							<div className={css.loadingItem}>
-								<Spinner size="small" />
-							</div>
-						) : (
-							<>
-								<Item className={css.infoItem} label="Server Name" slotAfter={serverInfo?.ServerName || 'Unknown'} />
-								<Item className={css.infoItem} label="Server Version" slotAfter={serverInfo?.Version || 'Unknown'} />
-								<Item className={css.infoItem} label="Server URL" slotAfter={jellyfinService.serverUrl || 'Not connected'} />
-							</>
-						)}
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Saved Servers</BodyText>
-						{savedServers.length === 0 && (
-							<BodyText className={css.mutedText}>No saved servers yet. Sign in to add one.</BodyText>
-						)}
-						<div className={css.serverList}>
-							{savedServers.map((entry) => {
-								const key = `${entry.serverId}:${entry.userId}`;
-								return (
-									<div key={key} className={`${css.serverCard} ${entry.isActive ? css.activeCard : ''}`}>
-										<div className={css.serverCardMain}>
-											<div className={css.serverTitle}>{entry.serverName || 'Jellyfin Server'}</div>
-											<div className={css.serverMeta}>{entry.username} - {entry.url}</div>
-										</div>
-										<div className={css.serverCardActions}>
-												<Button
-													size="small"
-													minWidth={false}
-													data-server-key={key}
-													onClick={handleSwitchServerClick}
-													selected={switchingServerId === key}
-												>
-												{entry.isActive ? 'Active' : switchingServerId === key ? 'Switching...' : 'Switch'}
-											</Button>
-												<Button
-													size="small"
-													minWidth={false}
-													data-server-key={key}
-													onClick={handleForgetServerClick}
-												>
-												Forget
-											</Button>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Home Rows</BodyText>
-								<SwitchItem
-									className={css.switchItem}
-									selected={settings.homeRows?.recentlyAdded !== false}
-									onToggle={homeRowToggleHandlers.recentlyAdded}
-								>
-								Recently Added
-							</SwitchItem>
-								<SwitchItem
-									className={css.switchItem}
-									selected={settings.homeRows?.continueWatching !== false}
-									onToggle={homeRowToggleHandlers.continueWatching}
-								>
-								Continue Watching
-							</SwitchItem>
-								<SwitchItem
-									className={css.switchItem}
-									selected={settings.homeRows?.nextUp !== false}
-									onToggle={homeRowToggleHandlers.nextUp}
-								>
-								Next Up
-							</SwitchItem>
-								<SwitchItem
-									className={css.switchItem}
-									selected={settings.homeRows?.latestMovies !== false}
-									onToggle={homeRowToggleHandlers.latestMovies}
-								>
-								Latest Movies
-							</SwitchItem>
-								<SwitchItem
-									className={css.switchItem}
-									selected={settings.homeRows?.latestShows !== false}
-									onToggle={homeRowToggleHandlers.latestShows}
-								>
-								Latest TV Shows
-							</SwitchItem>
-								<SwitchItem
-									className={css.switchItem}
-									selected={settings.homeRows?.myRequests !== false}
-									onToggle={homeRowToggleHandlers.myRequests}
-								>
-								My Requests
-							</SwitchItem>
-						<div className={css.rowOrderHeader}>Row Order</div>
-						<div className={css.rowOrderList}>
-							{(settings.homeRowOrder || HOME_ROW_ORDER).map((rowKey, index, list) => (
-								<div key={rowKey} className={css.rowOrderItem}>
-									<BodyText className={css.rowOrderLabel}>{getHomeRowLabel(rowKey)}</BodyText>
-									<div className={css.rowOrderActions}>
-											<Button
-												size="small"
-												minWidth={false}
-												disabled={index === 0}
-												data-row-key={rowKey}
-												onClick={moveHomeRowUp}
-											>
-											Up
-										</Button>
-											<Button
-												size="small"
-												minWidth={false}
-												disabled={index === list.length - 1}
-												data-row-key={rowKey}
-												onClick={moveHomeRowDown}
-											>
-											Down
-										</Button>
-									</div>
-								</div>
-							))}
-						</div>
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Account</BodyText>
-						{loading ? (
-							<div className={css.loadingItem}>
-								<Spinner size="small" />
-							</div>
-						) : (
-							<>
-								<Item className={css.infoItem} label="Username" slotAfter={userInfo?.Name || 'Unknown'} />
-								<Item className={css.infoItem} label="User ID" slotAfter={userInfo?.Id?.substring(0, 8) + '...' || 'Unknown'} />
-									<Button
-										className={css.logoutButton}
-										onClick={openLogoutConfirm}
-										icon="closex"
-									>
-									Sign Out
-								</Button>
-							</>
-						)}
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Playback</BodyText>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.autoPlayNext}
-									selected={settings.autoPlayNext}
-								>
-								Auto-play Next Episode
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.showPlayNextPrompt}
-									selected={settings.showPlayNextPrompt !== false}
-								>
-								Show Play Next Prompt
-							</SwitchItem>
-
-							<Item
-								className={css.settingItem}
-								label="Play Next Prompt Mode"
-								slotAfter={getPlayNextPromptModeLabel(settings.playNextPromptMode)}
-								onClick={openPlayNextPromptModePopup}
-							/>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.skipIntro}
-									selected={settings.skipIntro}
-								>
-								Show Skip Intro/Recap Prompt
-							</SwitchItem>
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Language Preferences</BodyText>
-
-							<Item
-								className={css.settingItem}
-								label="Preferred Audio Language"
-								slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
-								onClick={openAudioLangPopup}
-							/>
-
-							<Item
-								className={css.settingItem}
-								label="Preferred Subtitle Language"
-								slotAfter={getLanguageLabel(settings.preferredSubtitleLanguage)}
-								onClick={openSubtitleLangPopup}
-							/>
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
-
-							<Item
-								className={css.settingItem}
-								label="Maximum Bitrate"
-								slotAfter={getBitrateLabel(settings.maxBitrate)}
-								onClick={openBitratePopup}
-							/>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.enableTranscoding}
-									selected={settings.enableTranscoding}
-								>
-								Enable Transcoding
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.forceTranscoding}
-									selected={settings.forceTranscoding}
-								>
-								Force Transcoding (always)
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.forceTranscodingWithSubtitles}
-									selected={settings.forceTranscodingWithSubtitles}
-								>
-								Force Transcoding with Subtitles (burn-in subs)
-							</SwitchItem>
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Display</BodyText>
-
-							<Item
-								className={css.settingItem}
-								label="Navigation Theme"
-								slotAfter={getNavbarThemeLabel(settings.navbarTheme)}
-								onClick={openNavbarThemePopup}
-							/>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.showBackdrops}
-									selected={settings.showBackdrops}
-								>
-								Show Background Images
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.showSeasonImages}
-									selected={settings.showSeasonImages === true}
-								>
-								Show Season Card Images (Elegant)
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.useSidewaysEpisodeList}
-									selected={settings.useSidewaysEpisodeList !== false}
-								>
-								Sideways Episode List (Elegant)
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.disableAnimations}
-									selected={settings.disableAnimations}
-								>
-								Disable Animations (Performance Mode)
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.disableAllAnimations}
-									selected={settings.disableAllAnimations}
-								>
-								Disable ALL Animations (Performance+ Mode)
-							</SwitchItem>
-
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.showMediaBar}
-									selected={settings.showMediaBar !== false}
-								>
-								Show Media Bar on Home
-							</SwitchItem>
-					</section>
-
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>About</BodyText>
-						<Item className={css.infoItem} label="App Version" slotAfter={appVersion} />
-						<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
-						<Item className={css.infoItem} label="webOS Version" slotAfter={webosVersionLabel} />
-					</section>
-
-						<section className={css.section}>
-							<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
-								<SwitchItem
-									className={css.switchItem}
-									onToggle={settingToggleHandlers.showPerformanceOverlay}
-									selected={settings.showPerformanceOverlay === true}
-								>
-									Performance Overlay (FPS/Input)
-								</SwitchItem>
-								{STYLE_DEBUG_ENABLED ? (
-									<SwitchItem
-										className={css.switchItem}
-										onToggle={settingToggleHandlers.relaxedPlaybackProfile}
-										selected={settings.relaxedPlaybackProfile === true}
-									>
-									Relaxed Playback Profile (Debug)
-								</SwitchItem>
-							) : null}
-							{STYLE_DEBUG_ENABLED ? (
-								<Item
-									className={css.settingItem}
-									label="Styling Debug Panel"
-									slotAfter="Open"
-									onClick={openStylingDebugPanel}
-								/>
-							) : null}
-							<Item
-								className={css.settingItem}
-								label="Logs"
-								slotAfter={`${appLogCount} entries`}
-								onClick={openLogsPopup}
-							/>
-							<Item
-								className={css.settingItem}
-								label="Wipe App Cache"
-								slotAfter={cacheWipeInProgress ? 'Wiping...' : 'Run'}
-								onClick={openWipeCacheConfirm}
-							/>
-						</section>
-				</div>
-			</Scroller>
-
-				<Popup
-					open={bitratePopupOpen}
-					onClose={closeBitratePopup}
-					css={popupShellCss}
+		return (
+			<Panel {...rest}>
+				<Header title="Settings" />
+				<SettingsToolbar
+					{...toolbarActions}
+				/>
+				<Scroller
+					className={css.settingsContainer}
+					cbScrollTo={captureSettingsScrollRestore}
+					onScrollStop={handleSettingsScrollMemoryStop}
 				>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Select Maximum Bitrate</BodyText>
-						{BITRATE_OPTIONS.map(option => (
-							<Button
-								key={option.value}
-								data-bitrate={option.value}
-								className={css.popupOption}
-								selected={settings.maxBitrate === option.value}
-								onClick={handleBitrateSelect}
-							>
-							{option.label}
-						</Button>
-					))}
-				</div>
-			</Popup>
-
-				<Popup
-					open={audioLangPopupOpen}
-					onClose={closeAudioLangPopup}
-					css={popupShellCss}
-				>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Preferred Audio Language</BodyText>
-					<div className={css.popupOptions}>
-							{LANGUAGE_OPTIONS.map(option => (
-								<Button
-									key={option.value}
-									data-language={option.value}
-									className={css.popupOption}
-									selected={settings.preferredAudioLanguage === option.value}
-									onClick={handleAudioLanguageSelect}
-								>
-								{option.label}
-							</Button>
-						))}
-					</div>
-				</div>
-			</Popup>
-
-				<Popup
-					open={subtitleLangPopupOpen}
-					onClose={closeSubtitleLangPopup}
-					css={popupShellCss}
-				>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Preferred Subtitle Language</BodyText>
-					<div className={css.popupOptions}>
-							{LANGUAGE_OPTIONS.map(option => (
-								<Button
-									key={option.value}
-									data-language={option.value}
-									className={css.popupOption}
-									selected={settings.preferredSubtitleLanguage === option.value}
-									onClick={handleSubtitleLanguageSelect}
-								>
-								{option.label}
-							</Button>
-						))}
-					</div>
-				</div>
-			</Popup>
-
-				<Popup
-					open={navbarThemePopupOpen}
-					onClose={closeNavbarThemePopup}
-					css={popupShellCss}
-				>
-				<div className={`${popupStyles.popupSurface} ${css.nativeThemePopupContent}`}>
-					<BodyText className={css.popupTitle}>Navigation Theme</BodyText>
-					<div className={css.nativeThemePopupOptions}>
-							{NAVBAR_THEME_OPTIONS.map((option) => (
-								<Button
-									key={option.value}
-									size="small"
-									data-theme={option.value}
-									selected={settings.navbarTheme === option.value}
-									onClick={handleNavbarThemeSelect}
-									className={css.popupOption}
-								>
-								{option.label}
-							</Button>
-						))}
-					</div>
-				</div>
-			</Popup>
-
-				<Popup
-					open={playNextPromptModePopupOpen}
-					onClose={closePlayNextPromptModePopup}
-					css={popupShellCss}
-				>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Play Next Prompt Mode</BodyText>
-						<Button
-							className={css.popupOption}
-							selected={settings.playNextPromptMode === 'segmentsOnly'}
-							onClick={setSegmentsOnlyPromptMode}
-						>
-						Outro/Credits Only
-					</Button>
-						<Button
-							className={css.popupOption}
-							selected={settings.playNextPromptMode !== 'segmentsOnly'}
-							onClick={setSegmentsOrLast60PromptMode}
-						>
-						Segments or Last 60s
-					</Button>
-				</div>
-			</Popup>
-
-				<Popup
-					open={logoutConfirmOpen}
-					onClose={closeLogoutConfirm}
-					css={popupShellCss}
-				>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Sign Out</BodyText>
-						<BodyText className={css.popupMessage}>
-							Are you sure you want to sign out from {serverInfo?.ServerName || 'this server'}?
-						</BodyText>
-						<div className={css.popupActions}>
-							<Button onClick={closeLogoutConfirm} className={css.popupOption}>Cancel</Button>
-							<Button onClick={handleLogoutConfirm} className={`${css.popupOption} ${css.dangerButton}`}>Sign Out</Button>
-						</div>
-					</div>
-				</Popup>
-
-			<Popup
-				open={logsPopupOpen}
-				onClose={closeLogsPopup}
-				css={popupShellCss}
-			>
-				<div className={`${popupStyles.popupSurface} ${css.logPopupContent}`}>
-					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
-						<div className={css.logActions}>
-							<Button size="small" onClick={handleClearLogs} className={css.popupOption}>Clear Logs</Button>
-							<Button size="small" onClick={closeLogsPopup} className={css.popupOption}>Close</Button>
-						</div>
-					<Scroller className={css.logScroller}>
-						{appLogs.length === 0 && (
-							<BodyText className={css.mutedText}>No logs captured yet.</BodyText>
-						)}
-						{appLogs.map((entry, index) => (
-							<div key={`${entry.ts}-${index}`} className={css.logEntry}>
-								<BodyText className={css.logMeta}>[{entry.ts}] {entry.level?.toUpperCase()}</BodyText>
-								<BodyText className={css.logText}>{entry.message}</BodyText>
-							</div>
-						))}
-					</Scroller>
-				</div>
-			</Popup>
-
-			<Popup
-				open={wipeCacheConfirmOpen}
-				onClose={closeWipeCacheConfirm}
-				noAutoDismiss={cacheWipeInProgress}
-				css={popupShellCss}
-			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Wipe App Cache</BodyText>
-					<BodyText className={css.popupMessage}>
-						This clears local storage, session storage, cache storage, and IndexedDB, then reloads the app.
-					</BodyText>
-					{cacheWipeError ? (
-						<BodyText className={css.popupMessage}>{cacheWipeError}</BodyText>
-					) : null}
-					<div className={css.popupActions}>
-						<Button
-							onClick={closeWipeCacheConfirm}
-							disabled={cacheWipeInProgress}
-						>
-							Cancel
-						</Button>
-						<Button
-							onClick={handleWipeCacheConfirm}
-							className={css.dangerButton}
-							disabled={cacheWipeInProgress}
-							selected={cacheWipeInProgress}
-						>
-							{cacheWipeInProgress ? 'Wiping...' : 'Wipe & Reload'}
-						</Button>
-					</div>
-				</div>
-			</Popup>
-		</Panel>
-	);
-};
+					<SettingsSections
+						styleDebugEnabled={STYLE_DEBUG_ENABLED}
+						loading={loading}
+						serverInfo={serverInfo}
+						serverUrl={jellyfinService.serverUrl}
+						savedServers={savedServers}
+						switchingServerId={switchingServerId}
+						handleSwitchServerClick={handleSwitchServerClick}
+						handleForgetServerClick={handleForgetServerClick}
+						settings={settings}
+						homeRowToggleHandlers={homeRowToggleHandlers}
+						moveHomeRowUp={moveHomeRowUp}
+						moveHomeRowDown={moveHomeRowDown}
+						getHomeRowLabel={getHomeRowLabel}
+						userInfo={userInfo}
+						openLogoutConfirm={openLogoutConfirm}
+						settingToggleHandlers={settingToggleHandlers}
+						getPlayNextPromptModeLabel={getPlayNextPromptModeLabel}
+						openPlayNextPromptModePopup={openPlayNextPromptModePopup}
+						getLanguageLabel={getLanguageLabel}
+						openAudioLangPopup={openAudioLangPopup}
+						openSubtitleLangPopup={openSubtitleLangPopup}
+						getBitrateLabel={getBitrateLabel}
+						openBitratePopup={openBitratePopup}
+						getNavbarThemeLabel={getNavbarThemeLabel}
+						openNavbarThemePopup={openNavbarThemePopup}
+						appVersion={appVersion}
+						webosVersionLabel={webosVersionLabel}
+						openStylingDebugPanel={openStylingDebugPanel}
+						appLogCount={appLogCount}
+						cacheWipeInProgress={cacheWipeInProgress}
+						openLogsPopup={openLogsPopup}
+						openWipeCacheConfirm={openWipeCacheConfirm}
+					/>
+				</Scroller>
+				<SettingsPopups
+					popupShellCss={popupShellCss}
+					bitratePopupOpen={bitratePopupOpen}
+					closeBitratePopup={closeBitratePopup}
+					bitrateOptions={BITRATE_OPTIONS}
+					settings={settings}
+					handleBitrateSelect={handleBitrateSelect}
+					audioLangPopupOpen={audioLangPopupOpen}
+					closeAudioLangPopup={closeAudioLangPopup}
+					languageOptions={LANGUAGE_OPTIONS}
+					handleAudioLanguageSelect={handleAudioLanguageSelect}
+					subtitleLangPopupOpen={subtitleLangPopupOpen}
+					closeSubtitleLangPopup={closeSubtitleLangPopup}
+					handleSubtitleLanguageSelect={handleSubtitleLanguageSelect}
+					navbarThemePopupOpen={navbarThemePopupOpen}
+					closeNavbarThemePopup={closeNavbarThemePopup}
+					navbarThemeOptions={NAVBAR_THEME_OPTIONS}
+					handleNavbarThemeSelect={handleNavbarThemeSelect}
+					playNextPromptModePopupOpen={playNextPromptModePopupOpen}
+					closePlayNextPromptModePopup={closePlayNextPromptModePopup}
+					setSegmentsOnlyPromptMode={setSegmentsOnlyPromptMode}
+					setSegmentsOrLast60PromptMode={setSegmentsOrLast60PromptMode}
+					logoutConfirmOpen={logoutConfirmOpen}
+					closeLogoutConfirm={closeLogoutConfirm}
+					serverInfo={serverInfo}
+					handleLogoutConfirm={handleLogoutConfirm}
+					logsPopupOpen={logsPopupOpen}
+					closeLogsPopup={closeLogsPopup}
+					handleClearLogs={handleClearLogs}
+					appLogs={appLogs}
+					wipeCacheConfirmOpen={wipeCacheConfirmOpen}
+					closeWipeCacheConfirm={closeWipeCacheConfirm}
+					cacheWipeInProgress={cacheWipeInProgress}
+					cacheWipeError={cacheWipeError}
+					handleWipeCacheConfirm={handleWipeCacheConfirm}
+				/>
+			</Panel>
+		);
+	};
 
 export default SettingsPanel;

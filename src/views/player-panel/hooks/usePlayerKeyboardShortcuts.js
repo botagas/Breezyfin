@@ -1,5 +1,5 @@
 import {useEffect} from 'react';
-import {KeyCodes} from '../utils/keyCodes';
+import {KeyCodes} from '../../../utils/keyCodes';
 
 const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
 const SEEK_STEP_SECONDS = 15;
