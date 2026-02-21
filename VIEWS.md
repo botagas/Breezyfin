@@ -27,6 +27,7 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - Use `usePanelToolbarActions` for toolbar + layered back flow.
 - Use `usePanelScrollState` for panel scroll restore/cache.
 - Keep callbacks event-driven (`data-*` payloads) and avoid ad-hoc DOM querying unless focus orchestration requires it.
+- Prefer shared badge primitives from `src/styles/cardStyles.less` for watched/favorite/count overlays across panels.
 - Keep comments minimal and only for non-obvious constraints.
 
 ## Related docs

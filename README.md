@@ -18,7 +18,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 ## Current capabilities
 
 > [!NOTE]
-> The app is undergoing refactoring efforts, so please do report any issues if you encounter any.
+> The app has undergone major refactoring efforts, so please do report any issues if you encounter any.
 >
 > [Read more in the v0.1.5 announcement](https://github.com/botagas/Breezyfin/discussions/6)
 
@@ -76,6 +76,7 @@ Start with these principles:
 - Keep large behavior flows in dedicated panel hooks (e.g. player load/skip/seek/commands, media details focus/actions).
 - Keep `jellyfinService` as a thin facade; place domain logic in `src/services/jellyfin/*`.
 - Keep styling token-driven and consistent across themes.
+- Reuse shared status badge primitives for watched/favorite/count states instead of panel-specific badge variants.
 - For webOS 6 / legacy compat, prefer concrete dimensions in compat files when implicit sizing causes unstable layout.
 - Keep comments minimal; document only non-obvious constraints/tradeoffs.
 

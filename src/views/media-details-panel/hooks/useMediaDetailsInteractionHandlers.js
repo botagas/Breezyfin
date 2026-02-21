@@ -14,6 +14,7 @@ export const useMediaDetailsInteractionHandlers = ({
 	focusSeasonCardByIndex,
 	focusSeasonWatchedButton,
 	focusBelowSeasons,
+	handleToggleFavoriteById,
 	handleToggleWatched,
 	focusTopHeaderAction,
 	episodesById,
@@ -23,11 +24,13 @@ export const useMediaDetailsInteractionHandlers = ({
 	episodeFocusScrollTimeoutRef,
 	focusEpisodeCardByIndex,
 	focusEpisodeInfoButtonByIndex,
+	focusEpisodeFavoriteButtonByIndex,
 	focusEpisodeWatchedButtonByIndex,
 	focusEpisodeSelector,
 	focusNonSeriesSubtitleSelector,
 	focusNonSeriesPrimaryPlay,
 	focusNonSeriesAudioSelector,
+	showEpisodeInfoButton,
 	css
 }) => {
 	const handleCastCardFocus = useCallback((event) => {
@@ -165,6 +168,14 @@ export const useMediaDetailsInteractionHandlers = ({
 		handleToggleWatched(episode.Id, episode.UserData?.Played);
 	}, [episodesById, handleToggleWatched]);
 
+	const handleEpisodeFavoriteClick = useCallback((event) => {
+		event.stopPropagation();
+		const episodeId = event.currentTarget.dataset.episodeId;
+		const episode = episodesById.get(episodeId);
+		if (!episode) return;
+		handleToggleFavoriteById(episode.Id, episode.UserData?.IsFavorite === true);
+	}, [episodesById, handleToggleFavoriteById]);
+
 	const handleEpisodeCardKeyDown = useCallback((event) => {
 		const index = Number(event.currentTarget.dataset.episodeIndex);
 		if (!Number.isInteger(index)) return;
@@ -184,7 +195,9 @@ export const useMediaDetailsInteractionHandlers = ({
 			} else if (event.keyCode === KeyCodes.DOWN) {
 				event.preventDefault();
 				event.stopPropagation();
-				focusEpisodeInfoButtonByIndex(index);
+				if (!focusEpisodeInfoButtonByIndex(index) && !focusEpisodeFavoriteButtonByIndex(index)) {
+					focusEpisodeWatchedButtonByIndex(index);
+				}
 			}
 			return;
 		}
@@ -203,9 +216,18 @@ export const useMediaDetailsInteractionHandlers = ({
 		} else if (event.keyCode === KeyCodes.RIGHT) {
 			event.preventDefault();
 			event.stopPropagation();
-			focusEpisodeInfoButtonByIndex(index);
+			if (!focusEpisodeInfoButtonByIndex(index) && !focusEpisodeFavoriteButtonByIndex(index)) {
+				focusEpisodeWatchedButtonByIndex(index);
+			}
 		}
-	}, [focusEpisodeCardByIndex, focusEpisodeInfoButtonByIndex, focusEpisodeSelector, isSidewaysEpisodeLayout]);
+	}, [
+		focusEpisodeCardByIndex,
+		focusEpisodeFavoriteButtonByIndex,
+		focusEpisodeInfoButtonByIndex,
+		focusEpisodeSelector,
+		focusEpisodeWatchedButtonByIndex,
+		isSidewaysEpisodeLayout
+	]);
 
 	const handleEpisodeInfoButtonKeyDown = useCallback((event) => {
 		const index = Number(event.currentTarget.dataset.episodeIndex);
@@ -217,7 +239,9 @@ export const useMediaDetailsInteractionHandlers = ({
 		} else if (event.keyCode === KeyCodes.RIGHT) {
 			event.preventDefault();
 			event.stopPropagation();
-			focusEpisodeWatchedButtonByIndex(index);
+			if (!focusEpisodeFavoriteButtonByIndex(index)) {
+				focusEpisodeWatchedButtonByIndex(index);
+			}
 		} else if (isSidewaysEpisodeLayout && event.keyCode === KeyCodes.DOWN) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -245,10 +269,60 @@ export const useMediaDetailsInteractionHandlers = ({
 		}
 	}, [
 		focusEpisodeCardByIndex,
+		focusEpisodeFavoriteButtonByIndex,
 		focusEpisodeInfoButtonByIndex,
 		focusEpisodeSelector,
 		focusEpisodeWatchedButtonByIndex,
 		isSidewaysEpisodeLayout
+	]);
+
+	const handleEpisodeFavoriteButtonKeyDown = useCallback((event) => {
+		const index = Number(event.currentTarget.dataset.episodeIndex);
+		if (!Number.isInteger(index)) return;
+		if (event.keyCode === KeyCodes.LEFT) {
+			event.preventDefault();
+			event.stopPropagation();
+			if (showEpisodeInfoButton && focusEpisodeInfoButtonByIndex(index)) return;
+			focusEpisodeCardByIndex(index);
+		} else if (event.keyCode === KeyCodes.RIGHT) {
+			event.preventDefault();
+			event.stopPropagation();
+			if (!focusEpisodeWatchedButtonByIndex(index)) {
+				focusEpisodeCardByIndex(index + 1);
+			}
+		} else if (isSidewaysEpisodeLayout && event.keyCode === KeyCodes.DOWN) {
+			event.preventDefault();
+			event.stopPropagation();
+			focusEpisodeCardByIndex(index);
+		} else if (isSidewaysEpisodeLayout && event.keyCode === KeyCodes.UP) {
+			event.preventDefault();
+			event.stopPropagation();
+			focusEpisodeSelector();
+		} else if (event.keyCode === KeyCodes.DOWN) {
+			event.preventDefault();
+			event.stopPropagation();
+			if (!focusEpisodeFavoriteButtonByIndex(index + 1)) {
+				focusEpisodeCardByIndex(index + 1);
+			}
+		} else if (event.keyCode === KeyCodes.UP) {
+			event.preventDefault();
+			event.stopPropagation();
+			if (index === 0) {
+				focusEpisodeSelector();
+				return;
+			}
+			if (!focusEpisodeFavoriteButtonByIndex(index - 1)) {
+				focusEpisodeCardByIndex(index - 1);
+			}
+		}
+	}, [
+		focusEpisodeCardByIndex,
+		focusEpisodeFavoriteButtonByIndex,
+		focusEpisodeInfoButtonByIndex,
+		focusEpisodeSelector,
+		focusEpisodeWatchedButtonByIndex,
+		isSidewaysEpisodeLayout,
+		showEpisodeInfoButton
 	]);
 
 	const handleEpisodeWatchedButtonKeyDown = useCallback((event) => {
@@ -257,9 +331,9 @@ export const useMediaDetailsInteractionHandlers = ({
 		if (event.keyCode === KeyCodes.LEFT) {
 			event.preventDefault();
 			event.stopPropagation();
-			if (!focusEpisodeInfoButtonByIndex(index)) {
-				focusEpisodeCardByIndex(index);
-			}
+			if (focusEpisodeFavoriteButtonByIndex(index)) return;
+			if (showEpisodeInfoButton && focusEpisodeInfoButtonByIndex(index)) return;
+			focusEpisodeCardByIndex(index);
 		} else if (event.keyCode === KeyCodes.RIGHT) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -291,10 +365,12 @@ export const useMediaDetailsInteractionHandlers = ({
 		}
 	}, [
 		focusEpisodeCardByIndex,
+		focusEpisodeFavoriteButtonByIndex,
 		focusEpisodeInfoButtonByIndex,
 		focusEpisodeSelector,
 		focusEpisodeWatchedButtonByIndex,
-		isSidewaysEpisodeLayout
+		isSidewaysEpisodeLayout,
+		showEpisodeInfoButton
 	]);
 
 	const handleAudioSelectorKeyDown = useCallback((event) => {
@@ -351,9 +427,11 @@ export const useMediaDetailsInteractionHandlers = ({
 		handleEpisodeCardClick,
 		handleEpisodeCardFocus,
 		handleEpisodeInfoClick,
+		handleEpisodeFavoriteClick,
 		handleEpisodeWatchedClick,
 		handleEpisodeCardKeyDown,
 		handleEpisodeInfoButtonKeyDown,
+		handleEpisodeFavoriteButtonKeyDown,
 		handleEpisodeWatchedButtonKeyDown,
 		handleAudioSelectorKeyDown,
 		handleSubtitleSelectorKeyDown,

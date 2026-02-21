@@ -98,12 +98,14 @@
 			.card-image-focus();
 		}
 
-		.unfavoriteButton {
+		.unfavoriteButton,
+		.watchedToggleButton {
 			opacity: 1;
 		}
 	}
 
-	&:hover .unfavoriteButton {
+	&:hover .unfavoriteButton,
+	&:hover .watchedToggleButton {
 		opacity: 1;
 	}
 }
@@ -125,14 +127,66 @@
 	.card-placeholder-inner-content();
 }
 
-.unfavoriteButton {
+.favoriteOverlayFrame {
 	position: absolute;
-	top: 8px;
-	right: 8px;
+	inset: 0;
+	padding: 8px;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.favoriteBadgeColumn,
+.favoriteActionColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.favoriteBadgeColumn {
+	align-items: flex-start;
+}
+
+.favoriteActionColumn {
+	align-items: flex-end;
+}
+
+.favoriteBadge {
+	.status-badge-favorite();
+	font-size: 0.86em;
+	letter-spacing: 0;
+}
+
+.watchedBadge {
+	.status-badge-success();
+}
+
+.favoriteActionButtonSurface() {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: rgba(18, 30, 46, 0.42) !important;
+		border: 1px solid rgba(203, 223, 247, 0.48) !important;
+		border-radius: 999px !important;
+	}
+}
+
+.favoriteActionButtonHoverSurface() {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: rgba(36, 53, 76, 0.58) !important;
+		border-color: rgba(214, 231, 252, 0.68) !important;
+	}
+}
+
+.unfavoriteButton {
+	pointer-events: auto;
 	opacity: 0;
 	transition: opacity 0.2s ease;
-	z-index: 5;
+	z-index: 6;
 	.icon-circle-button-dimensions(2.35rem);
+	.favoriteActionButtonSurface();
 
 	:global(.bf-button-bg) {
 		background: rgba(255, 107, 127, 0.14) !important;
@@ -161,11 +215,33 @@
 	}
 }
 
-.watchedBadge {
-	position: absolute;
-	top: 8px;
-	left: 8px;
-	.status-badge-success();
+.watchedToggleButton {
+	pointer-events: auto;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 6;
+	.icon-circle-button-dimensions(2.35rem);
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: rgba(255, 255, 255, 0.08) !important;
+		border: 1px solid rgba(255, 255, 255, 0.24) !important;
+		border-radius: 999px !important;
+	}
+
+	&:focus,
+	&:global(.spottable):focus {
+		opacity: 1;
+	}
+
+	&:hover,
+	&:focus,
+	&:global(.spottable):focus {
+		:global(.bf-button-bg),
+		:global(.bg) {
+			background: rgba(0, 164, 220, 0.22) !important;
+		}
+	}
 }
 
 .favoriteActionIcon {
@@ -181,6 +257,26 @@
 .unfavoriteButton:hover .favoriteActionIcon,
 .unfavoriteButton:active .favoriteActionIcon,
 .unfavoriteButton:global(.spottable):focus .favoriteActionIcon {
+	color: #ffffff !important;
+}
+
+.watchedActionIcon {
+	font-size: 1rem !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	line-height: 1rem !important;
+	margin: 0 !important;
+	display: block !important;
+	color: rgba(236, 244, 253, 0.95) !important;
+}
+
+.watchedToggleButtonActive .watchedActionIcon {
+	color: #6ddc9a !important;
+}
+
+.watchedToggleButton:hover .watchedActionIcon,
+.watchedToggleButton:active .watchedActionIcon,
+.watchedToggleButton:global(.spottable):focus .watchedActionIcon {
 	color: #ffffff !important;
 }
 

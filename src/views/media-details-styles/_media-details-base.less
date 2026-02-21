@@ -1252,11 +1252,24 @@
 	border: 1px solid rgba(174, 221, 255, 0.38);
 }
 
-.episodeWatchedBadge {
+.episodeStatusBadges {
 	position: absolute;
 	top: 0.5rem;
 	right: 0.5rem;
 	z-index: 3;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.35rem;
+}
+
+.episodeFavoriteBadge {
+	.status-badge-favorite();
+	font-size: 0.86em;
+	letter-spacing: 0;
+}
+
+.episodeWatchedBadge {
 	.status-badge-success();
 }
 
@@ -1433,6 +1446,7 @@
 }
 
 .episodeInfoButton,
+.episodeFavoriteButton,
 .episodeWatchedButton {
 	min-width: 3rem !important;
 	width: 3rem !important;
@@ -1447,6 +1461,12 @@
 
 	.mdControlSurface(rgba(255, 255, 255, 0.08); 1px solid rgba(255, 255, 255, 0.24); 999px);
 	.mdControlHoverSurface(rgba(0, 164, 220, 0.22));
+}
+
+.episodeFavoriteButtonActive :global(.bf-button-bg),
+.episodeFavoriteButtonActive :global(.bg) {
+	background: rgba(255, 107, 127, 0.2) !important;
+	border-color: rgba(255, 177, 193, 0.9) !important;
 }
 
 .episodeWatchedButtonActive :global(.bf-button-bg),

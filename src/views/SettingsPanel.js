@@ -240,8 +240,17 @@ const SettingsPanel = ({
 	const handleForgetServer = useCallback((entry) => {
 		if (!entry) return;
 		jellyfinService.forgetServer(entry.serverId, entry.userId);
+		const hasActiveSession = Boolean(jellyfinService.userId && jellyfinService.serverUrl && jellyfinService.accessToken);
+		if (!hasActiveSession) {
+			if (typeof onSignOut === 'function') {
+				onSignOut();
+			} else {
+				onLogout();
+			}
+			return;
+		}
 		refreshSavedServers();
-	}, [refreshSavedServers]);
+	}, [onLogout, onSignOut, refreshSavedServers]);
 
 	const handleLogoutConfirm = useCallback(() => {
 		closeDisclosure(SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM);

@@ -157,6 +157,17 @@ export const useMediaDetailsFocusOrchestrator = ({
 		return false;
 	}, [css.episodeCard, css.episodeWatchedButton, episodesListRef]);
 
+	const focusEpisodeFavoriteButtonByIndex = useCallback((index) => {
+		const cards = Array.from(episodesListRef.current?.querySelectorAll(`.${css.episodeCard}`) || []);
+		if (index < 0 || index >= cards.length) return false;
+		const favoriteButton = cards[index].querySelector(`.${css.episodeFavoriteButton}`);
+		if (favoriteButton?.focus) {
+			favoriteButton.focus();
+			return true;
+		}
+		return false;
+	}, [css.episodeCard, css.episodeFavoriteButton, episodesListRef]);
+
 	const focusEpisodeSelector = useCallback(() => {
 		if (Spotlight?.focus?.('episode-selector-button')) return true;
 		const spotlightTarget = document.querySelector('[data-spotlight-id="episode-selector-button"]');
@@ -414,6 +425,7 @@ export const useMediaDetailsFocusOrchestrator = ({
 		focusTopHeaderAction,
 		focusEpisodeCardByIndex,
 		focusEpisodeInfoButtonByIndex,
+		focusEpisodeFavoriteButtonByIndex,
 		focusEpisodeWatchedButtonByIndex,
 		focusEpisodeSelector,
 		focusBelowSeasons,

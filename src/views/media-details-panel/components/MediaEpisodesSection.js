@@ -23,6 +23,8 @@ const MediaEpisodesSection = ({
 	onEpisodeImageError,
 	onEpisodeInfoClick,
 	onEpisodeInfoButtonKeyDown,
+	onEpisodeFavoriteClick,
+	onEpisodeFavoriteButtonKeyDown,
 	onEpisodeWatchedClick,
 	onEpisodeWatchedButtonKeyDown,
 	showEpisodeInfoButton
@@ -53,8 +55,15 @@ const MediaEpisodesSection = ({
 								loading="lazy"
 								decoding="async"
 							/>
-							{episode.UserData?.Played && (
-								<div className={css.episodeWatchedBadge}>{'\u2713'}</div>
+							{(episode.UserData?.IsFavorite === true || episode.UserData?.Played) && (
+								<div className={css.episodeStatusBadges}>
+									{episode.UserData?.IsFavorite === true && (
+										<div className={css.episodeFavoriteBadge}>{'\u2665'}</div>
+									)}
+									{episode.UserData?.Played && (
+										<div className={css.episodeWatchedBadge}>{'\u2713'}</div>
+									)}
+								</div>
 							)}
 							{!isElegantTheme && (
 								<div className={css.episodeImageMetaBadges}>
@@ -109,6 +118,16 @@ const MediaEpisodesSection = ({
 									onKeyDown={onEpisodeInfoButtonKeyDown}
 								/>
 							)}
+							<Button
+								size="small"
+								icon="heart"
+								data-episode-id={episode.Id}
+								data-episode-index={index}
+								selected={episode.UserData?.IsFavorite === true}
+								className={`${css.episodeFavoriteButton} ${episode.UserData?.IsFavorite ? css.episodeFavoriteButtonActive : ''}`}
+								onClick={onEpisodeFavoriteClick}
+								onKeyDown={onEpisodeFavoriteButtonKeyDown}
+							/>
 							<Button
 								size="small"
 								icon="check"

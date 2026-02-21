@@ -127,6 +127,10 @@ Service rule:
 - webOS compatibility mixins: `src/styles/compatMixins.less`
 - Panel styling pattern: `src/views/*-panel-styles/` split files (base + per-theme + shared tail)
 
+Status badge convention:
+- Reuse shared badge mixins from `src/styles/cardStyles.less` (`.status-badge-pill()`, `.status-badge-success()`, `.status-badge-favorite()`), then theme with tokens.
+- Avoid panel-specific one-off badge geometry/colors when an existing shared badge primitive can be reused.
+
 ## webOS 6 layout rule
 
 - For webOS 6 / legacy engines, prefer explicit `width` and `height` on card shells/media surfaces in compat files when layout becomes unstable.

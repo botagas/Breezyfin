@@ -18,6 +18,7 @@ This guide covers shared UI components in `src/components/`.
   - `src/styles/popupStyles.module.less`
   - `src/styles/panelLayoutMixins.less`
   - `src/styles/compatMixins.less`
+- For status chips/badges, prefer shared badge primitives in `src/styles/cardStyles.less` and theme-token overrides over one-off badge styles.
 - Add webOS compatibility rules in `src/components/*-styles/*-compat-webos6.less` when needed.
 
 ## Focus and input

@@ -59,6 +59,10 @@ body,
 	--bf-theme-card-success-badge-color: #03140e;
 	--bf-theme-card-success-badge-border: rgba(148, 233, 183, 0.65);
 	--bf-theme-card-success-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	--bf-theme-card-favorite-badge-bg: rgba(255, 107, 127, 0.92);
+	--bf-theme-card-favorite-badge-color: #fff4f6;
+	--bf-theme-card-favorite-badge-border: rgba(255, 166, 181, 0.7);
+	--bf-theme-card-favorite-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
 	--bf-theme-card-progress-track: rgba(255, 255, 255, 0.22);
 	--bf-theme-card-progress-fill: #3cb2f0;
 	--bf-theme-card-filter-chip-bg: rgba(255, 255, 255, 0.08);

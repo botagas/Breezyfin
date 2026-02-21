@@ -342,6 +342,7 @@ const MediaDetailsPanel = ({
 
 	const {
 		handleToggleFavorite,
+		handleToggleFavoriteById,
 		handleToggleWatched
 	} = useMediaDetailsItemActions({
 		item,
@@ -440,6 +441,7 @@ const MediaDetailsPanel = ({
 		focusTopHeaderAction,
 		focusEpisodeCardByIndex,
 		focusEpisodeInfoButtonByIndex,
+		focusEpisodeFavoriteButtonByIndex,
 		focusEpisodeWatchedButtonByIndex,
 		focusEpisodeSelector,
 		focusBelowSeasons,
@@ -627,9 +629,11 @@ const MediaDetailsPanel = ({
 		handleEpisodeCardClick,
 		handleEpisodeCardFocus,
 		handleEpisodeInfoClick,
+		handleEpisodeFavoriteClick,
 		handleEpisodeWatchedClick,
 		handleEpisodeCardKeyDown,
 		handleEpisodeInfoButtonKeyDown,
+		handleEpisodeFavoriteButtonKeyDown,
 		handleEpisodeWatchedButtonKeyDown,
 		handleAudioSelectorKeyDown,
 		handleSubtitleSelectorKeyDown,
@@ -655,11 +659,14 @@ const MediaDetailsPanel = ({
 		episodeFocusScrollTimeoutRef,
 		focusEpisodeCardByIndex,
 		focusEpisodeInfoButtonByIndex,
+		focusEpisodeFavoriteButtonByIndex,
 		focusEpisodeWatchedButtonByIndex,
 		focusEpisodeSelector,
+		handleToggleFavoriteById,
 		focusNonSeriesSubtitleSelector,
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesAudioSelector,
+		showEpisodeInfoButton: typeof onItemSelect === 'function',
 		css
 	});
 
@@ -688,6 +695,7 @@ const MediaDetailsPanel = ({
 
 	if (!item) return null;
 	const isSeriesMode = item.Type === 'Series';
+	const showEpisodeInfoButton = typeof onItemSelect === 'function';
 	const popupEpisodes = isSeriesMode ? episodes : episodeNavList;
 	const introDetails = {
 		item,
@@ -837,9 +845,11 @@ const MediaDetailsPanel = ({
 												onEpisodeImageError={handleEpisodeImageError}
 												onEpisodeInfoClick={handleEpisodeInfoClick}
 												onEpisodeInfoButtonKeyDown={handleEpisodeInfoButtonKeyDown}
+												onEpisodeFavoriteClick={handleEpisodeFavoriteClick}
+												onEpisodeFavoriteButtonKeyDown={handleEpisodeFavoriteButtonKeyDown}
 												onEpisodeWatchedClick={handleEpisodeWatchedClick}
 												onEpisodeWatchedButtonKeyDown={handleEpisodeWatchedButtonKeyDown}
-												showEpisodeInfoButton={typeof onItemSelect === 'function'}
+												showEpisodeInfoButton={showEpisodeInfoButton}
 											/>
 										</div>
 									)}

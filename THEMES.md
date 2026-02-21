@@ -56,7 +56,7 @@ Version/capability detection is implemented in `/Users/patrikas/Desktop/IT/Devel
 ### Shared style primitives
 
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/cardStyles.less`
-  - Reusable card shells, focus effects, image shells, status badges.
+  - Reusable card shells, focus effects, image shells, and shared status badge primitives (default/count, watched, favorite).
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popupStyles.module.less`
   - Shared popup surface skin with Classic/Elegant token usage.
 - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popupStyles.js`

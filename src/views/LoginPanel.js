@@ -62,6 +62,10 @@ const buildUserPrimaryImageUrl = ({ baseUrl, userId, accessToken, width, tag = n
 	return `${normalizedBase}/Users/${userId}/Images/Primary?${params.toString()}`;
 };
 
+const normalizeImageTag = (value) => (
+	typeof value === 'string' && value ? value : null
+);
+
 const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
 	const [username, setUsername] = useState('');
@@ -203,8 +207,6 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 					|| (typeof item.ImageTags?.Backdrop === 'string' && item.ImageTags.Backdrop ? item.ImageTags.Backdrop : null);
 				if (backdropTag) {
 					addImageUrl(item.Id, 'Backdrop', backdropTag, 0);
-				} else {
-					addImageUrl(item.Id, 'Backdrop', null, 0);
 				}
 
 				const primaryTag = item.PrimaryImageTag || item.ImageTags?.Primary || null;
@@ -220,8 +222,6 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 					const parentBackdropTag = getFirstImageTag(item.ParentBackdropImageTags);
 					if (parentBackdropTag) {
 						addImageUrl(item.ParentBackdropItemId, 'Backdrop', parentBackdropTag, 0);
-					} else {
-						addImageUrl(item.ParentBackdropItemId, 'Backdrop', null, 0);
 					}
 				}
 			});
@@ -230,6 +230,37 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 			if (err?.name === 'AbortError') return [];
 			return [];
 		}
+	}, []);
+
+	const resolveSavedUserBackdrop = useCallback(async (entry, signal) => {
+		if (!entry?.url || !entry?.userId || !entry?.accessToken) return '';
+		const baseUrl = entry.url.replace(/\/+$/, '');
+		let tag = normalizeImageTag(entry.avatarTag);
+
+		if (!tag) {
+			try {
+				const response = await fetch(`${baseUrl}/Users/${entry.userId}`, {
+					headers: {
+						'X-Emby-Token': entry.accessToken
+					},
+					signal
+				});
+				if (response?.ok) {
+					const data = await response.json().catch(() => null);
+					tag = normalizeImageTag(data?.PrimaryImageTag);
+				}
+			} catch (err) {
+				if (err?.name === 'AbortError') return '';
+			}
+		}
+
+		return buildUserPrimaryImageUrl({
+			baseUrl: entry.url,
+			userId: entry.userId,
+			accessToken: entry.accessToken,
+			width: LOGIN_BACKDROP_WIDTH,
+			tag
+		});
 	}, []);
 
 	useEffect(() => {
@@ -253,21 +284,20 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 
 		const loadBackdrops = async () => {
 			try {
-				const perServerBackdrops = await Promise.all(
-					availableServers.map((entry) => fetchBackdropsForSavedServer(entry, controller.signal))
-				);
+				const [perServerBackdrops, fallbackUserBackdrops] = await Promise.all([
+					Promise.all(
+						availableServers.map((entry) => fetchBackdropsForSavedServer(entry, controller.signal))
+					),
+					Promise.all(
+						availableServers.map((entry) => resolveSavedUserBackdrop(entry, controller.signal))
+					)
+				]);
 				if (isCancelled) return;
 				const uniqueBackdrops = [...new Set(perServerBackdrops.flat().filter(Boolean))];
-				const fallbackUserBackdrops = availableServers
-					.map((entry) => buildUserPrimaryImageUrl({
-						baseUrl: entry.url,
-						userId: entry.userId,
-						accessToken: entry.accessToken,
-						width: LOGIN_BACKDROP_WIDTH,
-						tag: entry.avatarTag || null
-					}))
-					.filter(Boolean);
-				const candidateBackdrops = uniqueBackdrops.length > 0 ? uniqueBackdrops : fallbackUserBackdrops;
+				const candidateBackdrops = [...new Set([
+					...uniqueBackdrops,
+					...fallbackUserBackdrops.filter(Boolean)
+				])];
 				const nextBackdrops = shuffleArray(candidateBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
 				setLoginBackdropUrls(nextBackdrops);
 				setBackdropImageErrors({});
@@ -284,7 +314,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 			isCancelled = true;
 			controller.abort();
 		};
-	}, [fetchBackdropsForSavedServer, isActive, savedServers]);
+	}, [fetchBackdropsForSavedServer, isActive, resolveSavedUserBackdrop, savedServers]);
 
 	useEffect(() => {
 		setActiveBackdropIndex(0);

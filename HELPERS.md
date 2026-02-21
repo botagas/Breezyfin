@@ -301,7 +301,7 @@ const loadVideo = usePlayerVideoLoader({
 - Returns key methods:
   - `scrollCastIntoView()`, `scrollSeasonIntoView()`
   - `focusTopHeaderAction()`, `focusEpisodeSelector()`
-  - `focusEpisodeCardByIndex()`, `focusEpisodeInfoButtonByIndex()`, `focusEpisodeWatchedButtonByIndex()`
+  - `focusEpisodeCardByIndex()`, `focusEpisodeInfoButtonByIndex()`, `focusEpisodeFavoriteButtonByIndex()`, `focusEpisodeWatchedButtonByIndex()`
   - `focusSeasonCardByIndex()`, `focusSeasonWatchedButton()`, `focusBelowSeasons()`
   - `focusNonSeriesAudioSelector()`, `focusNonSeriesSubtitleSelector()`, `focusNonSeriesPrimaryPlay()`
   - `handleDetailsPointerDownCapture()`, `handleDetailsPointerClickCapture()`
@@ -311,6 +311,7 @@ const loadVideo = usePlayerVideoLoader({
 - Purpose: centralize favorite/watched mutation flows and related local refresh behavior for item/episode/season contexts.
 - Returns:
   - `handleToggleFavorite()`
+  - `handleToggleFavoriteById(itemId?, currentFavoriteState?)`
   - `handleToggleWatched(itemId?, currentWatchedState?)`
 
 ### `useMediaDetailsPickerHandlers`
@@ -498,7 +499,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/media-details-panel/components/MediaSeriesStickyControls.js`
   - sticky episode selector + track selectors + primary play controls.
 - `src/views/media-details-panel/components/MediaEpisodesSection.js`
-  - episodes grid/sideways layout rendering and episode action buttons.
+  - episodes grid/sideways layout rendering with favorite/watched status badges and action buttons.
 
 ### Settings and track storage helpers
 - `src/utils/settingsStorage.js`
