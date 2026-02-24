@@ -6,18 +6,18 @@ This file documents how theming works in Breezyfin, which files own each part, a
 
 Breezyfin uses a layered theme model:
 
-1. Global tokens and behavior in `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/global.css`.
+1. Global tokens and behavior in `src/global.css`.
 2. Theme token packs in:
-   - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/themes/classic.css`
-   - `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/themes/elegant.css`
+   - `src/styles/themes/classic.css`
+   - `src/styles/themes/elegant.css`
 3. Panel/component local styles in module LESS files and split subfiles.
 4. Runtime capability + mode attributes set by the app root.
 
-All theme files are loaded from `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/index.js`.
+All theme files are loaded from `src/index.js`.
 
 ## 2) Runtime attributes
 
-The app sets the theme/mode/platform attributes in `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/App/App.js`.
+The app sets the theme/mode/platform attributes in `src/App/App.js`.
 
 These attributes are what CSS listens to:
 
@@ -34,20 +34,20 @@ These attributes are what CSS listens to:
 - `data-bf-aspect-ratio`: `on` or `off`
 - `data-bf-backdrop-filter`: `on` or `off`
 
-Version/capability detection is implemented in `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/utils/platformCapabilities.js`.
+Version/capability detection is implemented in `src/utils/platformCapabilities.js`.
 
 ## 3) Core theme files
 
 ### Token files
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/themes/classic.css`
+- `src/styles/themes/classic.css`
   - Defines Classic tokens and classic baseline surfaces.
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/themes/elegant.css`
+- `src/styles/themes/elegant.css`
   - Defines Elegant tokens and elegant-specific typography/chrome overrides.
 
 ### Global behavior
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/global.css`
+- `src/global.css`
   - Shared layout tokens (`--bf-header-height`, `--bf-toolbar-height`, panel offsets).
   - Sandstone chrome normalization.
   - Performance mode and Performance+ global behavior.
@@ -55,17 +55,17 @@ Version/capability detection is implemented in `/Users/patrikas/Desktop/IT/Devel
 
 ### Shared style primitives
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/cardStyles.less`
+- `src/styles/cardStyles.less`
   - Reusable card shells, focus effects, image shells, and shared status badge primitives (default/count, watched, favorite).
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popupStyles.module.less`
+- `src/styles/popupStyles.module.less`
   - Shared popup surface skin with Classic/Elegant token usage.
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popupStyles.js`
+- `src/styles/popupStyles.js`
   - JS export for popup style class wiring.
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popup-styles/_popup-styles-compat-webos6.less`
+- `src/styles/popup-styles/_popup-styles-compat-webos6.less`
   - webOS 6 popup fallback behaviors (solid-surface compatibility path).
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/panelLayoutMixins.less`
+- `src/styles/panelLayoutMixins.less`
   - Shared panel fill container mixin.
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/compatMixins.less`
+- `src/styles/compatMixins.less`
   - Shared compatibility mixins (gap fallbacks, scroll metric stabilization).
 
 ## 4) Panel styles split pattern
@@ -79,20 +79,20 @@ Most panels use split files under `*-panel-styles/`:
 
 Examples:
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/MediaDetailsPanel.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/SearchPanel.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/LibraryPanel.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/FavoritesPanel.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/LoginPanel.module.less`
+- `src/views/MediaDetailsPanel.module.less`
+- `src/views/SearchPanel.module.less`
+- `src/views/LibraryPanel.module.less`
+- `src/views/FavoritesPanel.module.less`
+- `src/views/LoginPanel.module.less`
 
 ### Component-level split/compat examples
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/Toolbar.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/toolbar-styles/_toolbar-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/HeroBanner.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/MediaRow.module.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/media-row-styles/_media-row-compat-webos6.less`
+- `src/components/Toolbar.module.less`
+- `src/components/toolbar-styles/_toolbar-compat-webos6.less`
+- `src/components/HeroBanner.module.less`
+- `src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
+- `src/components/MediaRow.module.less`
+- `src/components/media-row-styles/_media-row-compat-webos6.less`
 
 ## 5) Theme features by mode
 
@@ -135,12 +135,12 @@ Compatibility is capability-driven and scoped by root attributes.
 
 Key files:
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/toolbar-styles/_toolbar-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/media-details-styles/_media-details-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/login-panel-styles/_login-panel-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/media-row-styles/_media-row-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/styles/popup-styles/_popup-styles-compat-webos6.less`
+- `src/components/toolbar-styles/_toolbar-compat-webos6.less`
+- `src/views/media-details-styles/_media-details-compat-webos6.less`
+- `src/views/login-panel-styles/_login-panel-compat-webos6.less`
+- `src/components/media-row-styles/_media-row-compat-webos6.less`
+- `src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
+- `src/styles/popup-styles/_popup-styles-compat-webos6.less`
 
 ### webOS 22 compatibility
 
@@ -148,13 +148,13 @@ Key files:
 
 Key files:
 
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/search-panel-styles/_search-panel-compat-webos22.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/favorites-panel-styles/_favorites-panel-compat-webos22.less`
-- `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/library-panel-styles/_library-panel-compat-webos22.less`
+- `src/views/search-panel-styles/_search-panel-compat-webos22.less`
+- `src/views/favorites-panel-styles/_favorites-panel-compat-webos22.less`
+- `src/views/library-panel-styles/_library-panel-compat-webos22.less`
 
 ## 7) Settings storage
 
-Theme-related settings are managed from `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/views/SettingsPanel.js` and persisted via `/Users/patrikas/Desktop/IT/Development/Breezyfin/src/utils/settingsStorage.js`.
+Theme-related settings are managed from `src/views/SettingsPanel.js` and persisted via `src/utils/settingsStorage.js`.
 
 Relevant settings:
 

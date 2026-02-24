@@ -349,7 +349,6 @@ export const buildPlaybackRequestContext = (options = {}) => {
 	const enableTranscoding = options.enableTranscoding !== false;
 	const forceSubtitleBurnIn = options.forceSubtitleBurnIn === true;
 	const dynamicRangeCap = normalizeDynamicRangeCap(options.dynamicRangeCap);
-	// Keep stream copy available on transcode sessions unless explicitly disabled.
 	const allowStreamCopyOnTranscode = options.allowStreamCopyOnTranscode !== false;
 	const allowStreamCopy = enableTranscoding && (!forceTranscoding || allowStreamCopyOnTranscode);
 	const maxBitrateSetting = options.maxBitrate ? parseInt(options.maxBitrate, 10) : null;

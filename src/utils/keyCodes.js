@@ -1,6 +1,3 @@
-// Centralized key code definitions for webOS remotes and keyboards.
-// Having a single source of truth keeps navigation/controls consistent.
-
 export const KeyCodes = {
 	LEFT: 37,
 	UP: 38,

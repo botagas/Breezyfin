@@ -305,7 +305,6 @@ const MediaDetailsPanel = ({
 		}
 	}, [item, onPlay, playbackInfo, selectedAudioTrack, selectedEpisode, selectedSubtitleTrack]);
 
-	// Keep "Back" behavior consistent with other panels; series jump is exposed explicitly.
 	const handleBack = useCallback(() => {
 		onBack();
 	}, [onBack]);

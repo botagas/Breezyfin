@@ -72,7 +72,6 @@ export const getMediaItemSubtitle = (item, {includePersonRole = false} = {}) => 
 	}
 };
 
-// Poster-ish card art for grid/list cards in Favorites/Search/Library.
 export const getPosterCardImageUrl = (item, {maxWidth = 400, personMaxWidth = 200, includeBackdrop = true, includeSeriesFallback = true} = {}) => {
 	if (!item || !canBuildImageUrl()) return null;
 
@@ -103,7 +102,6 @@ export const getPosterCardImageUrl = (item, {maxWidth = 400, personMaxWidth = 20
 	return buildPrimaryImageUrl(item.Id, {maxWidth});
 };
 
-// Landscape art for Home/MediaRow style cards.
 export const getLandscapeCardImageUrl = (item, {width = 640, includeSeriesBackdrop = true} = {}) => {
 	if (!item || !canBuildImageUrl()) return '';
 

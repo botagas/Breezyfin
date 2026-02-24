@@ -21,15 +21,6 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - `src/views/media-details-panel/`
 - `src/views/settings-panel/` (`components/`, `constants.js`, `labels.js`)
 
-Player panel notable behaviors:
-- Episode header title uses `SxEx: {Title}` formatting when season/episode numbers are available.
-- Leaving Player returns to the currently playing episode details item, even after next-episode transitions.
-
-Settings panel notable sections:
-- Runtime device playback capability summary (DV/HDR/audio/video support snapshot)
-- Capability probe refresh controls (refresh period + manual refresh)
-- Shared toast feedback for capability refresh actions
-
 ## Conventions
 
 - Prefer shared hooks from `src/hooks/` before adding panel-local hooks.
