@@ -1,7 +1,7 @@
 import Slider from '@enact/sandstone/Slider';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../../../components/BreezyButton';
-import {formatPlaybackTime} from '../utils/playerPanelHelpers';
+import {formatPlaybackTime, getPlayerHeaderTitle} from '../utils/playerPanelHelpers';
 import css from '../../PlayerPanel.module.less';
 
 const PlayerControlsOverlay = ({
@@ -49,7 +49,7 @@ const PlayerControlsOverlay = ({
 					icon="arrowlargeleft"
 					className={css.playerBackButton}
 				/>
-				<BodyText className={css.title}>{item?.Name}</BodyText>
+				<BodyText className={css.title}>{getPlayerHeaderTitle(item)}</BodyText>
 			</div>
 
 			<div className={css.bottomBar}>

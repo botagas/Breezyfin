@@ -95,7 +95,8 @@ const App = (props) => {
 		pushPanelHistory,
 		clearPanelHistory,
 		navigateBackInHistory,
-		getHistoryFallbackItem
+		getHistoryFallbackItem,
+		updateLatestHistorySnapshot
 	} = usePanelHistory({
 		currentView,
 		selectedItem,
@@ -176,6 +177,19 @@ const App = (props) => {
 		setCurrentView('details');
 		return true;
 	}, [getHistoryFallbackItem, previousItem, selectedItem]);
+
+	const syncPlayerBackTargetDetailsItem = useCallback(() => {
+		const currentPlayerItem = selectedItem;
+		if (!currentPlayerItem?.Id) return;
+		updateLatestHistorySnapshot((snapshot) => {
+			if (!snapshot || snapshot.view !== 'details') return snapshot;
+			if (snapshot.selectedItem?.Id === currentPlayerItem.Id) return snapshot;
+			return {
+				...snapshot,
+				selectedItem: currentPlayerItem
+			};
+		});
+	}, [selectedItem, updateLatestHistorySnapshot]);
 
 	const applyVisualSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -296,6 +310,7 @@ const App = (props) => {
 					setPlayerControlsVisible(false);
 					return true;
 				}
+				syncPlayerBackTargetDetailsItem();
 				if (navigateBackInHistory()) return true;
 				return fallbackToDetailsFromPlayer();
 			case 'home':
@@ -318,6 +333,7 @@ const App = (props) => {
 			playerBackHandlerRef,
 			playerControlsVisible,
 			searchBackHandlerRef,
+			syncPlayerBackTargetDetailsItem,
 			runPanelBackHandler,
 			settingsBackHandlerRef,
 			styleDebugBackHandlerRef
@@ -490,9 +506,10 @@ const App = (props) => {
 	}, [navigateBackInHistory]);
 
 	const handleBackToDetails = useCallback(() => {
+		syncPlayerBackTargetDetailsItem();
 		if (navigateBackInHistory()) return;
 		fallbackToDetailsFromPlayer();
-	}, [fallbackToDetailsFromPlayer, navigateBackInHistory]);
+	}, [fallbackToDetailsFromPlayer, navigateBackInHistory, syncPlayerBackTargetDetailsItem]);
 
 	const handleExit = useCallback(() => {
 		if (typeof window !== 'undefined' && window.close) {

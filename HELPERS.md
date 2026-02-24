@@ -417,6 +417,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 ### Player and media detail helpers
 - `src/views/player-panel/utils/playerPanelHelpers.js`
   - `formatPlaybackTime(seconds)`
+  - `getPlayerHeaderTitle(item)` (builds `SxEx: Title` episode label)
   - `getPlayerTrackLabel(track)`
   - `getSkipSegmentLabel(segmentType, hasNextEpisode?)`
   - `getPlayerErrorBackdropUrl(item, imageApi)`

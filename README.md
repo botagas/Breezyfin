@@ -24,14 +24,12 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
-- Home, Library, Search, Favorites, Media Details, and Player panels
+- TV-first navigation tuned for LG Magic Remote (5-way and pointer flows)
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
-- Rich Media Details workflows (favorites, watched status, track pickers, episodes/seasons, side list toggle)
 - Player with dynamic-range-aware direct play/direct stream/transcode fallback paths (DV -> HDR -> SDR)
 - Subtitle/audio compatibility fallbacks for webOS playback paths, with optional subtitle burn-in policy
-- Diagnostics tools (logs, performance overlay, cache wipe, style debug panel)
-- Modular Jellyfin service architecture (session/library/item-state/playback domain split)
+- Built-in runtime diagnostics for playback validation and troubleshooting
 
 ## Install on TV (IPK)
 
@@ -134,7 +132,6 @@ Diagnostics currently include:
 
 - Performance Overlay (`FPS`, `Input`, `Mode`)
 - Playback toast with active dynamic range / play method (for quick validation)
-- Unified toast styling/behavior across Player, Media Details, and Settings feedback
 - Device playback capability summary in Settings (DV/HDR/codec/audio support snapshot + probe source/timestamp)
 - Configurable capability probe refresh period (default 30 days) plus manual "Refresh now" action
 - Relaxed Playback Profile toggle (debug-only visibility)

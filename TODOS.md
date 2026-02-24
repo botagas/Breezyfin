@@ -21,7 +21,6 @@ This is the current backlog for v0.1.5 release. Should be updated with further r
   - `src/services/jellyfin/sessionApi.js`
 - Identify the cause for FPS drops in Media Details panel when scrolling. Loading delay in panels might be directly related to the FPS drops since they are not present in Simulator tests. This might cause issues for TVs that were released in 2022 or prior. It could be related to backdrop/cast/episode image quality or complexity as not all media causes this behavior. Performance Mode should be improved in episode list to reduce heavyweight styling.
 - Could consider using WEBP for images to increase performance. 
-- In PlayerPanel, the title next to the back button should include the SxEx numbers.
 
 ## Medium priority
 

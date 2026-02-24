@@ -76,6 +76,7 @@ Other shared utilities:
 - Shared home row order constant: `src/constants/homeRows.js`
 - Shared poster card class helper: `src/utils/posterCardClassProps.js`
 - Shared player view helpers: `src/views/player-panel/utils/playerPanelHelpers.js`
+  - includes `getPlayerHeaderTitle(item)` for `SxEx: Title` episode header formatting
 - Shared episode next/previous helpers: `src/views/player-panel/utils/episodeNavigation.js`
 - Shared media details formatting/image helpers: `src/views/media-details-panel/utils/mediaDetailsHelpers.js`
 

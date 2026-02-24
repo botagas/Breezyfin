@@ -82,11 +82,23 @@ export const usePanelHistory = ({
 		return null;
 	}, []);
 
+	const updateLatestHistorySnapshot = useCallback((updater) => {
+		if (typeof updater !== 'function') return false;
+		const history = panelHistoryRef.current;
+		if (!history.length) return false;
+		const currentSnapshot = history[history.length - 1];
+		const nextSnapshot = updater(currentSnapshot);
+		if (!nextSnapshot || nextSnapshot === currentSnapshot) return false;
+		panelHistoryRef.current = [...history.slice(0, -1), nextSnapshot];
+		return true;
+	}, []);
+
 	return {
 		pushPanelHistory,
 		clearPanelHistory,
 		navigateBackInHistory,
-		getHistoryFallbackItem
+		getHistoryFallbackItem,
+		updateLatestHistorySnapshot
 	};
 };
 
