@@ -19,3 +19,9 @@ export const getPlayNextPromptModeLabel = (value) => {
 	}
 };
 
+export const getCapabilityProbeRefreshLabel = (value) => {
+	const days = Number(value);
+	if (!Number.isFinite(days) || days <= 0) return '30 days';
+	if (days === 1) return '1 day';
+	return `${Math.trunc(days)} days`;
+};

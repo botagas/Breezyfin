@@ -10,6 +10,7 @@ const MediaCastSection = ({
 	cast,
 	isCastCollapsed,
 	onToggleCastCollapsed,
+	onCastToggleKeyDown,
 	castScrollerRef,
 	castRowRef,
 	onCastCardFocus,
@@ -27,6 +28,7 @@ const MediaCastSection = ({
 				aria-label={isCastCollapsed ? 'Show cast' : 'Hide cast'}
 				title={isCastCollapsed ? 'Show cast' : 'Hide cast'}
 				onClick={onToggleCastCollapsed}
+				onKeyDown={onCastToggleKeyDown}
 			>
 				<Heading size="medium" className={`${css.sectionHeading} ${css.castToggleLabel}`}>Cast</Heading>
 				<Icon className={css.castToggleIcon}>

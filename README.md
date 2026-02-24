@@ -9,7 +9,7 @@
 </h1>
 
 Breezyfin is a Jellyfin client for LG webOS TVs, built with Enact Sandstone.
-It focuses on TV-first navigation, themeable UI, and resilient playback handling for webOS constraints.
+It focuses on TV-first navigation (best suited for usage with the Magic Remote), themeable UI, and resilient playback handling for webOS constraints.
 
 The app was inspired by other great apps and themes, like JellySee, AndroidTV-FireTV, Moonfin, ElegantFin and more. Check them out.
 
@@ -28,8 +28,8 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
 - Rich Media Details workflows (favorites, watched status, track pickers, episodes/seasons, side list toggle)
-- Player with direct play, direct stream, and transcode handling
-- Subtitle/audio compatibility fallbacks for webOS playback paths
+- Player with dynamic-range-aware direct play/direct stream/transcode fallback paths (DV -> HDR -> SDR)
+- Subtitle/audio compatibility fallbacks for webOS playback paths, with optional subtitle burn-in policy
 - Diagnostics tools (logs, performance overlay, cache wipe, style debug panel)
 - Modular Jellyfin service architecture (session/library/item-state/playback domain split)
 
@@ -133,6 +133,10 @@ localStorage.setItem('breezyfinFocusDebug', '1');
 Diagnostics currently include:
 
 - Performance Overlay (`FPS`, `Input`, `Mode`)
+- Playback toast with active dynamic range / play method (for quick validation)
+- Unified toast styling/behavior across Player, Media Details, and Settings feedback
+- Device playback capability summary in Settings (DV/HDR/codec/audio support snapshot + probe source/timestamp)
+- Configurable capability probe refresh period (default 30 days) plus manual "Refresh now" action
 - Relaxed Playback Profile toggle (debug-only visibility)
 - Styling Debug Panel shortcut (debug-only visibility)
 - Logs viewer and clear action

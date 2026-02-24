@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
+import Icon from '@enact/sandstone/Icon';
 import jellyfinService from '../services/jellyfinService';
 import {KeyCodes} from '../utils/keyCodes';
 import {
@@ -59,6 +60,9 @@ const MEDIA_DETAILS_DISCLOSURE_KEY_LIST = [
 	MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER,
 	MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER
 ];
+const SECTION_SNAP_TOLERANCE_PX = 8;
+const SECTION_WHEEL_DELTA_THRESHOLD = 18;
+const SECTION_SNAP_THRESHOLD_RATIO = 0.45;
 
 const MediaDetailsPanel = ({
 	item,
@@ -144,6 +148,8 @@ const MediaDetailsPanel = ({
 	const audioSelectorButtonRef = useRef(null);
 	const subtitleSelectorButtonRef = useRef(null);
 	const playPrimaryButtonRef = useRef(null);
+	const firstSectionRef = useRef(null);
+	const contentSectionRef = useRef(null);
 	const debugLastScrollTopRef = useRef(null);
 	const debugLastScrollTimeRef = useRef(0);
 	const playbackInfoRequestRef = useRef(0);
@@ -567,15 +573,252 @@ const MediaDetailsPanel = ({
 	const overviewPlayLabel = item?.Type === 'Series'
 		? seriesPlayLabel
 		: (shouldShowContinue ? 'Continue' : 'Play');
+	const hasSecondarySection = useMemo(() => {
+		if (Array.isArray(cast) && cast.length > 0) return true;
+		if (item?.Type === 'Series') return seasons.length > 0 || episodes.length > 0;
+		return false;
+	}, [cast, episodes.length, item?.Type, seasons.length]);
 
 	const captureDetailsScrollTo = useCallback((fn) => {
 		detailsScrollToRef.current = fn;
 		captureDetailsScrollRestore(fn);
 	}, [captureDetailsScrollRestore]);
 
+	const getContentSectionTop = useCallback(() => {
+		const scrollEl = getDetailsScrollElement();
+		const contentSection = contentSectionRef.current;
+		if (!scrollEl || !contentSection) return null;
+		const scrollRect = scrollEl.getBoundingClientRect();
+		const contentRect = contentSection.getBoundingClientRect();
+		return Math.max(0, scrollEl.scrollTop + (contentRect.top - scrollRect.top));
+	}, [getDetailsScrollElement]);
+
+	const focusSectionOnePrimary = useCallback(() => {
+		if (focusTopHeaderAction()) return true;
+		if (focusNonSeriesPrimaryPlay()) return true;
+		if (focusNonSeriesAudioSelector()) return true;
+		return focusNonSeriesSubtitleSelector();
+	}, [
+		focusNonSeriesAudioSelector,
+		focusNonSeriesPrimaryPlay,
+		focusNonSeriesSubtitleSelector,
+		focusTopHeaderAction
+	]);
+
+	const focusSectionOnePrimaryFromTopNav = useCallback(() => {
+		const candidateTargets = [
+			favoriteActionButtonRef.current?.nodeRef?.current || favoriteActionButtonRef.current,
+			watchedActionButtonRef.current?.nodeRef?.current || watchedActionButtonRef.current,
+			audioSelectorButtonRef.current?.nodeRef?.current || audioSelectorButtonRef.current,
+			subtitleSelectorButtonRef.current?.nodeRef?.current || subtitleSelectorButtonRef.current,
+			playPrimaryButtonRef.current?.nodeRef?.current || playPrimaryButtonRef.current
+		];
+		for (const target of candidateTargets) {
+			if (!target?.focus) continue;
+			focusNodeWithoutScroll(target);
+			return true;
+		}
+		const introRoot = firstSectionRef.current;
+		if (introRoot) {
+			const fallbackTarget = introRoot.querySelector(
+				`.${css.actionButton}, .${css.trackSelectorPrimary}, .${css.primaryButton}, .bf-button, .spottable`
+			);
+			if (fallbackTarget?.focus) {
+				focusNodeWithoutScroll(fallbackTarget);
+				return true;
+			}
+		}
+		return focusSectionOnePrimary();
+	}, [
+		audioSelectorButtonRef,
+		favoriteActionButtonRef,
+		focusNodeWithoutScroll,
+		focusSectionOnePrimary,
+		playPrimaryButtonRef,
+		subtitleSelectorButtonRef,
+		watchedActionButtonRef
+	]);
+
+	const focusIntroTopNavigation = useCallback(() => {
+		const introRoot = firstSectionRef.current;
+		if (!introRoot) return false;
+		const breadcrumbTarget = introRoot.querySelector('[data-bf-md-nav="breadcrumb"]');
+		if (breadcrumbTarget?.focus) {
+			focusNodeWithoutScroll(breadcrumbTarget);
+			return true;
+		}
+		const backTarget = introRoot.querySelector('[data-bf-md-nav="back"]');
+		if (backTarget?.focus) {
+			focusNodeWithoutScroll(backTarget);
+			return true;
+		}
+		return false;
+	}, [focusNodeWithoutScroll]);
+
+	const focusSectionTwoPrimary = useCallback(() => {
+		if (!hasSecondarySection) return false;
+		const castTarget = contentSectionRef.current?.querySelector?.(`.${css.castToggleRow}, .${css.castCard}`);
+		if (castTarget?.focus) {
+			focusNodeWithoutScroll(castTarget);
+			return true;
+		}
+		if (focusEpisodeSelector()) return true;
+		const seasonTarget = contentSectionRef.current?.querySelector?.(`.${css.seasonCard}`);
+		if (seasonTarget?.focus) {
+			focusNodeWithoutScroll(seasonTarget);
+			return true;
+		}
+		const episodeTarget = contentSectionRef.current?.querySelector?.(`.${css.episodeCard}`);
+		if (episodeTarget?.focus) {
+			focusNodeWithoutScroll(episodeTarget);
+			return true;
+		}
+		return false;
+	}, [
+		focusEpisodeSelector,
+		focusNodeWithoutScroll,
+		hasSecondarySection
+	]);
+
+	const scrollToDetailsSection = useCallback((sectionKey, options = {}) => {
+		const {
+			animate = true,
+			focusTarget = false
+		} = options;
+		if (sectionKey === 'content' && !hasSecondarySection) return false;
+		const scrollEl = getDetailsScrollElement();
+		if (!scrollEl) return false;
+		const sectionTwoTop = getContentSectionTop();
+		if (sectionTwoTop === null) return false;
+		const nextTop = sectionKey === 'content' ? sectionTwoTop : 0;
+		if (Math.abs(scrollEl.scrollTop - nextTop) > 1) {
+			scrollEl.scrollTo({top: nextTop, behavior: animate ? 'smooth' : 'auto'});
+		}
+		if (focusTarget) {
+			window.requestAnimationFrame(() => {
+				if (sectionKey === 'content') {
+					focusSectionTwoPrimary();
+				} else {
+					focusSectionOnePrimary();
+				}
+			});
+		}
+		return true;
+	}, [
+		focusSectionOnePrimary,
+		focusSectionTwoPrimary,
+		getContentSectionTop,
+		getDetailsScrollElement,
+		hasSecondarySection
+	]);
+
+	const focusAndShowSecondSection = useCallback(() => {
+		if (!focusSectionTwoPrimary()) return false;
+		scrollToDetailsSection('content', {animate: true, focusTarget: false});
+		return true;
+	}, [focusSectionTwoPrimary, scrollToDetailsSection]);
+
+	const handleIntroActionKeyDown = useCallback((event) => {
+		const code = event.keyCode || event.which;
+		if (code !== KeyCodes.DOWN) return;
+		if (!focusAndShowSecondSection()) return;
+		event.preventDefault();
+		event.stopPropagation();
+	}, [focusAndShowSecondSection]);
+
+	const handleIntroTopNavKeyDown = useCallback((event) => {
+		if (event.defaultPrevented) return;
+		const code = event.keyCode || event.which;
+		if (code !== KeyCodes.DOWN) return;
+		event.preventDefault();
+		event.stopPropagation();
+		if (focusSectionOnePrimaryFromTopNav()) return;
+		window.requestAnimationFrame(() => {
+			focusSectionOnePrimaryFromTopNav();
+		});
+	}, [focusSectionOnePrimaryFromTopNav]);
+
+	const handleSectionWheelCapture = useCallback((event) => {
+		if (!isActive || !hasSecondarySection) return;
+		if (showAudioPicker || showSubtitlePicker || showEpisodePicker) return;
+		const scrollEl = getDetailsScrollElement();
+		const sectionTwoTop = getContentSectionTop();
+		if (!scrollEl || sectionTwoTop === null) return;
+		const deltaY = Number(event.deltaY || 0);
+		if (Math.abs(deltaY) < SECTION_WHEEL_DELTA_THRESHOLD) return;
+		const currentTop = scrollEl.scrollTop;
+		if (deltaY > 0 && currentTop < (sectionTwoTop - SECTION_SNAP_TOLERANCE_PX)) {
+			event.preventDefault();
+			event.stopPropagation();
+			scrollToDetailsSection('content');
+		} else if (deltaY < 0 && currentTop <= (sectionTwoTop + SECTION_SNAP_TOLERANCE_PX)) {
+			event.preventDefault();
+			event.stopPropagation();
+			scrollToDetailsSection('intro');
+		}
+	}, [
+		getContentSectionTop,
+		getDetailsScrollElement,
+		hasSecondarySection,
+		isActive,
+		scrollToDetailsSection,
+		showAudioPicker,
+		showEpisodePicker,
+		showSubtitlePicker
+	]);
+
+	useEffect(() => {
+		if (!isActive || !hasSecondarySection || loading) return undefined;
+		if (showAudioPicker || showSubtitlePicker || showEpisodePicker) return undefined;
+
+		const handleFocusIn = (event) => {
+			const target = event.target;
+			if (!target || target.nodeType !== 1) return;
+			const targetNode = target;
+			const scrollEl = getDetailsScrollElement();
+			const sectionTwoTop = getContentSectionTop();
+			if (!scrollEl || sectionTwoTop === null) return;
+
+			if (firstSectionRef.current?.contains(targetNode)) {
+				if (scrollEl.scrollTop > SECTION_SNAP_TOLERANCE_PX) {
+					scrollToDetailsSection('intro');
+				}
+				return;
+			}
+			if (!contentSectionRef.current?.contains(targetNode)) return;
+			if (scrollEl.scrollTop < (sectionTwoTop - SECTION_SNAP_TOLERANCE_PX)) {
+				scrollToDetailsSection('content');
+			}
+		};
+
+		document.addEventListener('focusin', handleFocusIn, true);
+		return () => document.removeEventListener('focusin', handleFocusIn, true);
+	}, [
+		getContentSectionTop,
+		getDetailsScrollElement,
+		hasSecondarySection,
+		isActive,
+		loading,
+		scrollToDetailsSection,
+		showAudioPicker,
+		showEpisodePicker,
+		showSubtitlePicker
+	]);
+
 	const handleDetailsScrollerScrollStop = useCallback((event) => {
 		handleDetailsScrollMemoryStop(event);
-	}, [handleDetailsScrollMemoryStop]);
+		if (!hasSecondarySection) return;
+		const scrollEl = getDetailsScrollElement();
+		const sectionTwoTop = getContentSectionTop();
+		if (!scrollEl || sectionTwoTop === null) return;
+		const currentTop = scrollEl.scrollTop;
+		if (currentTop <= SECTION_SNAP_TOLERANCE_PX || currentTop >= sectionTwoTop) return;
+		const snapThreshold = sectionTwoTop * SECTION_SNAP_THRESHOLD_RATIO;
+		scrollEl.scrollTo({
+			top: currentTop <= snapThreshold ? 0 : sectionTwoTop,
+			behavior: 'smooth'
+		});
+	}, [getContentSectionTop, getDetailsScrollElement, handleDetailsScrollMemoryStop, hasSecondarySection]);
 
 	const handleOpenEpisodeSeries = useCallback(() => {
 		openSeriesFromEpisode(item?.SeasonId || null);
@@ -619,6 +862,7 @@ const MediaDetailsPanel = ({
 	});
 	const {
 		handleCastCardFocus,
+		handleCastToggleKeyDown,
 		handleCastCardKeyDown,
 		handleSeasonCardClick,
 		handleSeasonCardFocus,
@@ -666,6 +910,9 @@ const MediaDetailsPanel = ({
 		focusNonSeriesSubtitleSelector,
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesAudioSelector,
+		focusIntroTopNavigation,
+		focusFirstSectionPrimary: focusSectionOnePrimary,
+		focusSecondSectionPrimary: focusAndShowSecondSection,
 		showEpisodeInfoButton: typeof onItemSelect === 'function',
 		css
 	});
@@ -734,9 +981,13 @@ const MediaDetailsPanel = ({
 		onAudioSelectorKeyDown: handleAudioSelectorKeyDown,
 		onSubtitleSelectorKeyDown: handleSubtitleSelectorKeyDown,
 		onPlay: handlePlay,
-		onNonSeriesPlayKeyDown: handleNonSeriesPlayKeyDown
+		onNonSeriesPlayKeyDown: handleNonSeriesPlayKeyDown,
+		showSectionHints: hasSecondarySection,
+		onIntroActionKeyDown: handleIntroActionKeyDown,
+		onIntroTopNavKeyDown: handleIntroTopNavKeyDown
 	};
 	const introRefs = {
+		firstSectionRef,
 		favoriteActionButtonRef,
 		watchedActionButtonRef,
 		overviewTextRef,
@@ -759,6 +1010,7 @@ const MediaDetailsPanel = ({
 						tabIndex={-1}
 						onMouseDownCapture={handleDetailsPointerDownCapture}
 						onClickCapture={handleDetailsPointerClickCapture}
+						onWheelCapture={handleSectionWheelCapture}
 				>
 					{!loading && (
 						<div className={`${css.backdrop} ${hasBackdropImage ? '' : css.backdropFallback} ${isElegantTheme ? css.backdropElegant : ''}`}>
@@ -786,11 +1038,20 @@ const MediaDetailsPanel = ({
 											refs={introRefs}
 										/>
 
-										<div className={css.contentSection}>
+										<div className={css.contentSection} ref={contentSectionRef}>
+											{hasSecondarySection && (
+												<div className={css.sectionSwitchRow}>
+													<div className={css.sectionHint}>
+														<Icon className={css.sectionHintArrow}>arrowsmallup</Icon>
+														Overview
+													</div>
+												</div>
+											)}
 									<MediaCastSection
 										cast={cast}
 										isCastCollapsed={isCastCollapsed}
 										onToggleCastCollapsed={toggleCastCollapsed}
+										onCastToggleKeyDown={handleCastToggleKeyDown}
 										castScrollerRef={castScrollerRef}
 										castRowRef={castRowRef}
 										onCastCardFocus={handleCastCardFocus}

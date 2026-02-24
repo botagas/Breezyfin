@@ -27,8 +27,10 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Map lookups by id/key: `src/hooks/useMapById.js`
 - Item metadata fetch/state: `src/hooks/useItemMetadata.js`
 - Toast lifecycle: `src/hooks/useToastMessage.js`
+- Shared toast UI primitive (Player/Media Details/Settings): `src/components/BreezyToast.js`
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
+- Runtime platform/playback capability detection + cache controls: `src/utils/platformCapabilities.js`
 - Player remote/media-key handler: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
 - Player video load/session orchestration: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
 - Player skip/prompt state machine: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`

@@ -10,8 +10,12 @@ const SettingsPopups = ({
 	bitratePopupOpen,
 	closeBitratePopup,
 	bitrateOptions,
+	capabilityProbeRefreshPopupOpen,
+	closeCapabilityProbeRefreshPopup,
+	capabilityProbeRefreshOptions,
 	settings,
 	handleBitrateSelect,
+	handleCapabilityProbeRefreshSelect,
 	audioLangPopupOpen,
 	closeAudioLangPopup,
 	languageOptions,
@@ -84,6 +88,27 @@ const SettingsPopups = ({
 							</Button>
 						))}
 					</div>
+				</div>
+			</Popup>
+
+			<Popup
+				open={capabilityProbeRefreshPopupOpen}
+				onClose={closeCapabilityProbeRefreshPopup}
+				css={popupShellCss}
+			>
+				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Capability Probe Refresh Period</BodyText>
+					{capabilityProbeRefreshOptions.map((option) => (
+						<Button
+							key={option.value}
+							data-days={option.value}
+							className={css.popupOption}
+							selected={String(settings.capabilityProbeRefreshDays) === option.value}
+							onClick={handleCapabilityProbeRefreshSelect}
+						>
+							{option.label}
+						</Button>
+					))}
 				</div>
 			</Popup>
 

@@ -30,6 +30,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Reusable toast lifecycle | `useToastMessage` |
 | Reusable image fallback behavior | `useImageErrorFallback` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
+| Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` |
 
 ---
 
