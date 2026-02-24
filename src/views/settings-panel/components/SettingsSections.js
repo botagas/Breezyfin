@@ -34,6 +34,18 @@ const SettingsSections = ({
 	openNavbarThemePopup,
 	appVersion,
 	webosVersionLabel,
+	capabilityProbeLabel,
+	getCapabilityProbeRefreshPeriodLabel,
+	openCapabilityProbeRefreshPopup,
+	handleRefreshCapabilitiesNow,
+	dynamicRangeLabel,
+	dolbyVisionMkvLabel,
+	videoCodecsLabel,
+	audioCodecsLabel,
+	atmosLabel,
+	hdAudioLabel,
+	maxAudioChannelsLabel,
+	maxStreamingBitrateLabel,
 	openStylingDebugPanel,
 	appLogCount,
 	cacheWipeInProgress,
@@ -326,6 +338,31 @@ const SettingsSections = ({
 				<Item className={css.infoItem} label="App Version" slotAfter={appVersion} />
 				<Item className={css.infoItem} label="Platform" slotAfter="webOS TV" />
 				<Item className={css.infoItem} label="webOS Version" slotAfter={webosVersionLabel} />
+			</section>
+
+			<section className={css.section}>
+				<BodyText className={css.sectionTitle}>Device Playback Capabilities</BodyText>
+				<Item className={css.infoItem} label="Capability Probe" slotAfter={capabilityProbeLabel} />
+				<Item
+					className={css.settingItem}
+					label="Probe Refresh Period"
+					slotAfter={getCapabilityProbeRefreshPeriodLabel(settings.capabilityProbeRefreshDays)}
+					onClick={openCapabilityProbeRefreshPopup}
+				/>
+				<Item
+					className={css.settingItem}
+					label="Refresh Capabilities Now"
+					slotAfter="Run"
+					onClick={handleRefreshCapabilitiesNow}
+				/>
+				<Item className={css.infoItem} label="Dynamic Range" slotAfter={dynamicRangeLabel} />
+				<Item className={css.infoItem} label="Dolby Vision in MKV" slotAfter={dolbyVisionMkvLabel} />
+				<Item className={css.infoItem} label="Video Codecs" slotAfter={videoCodecsLabel} />
+				<Item className={css.infoItem} label="Audio Codecs" slotAfter={audioCodecsLabel} />
+				<Item className={css.infoItem} label="Dolby Atmos (EAC3 JOC)" slotAfter={atmosLabel} />
+				<Item className={css.infoItem} label="DTS / TrueHD" slotAfter={hdAudioLabel} />
+				<Item className={css.infoItem} label="Max Audio Channels" slotAfter={maxAudioChannelsLabel} />
+				<Item className={css.infoItem} label="Max Streaming Bitrate" slotAfter={maxStreamingBitrateLabel} />
 			</section>
 
 			<section className={css.section}>

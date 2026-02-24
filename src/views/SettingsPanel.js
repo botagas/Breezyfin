@@ -12,11 +12,18 @@ import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useToastMessage } from '../hooks/useToastMessage';
 import { readBreezyfinSettings, writeBreezyfinSettings } from '../utils/settingsStorage';
 import { wipeAllAppCache } from '../utils/cacheMaintenance';
-import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {
+	getRuntimePlatformCapabilities,
+	refreshRuntimePlatformCapabilities,
+	setRuntimeCapabilityProbeRefreshDays
+} from '../utils/platformCapabilities';
+import BreezyToast from '../components/BreezyToast';
 import {
 	BITRATE_OPTIONS,
+	CAPABILITY_PROBE_REFRESH_OPTIONS,
 	DISCLOSURE_BACK_PRIORITY,
 	DEFAULT_SETTINGS,
 	INITIAL_SETTINGS_DISCLOSURES,
@@ -26,6 +33,7 @@ import {
 	SETTINGS_DISCLOSURE_KEY_LIST
 } from './settings-panel/constants';
 import {
+	getCapabilityProbeRefreshLabel,
 	getHomeRowLabel,
 	getOptionLabel,
 	getPlayNextPromptModeLabel
@@ -37,6 +45,56 @@ import SettingsSections from './settings-panel/components/SettingsSections';
 import SettingsPopups from './settings-panel/components/SettingsPopups';
 
 const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
+const formatYesNoUnknown = (value) => {
+	if (value === true) return 'Yes';
+	if (value === false) return 'No';
+	return 'Unknown';
+};
+
+const formatCapabilityTimestamp = (timestamp) => {
+	if (!Number.isFinite(timestamp)) return 'Unknown';
+	try {
+		return new Date(timestamp).toLocaleString();
+	} catch (_) {
+		return 'Unknown';
+	}
+};
+
+const formatAudioCodecName = (codec) => {
+	const normalized = String(codec || '').trim().toLowerCase();
+	if (!normalized) return '';
+	if (normalized === 'pcm_s16le') return 'PCM 16-bit';
+	if (normalized === 'pcm_s24le') return 'PCM 24-bit';
+	if (normalized === 'eac3') return 'EAC3';
+	if (normalized === 'ac3') return 'AC3';
+	if (normalized === 'mp3') return 'MP3';
+	if (normalized === 'mp2') return 'MP2';
+	if (normalized === 'aac') return 'AAC';
+	if (normalized === 'opus') return 'Opus';
+	if (normalized === 'flac') return 'FLAC';
+	return normalized.toUpperCase();
+};
+
+const formatAudioCodecList = (audioCodecs) => {
+	if (!Array.isArray(audioCodecs) || audioCodecs.length === 0) return 'Unknown';
+	return Array.from(new Set(audioCodecs.map(formatAudioCodecName).filter(Boolean))).join(', ');
+};
+
+const formatBitrateMbps = (value) => {
+	const numeric = Number(value);
+	if (!Number.isFinite(numeric) || numeric <= 0) return 'Unknown';
+	return `${Math.round(numeric / 1000000)} Mbps`;
+};
+
+const CAPABILITY_PROBE_REFRESH_VALUE_SET = new Set(
+	CAPABILITY_PROBE_REFRESH_OPTIONS.map((option) => String(option.value))
+);
+
+const normalizeCapabilityProbeRefreshDaysSetting = (value) => {
+	const normalized = String(value ?? '');
+	if (CAPABILITY_PROBE_REFRESH_VALUE_SET.has(normalized)) return normalized;
+	return DEFAULT_SETTINGS.capabilityProbeRefreshDays;
+};
 
 const SettingsPanel = ({
 	onNavigate,
@@ -51,6 +109,7 @@ const SettingsPanel = ({
 	...rest
 }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
+	const [, bumpCapabilitySnapshotVersion] = useState(0);
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 	const [serverInfo, setServerInfo] = useState(null);
@@ -62,6 +121,11 @@ const SettingsPanel = ({
 	const [appLogCount, setAppLogCount] = useState(0);
 	const [cacheWipeInProgress, setCacheWipeInProgress] = useState(false);
 	const [cacheWipeError, setCacheWipeError] = useState('');
+	const {
+		toastMessage,
+		toastVisible,
+		setToastMessage
+	} = useToastMessage({durationMs: 2050, fadeOutMs: 350});
 	const {
 		disclosures,
 		openDisclosure,
@@ -78,6 +142,7 @@ const SettingsPanel = ({
 	);
 	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
 	const bitratePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.BITRATE] === true;
+	const capabilityProbeRefreshPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH] === true;
 	const audioLangPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE] === true;
 	const subtitleLangPopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE] === true;
 	const navbarThemePopupOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME] === true;
@@ -87,6 +152,8 @@ const SettingsPanel = ({
 	const wipeCacheConfirmOpen = disclosures[SETTINGS_DISCLOSURE_KEYS.WIPE_CACHE_CONFIRM] === true;
 	const openBitratePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.BITRATE].open;
 	const closeBitratePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.BITRATE].close;
+	const openCapabilityProbeRefreshPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH].open;
+	const closeCapabilityProbeRefreshPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH].close;
 	const openAudioLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE].open;
 	const closeAudioLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE].close;
 	const openSubtitleLangPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE].open;
@@ -101,6 +168,50 @@ const SettingsPanel = ({
 	const webosVersionLabel = hasRuntimeVersionInfo
 		? `${runtimeCapabilities.version ?? 'Unknown'}${runtimeCapabilities.chrome ? ` (Chrome ${runtimeCapabilities.chrome})` : ''}`
 		: 'Unknown';
+	const runtimePlaybackCapabilities = runtimeCapabilities?.playback || {};
+	const capabilityProbe = runtimeCapabilities?.capabilityProbe || null;
+	const dynamicRangeLabel = useMemo(() => {
+		const ranges = [];
+		if (runtimePlaybackCapabilities.supportsDolbyVision === true) ranges.push('Dolby Vision');
+		if (runtimePlaybackCapabilities.supportsHdr10 !== false) ranges.push('HDR10');
+		if (runtimePlaybackCapabilities.supportsHlg !== false) ranges.push('HLG');
+		if (ranges.length === 0) return 'SDR only';
+		return ranges.join(', ');
+	}, [
+		runtimePlaybackCapabilities.supportsDolbyVision,
+		runtimePlaybackCapabilities.supportsHdr10,
+		runtimePlaybackCapabilities.supportsHlg
+	]);
+	const videoCodecsLabel = useMemo(() => {
+		const codecs = ['H.264'];
+		if (runtimePlaybackCapabilities.supportsHevc !== false) codecs.push('HEVC');
+		if (runtimePlaybackCapabilities.supportsAv1 === true) codecs.push('AV1');
+		if (runtimePlaybackCapabilities.supportsVp9 === true) codecs.push('VP9');
+		return codecs.join(', ');
+	}, [
+		runtimePlaybackCapabilities.supportsAv1,
+		runtimePlaybackCapabilities.supportsHevc,
+		runtimePlaybackCapabilities.supportsVp9
+	]);
+	const audioCodecsLabel = useMemo(
+		() => formatAudioCodecList(runtimePlaybackCapabilities.audioCodecs),
+		[runtimePlaybackCapabilities.audioCodecs]
+	);
+	const dolbyVisionMkvLabel = formatYesNoUnknown(runtimePlaybackCapabilities.supportsDolbyVisionInMkv);
+	const atmosLabel = formatYesNoUnknown(runtimePlaybackCapabilities.supportsAtmos);
+	const hdAudioLabel = `${formatYesNoUnknown(runtimePlaybackCapabilities.supportsDts)} / ${formatYesNoUnknown(runtimePlaybackCapabilities.supportsTrueHd)}`;
+	const maxAudioChannelsLabel = Number.isFinite(Number(runtimePlaybackCapabilities.maxAudioChannels))
+		? `${runtimePlaybackCapabilities.maxAudioChannels} ch`
+		: 'Unknown';
+	const maxStreamingBitrateLabel = formatBitrateMbps(runtimePlaybackCapabilities.maxStreamingBitrate);
+	const capabilityProbeLabel = useMemo(() => {
+		const sourceLabel = capabilityProbe?.source === 'cache' ? 'Cached probe' : 'Live probe';
+		const checkedAtLabel = formatCapabilityTimestamp(capabilityProbe?.checkedAt);
+		const ttlMs = Number(capabilityProbe?.ttlMs);
+		if (!Number.isFinite(ttlMs) || ttlMs <= 0) return `${sourceLabel} | ${checkedAtLabel}`;
+		const ttlDays = Math.max(1, Math.round(ttlMs / (24 * 60 * 60 * 1000)));
+		return `${sourceLabel} | ${checkedAtLabel} | refresh ${ttlDays}d`;
+	}, [capabilityProbe?.checkedAt, capabilityProbe?.source, capabilityProbe?.ttlMs]);
 	const {
 		captureScrollTo: captureSettingsScrollRestore,
 		handleScrollStop: handleSettingsScrollMemoryStop
@@ -120,9 +231,12 @@ const SettingsPanel = ({
 				...normalizedOrder,
 				...HOME_ROW_ORDER.filter((key) => !normalizedOrder.includes(key))
 			];
+			const capabilityProbeRefreshDays = normalizeCapabilityProbeRefreshDaysSetting(parsed.capabilityProbeRefreshDays);
+			setRuntimeCapabilityProbeRefreshDays(capabilityProbeRefreshDays);
 			setSettings({
 				...DEFAULT_SETTINGS,
 				...parsed,
+				capabilityProbeRefreshDays,
 				homeRows: {
 					...DEFAULT_SETTINGS.homeRows,
 					...(parsed.homeRows || {})
@@ -387,6 +501,15 @@ const SettingsPanel = ({
 		closeBitratePopup();
 	}, [closeBitratePopup, handleSettingChange]);
 
+	const handleCapabilityProbeRefreshSelect = useCallback((event) => {
+		const daysValue = normalizeCapabilityProbeRefreshDaysSetting(event.currentTarget.dataset.days);
+		handleSettingChange('capabilityProbeRefreshDays', daysValue);
+		setRuntimeCapabilityProbeRefreshDays(daysValue);
+		closeCapabilityProbeRefreshPopup();
+		setToastMessage(`Capability refresh set to ${getCapabilityProbeRefreshLabel(daysValue)}.`);
+		bumpCapabilitySnapshotVersion((version) => version + 1);
+	}, [closeCapabilityProbeRefreshPopup, handleSettingChange, setToastMessage]);
+
 	const handleAudioLanguageSelect = useCallback((event) => {
 		const language = event.currentTarget.dataset.language;
 		if (!language) return;
@@ -426,6 +549,28 @@ const SettingsPanel = ({
 		[]
 	);
 
+	const getCapabilityProbeRefreshPeriodLabel = useCallback(
+		(value) => getOptionLabel(
+			CAPABILITY_PROBE_REFRESH_OPTIONS,
+			normalizeCapabilityProbeRefreshDaysSetting(value),
+			getCapabilityProbeRefreshLabel(value)
+		),
+		[]
+	);
+
+	const handleRefreshCapabilitiesNow = useCallback(() => {
+		try {
+			const refreshed = refreshRuntimePlatformCapabilities();
+			bumpCapabilitySnapshotVersion((version) => version + 1);
+			const refreshedAt = refreshed?.capabilityProbe?.checkedAt;
+			const refreshedLabel = formatCapabilityTimestamp(refreshedAt);
+			setToastMessage(`Capabilities refreshed (${refreshedLabel}).`);
+		} catch (error) {
+			console.error('Failed to refresh runtime capabilities:', error);
+			setToastMessage('Failed to refresh capabilities.');
+		}
+	}, [setToastMessage]);
+
 	const handlePanelBack = useCallback(() => {
 		for (const disclosureKey of DISCLOSURE_BACK_PRIORITY) {
 			if (disclosures[disclosureKey] !== true) continue;
@@ -461,6 +606,7 @@ const SettingsPanel = ({
 				<SettingsToolbar
 					{...toolbarActions}
 				/>
+				<BreezyToast message={toastMessage} visible={toastVisible} />
 				<Scroller
 					className={css.settingsContainer}
 					cbScrollTo={captureSettingsScrollRestore}
@@ -494,6 +640,18 @@ const SettingsPanel = ({
 						openNavbarThemePopup={openNavbarThemePopup}
 						appVersion={appVersion}
 						webosVersionLabel={webosVersionLabel}
+						capabilityProbeLabel={capabilityProbeLabel}
+						getCapabilityProbeRefreshPeriodLabel={getCapabilityProbeRefreshPeriodLabel}
+						openCapabilityProbeRefreshPopup={openCapabilityProbeRefreshPopup}
+						handleRefreshCapabilitiesNow={handleRefreshCapabilitiesNow}
+						dynamicRangeLabel={dynamicRangeLabel}
+						dolbyVisionMkvLabel={dolbyVisionMkvLabel}
+						videoCodecsLabel={videoCodecsLabel}
+						audioCodecsLabel={audioCodecsLabel}
+						atmosLabel={atmosLabel}
+						hdAudioLabel={hdAudioLabel}
+						maxAudioChannelsLabel={maxAudioChannelsLabel}
+						maxStreamingBitrateLabel={maxStreamingBitrateLabel}
 						openStylingDebugPanel={openStylingDebugPanel}
 						appLogCount={appLogCount}
 						cacheWipeInProgress={cacheWipeInProgress}
@@ -506,8 +664,12 @@ const SettingsPanel = ({
 					bitratePopupOpen={bitratePopupOpen}
 					closeBitratePopup={closeBitratePopup}
 					bitrateOptions={BITRATE_OPTIONS}
+					capabilityProbeRefreshPopupOpen={capabilityProbeRefreshPopupOpen}
+					closeCapabilityProbeRefreshPopup={closeCapabilityProbeRefreshPopup}
+					capabilityProbeRefreshOptions={CAPABILITY_PROBE_REFRESH_OPTIONS}
 					settings={settings}
 					handleBitrateSelect={handleBitrateSelect}
+					handleCapabilityProbeRefreshSelect={handleCapabilityProbeRefreshSelect}
 					audioLangPopupOpen={audioLangPopupOpen}
 					closeAudioLangPopup={closeAudioLangPopup}
 					languageOptions={LANGUAGE_OPTIONS}

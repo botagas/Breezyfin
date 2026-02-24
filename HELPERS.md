@@ -30,6 +30,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Reusable toast lifecycle | `useToastMessage` |
 | Reusable image fallback behavior | `useImageErrorFallback` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
+| Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` |
 
 ---
 
@@ -416,6 +417,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 ### Player and media detail helpers
 - `src/views/player-panel/utils/playerPanelHelpers.js`
   - `formatPlaybackTime(seconds)`
+  - `getPlayerHeaderTitle(item)` (builds formatted episode title with season/episode prefix when available)
   - `getPlayerTrackLabel(track)`
   - `getSkipSegmentLabel(segmentType, hasNextEpisode?)`
   - `getPlayerErrorBackdropUrl(item, imageApi)`

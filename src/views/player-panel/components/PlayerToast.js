@@ -1,8 +1,7 @@
-import css from '../../PlayerPanel.module.less';
+import BreezyToast from '../../../components/BreezyToast';
 
-const PlayerToast = ({message, hidden}) => {
-	if (!message || hidden) return null;
-	return <div className={css.playerToast}>{message}</div>;
+const PlayerToast = ({message, visible}) => {
+	return <BreezyToast message={message} visible={visible} />;
 };
 
 export default PlayerToast;

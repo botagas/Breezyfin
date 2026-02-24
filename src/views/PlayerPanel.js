@@ -84,6 +84,7 @@ const PlayerPanel = ({
 	const currentSubtitleTrackRef = useRef(null);
 	const startupFallbackTimerRef = useRef(null);
 	const transcodeFallbackAttemptedRef = useRef(false);
+	const dynamicRangeFallbackAttemptedRef = useRef(false);
 	const reloadAttemptedRef = useRef(false);
 	const lastProgressRef = useRef({ time: 0, timestamp: 0 });
 	const loadVideoRef = useRef(null);
@@ -107,8 +108,9 @@ const PlayerPanel = ({
 	const playbackFailureLockedRef = useRef(false);
 	const {
 		toastMessage,
+		toastVisible,
 		setToastMessage
-	} = useToastMessage({durationMs: 2000});
+	} = useToastMessage({durationMs: 2050, fadeOutMs: 350});
 	const {
 		loadTrackPreferences,
 		pickPreferredAudio,
@@ -366,11 +368,12 @@ const PlayerPanel = ({
 		playbackOverrideRef,
 		loadVideoRef,
 		mediaSourceData,
-		playbackSettingsRef,
-		transcodeFallbackAttemptedRef,
-		subtitleCompatibilityFallbackAttemptedRef,
-		setCurrentSubtitleTrack
-	});
+			playbackSettingsRef,
+			transcodeFallbackAttemptedRef,
+			dynamicRangeFallbackAttemptedRef,
+			subtitleCompatibilityFallbackAttemptedRef,
+			setCurrentSubtitleTrack
+		});
 
 	const loadVideo = usePlayerVideoLoader({
 		item,
@@ -883,7 +886,7 @@ const PlayerPanel = ({
 					getSkipSegmentLabel={getSkipSegmentLabel}
 				/>
 
-				<PlayerToast message={toastMessage} hidden={Boolean(error)} />
+				<PlayerToast message={toastMessage} visible={toastVisible && !error} />
 
 					<PlayerControlsOverlay
 						state={playerControlsState}

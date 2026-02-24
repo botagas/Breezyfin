@@ -4,6 +4,8 @@ import {
 	findBestCompatibleAudioStreamIndex,
 	getAudioStreams,
 	getDefaultAudioStreamIndex,
+	getMediaSourceDynamicRangeInfo,
+	getSubtitleStreamByIndex,
 	isSupportedAudioCodec,
 	reorderMediaSources,
 	selectMediaSource,
@@ -11,6 +13,7 @@ import {
 	toInteger
 } from './playbackSelection';
 import {buildPlaybackRequestContext} from './playbackProfileBuilder';
+import {getDynamicRangeDisplayLabel} from '../../utils/playbackDynamicRange';
 
 const fetchPlaybackInfo = async (service, itemId, payload) => {
 	const response = await fetch(`${service.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${service.userId}`, {
@@ -49,26 +52,34 @@ const attachPlaybackInfoMetadata = (data, {
 	playMethod,
 	selectedSource,
 	selectedAudioStreamIndex,
-	adjustments
+	adjustments,
+	dynamicRange,
+	dynamicRangeCap,
+	subtitlePolicy
 }) => {
 	data.__breezyfin = {
 		playMethod,
 		selectedMediaSourceId: selectedSource?.Id || null,
 		selectedAudioStreamIndex,
-		adjustments
+		adjustments,
+		dynamicRange,
+		dynamicRangeCap,
+		subtitlePolicy
 	};
 	return data;
 };
 
 export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 	try {
-		const {
-			payload,
-			forceTranscoding,
-			enableTranscoding,
-			requestedAudioStreamIndex: initialRequestedAudioStreamIndex
-		} = buildPlaybackRequestContext(options);
-		let requestedAudioStreamIndex = initialRequestedAudioStreamIndex;
+			const {
+				payload,
+				forceTranscoding,
+				enableTranscoding,
+				requestedAudioStreamIndex: initialRequestedAudioStreamIndex,
+				forceSubtitleBurnIn,
+				dynamicRangeCap
+			} = buildPlaybackRequestContext(options);
+			let requestedAudioStreamIndex = initialRequestedAudioStreamIndex;
 
 		let data = await fetchPlaybackInfo(service, itemId, payload);
 		const adjustments = [];
@@ -77,10 +88,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			return data;
 		}
 
-		const sourceSelection = selectMediaSource(data.MediaSources, {
-			preferredMediaSourceId: options.mediaSourceId,
-			forceTranscoding
-		});
+			const sourceSelection = selectMediaSource(data.MediaSources, {
+				preferredMediaSourceId: options.mediaSourceId,
+				forceTranscoding,
+				dynamicRangeCap
+			});
 		if (sourceSelection.index > 0) {
 			data.MediaSources = reorderMediaSources(data.MediaSources, sourceSelection.index);
 			adjustments.push({
@@ -106,10 +118,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 					const retryData = await fetchPlaybackInfo(service, itemId, retryPayload);
 					if (retryData?.MediaSources?.length) {
 						data = retryData;
-						const retrySelection = selectMediaSource(data.MediaSources, {
-							preferredMediaSourceId: selectedSource.Id,
-							forceTranscoding
-						});
+							const retrySelection = selectMediaSource(data.MediaSources, {
+								preferredMediaSourceId: selectedSource.Id,
+								forceTranscoding,
+								dynamicRangeCap
+							});
 						if (retrySelection.index > 0) {
 							data.MediaSources = reorderMediaSources(data.MediaSources, retrySelection.index);
 						}
@@ -125,19 +138,28 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		}
 
 		const selectedSubtitleStreamIndex = toInteger(payload.SubtitleStreamIndex);
-		const subtitleNeedsTranscoding =
-			selectedSubtitleStreamIndex !== null &&
-			selectedSubtitleStreamIndex >= 0 &&
-			shouldTranscodeForSubtitleSelection(selectedSource, selectedSubtitleStreamIndex);
-		let playMethod = determinePlayMethod(selectedSource, {
-			forceTranscoding: forceTranscoding || subtitleNeedsTranscoding
-		});
-		if (subtitleNeedsTranscoding) {
-			adjustments.push({
-				type: 'subtitleTranscodeGuard',
-				toast: 'Using transcoding for subtitle compatibility.'
+			const subtitleNeedsTranscoding =
+				selectedSubtitleStreamIndex !== null &&
+				selectedSubtitleStreamIndex >= 0 &&
+				shouldTranscodeForSubtitleSelection(selectedSource, selectedSubtitleStreamIndex);
+			const effectiveForceSubtitleBurnIn = forceSubtitleBurnIn || subtitleNeedsTranscoding;
+			if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
+				if (effectiveForceSubtitleBurnIn) {
+					payload.SubtitleMethod = 'Encode';
+				} else {
+					delete payload.SubtitleMethod;
+				}
+			}
+			let playMethod = determinePlayMethod(selectedSource, {
+				forceTranscoding: forceTranscoding || subtitleNeedsTranscoding,
+				dynamicRangeCap
 			});
-		}
+			if (subtitleNeedsTranscoding) {
+				adjustments.push({
+					type: 'subtitleTranscodeGuard',
+					toast: 'Using transcoding for subtitle compatibility.'
+				});
+			}
 		if (playMethod === 'Transcode' && !selectedSource?.TranscodingUrl && enableTranscoding) {
 			const transcodePayload = {
 				...payload,
@@ -148,16 +170,24 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			if (selectedSource?.Id) {
 				transcodePayload.MediaSourceId = selectedSource.Id;
 			}
-			if (Number.isInteger(requestedAudioStreamIndex)) {
-				transcodePayload.AudioStreamIndex = requestedAudioStreamIndex;
-			}
-			const transcodedData = await fetchPlaybackInfo(service, itemId, transcodePayload);
-			if (transcodedData?.MediaSources?.length) {
-				data = transcodedData;
-				const transcodeSelection = selectMediaSource(data.MediaSources, {
-					preferredMediaSourceId: selectedSource?.Id,
-					forceTranscoding: true
-				});
+				if (Number.isInteger(requestedAudioStreamIndex)) {
+					transcodePayload.AudioStreamIndex = requestedAudioStreamIndex;
+				}
+				if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
+					if (effectiveForceSubtitleBurnIn) {
+						transcodePayload.SubtitleMethod = 'Encode';
+					} else {
+						delete transcodePayload.SubtitleMethod;
+					}
+				}
+				const transcodedData = await fetchPlaybackInfo(service, itemId, transcodePayload);
+				if (transcodedData?.MediaSources?.length) {
+					data = transcodedData;
+					const transcodeSelection = selectMediaSource(data.MediaSources, {
+						preferredMediaSourceId: selectedSource?.Id,
+						forceTranscoding: true,
+						dynamicRangeCap
+					});
 				if (transcodeSelection.index > 0) {
 					data.MediaSources = reorderMediaSources(data.MediaSources, transcodeSelection.index);
 				}
@@ -167,15 +197,31 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 					type: 'forcedTranscode',
 					toast: 'Using transcoding for compatibility.'
 				});
+				}
 			}
-		}
 
-		return attachPlaybackInfoMetadata(data, {
-			playMethod,
-			selectedSource,
-			selectedAudioStreamIndex: requestedAudioStreamIndex,
-			adjustments
-		});
+			const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(selectedSource);
+			const dynamicRange = {
+				...dynamicRangeInfo,
+				displayLabel: getDynamicRangeDisplayLabel(dynamicRangeInfo, dynamicRangeCap)
+			};
+			const subtitleStream = getSubtitleStreamByIndex(selectedSource, selectedSubtitleStreamIndex);
+			const subtitlePolicy = {
+				streamIndex: selectedSubtitleStreamIndex,
+				codec: subtitleStream?.Codec || null,
+				requiresBurnIn: subtitleNeedsTranscoding,
+				forceBurnIn: effectiveForceSubtitleBurnIn
+			};
+
+			return attachPlaybackInfoMetadata(data, {
+				playMethod,
+				selectedSource,
+				selectedAudioStreamIndex: requestedAudioStreamIndex,
+				adjustments,
+				dynamicRange,
+				dynamicRangeCap,
+				subtitlePolicy
+			});
 	} catch (error) {
 		console.error('Failed to get playback info:', error);
 		throw error;

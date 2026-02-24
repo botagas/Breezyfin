@@ -19,6 +19,8 @@ This is the current backlog for v0.1.5 release. Should be updated with further r
   - `src/services/jellyfin/playbackApi.js`
   - `src/services/jellyfin/libraryApi.js`
   - `src/services/jellyfin/sessionApi.js`
+- Identify the cause for FPS drops in Media Details panel when scrolling. Loading delay in panels might be directly related to the FPS drops since they are not present in Simulator tests. This might cause issues for TVs that were released in 2022 or prior. It could be related to backdrop/cast/episode image quality or complexity as not all media causes this behavior. Performance Mode should be improved in episode list to reduce heavyweight styling.
+- Could consider using WEBP for images to increase performance. 
 
 ## Medium priority
 
@@ -45,6 +47,7 @@ This is the current backlog for v0.1.5 release. Should be updated with further r
 - Inspect button styling in Favorites panel to ensure we're using already existing mixins. Alter Mark Watched button hover background color to match the icon color (already done for Favorite button) via shared styles or mixins and ensure that is also used in episode list and favorite panels. 
 - Fix badge spacing and sizing on webOS 6. We also need to make sure badges actually appear in Favorites and Search panel on webOS 6.
 - Inspect the cause for the first library option having extra whitespace separating it from the second option in webOS 6. 
+- Apply our PlayerPanel loading animation to all panels that would replace the default loading animation.
 
 ## Maintenance checks (recurring)
 

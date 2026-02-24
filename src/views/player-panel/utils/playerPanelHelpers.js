@@ -11,6 +11,23 @@ export const formatPlaybackTime = (seconds) => {
 	return `${minutes}:${secs.toString().padStart(2, '0')}`;
 };
 
+const toPositiveInteger = (value) => {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return null;
+	const integerValue = Math.trunc(parsed);
+	if (integerValue < 0) return null;
+	return integerValue;
+};
+
+export const getPlayerHeaderTitle = (item) => {
+	const baseTitle = item?.Name || 'Unknown title';
+	if (item?.Type !== 'Episode') return baseTitle;
+	const seasonNumber = toPositiveInteger(item?.ParentIndexNumber);
+	const episodeNumber = toPositiveInteger(item?.IndexNumber);
+	if (seasonNumber == null || episodeNumber == null) return baseTitle;
+	return `S${seasonNumber}E${episodeNumber}: ${baseTitle}`;
+};
+
 export const getPlayerTrackLabel = (track) => {
 	if (!track || typeof track !== 'object') return 'Track';
 	const parts = [];

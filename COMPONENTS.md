@@ -9,6 +9,7 @@ This guide covers shared UI components in `src/components/`.
 - Keep event contracts explicit (`onClick`, `onClose`, `onSelect`, etc.).
 - Keep style overrides token-driven (`var(--bf-...)`) and compatible with Classic/Elegant themes.
 - For larger shared components, prefer local decomposition folders (for example `src/components/toolbar/`) to keep root files focused on orchestration.
+- Reuse shared feedback primitives (for example `src/components/BreezyToast.js`) instead of panel-specific toast styling/markup.
 
 ## Styling
 

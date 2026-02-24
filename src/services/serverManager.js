@@ -1,6 +1,3 @@
-// Simple multi-server manager for storing multiple Jellyfin servers and users.
-// Persists to localStorage so we can reconnect or switch without re-entering credentials.
-
 const SERVERS_KEY = 'breezyfin_servers';
 const ACTIVE_SERVER_KEY = 'breezyfin_active_server';
 const ACTIVE_USER_KEY = 'breezyfin_active_user';
@@ -71,7 +68,6 @@ const addServer = ({ serverUrl, serverName, userId, username, accessToken, avata
 
 	const servers = loadServers();
 
-	// Find existing server by URL
 	let serverId = Object.keys(servers).find((key) => servers[key].url === serverUrl) || null;
 	if (!serverId) {
 		serverId = generateId('srv');
@@ -169,7 +165,6 @@ const listServers = () => {
 		});
 	});
 
-	// Sort by last connected, most recent first
 	return result.sort((a, b) => (b.lastConnected || '').localeCompare(a.lastConnected || ''));
 };
 

@@ -1,3 +1,10 @@
+import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
+import {
+	canDynamicRangeSatisfyCap,
+	getDynamicRangeInfo,
+	normalizeDynamicRangeCap
+} from '../../utils/playbackDynamicRange';
+
 export const WEBOS_AUDIO_CODEC_PRIORITY = [
 	'eac3',
 	'ec3',
@@ -21,15 +28,36 @@ const WEBOS_DIRECTPLAY_TEXT_SUBTITLE_CODECS = new Set([
 	'subrip',
 	'vtt',
 	'webvtt',
+	'ass',
+	'ssa',
 	'txt',
+	'sub',
 	'smi',
 	'sami',
 	'ttml',
 	'dfxp'
 ]);
 
+const getPlaybackCapabilities = () => {
+	return getRuntimePlatformCapabilities()?.playback || {};
+};
+
 export const normalizeCodec = (codec) => {
 	return (codec || '').toString().trim().toLowerCase();
+};
+
+const getContainerParts = (mediaSource) => {
+	const container = normalizeCodec(mediaSource?.Container);
+	if (!container) return [];
+	return container
+		.split(',')
+		.map((part) => normalizeCodec(part))
+		.filter(Boolean);
+};
+
+const mediaSourceUsesMkvContainer = (mediaSource) => {
+	const containerParts = getContainerParts(mediaSource);
+	return containerParts.includes('mkv') || containerParts.includes('matroska');
 };
 
 export const toInteger = (value) => {
@@ -51,6 +79,10 @@ export const getSubtitleStreams = (mediaSource) => {
 
 export const getVideoStream = (mediaSource) => {
 	return mediaSource?.MediaStreams?.find((stream) => stream.Type === 'Video') || null;
+};
+
+export const getMediaSourceDynamicRangeInfo = (mediaSource) => {
+	return getDynamicRangeInfo(mediaSource);
 };
 
 export const isSupportedAudioCodec = (codec) => {
@@ -75,7 +107,6 @@ export const normalizeSubtitleCodec = (stream) => {
 	const candidates = [
 		stream?.Codec,
 		stream?.CodecTag,
-		stream?.DeliveryMethod,
 		stream?.DisplayTitle
 	];
 	for (const candidate of candidates) {
@@ -94,7 +125,11 @@ export const shouldTranscodeForSubtitleSelection = (mediaSource, subtitleStreamI
 	const subtitleStream = getSubtitleStreamByIndex(mediaSource, subtitleStreamIndex);
 	if (!subtitleStream) return false;
 	const codec = normalizeSubtitleCodec(subtitleStream);
-	// Fail-safe: only keep direct-play for known text subtitle codecs.
+	if (!codec) {
+		const deliveryMethod = normalizeCodec(subtitleStream?.DeliveryMethod);
+		if (deliveryMethod === 'external') return false;
+	}
+	// Fail-safe: keep direct/copy only for known text subtitle codecs.
 	return !isTextSubtitleCodec(codec);
 };
 
@@ -116,10 +151,13 @@ export const findBestCompatibleAudioStreamIndex = (mediaSource) => {
 	return best?.index ?? null;
 };
 
-export const scoreMediaSource = (mediaSource, {forceTranscoding = false} = {}) => {
+export const scoreMediaSource = (mediaSource, {forceTranscoding = false, dynamicRangeCap = 'auto'} = {}) => {
 	if (!mediaSource) return Number.NEGATIVE_INFINITY;
 	const videoStream = getVideoStream(mediaSource);
 	const audioStreams = getAudioStreams(mediaSource);
+	const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(mediaSource);
+	const playbackCapabilities = getPlaybackCapabilities();
+	const normalizedRangeCap = normalizeDynamicRangeCap(dynamicRangeCap);
 	const hasCompatibleAudio = !audioStreams.length || audioStreams.some((stream) => isSupportedAudioCodec(stream.Codec));
 	let score = 0;
 
@@ -141,10 +179,27 @@ export const scoreMediaSource = (mediaSource, {forceTranscoding = false} = {}) =
 	else if (videoStream?.Width >= 1280) score += 20;
 	if (videoStream?.BitRate && videoStream.BitRate <= 120000000) score += 20;
 
+	if (!canDynamicRangeSatisfyCap(dynamicRangeInfo, normalizedRangeCap)) {
+		score -= 220;
+	}
+
+	if (dynamicRangeInfo.id === 'DV') {
+		if (playbackCapabilities.supportsDolbyVision) {
+			score += 45;
+		} else if (dynamicRangeInfo.hasFallbackLayer) {
+			score += 10;
+		} else {
+			score -= 120;
+		}
+		if (mediaSourceUsesMkvContainer(mediaSource) && !playbackCapabilities.supportsDolbyVisionInMkv && dynamicRangeInfo.isPureDolbyVision) {
+			score -= 180;
+		}
+	}
+
 	return score;
 };
 
-export const selectMediaSource = (mediaSources, {preferredMediaSourceId = null, forceTranscoding = false} = {}) => {
+export const selectMediaSource = (mediaSources, {preferredMediaSourceId = null, forceTranscoding = false, dynamicRangeCap = 'auto'} = {}) => {
 	if (!Array.isArray(mediaSources) || mediaSources.length === 0) {
 		return {source: null, index: -1, score: Number.NEGATIVE_INFINITY, reason: 'none'};
 	}
@@ -164,7 +219,7 @@ export const selectMediaSource = (mediaSources, {preferredMediaSourceId = null, 
 	let bestIndex = 0;
 	let bestScore = Number.NEGATIVE_INFINITY;
 	for (let index = 0; index < mediaSources.length; index += 1) {
-		const score = scoreMediaSource(mediaSources[index], {forceTranscoding});
+		const score = scoreMediaSource(mediaSources[index], {forceTranscoding, dynamicRangeCap});
 		if (score > bestScore) {
 			bestScore = score;
 			bestIndex = index;
@@ -189,15 +244,32 @@ export const reorderMediaSources = (mediaSources, selectedIndex) => {
 	return reordered;
 };
 
-export const determinePlayMethod = (mediaSource, {forceTranscoding = false} = {}) => {
+export const determinePlayMethod = (mediaSource, {forceTranscoding = false, dynamicRangeCap = 'auto'} = {}) => {
 	if (!mediaSource) return 'DirectStream';
 	if (forceTranscoding) return 'Transcode';
+
 	const audioStreams = getAudioStreams(mediaSource);
 	const hasCompatibleAudio = !audioStreams.length || audioStreams.some((stream) => isSupportedAudioCodec(stream.Codec));
+	const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(mediaSource);
+	const playbackCapabilities = getPlaybackCapabilities();
+	const normalizedRangeCap = normalizeDynamicRangeCap(dynamicRangeCap);
+
+	if (!canDynamicRangeSatisfyCap(dynamicRangeInfo, normalizedRangeCap) && mediaSource.TranscodingUrl) {
+		return 'Transcode';
+	}
+
+	if (
+		dynamicRangeInfo.isPureDolbyVision &&
+		mediaSourceUsesMkvContainer(mediaSource) &&
+		!playbackCapabilities.supportsDolbyVisionInMkv &&
+		mediaSource.TranscodingUrl
+	) {
+		return 'Transcode';
+	}
+
 	if (!hasCompatibleAudio && mediaSource.TranscodingUrl) return 'Transcode';
 	if (mediaSource.SupportsDirectPlay) return 'DirectPlay';
 	if (mediaSource.SupportsDirectStream) return 'DirectStream';
 	if (mediaSource.TranscodingUrl) return 'Transcode';
 	return 'DirectStream';
 };
-

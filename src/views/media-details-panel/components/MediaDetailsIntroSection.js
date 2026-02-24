@@ -48,9 +48,13 @@ const MediaDetailsIntroSection = ({
 		onAudioSelectorKeyDown,
 		onSubtitleSelectorKeyDown,
 		onPlay,
-		onNonSeriesPlayKeyDown
+		onNonSeriesPlayKeyDown,
+		showSectionHints,
+		onIntroActionKeyDown,
+		onIntroTopNavKeyDown
 	} = actions;
 	const {
+		firstSectionRef,
 		favoriteActionButtonRef,
 		watchedActionButtonRef,
 		overviewTextRef,
@@ -62,15 +66,18 @@ const MediaDetailsIntroSection = ({
 	if (!item) return null;
 
 	return (
-		<div className={css.firstSection}>
+		<div className={css.firstSection} ref={firstSectionRef}>
 			<div className={css.detailsHeadingStack}>
 				<div className={css.detailsTopBar}>
 					<Button
 						size="small"
 						icon="arrowsmallleft"
 						onClick={onBack}
+						onKeyDown={onIntroTopNavKeyDown}
+						onKeyDownCapture={onIntroTopNavKeyDown}
 						className={css.detailsBackButton}
 						aria-label="Back"
+						data-bf-md-nav="back"
 					/>
 					<BodyText className={css.detailsTopTitle}>{pageTitle}</BodyText>
 				</div>
@@ -81,6 +88,9 @@ const MediaDetailsIntroSection = ({
 								size="small"
 								className={`${css.episodeNavButton} ${css.episodeSeriesButton}`}
 								onClick={onOpenEpisodeSeries}
+								onKeyDown={onIntroTopNavKeyDown}
+								onKeyDownCapture={onIntroTopNavKeyDown}
+								data-bf-md-nav="breadcrumb"
 							>
 								{item.SeriesName}
 							</Button>
@@ -91,6 +101,9 @@ const MediaDetailsIntroSection = ({
 										size="small"
 										className={css.episodeNavButton}
 										onClick={onOpenEpisodeSeries}
+										onKeyDown={onIntroTopNavKeyDown}
+										onKeyDownCapture={onIntroTopNavKeyDown}
+										data-bf-md-nav="breadcrumb"
 									>
 										Season {item.ParentIndexNumber}
 									</Button>
@@ -101,6 +114,9 @@ const MediaDetailsIntroSection = ({
 								size="small"
 								className={`${css.episodeNavButton} ${css.episodeCurrentButton}`}
 								onClick={onOpenEpisodePicker}
+								onKeyDown={onIntroTopNavKeyDown}
+								onKeyDownCapture={onIntroTopNavKeyDown}
+								data-bf-md-nav="breadcrumb"
 							>
 								Episode {item.IndexNumber}
 							</Button>
@@ -179,6 +195,7 @@ const MediaDetailsIntroSection = ({
 									size="small"
 									icon={isFavorite ? 'heart' : 'hearthollow'}
 									onClick={onToggleFavorite}
+									onKeyDown={onIntroActionKeyDown}
 									css={{icon: css.actionIcon}}
 									componentRef={favoriteActionButtonRef}
 									spotlightId="details-favorite-action"
@@ -189,6 +206,7 @@ const MediaDetailsIntroSection = ({
 									size="small"
 									icon="check"
 									onClick={onToggleWatchedMain}
+									onKeyDown={onIntroActionKeyDown}
 									css={{icon: css.actionIcon}}
 									componentRef={watchedActionButtonRef}
 									spotlightId="details-watched-action"
@@ -239,6 +257,12 @@ const MediaDetailsIntroSection = ({
 								>
 									{overviewPlayLabel}
 								</Button>
+								{showSectionHints && (
+									<BodyText className={css.sectionHint}>
+										More
+										<Icon className={css.sectionHintArrow}>arrowsmalldown</Icon>
+									</BodyText>
+								)}
 							</div>
 						</div>
 					</div>

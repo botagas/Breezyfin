@@ -1,5 +1,6 @@
 import {useCallback} from 'react';
 import Hls from 'hls.js';
+import {getDynamicRangeInfo, normalizeDynamicRangeCap} from '../../../utils/playbackDynamicRange';
 
 export const usePlayerRecoveryHandlers = ({
 	maxHlsNetworkRecoveryAttempts,
@@ -30,6 +31,7 @@ export const usePlayerRecoveryHandlers = ({
 	mediaSourceData,
 	playbackSettingsRef,
 	transcodeFallbackAttemptedRef,
+	dynamicRangeFallbackAttemptedRef,
 	subtitleCompatibilityFallbackAttemptedRef,
 	setCurrentSubtitleTrack
 }) => {
@@ -37,7 +39,13 @@ export const usePlayerRecoveryHandlers = ({
 		playbackFailureLockedRef.current = false;
 		hlsNetworkRecoveryAttemptsRef.current = 0;
 		hlsMediaRecoveryAttemptsRef.current = 0;
-	}, [hlsMediaRecoveryAttemptsRef, hlsNetworkRecoveryAttemptsRef, playbackFailureLockedRef]);
+		dynamicRangeFallbackAttemptedRef.current = false;
+	}, [
+		dynamicRangeFallbackAttemptedRef,
+		hlsMediaRecoveryAttemptsRef,
+		hlsNetworkRecoveryAttemptsRef,
+		playbackFailureLockedRef
+	]);
 
 	const stopHlsRecoveryLoop = useCallback(() => {
 		if (!hlsRef.current) return;
@@ -178,6 +186,46 @@ export const usePlayerRecoveryHandlers = ({
 		if (playbackFailureLockedRef.current) {
 			return false;
 		}
+		const reasonText = typeof reason === 'string' ? reason.toLowerCase() : '';
+		const currentDynamicRangeCap = normalizeDynamicRangeCap(playbackSettingsRef.current.dynamicRangeCap);
+		const dynamicRangeInfo = getDynamicRangeInfo(mediaSourceData);
+		const shouldAttemptRangeFallback =
+			!reasonText.includes('subtitle') &&
+			!dynamicRangeFallbackAttemptedRef.current &&
+			currentDynamicRangeCap !== 'sdr' &&
+			dynamicRangeInfo.id === 'DV';
+		if (shouldAttemptRangeFallback) {
+			const nextDynamicRangeCap = currentDynamicRangeCap === 'hdr10' ? 'sdr' : 'hdr10';
+			dynamicRangeFallbackAttemptedRef.current = true;
+			setToastMessage(
+				nextDynamicRangeCap === 'hdr10'
+					? 'Dolby Vision failed. Retrying with HDR fallback...'
+					: 'HDR fallback failed. Retrying in SDR mode...'
+			);
+			playbackOverrideRef.current = {
+				...(playbackOptions || {}),
+				audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
+				subtitleStreamIndex:
+					(currentSubtitleTrackRef.current === -1 || Number.isInteger(currentSubtitleTrackRef.current))
+						? currentSubtitleTrackRef.current
+						: undefined,
+				seekSeconds: videoRef.current?.currentTime || 0,
+				forceNewSession: true,
+				dynamicRangeCap: nextDynamicRangeCap
+			};
+			try {
+				await handleStop();
+			} catch (rangeFallbackError) {
+				console.warn('Failed while preparing dynamic range fallback:', rangeFallbackError);
+			}
+			setError(null);
+			setLoading(true);
+			setPlaying(false);
+			if (typeof loadVideoRef.current === 'function') {
+				loadVideoRef.current();
+				return true;
+			}
+		}
 		if (playbackSettingsRef.current.strictTranscodingMode || transcodeFallbackAttemptedRef.current) {
 			return false;
 		}
@@ -202,7 +250,14 @@ export const usePlayerRecoveryHandlers = ({
 		playbackSettingsRef,
 		setError,
 		setLoading,
+		setPlaying,
 		setToastMessage,
+		playbackOptions,
+		playbackOverrideRef,
+		currentAudioTrackRef,
+		currentSubtitleTrackRef,
+		videoRef,
+		dynamicRangeFallbackAttemptedRef,
 		transcodeFallbackAttemptedRef
 	]);
 
