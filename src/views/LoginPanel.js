@@ -11,6 +11,7 @@ import jellyfinService from '../services/jellyfinService';
 import {getUserErrorMessage} from '../utils/errorMessages';
 import { shuffleArray } from '../utils/arrayUtils';
 import { useMapById } from '../hooks/useMapById';
+import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
 
 import css from './LoginPanel.module.less';
 
@@ -517,9 +518,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		});
 	}, []);
 
-	const handleSavedAvatarError = useCallback((event) => {
-		event.currentTarget.style.display = 'none';
-	}, []);
+	const handleSavedAvatarError = useImageErrorFallback();
 
 	const headingText = step === 'saved'
 		? 'Choose Account'

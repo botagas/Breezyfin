@@ -77,7 +77,8 @@ const formatAudioCodecName = (codec) => {
 
 const formatAudioCodecList = (audioCodecs) => {
 	if (!Array.isArray(audioCodecs) || audioCodecs.length === 0) return 'Unknown';
-	return Array.from(new Set(audioCodecs.map(formatAudioCodecName).filter(Boolean))).join(', ');
+	const normalized = Array.from(new Set(audioCodecs.map(formatAudioCodecName).filter(Boolean)));
+	return normalized.length > 0 ? normalized.join(', ') : 'Unknown';
 };
 
 const formatBitrateMbps = (value) => {
