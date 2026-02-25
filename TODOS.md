@@ -27,6 +27,7 @@ This is the current backlog for v0.1.5 release. Should be updated with further r
 - Normalize remaining hardcoded color/rgba values into `--bf-theme-*` tokens where practical, starting with Player/MediaDetails/Toolbar style files.
 - Audit and reduce custom per-file CSS variables that overlap with global theme tokens.
 - Keep compat behavior isolated in compat files; document intentional exceptions when global shared fallbacks are required.
+- Normalize Search panel filter popup handlers to `useDisclosureHandlers` (replace manual open/close callbacks).
 - Standardize watched-status badge usage across all item-card panels so watched state uses the same badge system everywhere it is shown:
   - `src/views/HomePanel.js`
   - `src/views/LibraryPanel.js`

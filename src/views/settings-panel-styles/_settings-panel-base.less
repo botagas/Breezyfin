@@ -20,6 +20,11 @@
 	--settings-danger-bg: var(--bf-theme-settings-danger-bg, rgba(244, 84, 84, 0.2));
 	--settings-danger-border: var(--bf-theme-settings-danger-border, rgba(244, 84, 84, 0.4));
 	--settings-danger-bg-hover: var(--bf-theme-settings-danger-bg-hover, rgba(244, 84, 84, 0.34));
+	--settings-tab-bg: var(--bf-theme-tab-bg, transparent);
+	--settings-tab-active-bg: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
+	--settings-tab-surface: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
+	--settings-tab-border: var(--bf-theme-surface-border, rgba(255, 255, 255, 0.1));
+	--settings-tab-shadow: var(--bf-theme-surface-shadow, 0 0.7rem 1.8rem rgba(4, 10, 17, 0.38));
 	background:
 		radial-gradient(120rem 50rem at 20% -10%, var(--settings-bg-glow-a), transparent 60%),
 		radial-gradient(100rem 60rem at 100% -20%, var(--settings-bg-glow-b), transparent 58%),
@@ -33,9 +38,9 @@
 }
 
 .content {
-	padding: calc(var(--bf-top-chrome-height, 12rem) + 3rem) 4rem var(--bf-settings-content-bottom-pad);
+	padding: calc(var(--bf-top-chrome-height, 12rem) + 1.9rem) 4rem var(--bf-settings-content-bottom-pad);
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
+	grid-template-columns: minmax(0, 1fr);
 	gap: 1.25rem;
 	max-width: 100%;
 	margin: 0 auto;
@@ -47,6 +52,85 @@
 		grid-column: 1 / -1;
 		height: var(--bf-settings-bottom-spacer);
 		pointer-events: none;
+	}
+}
+
+.settingsTabsRow {
+	grid-column: 1 / -1;
+	display: flex;
+	justify-content: center;
+	margin-bottom: 0.2rem;
+}
+
+.settingsTabs {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	width: min(74rem, 100%);
+	padding: 0.4rem;
+	border-radius: 999px;
+	border: 1px solid var(--settings-tab-border);
+	background: var(--settings-tab-surface);
+	box-shadow: var(--settings-tab-shadow);
+	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+}
+
+.settingsTabButton {
+	--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.96));
+	--bf-button-fg-hover: var(--settings-accent);
+	--bf-button-fg-active: var(--settings-accent);
+	font-family: 'Noto Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
+	font-size: 0.82em !important;
+	font-weight: 300 !important;
+	letter-spacing: 0.03em;
+	min-width: auto !important;
+	height: 2.25rem !important;
+	min-height: 2.25rem !important;
+	padding: 0 1.2rem !important;
+	border: none !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	box-shadow: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--settings-tab-bg) !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	:global(.client),
+	:global(.marquee) {
+		font-family: inherit !important;
+		font-weight: 300 !important;
+		letter-spacing: inherit !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg),
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
+		background: var(--settings-tab-active-bg) !important;
+		border: none !important;
+	}
+}
+
+.settingsTabButtonSelected {
+	--bf-button-fg: var(--bf-theme-text-primary, rgba(244, 249, 255, 0.98));
+	--bf-button-fg-hover: var(--settings-accent);
+	--bf-button-fg-active: var(--settings-accent);
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--settings-tab-active-bg) !important;
 	}
 }
 
@@ -74,10 +158,78 @@
 	background: transparent !important;
 	padding: 0.85rem 0;
 	border-bottom: 1px solid var(--settings-row-divider);
+
+	:global(.itemContent),
+	:global(.slotAfter) {
+		min-width: 0;
+	}
+
+	:global(.content),
+	:global(.label),
+	:global(.slotAfter) {
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	:global(.itemContent) {
+		flex: 1 1 0 !important;
+	}
+
+	:global(.slotAfter) {
+		flex: 1 1 0 !important;
+		line-height: normal !important;
+		text-align: right;
+	}
+
+	:global(.slotAfter > *) {
+		display: block;
+		min-width: 0;
+		max-width: 100%;
+	}
 	
 	&:last-of-type {
 		border-bottom: none;
 	}
+}
+
+.collapsibleInfoItem {
+	cursor: pointer;
+
+	&:global(.spottable):focus {
+		background: var(--settings-focus) !important;
+		border-radius: 8px;
+		border-bottom-color: rgba(143, 213, 255, 0.5);
+	}
+}
+
+.collapsibleInfoItemExpanded {
+	height: auto !important;
+	min-height: 3.25rem;
+	align-items: flex-start;
+
+	:global(.slotAfter) {
+		overflow: visible;
+		white-space: normal;
+		text-overflow: clip;
+	}
+}
+
+.infoItemValueWrap {
+	display: block;
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 1.3em;
+	text-align: right;
+}
+
+.infoItemValueWrapExpanded {
+	white-space: normal;
+	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 .settingItem,
@@ -349,6 +501,11 @@
 @media (max-width: 1600px) {
 	.content {
 		grid-template-columns: 1fr;
-		padding: calc(var(--bf-top-chrome-height, 12rem) + 1.5rem) 2.5rem var(--bf-settings-content-bottom-pad);
+		padding: calc(var(--bf-top-chrome-height, 12rem) + 1.35rem) 2.5rem var(--bf-settings-content-bottom-pad);
+	}
+
+	.settingsTabs {
+		width: 100%;
+		border-radius: 1.2rem;
 	}
 }
