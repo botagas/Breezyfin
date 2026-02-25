@@ -1,39 +1,17 @@
 import jellyfinService from '../services/jellyfinService';
 
-const appendQuery = (url, params) => {
-	const search = new URLSearchParams();
-	Object.entries(params || {}).forEach(([key, value]) => {
-		if (value === undefined || value === null || value === '') return;
-		search.set(key, String(value));
-	});
-	return `${url}?${search.toString()}`;
-};
-
 const canBuildImageUrl = () => {
 	return Boolean(jellyfinService?.serverUrl && jellyfinService?.accessToken);
 };
 
 const buildPrimaryImageUrl = (itemId, {maxWidth = 400, tag} = {}) => {
 	if (!itemId || !canBuildImageUrl()) return null;
-	return appendQuery(
-		`${jellyfinService.serverUrl}/Items/${itemId}/Images/Primary`,
-		{
-			maxWidth,
-			tag,
-			api_key: jellyfinService.accessToken
-		}
-	);
+	return jellyfinService.getImageUrl(itemId, 'Primary', maxWidth, {tag});
 };
 
 const buildBackdropImageUrl = (itemId, {maxWidth = 400, index = 0} = {}) => {
 	if (!itemId || !canBuildImageUrl()) return null;
-	return appendQuery(
-		`${jellyfinService.serverUrl}/Items/${itemId}/Images/Backdrop/${index}`,
-		{
-			maxWidth,
-			api_key: jellyfinService.accessToken
-		}
-	);
+	return jellyfinService.getBackdropUrl(itemId, index, maxWidth);
 };
 
 export const hasStartedWatching = (item) => {

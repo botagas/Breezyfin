@@ -200,3 +200,4 @@ Also verify:
 - [`DEVELOPING.md`](./DEVELOPING.md)
 - [`COMPONENTS.md`](./COMPONENTS.md)
 - [`VIEWS.md`](./VIEWS.md)
+- [`CHECKS.md`](./CHECKS.md)

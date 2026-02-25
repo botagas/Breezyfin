@@ -8,6 +8,7 @@ import jellyfinService from '../services/jellyfinService';
 import { shuffleArray } from '../utils/arrayUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
+import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 
 import css from './StyleDebugPanel.module.less';
 
@@ -154,7 +155,8 @@ const StyleDebugPanel = ({ onNavigate, onSwitchUser, onLogout, onExit, registerB
 		loadRandomBackdropCandidate();
 	}, [loadRandomBackdropCandidate]);
 
-	const handleBackdropImageError = useCallback(() => {
+	const handleBackdropImageError = useCallback((event) => {
+		if (applyImageFormatFallbackFromEvent(event)) return;
 		setBackdropCandidateIndex((previousIndex) => {
 			if (previousIndex >= backdropCandidates.length - 1) {
 				return previousIndex;

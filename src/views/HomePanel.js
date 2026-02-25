@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
-import Spinner from '@enact/sandstone/Spinner';
 import jellyfinService from '../services/jellyfinService';
 import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
+import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
@@ -307,7 +307,7 @@ const HomePanel = ({
 			<Panel {...rest}>
 				{topToolbar}
 				<div className={css.loading}>
-					<Spinner />
+					<BreezyLoadingOverlay />
 				</div>
 			</Panel>
 		);

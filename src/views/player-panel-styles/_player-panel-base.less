@@ -1,8 +1,28 @@
 .playerContainer {
+	--bf-player-bg: var(--bf-theme-player-bg, #000);
+	--bf-player-error-grad-start: var(--bf-theme-player-error-grad-start, rgba(0, 0, 0, 0.55));
+	--bf-player-error-grad-mid: var(--bf-theme-player-error-grad-mid, rgba(0, 0, 0, 0.35));
+	--bf-player-error-grad-end: var(--bf-theme-player-error-grad-end, rgba(18, 18, 18, 0.85));
+	--bf-player-error-grad-solid: var(--bf-theme-player-error-grad-solid, #121212);
+	--bf-player-controls-grad-edge: var(--bf-theme-player-controls-grad-edge, rgba(0, 0, 0, 0.7));
+	--bf-player-controls-grad-center: var(--bf-theme-player-controls-grad-center, rgba(0, 0, 0, 0));
+	--bf-player-seek-text-shadow: var(--bf-theme-player-seek-text-shadow, 0 1px 6px rgba(0, 0, 0, 0.7));
+	--bf-player-skip-countdown-color: var(--bf-theme-player-skip-countdown-color, rgba(218, 246, 255, 0.95));
+	--bf-player-skip-action-fg: var(--bf-theme-player-skip-action-fg, rgba(235, 246, 255, 0.95));
+	--bf-player-skip-close-fg: var(--bf-theme-player-skip-close-fg, rgba(238, 245, 255, 0.9));
+	--bf-player-skip-button-bg: var(--bf-theme-player-skip-button-bg, rgba(157, 207, 255, 0.16));
+	--bf-player-skip-button-border: var(--bf-theme-player-skip-button-border, rgba(157, 207, 255, 0.62));
+	--bf-player-skip-button-hover-bg: var(--bf-theme-player-skip-button-hover-bg, rgba(157, 207, 255, 0.3));
+	--bf-player-skip-button-hover-border: var(--bf-theme-player-skip-button-hover-border, rgba(192, 228, 255, 0.88));
+	--bf-player-skip-button-active-bg: var(--bf-theme-player-skip-button-active-bg, rgba(157, 207, 255, 0.4));
+	--bf-player-skip-close-bg: var(--bf-theme-player-skip-close-bg, rgba(255, 255, 255, 0.08));
+	--bf-player-skip-close-border: var(--bf-theme-player-skip-close-border, rgba(255, 255, 255, 0.24));
+	--bf-player-skip-close-hover-bg: var(--bf-theme-player-skip-close-hover-bg, rgba(255, 128, 146, 0.22));
+	--bf-player-skip-close-hover-border: var(--bf-theme-player-skip-close-hover-border, rgba(255, 180, 196, 0.72));
 	position: relative;
 	width: 100%;
 	height: 100%;
-	background: #000;
+	background: var(--bf-player-bg);
 	overflow: hidden;
 }
 
@@ -12,7 +32,7 @@
 	width: 100%;
 	height: 100%;
 	object-fit: contain;
-	background: #000;
+	background: var(--bf-player-bg);
 }
 
 .videoHidden {
@@ -88,10 +108,10 @@
 	inset: 0;
 	background: linear-gradient(
 		to bottom,
-		rgba(0, 0, 0, 0.55) 0%,
-		rgba(0, 0, 0, 0.35) 35%,
-		rgba(18, 18, 18, 0.85) 75%,
-		#121212 100%
+		var(--bf-player-error-grad-start) 0%,
+		var(--bf-player-error-grad-mid) 35%,
+		var(--bf-player-error-grad-end) 75%,
+		var(--bf-player-error-grad-solid) 100%
 	);
 	z-index: 1;
 }
@@ -106,116 +126,6 @@
 	left: 50%;
 	transform: translate(-50%, -50%);
 	z-index: 100;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 0.8rem;
-	pointer-events: none;
-}
-
-.loadingDefs {
-	position: absolute;
-	width: 0;
-	height: 0;
-	overflow: hidden;
-	pointer-events: none;
-}
-
-.loadingGlassSpinner {
-	--bg-color: rgba(255, 255, 255, 0.25);
-	--highlight: rgba(255, 255, 255, 0.75);
-	--spinner-size: 5rem;
-	--ring-size: 4rem;
-	--core-size: 1.5rem;
-	position: relative;
-	width: var(--spinner-size);
-	height: var(--spinner-size);
-	border-radius: 50%;
-	overflow: hidden;
-	background: transparent;
-}
-
-.loadingGlassFilter,
-.loadingGlassOverlay,
-.loadingGlassSpecular {
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-}
-
-.loadingGlassFilter {
-	z-index: 1;
-	backdrop-filter: blur(4px);
-	-webkit-backdrop-filter: blur(4px);
-	filter: url(#glass-distortion-player-loading) saturate(120%) brightness(1.15);
-}
-
-.loadingGlassOverlay {
-	z-index: 2;
-	background: var(--bg-color);
-}
-
-.loadingGlassSpecular {
-	z-index: 3;
-	box-shadow: inset 1px 1px 1px var(--highlight);
-}
-
-.loadingGlassContent {
-	position: relative;
-	z-index: 4;
-	width: 100%;
-	height: 100%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.loadingSpinnerRing {
-	position: absolute;
-	width: var(--ring-size);
-	height: var(--ring-size);
-	border: 2px solid transparent;
-	border-top-color: var(--bf-theme-player-loading-ring-primary, rgba(255, 255, 255, 0.8));
-	border-right-color: var(--bf-theme-player-loading-ring-secondary, rgba(255, 255, 255, 0.6));
-	border-radius: 50%;
-	animation: player-loading-spin 1s linear infinite;
-}
-
-.loadingSpinnerCore {
-	width: var(--core-size);
-	height: var(--core-size);
-	background: var(--bf-theme-player-loading-core-bg, rgba(255, 255, 255, 0.9));
-	border-radius: 50%;
-	animation: player-loading-pulse 1s ease-in-out infinite alternate;
-}
-
-.loadingText {
-	font-size: 0.95em;
-	font-weight: 600;
-	letter-spacing: 0.02em;
-	text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-}
-
-@keyframes player-loading-spin {
-	from {
-		transform: rotate(0deg);
-	}
-
-	to {
-		transform: rotate(360deg);
-	}
-}
-
-@keyframes player-loading-pulse {
-	from {
-		transform: scale(0.8);
-		opacity: 0.5;
-	}
-
-	to {
-		transform: scale(1);
-		opacity: 0.8;
-	}
 }
 
 .seekFeedback {
@@ -239,7 +149,7 @@
 .seekFeedbackText {
 	font-size: 0.7em;
 	font-weight: 700;
-	text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+	text-shadow: var(--bf-player-seek-text-shadow);
 	margin: 0;
 }
 
@@ -254,10 +164,10 @@
 	justify-content: space-between;
 	background: linear-gradient(
 		to bottom,
-		rgba(0, 0, 0, 0.7) 0%,
-		rgba(0, 0, 0, 0) 20%,
-		rgba(0, 0, 0, 0) 80%,
-		rgba(0, 0, 0, 0.7) 100%
+		var(--bf-player-controls-grad-edge) 0%,
+		var(--bf-player-controls-grad-center) 20%,
+		var(--bf-player-controls-grad-center) 80%,
+		var(--bf-player-controls-grad-edge) 100%
 	);
 	pointer-events: none;
 	
@@ -489,26 +399,26 @@
 	margin: 0;
 	padding: 0 6px;
 	line-height: 1;
-	color: rgba(218, 246, 255, 0.95);
+	color: var(--bf-player-skip-countdown-color);
 }
 
 .skipButton {
-	--bf-button-fg: rgba(235, 246, 255, 0.95);
+	--bf-button-fg: var(--bf-player-skip-action-fg);
 	--bf-button-fg-hover: #ffffff;
 	--bf-button-fg-active: #ffffff;
 	min-width: 120px;
 	.playerButtonShell();
-	.playerButtonSurface(rgba(157, 207, 255, 0.16); 1px solid rgba(157, 207, 255, 0.62));
-	.playerButtonHover(rgba(157, 207, 255, 0.3); rgba(192, 228, 255, 0.88));
-	.playerButtonActive(rgba(157, 207, 255, 0.4));
+	.playerButtonSurface(var(--bf-player-skip-button-bg); 1px solid var(--bf-player-skip-button-border));
+	.playerButtonHover(var(--bf-player-skip-button-hover-bg); var(--bf-player-skip-button-hover-border));
+	.playerButtonActive(var(--bf-player-skip-button-active-bg));
 }
 
 .skipCloseButton {
-	--bf-button-fg: rgba(238, 245, 255, 0.9);
+	--bf-button-fg: var(--bf-player-skip-close-fg);
 	--bf-button-fg-hover: #ffffff;
 	--bf-button-fg-active: #ffffff;
 	min-width: 56px;
 	.playerButtonShell();
-	.playerButtonSurface(rgba(255, 255, 255, 0.08); 1px solid rgba(255, 255, 255, 0.24));
-	.playerButtonHover(rgba(255, 128, 146, 0.22); rgba(255, 180, 196, 0.72));
+	.playerButtonSurface(var(--bf-player-skip-close-bg); 1px solid var(--bf-player-skip-close-border));
+	.playerButtonHover(var(--bf-player-skip-close-hover-bg); var(--bf-player-skip-close-hover-border));
 }

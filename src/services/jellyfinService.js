@@ -1,5 +1,6 @@
 import { Jellyfin } from '@jellyfin/sdk';
 import {APP_VERSION} from '../utils/appInfo';
+import {applyPreferredImageFormatToParams} from '../utils/imageFormat';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {
 	applySessionFromStore,
@@ -105,6 +106,18 @@ class JellyfinService {
 		};
 	}
 
+	_buildImageAssetUrl(path, params = {}, options = {}) {
+		if (!this.serverUrl || !this.accessToken || !path) return null;
+		const search = new URLSearchParams();
+		Object.entries(params).forEach(([key, value]) => {
+			if (value === undefined || value === null || value === '') return;
+			search.set(key, String(value));
+		});
+		search.set('api_key', this.accessToken);
+		applyPreferredImageFormatToParams(search, options);
+		return `${this.serverUrl}${path}?${search.toString()}`;
+	}
+
 	async _request(pathOrUrl, options = {}) {
 		const {
 			method = 'GET',
@@ -179,14 +192,40 @@ class JellyfinService {
 		forgetServiceServer(this, serverId, userId);
 	}
 
-	getImageUrl(itemId, imageType = 'Primary', width = 400) {
-		if (!this.serverUrl) return null;
-		return `${this.serverUrl}/Items/${itemId}/Images/${imageType}?width=${width}&api_key=${this.accessToken}`;
+	getImageUrl(itemId, imageType = 'Primary', width = 400, options = {}) {
+		if (!itemId || !imageType) return null;
+		return this._buildImageAssetUrl(
+			`/Items/${itemId}/Images/${imageType}`,
+			{
+				width,
+				tag: options?.tag
+			},
+			options
+		);
 	}
 
-	getBackdropUrl(itemId, index = 0, width = 1920) {
-		if (!this.serverUrl) return null;
-		return `${this.serverUrl}/Items/${itemId}/Images/Backdrop/${index}?width=${width}&api_key=${this.accessToken}`;
+	getBackdropUrl(itemId, index = 0, width = 1920, options = {}) {
+		if (!itemId) return null;
+		return this._buildImageAssetUrl(
+			`/Items/${itemId}/Images/Backdrop/${index}`,
+			{
+				width,
+				tag: options?.tag
+			},
+			options
+		);
+	}
+
+	getUserImageUrl(userId, width = 96, options = {}) {
+		if (!userId) return null;
+		return this._buildImageAssetUrl(
+			`/Users/${userId}/Images/Primary`,
+			{
+				width,
+				tag: options?.tag
+			},
+			options
+		);
 	}
 
 	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16) {

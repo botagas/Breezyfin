@@ -169,6 +169,18 @@ const detectCodecSupport = (types) => {
 	return sawSignal ? false : null;
 };
 
+const detectImageFormatSupport = (mimeType) => {
+	if (typeof document === 'undefined') return null;
+	try {
+		const canvas = document.createElement('canvas');
+		if (!canvas?.getContext) return null;
+		const encoded = canvas.toDataURL(mimeType);
+		return typeof encoded === 'string' && encoded.startsWith(`data:${mimeType}`);
+	} catch (_) {
+		return null;
+	}
+};
+
 const hasPlaybackCapabilitiesShape = (value) => {
 	return Boolean(
 		value &&
@@ -274,6 +286,7 @@ const buildPlaybackCapabilitySnapshot = ({
 	const atmosProbe = detectCodecSupport([
 		'audio/mp4; codecs="ec+3"'
 	]);
+	const webpImageProbe = detectImageFormatSupport('image/webp');
 	const dolbyVisionProbe = detectCodecSupport([
 		'video/mp4; codecs="dvh1.05.06"',
 		'video/mp4; codecs="dvhe.05.06"',
@@ -315,6 +328,7 @@ const buildPlaybackCapabilitySnapshot = ({
 		supportsHlg: webos && versionBucket >= 4,
 		supportsDolbyVision,
 		supportsDolbyVisionInMkv: webos25Plus,
+		supportsWebpImage: webpImageProbe,
 		supportsDts: false,
 		supportsTrueHd: false,
 		nativeHls: webos,

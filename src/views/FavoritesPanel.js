@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '../components/AppScroller';
-import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
@@ -283,7 +283,7 @@ const FavoritesPanel = ({
 						<div className={css.favoritesBody}>
 							{loading ? (
 								<div className={css.loadingState}>
-									<Spinner />
+									<BreezyLoadingOverlay />
 								</div>
 							) : favorites.length === 0 ? (
 								<div className={css.emptyState}>

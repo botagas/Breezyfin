@@ -38,6 +38,11 @@ import {
 	getOptionLabel,
 	getPlayNextPromptModeLabel
 } from './settings-panel/labels';
+import {
+	createCapabilityProbeRefreshNormalizer,
+	formatCapabilityTimestamp
+} from './settings-panel/capabilityFormatting';
+import { useRuntimeCapabilityLabels } from './settings-panel/hooks/useRuntimeCapabilityLabels';
 
 import css from './SettingsPanel.module.less';
 import {popupShellCss} from '../styles/popupStyles';
@@ -45,57 +50,10 @@ import SettingsSections from './settings-panel/components/SettingsSections';
 import SettingsPopups from './settings-panel/components/SettingsPopups';
 
 const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
-const formatYesNoUnknown = (value) => {
-	if (value === true) return 'Yes';
-	if (value === false) return 'No';
-	return 'Unknown';
-};
-
-const formatCapabilityTimestamp = (timestamp) => {
-	if (!Number.isFinite(timestamp)) return 'Unknown';
-	try {
-		return new Date(timestamp).toLocaleString();
-	} catch (_) {
-		return 'Unknown';
-	}
-};
-
-const formatAudioCodecName = (codec) => {
-	const normalized = String(codec || '').trim().toLowerCase();
-	if (!normalized) return '';
-	if (normalized === 'pcm_s16le') return 'PCM 16-bit';
-	if (normalized === 'pcm_s24le') return 'PCM 24-bit';
-	if (normalized === 'eac3') return 'EAC3';
-	if (normalized === 'ac3') return 'AC3';
-	if (normalized === 'mp3') return 'MP3';
-	if (normalized === 'mp2') return 'MP2';
-	if (normalized === 'aac') return 'AAC';
-	if (normalized === 'opus') return 'Opus';
-	if (normalized === 'flac') return 'FLAC';
-	return normalized.toUpperCase();
-};
-
-const formatAudioCodecList = (audioCodecs) => {
-	if (!Array.isArray(audioCodecs) || audioCodecs.length === 0) return 'Unknown';
-	const normalized = Array.from(new Set(audioCodecs.map(formatAudioCodecName).filter(Boolean)));
-	return normalized.length > 0 ? normalized.join(', ') : 'Unknown';
-};
-
-const formatBitrateMbps = (value) => {
-	const numeric = Number(value);
-	if (!Number.isFinite(numeric) || numeric <= 0) return 'Unknown';
-	return `${Math.round(numeric / 1000000)} Mbps`;
-};
-
-const CAPABILITY_PROBE_REFRESH_VALUE_SET = new Set(
-	CAPABILITY_PROBE_REFRESH_OPTIONS.map((option) => String(option.value))
+const normalizeCapabilityProbeRefreshDaysSetting = createCapabilityProbeRefreshNormalizer(
+	CAPABILITY_PROBE_REFRESH_OPTIONS,
+	DEFAULT_SETTINGS.capabilityProbeRefreshDays
 );
-
-const normalizeCapabilityProbeRefreshDaysSetting = (value) => {
-	const normalized = String(value ?? '');
-	if (CAPABILITY_PROBE_REFRESH_VALUE_SET.has(normalized)) return normalized;
-	return DEFAULT_SETTINGS.capabilityProbeRefreshDays;
-};
 
 const SettingsPanel = ({
 	onNavigate,
@@ -165,54 +123,19 @@ const SettingsPanel = ({
 	const closeLogoutConfirm = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM].close;
 	const closePlayNextPromptModePopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE].close;
 	const closeLogsPopup = disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.LOGS].close;
-	const hasRuntimeVersionInfo = runtimeCapabilities.version != null || runtimeCapabilities.chrome != null;
-	const webosVersionLabel = hasRuntimeVersionInfo
-		? `${runtimeCapabilities.version ?? 'Unknown'}${runtimeCapabilities.chrome ? ` (Chrome ${runtimeCapabilities.chrome})` : ''}`
-		: 'Unknown';
-	const runtimePlaybackCapabilities = runtimeCapabilities?.playback || {};
-	const capabilityProbe = runtimeCapabilities?.capabilityProbe || null;
-	const dynamicRangeLabel = useMemo(() => {
-		const ranges = [];
-		if (runtimePlaybackCapabilities.supportsDolbyVision === true) ranges.push('Dolby Vision');
-		if (runtimePlaybackCapabilities.supportsHdr10 !== false) ranges.push('HDR10');
-		if (runtimePlaybackCapabilities.supportsHlg !== false) ranges.push('HLG');
-		if (ranges.length === 0) return 'SDR only';
-		return ranges.join(', ');
-	}, [
-		runtimePlaybackCapabilities.supportsDolbyVision,
-		runtimePlaybackCapabilities.supportsHdr10,
-		runtimePlaybackCapabilities.supportsHlg
-	]);
-	const videoCodecsLabel = useMemo(() => {
-		const codecs = ['H.264'];
-		if (runtimePlaybackCapabilities.supportsHevc !== false) codecs.push('HEVC');
-		if (runtimePlaybackCapabilities.supportsAv1 === true) codecs.push('AV1');
-		if (runtimePlaybackCapabilities.supportsVp9 === true) codecs.push('VP9');
-		return codecs.join(', ');
-	}, [
-		runtimePlaybackCapabilities.supportsAv1,
-		runtimePlaybackCapabilities.supportsHevc,
-		runtimePlaybackCapabilities.supportsVp9
-	]);
-	const audioCodecsLabel = useMemo(
-		() => formatAudioCodecList(runtimePlaybackCapabilities.audioCodecs),
-		[runtimePlaybackCapabilities.audioCodecs]
-	);
-	const dolbyVisionMkvLabel = formatYesNoUnknown(runtimePlaybackCapabilities.supportsDolbyVisionInMkv);
-	const atmosLabel = formatYesNoUnknown(runtimePlaybackCapabilities.supportsAtmos);
-	const hdAudioLabel = `${formatYesNoUnknown(runtimePlaybackCapabilities.supportsDts)} / ${formatYesNoUnknown(runtimePlaybackCapabilities.supportsTrueHd)}`;
-	const maxAudioChannelsLabel = Number.isFinite(Number(runtimePlaybackCapabilities.maxAudioChannels))
-		? `${runtimePlaybackCapabilities.maxAudioChannels} ch`
-		: 'Unknown';
-	const maxStreamingBitrateLabel = formatBitrateMbps(runtimePlaybackCapabilities.maxStreamingBitrate);
-	const capabilityProbeLabel = useMemo(() => {
-		const sourceLabel = capabilityProbe?.source === 'cache' ? 'Cached probe' : 'Live probe';
-		const checkedAtLabel = formatCapabilityTimestamp(capabilityProbe?.checkedAt);
-		const ttlMs = Number(capabilityProbe?.ttlMs);
-		if (!Number.isFinite(ttlMs) || ttlMs <= 0) return `${sourceLabel} | ${checkedAtLabel}`;
-		const ttlDays = Math.max(1, Math.round(ttlMs / (24 * 60 * 60 * 1000)));
-		return `${sourceLabel} | ${checkedAtLabel} | refresh ${ttlDays}d`;
-	}, [capabilityProbe?.checkedAt, capabilityProbe?.source, capabilityProbe?.ttlMs]);
+	const {
+		webosVersionLabel,
+		capabilityProbeLabel,
+		dynamicRangeLabel,
+		videoCodecsLabel,
+		audioCodecsLabel,
+		dolbyVisionMkvLabel,
+		webpImageDecodeLabel,
+		atmosLabel,
+		hdAudioLabel,
+		maxAudioChannelsLabel,
+		maxStreamingBitrateLabel
+	} = useRuntimeCapabilityLabels(runtimeCapabilities);
 	const {
 		captureScrollTo: captureSettingsScrollRestore,
 		handleScrollStop: handleSettingsScrollMemoryStop
@@ -647,6 +570,7 @@ const SettingsPanel = ({
 						handleRefreshCapabilitiesNow={handleRefreshCapabilitiesNow}
 						dynamicRangeLabel={dynamicRangeLabel}
 						dolbyVisionMkvLabel={dolbyVisionMkvLabel}
+						webpImageDecodeLabel={webpImageDecodeLabel}
 						videoCodecsLabel={videoCodecsLabel}
 						audioCodecsLabel={audioCodecsLabel}
 						atmosLabel={atmosLabel}

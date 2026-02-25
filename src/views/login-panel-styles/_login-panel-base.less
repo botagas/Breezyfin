@@ -1,4 +1,11 @@
 .page {
+	--bf-login-page-bg: var(--bf-theme-login-page-bg, #11121a);
+	--bf-login-grid-line: var(--bf-theme-login-grid-line, rgba(255, 255, 255, 0.05));
+	--bf-login-grid-accent: var(--bf-theme-login-grid-accent, rgba(0, 164, 220, 0.06));
+	--bf-login-backdrop-grad-top: var(--bf-theme-login-backdrop-grad-top, rgba(7, 10, 15, 0.44));
+	--bf-login-backdrop-grad-mid: var(--bf-theme-login-backdrop-grad-mid, rgba(7, 10, 15, 0.84));
+	--bf-login-backdrop-grad-bottom: var(--bf-theme-login-backdrop-grad-bottom, rgba(7, 10, 15, 0.95));
+	--bf-login-backdrop-radial: var(--bf-theme-login-backdrop-radial, rgba(17, 47, 74, 0.32));
 	position: relative;
 	overflow: hidden;
 	isolation: isolate;
@@ -7,19 +14,19 @@
 	justify-content: center;
 	min-height: 100vh;
 	padding: 48px;
-	background-color: #11121a;
+	background-color: var(--bf-login-page-bg);
 	background-image:
 		repeating-linear-gradient(
 			135deg,
-			rgba(255, 255, 255, 0.05),
-			rgba(255, 255, 255, 0.05) 2px,
+			var(--bf-login-grid-line),
+			var(--bf-login-grid-line) 2px,
 			transparent 2px,
 			transparent 88px
 		),
 		repeating-linear-gradient(
 			135deg,
-			rgba(0, 164, 220, 0.06),
-			rgba(0, 164, 220, 0.06) 2px,
+			var(--bf-login-grid-accent),
+			var(--bf-login-grid-accent) 2px,
 			transparent 2px,
 			transparent 108px
 		);
@@ -61,8 +68,13 @@
 	position: absolute;
 	inset: 0;
 	background:
-		linear-gradient(to bottom, rgba(7, 10, 15, 0.44), rgba(7, 10, 15, 0.84) 72%, rgba(7, 10, 15, 0.95)),
-		radial-gradient(130% 120% at 50% 0%, rgba(17, 47, 74, 0.32), rgba(17, 47, 74, 0) 65%);
+		linear-gradient(
+			to bottom,
+			var(--bf-login-backdrop-grad-top),
+			var(--bf-login-backdrop-grad-mid) 72%,
+			var(--bf-login-backdrop-grad-bottom)
+		),
+		radial-gradient(130% 120% at 50% 0%, var(--bf-login-backdrop-radial), rgba(17, 47, 74, 0) 65%);
 }
 
 @keyframes login-backdrop-fade-in {
@@ -84,17 +96,30 @@
 }
 
 .loginBox {
+	--bf-login-box-bg: var(--bf-theme-login-surface-bg, rgba(0, 0, 0, 0.35));
+	--bf-login-box-border: var(--bf-theme-login-surface-border, rgba(255, 255, 255, 0.08));
+	--bf-login-box-shadow: var(--bf-theme-login-surface-shadow, 0 20px 60px rgba(0, 0, 0, 0.6));
+	--bf-login-control-fg: var(--bf-theme-text-primary, #ffffff);
+	--bf-login-control-surface: var(--bf-theme-login-control-surface, rgba(255, 255, 255, 0.08));
+	--bf-login-control-border: var(--bf-theme-login-control-border, rgba(255, 255, 255, 0.18));
+	--bf-login-control-hover-bg: var(--bf-theme-login-control-hover-bg, rgba(255, 255, 255, 0.16));
+	--bf-login-control-hover-border: var(--bf-theme-login-control-hover-border, rgba(255, 255, 255, 0.32));
+	--bf-login-subtle-text: var(--bf-theme-login-subtle-text, rgba(255, 255, 255, 0.85));
+	--bf-login-saved-focus-border: var(--bf-theme-login-saved-focus-border, rgba(255, 255, 255, 0.24));
+	--bf-login-saved-active-border: var(--bf-theme-login-saved-active-border, rgba(0, 200, 255, 0.4));
+	--bf-login-avatar-bg: var(--bf-theme-login-avatar-bg, rgba(255, 255, 255, 0.12));
+	--bf-login-avatar-border: var(--bf-theme-login-avatar-border, rgba(255, 255, 255, 0.18));
 	position: relative;
 	z-index: 1;
 	max-width: 100%;
 	width: min(92vw, 50%);
-	background: rgba(0, 0, 0, 0.35);
+	background: var(--bf-login-box-bg);
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
 	padding: 64px 72px 72px;
 	border-radius: 16px;
-	border: 1px solid rgba(255, 255, 255, 0.08);
-	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+	border: 1px solid var(--bf-login-box-border);
+	box-shadow: var(--bf-login-box-shadow);
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
@@ -148,21 +173,21 @@
 .loginBox :global(.bf-button:focus),
 .loginBox :global(.bf-button:active),
 .loginBox :global(.bf-button *) {
-	color: #ffffff !important;
+	color: var(--bf-login-control-fg) !important;
 }
 
 .loginBox :global(.bf-button-bg) {
-	background: rgba(255, 255, 255, 0.08) !important;
+	background: var(--bf-login-control-surface) !important;
 	background-image: none !important;
-	border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	border: 1px solid var(--bf-login-control-border) !important;
 	border-radius: 999px !important;
 	box-shadow: none !important;
 }
 
 .loginBox :global(.bg) {
-	background: rgba(255, 255, 255, 0.08) !important;
+	background: var(--bf-login-control-surface) !important;
 	background-image: none !important;
-	border: 1px solid rgba(255, 255, 255, 0.18) !important;
+	border: 1px solid var(--bf-login-control-border) !important;
 	border-radius: 999px !important;
 	box-shadow: none !important;
 }
@@ -170,15 +195,15 @@
 .loginBox :global(.bf-button:hover .bf-button-bg),
 .loginBox :global(.bf-button:focus .bf-button-bg),
 .loginBox :global(.bf-button:active .bf-button-bg) {
-	background: rgba(255, 255, 255, 0.16) !important;
-	border-color: rgba(255, 255, 255, 0.32) !important;
+	background: var(--bf-login-control-hover-bg) !important;
+	border-color: var(--bf-login-control-hover-border) !important;
 }
 
 .loginBox :global(.bf-button:hover .bg),
 .loginBox :global(.bf-button:focus .bg),
 .loginBox :global(.bf-button:active .bg) {
-	background: rgba(255, 255, 255, 0.16) !important;
-	border-color: rgba(255, 255, 255, 0.32) !important;
+	background: var(--bf-login-control-hover-bg) !important;
+	border-color: var(--bf-login-control-hover-border) !important;
 }
 
 .inputField {
@@ -190,7 +215,7 @@
 
 	:global(input) {
 		background: transparent !important;
-		color: #ffffff !important;
+		color: var(--bf-login-control-fg) !important;
 	}
 }
 
@@ -232,7 +257,7 @@
 
 	:global(.bf-button),
 	:global(.bf-button *) {
-		color: rgba(255, 255, 255, 0.85) !important;
+		color: var(--bf-login-subtle-text) !important;
 	}
 
 	&:hover :global(.bf-button),
@@ -241,7 +266,7 @@
 	&:focus :global(.bf-button *),
 	&:active :global(.bf-button),
 	&:active :global(.bf-button *) {
-		color: #ffffff !important;
+		color: var(--bf-login-control-fg) !important;
 	}
 }
 
@@ -309,20 +334,20 @@
 }
 
 .savedItem:global(.spottable):focus {
-	border-color: rgba(255, 255, 255, 0.24);
+	border-color: var(--bf-login-saved-focus-border);
 	transform: scale(1.05);
 }
 
 .activeSaved {
-	border-color: rgba(0, 200, 255, 0.4) !important;
+	border-color: var(--bf-login-saved-active-border) !important;
 }
 
 .savedAvatar {
 	width: 5.6rem;
 	height: 5.6rem;
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.12);
-	border: 2px solid rgba(255, 255, 255, 0.18);
+	background: var(--bf-login-avatar-bg);
+	border: 2px solid var(--bf-login-avatar-border);
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;

@@ -61,6 +61,7 @@ const SettingsSections = ({
 	handleRefreshCapabilitiesNow,
 	dynamicRangeLabel,
 	dolbyVisionMkvLabel,
+	webpImageDecodeLabel,
 	videoCodecsLabel,
 	audioCodecsLabel,
 	atmosLabel,
@@ -492,6 +493,7 @@ const SettingsSections = ({
 					/>
 					<Item className={css.infoItem} label="Dynamic Range" slotAfter={dynamicRangeLabel} />
 					<Item className={css.infoItem} label="Dolby Vision in MKV" slotAfter={dolbyVisionMkvLabel} />
+					<Item className={css.infoItem} label="WebP Image Decode" slotAfter={webpImageDecodeLabel} />
 					<Item
 						className={`${css.infoItem} ${css.collapsibleInfoItem} ${expandedCapabilityRows.videoCodecs ? css.collapsibleInfoItemExpanded : ''}`}
 						label="Video Codecs"

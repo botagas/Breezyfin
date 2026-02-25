@@ -11,10 +11,12 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {KeyCodes} from '../utils/keyCodes';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
@@ -33,6 +35,9 @@ const FILTER_OPTIONS = [
 const SEARCH_DISCLOSURE_KEYS = {
 	FILTER_POPUP: 'filterPopup'
 };
+const SEARCH_DISCLOSURE_KEY_LIST = [
+	SEARCH_DISCLOSURE_KEYS.FILTER_POPUP
+];
 const INITIAL_SEARCH_DISCLOSURES = {
 	[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP]: false
 };
@@ -76,7 +81,14 @@ const SearchPanel = ({
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasSearched, setHasSearched] = useState(() => cachedState?.hasSearched === true);
 	const {disclosures, openDisclosure, closeDisclosure} = useDisclosureMap(INITIAL_SEARCH_DISCLOSURES);
+	const disclosureHandlers = useDisclosureHandlers(
+		SEARCH_DISCLOSURE_KEY_LIST,
+		openDisclosure,
+		closeDisclosure
+	);
 	const filterPopupOpen = disclosures[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP] === true;
+	const openFilterPopup = disclosureHandlers[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP].open;
+	const closeFilterPopup = disclosureHandlers[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP].close;
 	const [selectedFilterIds, setSelectedFilterIds] = useState(() => (
 		sanitizeSelectedFilterIds(cachedState?.selectedFilterIds)
 	));
@@ -313,21 +325,13 @@ const SearchPanel = ({
 		onItemSelect(item);
 	}, [onItemSelect]);
 
-	const openFilterPopup = useCallback(() => {
-		openDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
-	}, [openDisclosure]);
-
-	const closeFilterPopup = useCallback(() => {
-		closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
-	}, [closeDisclosure]);
-
 	const handlePanelBack = useCallback(() => {
 		if (filterPopupOpen) {
-			closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
+			closeFilterPopup();
 			return true;
 		}
 		return false;
-	}, [closeDisclosure, filterPopupOpen]);
+	}, [closeFilterPopup, filterPopupOpen]);
 
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
@@ -456,7 +460,7 @@ const SearchPanel = ({
 						<div className={css.resultsBody}>
 							{loading ? (
 								<div className={css.loadingState}>
-									<Spinner />
+									<BreezyLoadingOverlay />
 								</div>
 							) : hasSearched && results.length === 0 ? (
 								<div className={css.emptyState}>

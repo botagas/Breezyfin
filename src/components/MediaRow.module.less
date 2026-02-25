@@ -14,7 +14,7 @@
 	letter-spacing: 0.01em;
 	margin-bottom: 18px;
 	padding: 0 60px;
-	color: rgba(238, 242, 247, 0.96);
+	color: var(--bf-theme-card-title-color, rgba(236, 241, 247, 0.96));
 }
 
 .rowContent {
@@ -59,8 +59,8 @@
 		z-index: 10;
 
 		.cardImage {
-			border-color: rgba(212, 226, 255, 0.82);
-			box-shadow: 0 8px 22px rgba(0, 0, 0, 0.52);
+			border-color: var(--bf-theme-card-border-focus, rgba(212, 226, 255, 0.9));
+			box-shadow: var(--bf-theme-card-shadow-focus, 0 8px 22px rgba(0, 0, 0, 0.52));
 		}
 	}
 
@@ -80,12 +80,12 @@
 .cardImage {
 	width: 100%;
 	aspect-ratio: 16 / 9;
-	background: linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%);
+	background: var(--bf-theme-card-surface-gradient, linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%));
 	border-radius: 1rem;
 	overflow: hidden;
 	position: relative;
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
+	border: 1px solid var(--bf-theme-card-border-rest, rgba(255, 255, 255, 0.16));
+	box-shadow: var(--bf-theme-card-shadow-rest, 0 8px 18px rgba(0, 0, 0, 0.38));
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 	display: flex;
 	align-items: center;
@@ -117,7 +117,7 @@
 	padding: 12px;
 	text-align: center;
 	.card-placeholder-surface();
-	color: rgba(233, 238, 244, 0.92);
+	color: var(--bf-theme-card-title-color, rgba(236, 241, 247, 0.96));
 }
 
 .progressBar {
@@ -126,13 +126,13 @@
 	left: 0;
 	right: 0;
 	height: 4px;
-	background: rgba(255, 255, 255, 0.22);
+	background: var(--bf-theme-card-progress-track, rgba(255, 255, 255, 0.22));
 	z-index: 3;
 }
 
 .progress {
 	height: 100%;
-	background: #3cb2f0;
+	background: var(--bf-theme-card-progress-fill, #3cb2f0);
 	transition: width 0.3s ease;
 }
 
@@ -155,6 +155,13 @@
 	padding: 0.35rem 0.5rem;
 }
 
+.watchedBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-success();
+}
+
 .cardInfo {
 	max-width: 25rem;
 	padding: 0 0.2rem;
@@ -172,13 +179,13 @@
 	line-height: 1.35;
 	min-height: 1em;
 	text-align: left;
-	color: rgba(236, 241, 247, 0.96);
+	color: var(--bf-theme-card-title-color, rgba(236, 241, 247, 0.96));
 }
 
 .cardSubtitle {
 	margin-top: 0.28rem;
 	font-size: 0.82em;
-	color: rgba(173, 185, 203, 0.88);
+	color: var(--bf-theme-card-subtitle-color, rgba(173, 185, 203, 0.88));
 	text-align: left;
 }
 

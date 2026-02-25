@@ -9,6 +9,7 @@ import { useDismissOnOutsideInteraction } from '../hooks/useDismissOnOutsideInte
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 import ToolbarLibraryPicker from './toolbar/ToolbarLibraryPicker';
 import ToolbarElegantLayout from './toolbar/ToolbarElegantLayout';
 import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
@@ -80,12 +81,7 @@ const Toolbar = ({
 
 	const buildUserAvatarUrl = useCallback((user) => {
 		if (!user?.Id || !jellyfinService?.serverUrl || !jellyfinService?.accessToken || !user?.PrimaryImageTag) return '';
-		const params = new URLSearchParams({
-			width: '96',
-			api_key: jellyfinService.accessToken
-		});
-		params.set('tag', user.PrimaryImageTag);
-		return `${jellyfinService.serverUrl}/Users/${user.Id}/Images/Primary?${params.toString()}`;
+		return jellyfinService.getUserImageUrl(user.Id, 96, {tag: user.PrimaryImageTag}) || '';
 	}, []);
 
 	const loadUserInfo = useCallback(async () => {
@@ -189,7 +185,8 @@ const Toolbar = ({
 		setDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU, !showUserMenu);
 	}, [closeDisclosure, setDisclosure, showUserMenu]);
 
-	const handleUserAvatarError = useCallback(() => {
+	const handleUserAvatarError = useCallback((event) => {
+		if (applyImageFormatFallbackFromEvent(event)) return;
 		setUserAvatarUrl('');
 	}, []);
 

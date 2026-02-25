@@ -29,6 +29,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Performance Mode and Performance+ Mode (animation reduction options)
 - Player with dynamic-range-aware direct play/direct stream/transcode fallback paths (DV -> HDR -> SDR)
 - Subtitle/audio compatibility fallbacks for webOS playback paths, with optional subtitle burn-in policy
+- Adaptive image delivery path: request WebP when supported, with automatic non-WebP retry fallback on image load failure
 - Built-in runtime diagnostics for playback validation and troubleshooting
 
 ## Install on TV (IPK)
@@ -84,6 +85,7 @@ For the full development guide (shared building blocks, panel patterns, style re
 - [`THEMES.md`](./THEMES.md)
 - [`COMPONENTS.md`](./COMPONENTS.md)
 - [`VIEWS.md`](./VIEWS.md)
+- [`CHECKS.md`](./CHECKS.md)
 - [`TODOS.md`](./TODOS.md)
 
 ## Debug flags
@@ -92,8 +94,7 @@ The app supports build-time/runtime debug behavior through environment flags:
 
 Defaults:
 
-- In non-production builds, Style Debug features are enabled by default.
-- Persistent app logging follows the same default as Style Debug.
+- In non-production builds, Style Debug and Persistent app logging features are enabled by default.
 - In production builds, both are off unless explicitly enabled by flags.
 
 Flags:
@@ -132,10 +133,10 @@ Diagnostics currently include:
 
 - Performance Overlay (`FPS`, `Input`, `Mode`)
 - Playback toast with active dynamic range / play method (for quick validation)
-- Device playback capability summary in Settings (DV/HDR/codec/audio support snapshot + probe source/timestamp)
-- Configurable capability probe refresh period (default 30 days) plus manual "Refresh now" action
-- Relaxed Playback Profile toggle (debug-only visibility)
-- Styling Debug Panel shortcut (debug-only visibility)
+- Device playback capability summary in Settings (DV/HDR/codec support + WebP image decode support)
+- Configurable capability check refresh period (default 30 days) with optional manual "Refresh now" action
+- Relaxed Playback Profile toggle (debug-only)
+- Styling Debug Panel shortcut (debug-only)
 - Logs viewer and clear action
 - Wipe App Cache (clears local/session storage, cache storage, IndexedDB, unregisters service workers, then reloads)
 
@@ -151,6 +152,8 @@ Output will be in the `dist/` folder.
 - Dead CSS module audit: `npm run audit:styles`
 - Mixed JS/LESS duplicate snippet audit: `npm run audit:duplicates`
 
+For the full recurring validation checklist, use [`CHECKS.md`](./CHECKS.md).
+
 ## Possible improvements
 
 - Stabilize playback across edge-case media by improving server capability checks and fallback messaging.
@@ -162,7 +165,7 @@ Output will be in the `dist/` folder.
 - Add CI quality gates for lint/test/build plus release artifact checks.
 - Improve accessibility/readability options (larger text mode, stronger contrast presets, clearer focus indicators).
 
-See [`TODOS.md`](./TODOS.md) for the prioritized implementation backlog.
+See [`TODOS.md`](./TODOS.md) for the prioritized implementation backlog, and [`CHECKS.md`](./CHECKS.md) for recurring validation commands.
 
 ## Release automation
 
@@ -181,4 +184,6 @@ Pull requests and issues are welcome! Please follow the code style and add tests
 
 - Built with [Enact Sandstone](https://github.com/enactjs/sandstone)
 - Uses [Jellyfin SDK](https://github.com/jellyfin/sdk)
-- AI-assisted development was used; please review changes carefully and report regressions/issues.
+
+## Disclaimer
+- A large set of the latest code is written with AI-assistance. That includes the web interface and underlying systems. While I have learnt and had experience with Python, and have some basic knowledge in HTML/CSS, I am far from being highly proficient. As my time is very limited, I'm often finding myself guiding the AI to do various tasks, verifying and testing the changes, and trying to prevent it from conquering the world. As such, please be aware of the state of the code and feel free to point out areas of improvement.

@@ -6,6 +6,7 @@ import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 
 import css from './MediaRow.module.less';
 
@@ -33,7 +34,8 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		}
 	}, [item, onCardKeyDown]);
 
-	const handleImageError = useCallback(() => {
+	const handleImageError = useCallback((event) => {
+		if (applyImageFormatFallbackFromEvent(event)) return;
 		setImageError(true);
 	}, []);
 
@@ -56,15 +58,15 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	const getRemainingCount = () => {
 		if (item.Type === 'Series' && item.UserData) {
 			const hasWatched = item.UserData.PlayedPercentage > 0 || item.UserData.PlaybackPositionTicks > 0 || item.UserData.Played;
-			const unwatchedCount = item.UserData.UnplayedItemCount;
-			if (hasWatched && unwatchedCount > 0) {
-				return unwatchedCount;
+			const remainingUnwatchedCount = item.UserData.UnplayedItemCount;
+			if (hasWatched && remainingUnwatchedCount > 0) {
+				return remainingUnwatchedCount;
 			}
 		}
 		if (item.Type === 'Episode') {
-			const unwatchedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
-			if (unwatchedCount > 0) {
-				return unwatchedCount;
+			const remainingUnwatchedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
+			if (remainingUnwatchedCount > 0) {
+				return remainingUnwatchedCount;
 			}
 		}
 		return null;
@@ -73,12 +75,12 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	const getUnwatchedCount = () => {
 		if (!showEpisodeProgress) return null;
 		if (item.Type === 'Series') {
-			const unplayedCount = item.UserData?.UnplayedItemCount;
-			return Number.isInteger(unplayedCount) ? unplayedCount : null;
+			const seriesUnplayedCount = item.UserData?.UnplayedItemCount;
+			return Number.isInteger(seriesUnplayedCount) ? seriesUnplayedCount : null;
 		}
 		if (item.Type === 'Episode') {
-			const unplayedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
-			return Number.isInteger(unplayedCount) ? unplayedCount : null;
+			const episodeUnplayedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
+			return Number.isInteger(episodeUnplayedCount) ? episodeUnplayedCount : null;
 		}
 		return null;
 	};
@@ -89,6 +91,9 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		}
 		return imageUrl;
 	};
+	const cardUnwatchedCount = getUnwatchedCount();
+	const showWatchedStatusBadge = showEpisodeProgress && cardUnwatchedCount !== null;
+	const isCompletedWatchBadge = showWatchedStatusBadge && cardUnwatchedCount === 0;
 
 		return (
 			<SpottableDiv
@@ -112,9 +117,9 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 						<BodyText>{getDisplayTitle()}</BodyText>
 					</div>
 				)}
-				{showEpisodeProgress && getUnwatchedCount() !== null ? (
-					<div className={css.progressBadge}>
-						{getUnwatchedCount() === 0 ? '✓' : getUnwatchedCount()}
+				{showWatchedStatusBadge ? (
+					<div className={isCompletedWatchBadge ? css.watchedBadge : css.progressBadge}>
+						{isCompletedWatchBadge ? '✓' : cardUnwatchedCount}
 					</div>
 				) : (
 					getRemainingCount() && (

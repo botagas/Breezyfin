@@ -5,6 +5,7 @@ import Heading from '@enact/sandstone/Heading';
 import Marquee from '@enact/sandstone/Marquee';
 import jellyfinService from '../services/jellyfinService';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 
 import css from './HeroBanner.module.less';
 
@@ -188,19 +189,20 @@ const HeroBanner = ({ items, onPlayClick }) => {
 		changeIndex((prev) => prev + 1);
 	}, [changeIndex]);
 
-	const handleImageError = useCallback((itemId) => {
+	const handleImageError = useCallback((itemId, event) => {
 		if (!itemId) return;
+		if (applyImageFormatFallbackFromEvent(event)) return;
 		setImageErrors((prev) => (prev[itemId] ? prev : { ...prev, [itemId]: true }));
 	}, []);
 
-	const handleCurrentImageError = useCallback(() => {
+	const handleCurrentImageError = useCallback((event) => {
 		if (!currentItem?.Id) return;
-		handleImageError(currentItem.Id);
+		handleImageError(currentItem.Id, event);
 	}, [currentItem?.Id, handleImageError]);
 
-	const handlePreviousImageError = useCallback(() => {
+	const handlePreviousImageError = useCallback((event) => {
 		if (!previousItem?.Id) return;
-		handleImageError(previousItem.Id);
+		handleImageError(previousItem.Id, event);
 	}, [handleImageError, previousItem?.Id]);
 
 	const handlePlay = useCallback(() => {

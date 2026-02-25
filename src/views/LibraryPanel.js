@@ -6,6 +6,7 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {KeyCodes} from '../utils/keyCodes';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
@@ -223,7 +224,7 @@ const LibraryPanel = ({
 				<Header title={library?.Name || 'Library'} />
 				{topToolbar}
 				<div className={css.loading}>
-					<Spinner />
+					<BreezyLoadingOverlay />
 				</div>
 			</Panel>
 		);
@@ -241,35 +242,40 @@ const LibraryPanel = ({
 				>
 					<div ref={gridRef}>
 						<LibraryGridSpotlightContainer className={css.gridContainer} spotlightId="library-grid">
-							{items.map((item, index) => (
-								<PosterMediaCard
-									key={item.Id}
-									itemId={item.Id}
-									data-item-index={index}
-									className={css.gridCard}
-									imageClassName={css.cardImage}
-									placeholderClassName={css.placeholder}
-									usePlaceholderClassWhenNoImage
-									imageUrl={getPosterCardImageUrl(item, {includeBackdrop: true, includeSeriesFallback: false}) || ''}
-									title={item.Name}
-									subtitle={item.ProductionYear ? String(item.ProductionYear) : ''}
-									titleClassName={css.cardTitle}
-									subtitleClassName={css.cardSubtitle}
-									onClick={handleGridCardClick}
-									onKeyDown={handleGridCardKeyDown}
-									onFocus={handleGridCardFocus}
-									overlayContent={(
-										<MediaCardStatusOverlay
-											showWatched={getUnwatchedCount(item) !== null && hasStartedWatching(item)}
-											watchedContent={getUnwatchedCount(item) === 0 ? '\u2713' : getUnwatchedCount(item)}
-											watchedClassName={css.progressBadge}
-											progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
-											progressBarClassName={css.progressBar}
-											progressClassName={css.progress}
-										/>
-									)}
-								/>
-						))}
+							{items.map((item, index) => {
+								const unwatchedCount = getUnwatchedCount(item);
+								const showWatchStatus = unwatchedCount !== null && hasStartedWatching(item);
+								const isWatchComplete = showWatchStatus && unwatchedCount === 0;
+								return (
+									<PosterMediaCard
+										key={item.Id}
+										itemId={item.Id}
+										data-item-index={index}
+										className={css.gridCard}
+										imageClassName={css.cardImage}
+										placeholderClassName={css.placeholder}
+										usePlaceholderClassWhenNoImage
+										imageUrl={getPosterCardImageUrl(item, {includeBackdrop: true, includeSeriesFallback: false}) || ''}
+										title={item.Name}
+										subtitle={item.ProductionYear ? String(item.ProductionYear) : ''}
+										titleClassName={css.cardTitle}
+										subtitleClassName={css.cardSubtitle}
+										onClick={handleGridCardClick}
+										onKeyDown={handleGridCardKeyDown}
+										onFocus={handleGridCardFocus}
+										overlayContent={(
+											<MediaCardStatusOverlay
+												showWatched={showWatchStatus}
+												watchedContent={isWatchComplete ? '\u2713' : unwatchedCount}
+												watchedClassName={isWatchComplete ? css.watchedBadge : css.progressBadge}
+												progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
+												progressBarClassName={css.progressBar}
+												progressClassName={css.progress}
+											/>
+										)}
+									/>
+								);
+							})}
 						{loadingMore && (
 							<div className={css.loadingMore}>
 								<Spinner size="small" />

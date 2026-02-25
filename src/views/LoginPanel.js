@@ -12,6 +12,7 @@ import {getUserErrorMessage} from '../utils/errorMessages';
 import { shuffleArray } from '../utils/arrayUtils';
 import { useMapById } from '../hooks/useMapById';
 import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
+import {applyImageFormatFallbackFromEvent, applyPreferredImageFormatToParams} from '../utils/imageFormat';
 
 import css from './LoginPanel.module.less';
 
@@ -48,6 +49,7 @@ const buildItemImageUrl = ({ baseUrl, itemId, imageType, accessToken, width, tag
 	if (tag) {
 		params.set('tag', tag);
 	}
+	applyPreferredImageFormatToParams(params);
 	const imageSuffix = index == null ? imageType : `${imageType}/${index}`;
 	return `${normalizedBase}/Items/${itemId}/Images/${imageSuffix}?${params.toString()}`;
 };
@@ -60,6 +62,7 @@ const buildUserPrimaryImageUrl = ({ baseUrl, userId, accessToken, width, tag = n
 		api_key: accessToken,
 		tag
 	});
+	applyPreferredImageFormatToParams(params);
 	return `${normalizedBase}/Users/${userId}/Images/Primary?${params.toString()}`;
 };
 
@@ -372,6 +375,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	const handleBackdropError = useCallback((event) => {
 		const source = event.currentTarget?.currentSrc || event.currentTarget?.src;
 		if (!source) return;
+		if (applyImageFormatFallbackFromEvent(event)) return;
 		setBackdropImageErrors((previous) => (
 			previous[source] ? previous : { ...previous, [source]: true }
 		));

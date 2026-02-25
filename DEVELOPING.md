@@ -16,6 +16,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 - [`THEMES.md`](./THEMES.md)
 - [`COMPONENTS.md`](./COMPONENTS.md)
 - [`VIEWS.md`](./VIEWS.md)
+- [`CHECKS.md`](./CHECKS.md)
 - [`TODOS.md`](./TODOS.md)
 
 ## Shared building blocks (prefer these first)
@@ -31,6 +32,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
 - Runtime platform/playback capability detection + cache controls: `src/utils/platformCapabilities.js`
+- Runtime image format preference + fallback helpers: `src/utils/imageFormat.js`
 - Player remote/media-key handler: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
 - Player video load/session orchestration: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
 - Player skip/prompt state machine: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
@@ -40,11 +42,13 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Player lifecycle effects: `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
 - Media details focus debug tracing: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
 - Media details focus orchestration: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
+- Media details section snap/focus navigation orchestration: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
 - Media details watched/favorite actions: `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
 - Media details picker handlers: `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
 - Media details interaction handlers: `src/views/media-details-panel/hooks/useMediaDetailsInteractionHandlers.js`
 - Media details data loader: `src/views/media-details-panel/hooks/useMediaDetailsDataLoader.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
+- Settings runtime capability label derivation: `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
 
 Preferred panel scroll cache wiring:
 - `src/hooks/usePanelScrollState.js`
@@ -93,11 +97,12 @@ Media details decomposition paths:
 
 Settings panel decomposition paths:
 - `src/views/settings-panel/components/`
-- `src/views/settings-panel/` (constants, labels, and panel-local helpers)
+- `src/views/settings-panel/hooks/`
+- `src/views/settings-panel/` (constants, labels, and panel-local formatting helpers)
 
 App shell decomposition paths:
 - `src/App/hooks/` (`usePanelHistory`, `usePanelBackHandlerRegistry`)
-- `src/App/utils/` (`panelStateCache`, `panelIndex`)
+- `src/App/utils/` (`panelStateCache`, `panelIndex`, `createPanelChildren`, `runtimeDataAttributes`)
 
 Media details section components:
 - `MediaCastSection`

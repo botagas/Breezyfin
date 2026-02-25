@@ -14,9 +14,22 @@
 	--bf-styledebug-liquid-border: var(--bf-theme-popup-border, rgba(255, 255, 255, 0.22));
 	--bf-styledebug-liquid-shadow: var(--bf-theme-popup-shadow, 0 0.5rem 1.4rem rgba(0, 0, 0, 0.4));
 	--bf-styledebug-liquid-hover-bg: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
-	--bf-styledebug-liquid-active-bg: rgba(255, 255, 255, 0.18);
+	--bf-styledebug-liquid-active-bg: var(--bf-theme-styledebug-liquid-active-bg, rgba(255, 255, 255, 0.18));
+	--bf-styledebug-page-bg: var(--bf-theme-styledebug-page-bg, #121212);
+	--bf-styledebug-heading-color: var(--bf-theme-styledebug-heading-color, rgba(250, 252, 255, 0.95));
+	--bf-styledebug-badge-fg: var(--bf-theme-styledebug-badge-fg, rgba(230, 238, 247, 0.95));
+	--bf-styledebug-badge-bg: var(--bf-theme-styledebug-badge-bg, rgba(255, 255, 255, 0.07));
+	--bf-styledebug-badge-border: var(--bf-theme-styledebug-badge-border, rgba(255, 255, 255, 0.18));
+	--bf-styledebug-card-title: var(--bf-theme-styledebug-card-title, rgba(247, 252, 255, 0.96));
+	--bf-styledebug-card-body: var(--bf-theme-styledebug-card-body, rgba(228, 237, 248, 0.86));
+	--bf-styledebug-scene-border: var(--bf-theme-styledebug-scene-border, rgba(255, 255, 255, 0.16));
+	--bf-styledebug-scene-bg: var(--bf-theme-styledebug-scene-bg, #111822);
+	--bf-styledebug-scene-bg-secondary: var(--bf-theme-styledebug-scene-bg-secondary, #0f1723);
+	--bf-styledebug-scene-label-fg: var(--bf-theme-styledebug-scene-label-fg, rgba(236, 244, 255, 0.95));
+	--bf-styledebug-scene-label-bg: var(--bf-theme-styledebug-scene-label-bg, rgba(8, 15, 25, 0.52));
+	--bf-styledebug-scene-label-border: var(--bf-theme-styledebug-scene-label-border, rgba(255, 255, 255, 0.2));
 	min-height: 100%;
-	background: #121212;
+	background: var(--bf-styledebug-page-bg);
 	padding: calc(var(--bf-top-chrome-height, 12rem) + 1.4rem) 4rem calc(var(--bf-panel-content-bottom-padding, 4rem) + 1.5rem);
 }
 
@@ -30,7 +43,7 @@
 .sectionTitle {
 	font-size: 1.05em;
 	font-weight: 600;
-	color: rgba(250, 252, 255, 0.95);
+	color: var(--bf-styledebug-heading-color);
 }
 
 .modeBadges {
@@ -44,9 +57,9 @@
 	border-radius: 999px;
 	font-size: 0.82em;
 	font-weight: 500;
-	color: rgba(230, 238, 247, 0.95);
-	background: rgba(255, 255, 255, 0.07);
-	border: 1px solid rgba(255, 255, 255, 0.18);
+	color: var(--bf-styledebug-badge-fg);
+	background: var(--bf-styledebug-badge-bg);
+	border: 1px solid var(--bf-styledebug-badge-border);
 }
 
 .liquidCard {
@@ -65,13 +78,13 @@
 	margin-bottom: 0.35rem;
 	font-size: 0.98em;
 	font-weight: 600;
-	color: rgba(247, 252, 255, 0.96);
+	color: var(--bf-styledebug-card-title);
 }
 
 .cardBody {
 	font-size: 0.88em;
 	line-height: 1.45;
-	color: rgba(228, 237, 248, 0.86);
+	color: var(--bf-styledebug-card-body);
 }
 
 .backdropScenes {
@@ -85,8 +98,8 @@
 	min-height: 15rem;
 	border-radius: 1rem;
 	overflow: hidden;
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	background: #111822;
+	border: 1px solid var(--bf-styledebug-scene-border);
+	background: var(--bf-styledebug-scene-bg);
 }
 
 .backdropImage,
@@ -132,7 +145,7 @@
 }
 
 .backdropSceneSecondary {
-	background: #0f1723;
+	background: var(--bf-styledebug-scene-bg-secondary);
 }
 
 .backdropGradientOnly {
@@ -157,9 +170,9 @@
 	border-radius: 999px;
 	font-size: 0.78em;
 	font-weight: 600;
-	color: rgba(236, 244, 255, 0.95);
-	background: rgba(8, 15, 25, 0.52);
-	border: 1px solid rgba(255, 255, 255, 0.2);
+	color: var(--bf-styledebug-scene-label-fg);
+	background: var(--bf-styledebug-scene-label-bg);
+	border: 1px solid var(--bf-styledebug-scene-label-border);
 }
 
 .sceneCard {

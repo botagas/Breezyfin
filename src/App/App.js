@@ -1,16 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import Spotlight from '@enact/spotlight';
 import { Panels } from '../components/BreezyPanels';
 
-import LoginPanel from '../views/LoginPanel';
-import HomePanel from '../views/HomePanel';
-import LibraryPanel from '../views/LibraryPanel';
-import SearchPanel from '../views/SearchPanel';
-import FavoritesPanel from '../views/FavoritesPanel';
-import SettingsPanel from '../views/SettingsPanel';
-import PlayerPanel from '../views/PlayerPanel';
-import MediaDetailsPanel from '../views/MediaDetailsPanel';
 import PerformanceOverlay from '../components/PerformanceOverlay';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
@@ -23,6 +15,8 @@ import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import AppCrashBoundary from './AppCrashBoundary';
 import {normalizePanelStatePayload, upsertKeyedPanelState, clearKeyedPanelState} from './utils/panelStateCache';
 import {getPanelIndexForView} from './utils/panelIndex';
+import {createPanelChildren} from './utils/createPanelChildren';
+import {buildRuntimeDataAttributes} from './utils/runtimeDataAttributes';
 import {usePanelHistory} from './hooks/usePanelHistory';
 import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 
@@ -245,49 +239,40 @@ const App = (props) => {
 		}
 	}, [currentView]);
 
+	const runtimeDataAttributes = useMemo(() => (
+		buildRuntimeDataAttributes({
+			navbarTheme,
+			animationsDisabled,
+			allAnimationsDisabled,
+			inputMode,
+			performanceOverlayEnabled,
+			runtimeCapabilities
+		})
+	), [
+		allAnimationsDisabled,
+		animationsDisabled,
+		inputMode,
+		navbarTheme,
+		performanceOverlayEnabled,
+		runtimeCapabilities
+	]);
+
 	useEffect(() => {
 		if (typeof document === 'undefined') return undefined;
 		const roots = [document.documentElement, document.body].filter(Boolean);
-		const rootAttributes = {
-			'data-bf-nav-theme': navbarTheme,
-			'data-bf-animations': animationsDisabled ? 'off' : 'on',
-			'data-bf-all-animations': allAnimationsDisabled ? 'off' : 'on',
-			'data-bf-input-mode': inputMode,
-			'data-bf-platform-webos': runtimeCapabilities.webos ? 'on' : 'off',
-			'data-bf-webos-version': runtimeCapabilities.version ?? 'unknown',
-			'data-bf-webos-v6-compat': runtimeCapabilities.webosV6Compat ? 'on' : 'off',
-			'data-bf-webos-v22-compat': runtimeCapabilities.webosV22Compat ? 'on' : 'off',
-			'data-bf-webos-legacy': runtimeCapabilities.legacyWebOS ? 'on' : 'off',
-			'data-bf-flex-gap': runtimeCapabilities.supportsFlexGap ? 'on' : 'off',
-			'data-bf-aspect-ratio': runtimeCapabilities.supportsAspectRatio ? 'on' : 'off',
-			'data-bf-backdrop-filter': runtimeCapabilities.supportsBackdropFilter ? 'on' : 'off'
-		};
 		roots.forEach((root) => {
-			Object.entries(rootAttributes).forEach(([attribute, value]) => {
+			Object.entries(runtimeDataAttributes).forEach(([attribute, value]) => {
 				root.setAttribute(attribute, String(value));
 			});
 		});
 		return () => {
 			roots.forEach((root) => {
-				Object.keys(rootAttributes).forEach((attribute) => {
+				Object.keys(runtimeDataAttributes).forEach((attribute) => {
 					root.removeAttribute(attribute);
 				});
 			});
 		};
-	}, [
-		allAnimationsDisabled,
-		animationsDisabled,
-		inputMode,
-		navbarTheme,
-		runtimeCapabilities.legacyWebOS,
-		runtimeCapabilities.supportsAspectRatio,
-		runtimeCapabilities.supportsBackdropFilter,
-		runtimeCapabilities.supportsFlexGap,
-		runtimeCapabilities.version,
-		runtimeCapabilities.webos,
-		runtimeCapabilities.webosV22Compat,
-		runtimeCapabilities.webosV6Compat
-	]);
+	}, [runtimeDataAttributes]);
 
 	const handleBack = useCallback(() => {
 		switch (currentView) {
@@ -497,14 +482,6 @@ const App = (props) => {
 		setCurrentView('player');
 	}, [currentView, pushPanelHistory]);
 
-	const handleBackToHome = useCallback(() => {
-		if (navigateBackInHistory()) return;
-		setCurrentView('home');
-		setSelectedItem(null);
-		setSelectedLibrary(null);
-		setPlaybackOptions(null);
-	}, [navigateBackInHistory]);
-
 	const handleBackToDetails = useCallback(() => {
 		syncPlayerBackTargetDetailsItem();
 		if (navigateBackInHistory()) return;
@@ -547,143 +524,53 @@ const App = (props) => {
 		));
 	}, []);
 
-	const panelChildren = [
-		<LoginPanel
-			key="login"
-			onLogin={handleLogin}
-			isActive={currentView === 'login'}
-			sessionNotice={loginNotice}
-			sessionNoticeNonce={loginNoticeNonce}
-		/>,
-		<HomePanel
-			key="home"
-			isActive={currentView === 'home'}
-			onItemSelect={handleItemSelect}
-			onNavigate={handleNavigate}
-			onSwitchUser={handleSwitchUser}
-			onLogout={handleLogout}
-			onExit={handleExit}
-			cachedState={homePanelState}
-			onCacheState={handleHomePanelStateChange}
-			registerBackHandler={registerHomeBackHandler}
-			noCloseButton
-		/>,
-		<LibraryPanel
-			key="library"
-			isActive={currentView === 'library'}
-			library={selectedLibrary}
-			onItemSelect={handleItemSelect}
-			onNavigate={handleNavigate}
-			onSwitchUser={handleSwitchUser}
-			onLogout={handleLogout}
-			onExit={handleExit}
-			onBack={handleBackToHome}
-			cachedState={selectedLibrary?.Id ? libraryPanelStateById[String(selectedLibrary.Id)] || null : null}
-			onCacheState={handleLibraryPanelStateChange}
-			registerBackHandler={registerLibraryBackHandler}
-			noCloseButton
-		/>,
-		<SearchPanel
-			key="search"
-			isActive={currentView === 'search'}
-			onItemSelect={handleItemSelect}
-			onNavigate={handleNavigate}
-			onSwitchUser={handleSwitchUser}
-			onLogout={handleLogout}
-			onExit={handleExit}
-			cachedState={searchPanelState}
-			onCacheState={handleSearchPanelStateChange}
-			registerBackHandler={registerSearchBackHandler}
-			noCloseButton
-		/>,
-		<FavoritesPanel
-			key="favorites"
-			isActive={currentView === 'favorites'}
-			onItemSelect={handleItemSelect}
-			onNavigate={handleNavigate}
-			onSwitchUser={handleSwitchUser}
-			onLogout={handleLogout}
-			onExit={handleExit}
-			cachedState={favoritesPanelState}
-			onCacheState={handleFavoritesPanelStateChange}
-			registerBackHandler={registerFavoritesBackHandler}
-			noCloseButton
-		/>,
-		<SettingsPanel
-			key="settings"
-			isActive={currentView === 'settings'}
-			onNavigate={handleNavigate}
-			onSwitchUser={handleSwitchUser}
-			onLogout={handleLogout}
-			onSignOut={handleSignOut}
-			onExit={handleExit}
-			cachedState={settingsPanelState}
-			onCacheState={handleSettingsPanelStateChange}
-			registerBackHandler={registerSettingsBackHandler}
-			noCloseButton
-		/>
-	];
-
-	if (STYLE_DEBUG_ENABLED && StyleDebugPanel) {
-		panelChildren.push(
-			<StyleDebugPanel
-				key="styleDebug"
-				isActive={currentView === 'styleDebug'}
-				onNavigate={handleNavigate}
-				onSwitchUser={handleSwitchUser}
-				onLogout={handleLogout}
-				onExit={handleExit}
-				registerBackHandler={registerStyleDebugBackHandler}
-				noCloseButton
-			/>
-		);
-	}
-
-	panelChildren.push(
-		<MediaDetailsPanel
-			key={`details-${selectedItem?.Id || 'none'}`}
-			isActive={currentView === 'details'}
-			item={selectedItem}
-			onBack={navigateBackFromDetails}
-			onPlay={handlePlay}
-			onItemSelect={handleItemSelect}
-			cachedState={selectedItem?.Id ? detailsPanelStateByItemId[String(selectedItem.Id)] || null : null}
-			onCacheState={handleDetailsPanelStateChange}
-			registerBackHandler={registerDetailsBackHandler}
-			noCloseButton
-		/>
-	);
-
-	panelChildren.push(
-		<PlayerPanel
-			key="player"
-			isActive={currentView === 'player'}
-			item={selectedItem}
-			playbackOptions={playbackOptions}
-			onBack={handleBackToDetails}
-			onPlay={handlePlay}
-			requestedControlsVisible={playerControlsVisible}
-			onControlsVisibilityChange={setPlayerControlsVisible}
-			registerBackHandler={registerPlayerBackHandler}
-		/>
-	);
+	const panelChildren = createPanelChildren({
+		currentView,
+		selectedItem,
+		selectedLibrary,
+		playbackOptions,
+		loginNotice,
+		loginNoticeNonce,
+		homePanelState,
+		libraryPanelStateById,
+		searchPanelState,
+		favoritesPanelState,
+		settingsPanelState,
+		detailsPanelStateByItemId,
+		styleDebugEnabled: STYLE_DEBUG_ENABLED,
+		StyleDebugPanel,
+		handleLogin,
+		handleItemSelect,
+		handleNavigate,
+		handleSwitchUser,
+		handleLogout,
+		handleSignOut,
+		handleExit,
+		handlePlay,
+		navigateBackFromDetails,
+		handleBackToDetails,
+		setPlayerControlsVisible,
+		playerControlsVisible,
+		handleSearchPanelStateChange,
+		handleHomePanelStateChange,
+		handleLibraryPanelStateChange,
+		handleFavoritesPanelStateChange,
+		handleSettingsPanelStateChange,
+		handleDetailsPanelStateChange,
+		registerHomeBackHandler,
+		registerLibraryBackHandler,
+		registerSearchBackHandler,
+		registerFavoritesBackHandler,
+		registerSettingsBackHandler,
+		registerStyleDebugBackHandler,
+		registerDetailsBackHandler,
+		registerPlayerBackHandler
+	});
 
 	return (
 			<div
 				className={css.app}
-				data-bf-animations={animationsDisabled ? 'off' : 'on'}
-				data-bf-all-animations={allAnimationsDisabled ? 'off' : 'on'}
-				data-bf-nav-theme={navbarTheme}
-				data-bf-performance-overlay={performanceOverlayEnabled ? 'on' : 'off'}
-				data-bf-input-mode={inputMode}
-				data-bf-platform-webos={runtimeCapabilities.webos ? 'on' : 'off'}
-				data-bf-webos-version={runtimeCapabilities.version ?? 'unknown'}
-				data-bf-webos-v6-compat={runtimeCapabilities.webosV6Compat ? 'on' : 'off'}
-				data-bf-webos-v22-compat={runtimeCapabilities.webosV22Compat ? 'on' : 'off'}
-				data-bf-webos-legacy={runtimeCapabilities.legacyWebOS ? 'on' : 'off'}
-				data-bf-flex-gap={runtimeCapabilities.supportsFlexGap ? 'on' : 'off'}
-				data-bf-aspect-ratio={runtimeCapabilities.supportsAspectRatio ? 'on' : 'off'}
-				data-bf-backdrop-filter={runtimeCapabilities.supportsBackdropFilter ? 'on' : 'off'}
+				{...runtimeDataAttributes}
 				{...props}
 				>
 					<Panels

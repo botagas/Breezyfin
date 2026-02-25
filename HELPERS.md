@@ -21,6 +21,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize PlayerPanel play/pause/retry/end command handlers | `usePlayerPlaybackCommands` |
 | Centralize Media Details focus debug tracing | `useMediaDetailsFocusDebug` |
 | Centralize Media Details focus orchestration (pointer + 5-way seed/focus) | `useMediaDetailsFocusOrchestrator` |
+| Centralize Media Details section snap + section-switch focus behavior | `useMediaDetailsSectionNavigation` |
 | Centralize Media Details watched/favorite mutations | `useMediaDetailsItemActions` |
 | Centralize Media Details popup picker handlers | `useMediaDetailsPickerHandlers` |
 | Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
@@ -30,6 +31,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Reusable toast lifecycle | `useToastMessage` |
 | Reusable image fallback behavior | `useImageErrorFallback` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
+| Derive Settings runtime capability labels from capability snapshot | `useRuntimeCapabilityLabels` |
 | Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` |
 
 ---
@@ -307,6 +309,23 @@ const loadVideo = usePlayerVideoLoader({
   - `focusNonSeriesAudioSelector()`, `focusNonSeriesSubtitleSelector()`, `focusNonSeriesPrimaryPlay()`
   - `handleDetailsPointerDownCapture()`, `handleDetailsPointerClickCapture()`
 
+### `useMediaDetailsSectionNavigation`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
+- Purpose: centralize intro/content section navigation behavior for Media Details:
+  - section snap thresholds and wheel capture
+  - focus-driven section switching
+  - intro top-nav `DOWN` routing and section primary focus targets
+  - scroller stop snap behavior
+- Returns key methods:
+  - `hasSecondarySection`
+  - `focusSectionOnePrimary()`
+  - `focusAndShowSecondSection()`
+  - `focusIntroTopNavigation()`
+  - `handleIntroActionKeyDown(event)`
+  - `handleIntroTopNavKeyDown(event)`
+  - `handleSectionWheelCapture(event)`
+  - `handleDetailsScrollerScrollStop(event)`
+
 ### `useMediaDetailsItemActions`
 - File: `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
 - Purpose: centralize favorite/watched mutation flows and related local refresh behavior for item/episode/season contexts.
@@ -363,6 +382,7 @@ useItemMetadata(itemId, { enabled = true, errorContext = 'item metadata' })
 ### `useImageErrorFallback`
 - File: `src/hooks/useImageErrorFallback.js`
 - Purpose: shared `onError` behavior for images:
+  - retry once with downgraded non-WebP URL when preferred WebP path fails
   - hide broken image
   - mark container with placeholder class
   - optional callback
@@ -435,7 +455,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/player-panel/components/PlayerTrackPopup.js`
   - shared audio/subtitle popup list shell.
 - `src/views/player-panel/components/PlayerLoadingOverlay.js`
-  - loading glass spinner shell.
+  - player wrapper around shared `src/components/BreezyLoadingOverlay.js`.
 - `src/views/player-panel/components/PlayerSeekFeedback.js`
   - transient seek feedback label overlay.
 - `src/views/player-panel/components/PlayerSkipOverlay.js`
@@ -466,6 +486,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes optional focus/scroll debug tracing lifecycle.
 - `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
   - centralizes pointer/5-way focus routing and initial focus seeding.
+- `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
+  - centralizes section snap + first/second section focus switch behavior.
 - `src/views/media-details-panel/hooks/useMediaDetailsKeyboardShortcuts.js`
   - centralizes details panel BACK/PLAY key handling and pointer-mode guard behavior.
 - `src/views/media-details-panel/hooks/useMediaDetailsTrackOptions.js`
@@ -512,6 +534,17 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - `writeTrackPreferences(preferences)`
   - `createAudioPreference(index, stream)`
   - `createSubtitlePreference(index, stream)`
+- `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
+  - derives UI-ready settings labels from runtime playback capabilities.
+- `src/views/settings-panel/capabilityFormatting.js`
+  - formatting/normalization helpers for runtime capability values and refresh period settings.
+
+### Runtime image format helpers
+- `src/utils/imageFormat.js`
+  - `getPreferredImageFormat()`
+  - `applyPreferredImageFormatToParams(searchParams, options?)`
+  - `stripPreferredImageFormatFromUrl(url)`
+  - `applyImageFormatFallbackFromEvent(event)`
 
 ---
 
@@ -522,6 +555,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - [`THEMES.md`](./THEMES.md)
 - [`COMPONENTS.md`](./COMPONENTS.md)
 - [`VIEWS.md`](./VIEWS.md)
+- [`CHECKS.md`](./CHECKS.md)
 - [`TODOS.md`](./TODOS.md)
 
 ---

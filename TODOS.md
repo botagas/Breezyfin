@@ -1,41 +1,45 @@
 # Breezyfin TODOs
 
-This is the current backlog for v0.1.5 release. Should be updated with further releases.
+This is the active backlog after the latest refactor cycle. Update it per release.
+
+Rule:
+- Keep this file for unfinished / planned tasks only.
+- Move validation/test items to `CHECKS.md` only after the related TODO is completed (if needed).
 
 ## High priority
 
-- Decompose remaining large panels:
+- Continue decomposing large panel orchestrators:
   - `src/views/PlayerPanel.js`
-  - `src/views/MediaDetailsPanel.js`
-  - `src/App/App.js`
-- Investigate webOS 6 login/switch-user backdrop rendering (requests now avoid hard failures, but fallback imagery still does not render reliably on sim):
+  - reduce remaining orchestration weight in `src/views/MediaDetailsPanel.js`
+  - reduce remaining orchestration weight in `src/views/SettingsPanel.js`
+- Fix webOS 6 login/switch-user backdrop rendering reliability (fallback imagery still does not render reliably on simulator):
   - `src/views/LoginPanel.js`
   - `src/views/login-panel-styles/_login-panel-compat-webos6.less`
-- Continue splitting very large style surfaces into smaller units with clearer ownership:
-  - `src/views/media-details-styles/_media-details-base.less`
-  - `src/components/Toolbar.module.less`
-  - `src/views/player-panel-styles/_player-panel-base.less`
 - Expand Jellyfin service tests to cover extracted modules directly:
   - `src/services/jellyfin/playbackApi.js`
   - `src/services/jellyfin/libraryApi.js`
   - `src/services/jellyfin/sessionApi.js`
+- Add focused test coverage for image format preference/fallback:
+  - `src/utils/imageFormat.js`
+  - `src/services/jellyfinService.js`
+- Decide whether to expose a user-facing setting to disable WebP image preference for problematic server/device combinations.
 - Identify the cause for FPS drops in Media Details panel when scrolling. Loading delay in panels might be directly related to the FPS drops since they are not present in Simulator tests. This might cause issues for TVs that were released in 2022 or prior. It could be related to backdrop/cast/episode image quality or complexity as not all media causes this behavior. Performance Mode should be improved in episode list to reduce heavyweight styling.
-- Could consider using WEBP for images to increase performance. 
 
 ## Medium priority
 
 - Normalize remaining hardcoded color/rgba values into `--bf-theme-*` tokens where practical, starting with Player/MediaDetails/Toolbar style files.
 - Audit and reduce custom per-file CSS variables that overlap with global theme tokens.
 - Keep compat behavior isolated in compat files; document intentional exceptions when global shared fallbacks are required.
-- Normalize Search panel filter popup handlers to `useDisclosureHandlers` (replace manual open/close callbacks).
-- Standardize watched-status badge usage across all item-card panels so watched state uses the same badge system everywhere it is shown:
-  - `src/views/HomePanel.js`
-  - `src/views/LibraryPanel.js`
-  - `src/views/SearchPanel.js`
 - Standardize count/status badges to shared badge primitives with tokenized color variants (for example episode-count badges), instead of panel-specific one-off styling:
   - `src/components/MediaRow.module.less`
   - `src/views/library-panel-styles/_library-panel-base.less`
   - `src/views/search-panel-styles/_search-panel-base.less`
+- Continue splitting very large style surfaces into smaller units with clearer ownership:
+  - `src/views/player-panel-styles/_player-panel-base.less`
+  - `src/views/style-debug-panel-styles/_style-debug-panel-snipzy.less`
+  - `src/views/login-panel-styles/_login-panel-base.less`
+- Fix badge spacing/sizing and missing badge visibility issues on webOS 6 (Favorites/Search).
+- Fix extra whitespace before the first library option on webOS 6.
 
 ## Secondary improvements
 
@@ -45,14 +49,4 @@ This is the current backlog for v0.1.5 release. Should be updated with further r
   - service domain modules
 - Add a small script/report for style token adoption (where raw color usage still remains).
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
-- Inspect button styling in Favorites panel to ensure we're using already existing mixins. Alter Mark Watched button hover background color to match the icon color (already done for Favorite button) via shared styles or mixins and ensure that is also used in episode list and favorite panels. 
-- Fix badge spacing and sizing on webOS 6. We also need to make sure badges actually appear in Favorites and Search panel on webOS 6.
-- Inspect the cause for the first library option having extra whitespace separating it from the second option in webOS 6. 
-- Apply our PlayerPanel loading animation to all panels that would replace the default loading animation.
-
-## Maintenance checks (recurring)
-
-- `npm run lint`
-- `npm run test -- --watch=false --runInBand`
-- `npm run audit:styles`
-- `npm run audit:duplicates`
+- Refactor Favorites button styling to reuse existing shared mixins and align Mark Watched hover background with icon color (and mirror the same treatment in episode list/favorite panels).
