@@ -1,6 +1,6 @@
 # Breezyfin TODOs
 
-This is the active backlog after the latest refactor cycle. Update it per release.
+This is the most recent TO-DO backlog file. It is updated actively with changes.
 
 Rule:
 - Keep this file for unfinished / planned tasks only.
@@ -22,18 +22,14 @@ Rule:
 - Add focused test coverage for image format preference/fallback:
   - `src/utils/imageFormat.js`
   - `src/services/jellyfinService.js`
-- Decide whether to expose a user-facing setting to disable WebP image preference for problematic server/device combinations.
 - Identify the cause for FPS drops in Media Details panel when scrolling. Loading delay in panels might be directly related to the FPS drops since they are not present in Simulator tests. This might cause issues for TVs that were released in 2022 or prior. It could be related to backdrop/cast/episode image quality or complexity as not all media causes this behavior. Performance Mode should be improved in episode list to reduce heavyweight styling.
+- Identify the cause of loading delay in panels as well as panel reloads when switching between panels without waiting for a proper load. This might be caused by one of our early refactors.
 
 ## Medium priority
 
 - Normalize remaining hardcoded color/rgba values into `--bf-theme-*` tokens where practical, starting with Player/MediaDetails/Toolbar style files.
 - Audit and reduce custom per-file CSS variables that overlap with global theme tokens.
 - Keep compat behavior isolated in compat files; document intentional exceptions when global shared fallbacks are required.
-- Standardize count/status badges to shared badge primitives with tokenized color variants (for example episode-count badges), instead of panel-specific one-off styling:
-  - `src/components/MediaRow.module.less`
-  - `src/views/library-panel-styles/_library-panel-base.less`
-  - `src/views/search-panel-styles/_search-panel-base.less`
 - Continue splitting very large style surfaces into smaller units with clearer ownership:
   - `src/views/player-panel-styles/_player-panel-base.less`
   - `src/views/style-debug-panel-styles/_style-debug-panel-snipzy.less`
@@ -41,7 +37,7 @@ Rule:
 - Fix badge spacing/sizing and missing badge visibility issues on webOS 6 (Favorites/Search).
 - Fix extra whitespace before the first library option on webOS 6.
 
-## Secondary improvements
+## Low priority
 
 - Add a lightweight architecture index in docs mapping:
   - panel-level decomposition folders
@@ -49,4 +45,4 @@ Rule:
   - service domain modules
 - Add a small script/report for style token adoption (where raw color usage still remains).
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
-- Refactor Favorites button styling to reuse existing shared mixins and align Mark Watched hover background with icon color (and mirror the same treatment in episode list/favorite panels).
+- Align episode/season watched-action styling in Media Details to the same shared token/mixin approach used in Favorites and other panels.
