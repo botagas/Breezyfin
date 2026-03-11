@@ -31,6 +31,7 @@ export const useMediaDetailsInteractionHandlers = ({
 	focusNonSeriesAudioSelector,
 	focusNodeWithoutScroll,
 	focusIntroTopNavigation,
+	focusTopHeaderAction,
 	focusFirstSectionPrimary,
 	focusSecondSectionPrimary,
 	showEpisodeInfoButton,
@@ -483,12 +484,18 @@ export const useMediaDetailsInteractionHandlers = ({
 			event.stopPropagation();
 			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
 			if (!focusNonSeriesSubtitleSelector()) focusNonSeriesAudioSelector();
+		} else if (event.keyCode === KeyCodes.RIGHT) {
+			if (typeof focusTopHeaderAction !== 'function') return;
+			if (!focusTopHeaderAction()) return;
+			event.preventDefault();
+			event.stopPropagation();
 		}
 	}, [
 		focusIntroTopNavigation,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesSubtitleSelector,
+		focusTopHeaderAction,
 		focusSecondSectionPrimary
 	]);
 

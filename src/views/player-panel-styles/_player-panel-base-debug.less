@@ -1,21 +1,20 @@
 .debugOverlay {
 	position: absolute;
-	top: 1rem;
-	left: 1rem;
+	top: var(--bf-theme-debug-overlay-inset);
+	left: var(--bf-theme-debug-overlay-inset);
 	right: auto;
-	z-index: 2147483647;
-	width: min(92vw, 56rem);
-	max-height: min(78vh, 42rem);
+	z-index: var(--bf-theme-debug-overlay-z-index);
+	width: min(var(--bf-theme-player-debug-overlay-max-width), var(--bf-theme-player-debug-overlay-width));
+	max-height: min(var(--bf-theme-player-debug-overlay-max-height), var(--bf-theme-focus-debug-overlay-max-height-abs));
 	overflow-y: auto;
 	overflow-x: hidden;
-	padding: 0.55rem 0.75rem;
-	.debug-overlay-surface(0.8rem);
+	.debug-overlay-shell(
+		var(--bf-theme-debug-radius);
+		var(--bf-theme-debug-compact-padding-block);
+		var(--bf-theme-debug-compact-padding-inline)
+	);
 	pointer-events: auto;
 	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-	font-size: 0.75rem;
-	letter-spacing: 0.01em;
-	line-height: 1.32;
-	color: var(--bf-theme-debug-value-color);
 	.debug-overlay-scrollbar();
 }
 
@@ -23,15 +22,15 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.6rem;
-	margin-bottom: 0.45rem;
+	gap: var(--bf-theme-debug-overlay-gap);
+	margin-bottom: var(--bf-theme-debug-header-margin-bottom);
 }
 
 .debugOverlayTitle {
 	margin: 0;
 	.debug-overlay-label();
 	font-weight: 700;
-	letter-spacing: 0.05em;
+	letter-spacing: var(--bf-theme-debug-title-letter-spacing);
 }
 
 .debugOverlayCloseButton {
@@ -39,20 +38,20 @@
 	--bf-button-fg-hover: var(--bf-theme-text-primary);
 	--bf-button-fg-active: var(--bf-theme-text-primary);
 	min-width: auto !important;
-	padding: 0.1rem 0.7rem !important;
-	border-radius: 999px !important;
+	padding: var(--bf-theme-debug-close-padding) !important;
+	border-radius: var(--bf-theme-debug-pill-radius) !important;
 	background: transparent !important;
 	border: none !important;
 	box-shadow: none !important;
-	font-size: 0.68rem !important;
+	font-size: var(--bf-theme-debug-close-size) !important;
 
-	:global(.bf-button-bg),
-	:global(.bg) {
-		background: rgba(255, 255, 255, 0.1) !important;
-		border: 1px solid rgba(255, 255, 255, 0.22) !important;
-		border-radius: 999px !important;
-		box-shadow: none !important;
-	}
+		:global(.bf-button-bg),
+		:global(.bg) {
+			background: var(--bf-theme-debug-close-bg) !important;
+			border: var(--bf-theme-debug-border-width) solid var(--bf-theme-debug-close-border) !important;
+			border-radius: var(--bf-theme-debug-pill-radius) !important;
+			box-shadow: none !important;
+		}
 
 	&:hover :global(.bf-button-bg),
 	&:focus :global(.bf-button-bg),
@@ -60,16 +59,16 @@
 	&:hover :global(.bg),
 	&:focus :global(.bg),
 	&:global(.spottable):focus :global(.bg) {
-		background: rgba(255, 255, 255, 0.2) !important;
-		border-color: rgba(255, 255, 255, 0.35) !important;
+		background: var(--bf-theme-debug-close-hover-bg) !important;
+		border-color: var(--bf-theme-debug-close-hover-border) !important;
 	}
 }
 
 .debugOverlayRow {
 	display: grid;
-	grid-template-columns: 86px minmax(0, 1fr);
-	column-gap: 0.4rem;
-	padding: 0.1rem 0;
+	grid-template-columns: var(--bf-theme-player-debug-grid-label-width) minmax(0, 1fr);
+	column-gap: var(--bf-theme-debug-grid-gap);
+	padding: var(--bf-theme-debug-row-padding);
 }
 
 .debugOverlayLabel {

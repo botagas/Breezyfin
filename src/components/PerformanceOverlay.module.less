@@ -1,24 +1,24 @@
 @import (reference) '../styles/debugStyles.less';
 
 .overlay {
-	position: fixed;
-	top: 1rem;
-	right: 1rem;
-	z-index: 2147483647;
+	.debug-overlay-fixed-top(
+		auto;
+		var(--bf-theme-debug-overlay-inset);
+		var(--bf-theme-debug-overlay-z-index)
+	);
 	display: inline-flex;
 	align-items: center;
-	gap: 0.6rem;
-	padding: 0.45rem 0.7rem;
-	.debug-overlay-surface(999px);
+	gap: var(--bf-theme-debug-overlay-gap);
+	.debug-overlay-shell(
+		var(--bf-theme-debug-pill-radius);
+		var(--bf-theme-debug-compact-padding-block);
+		var(--bf-theme-debug-compact-padding-inline)
+	);
 	pointer-events: none;
-	font-size: 0.75rem;
-	letter-spacing: 0.01em;
 }
 
 .metric {
-	display: inline-flex;
-	align-items: baseline;
-	gap: 0.3rem;
+	.debug-overlay-inline-metric();
 }
 
 .label {

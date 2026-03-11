@@ -7,6 +7,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Reuse existing shared hooks/components before introducing new abstractions.
 - Keep panel logic modular with panel-local `components/`, `hooks/`, and `utils/` folders.
 - Keep styling token-driven and theme-consistent.
+- Keep Media Details section-switch focus playback-first (`Audio -> Subtitle -> Play`, then fallbacks).
 - Keep comments minimal; only document non-obvious constraints, tradeoffs, or behavior.
 
 ## Related docs
@@ -32,7 +33,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Shared toast UI primitive (Player/Media Details/Settings): `src/components/BreezyToast.js`
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
-- Runtime platform/playback capability detection + cache controls: `src/utils/platformCapabilities.js`
+- Runtime platform/playback capability detection + cache controls: `src/utils/platformCapabilities.js` (+ decomposed internals in `src/utils/platform-capabilities/`)
 - Runtime image format preference + fallback helpers: `src/utils/imageFormat.js`
 - Player remote/media-key handler: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
 - Player controls-visibility synchronization: `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
@@ -58,6 +59,11 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Media details per-item bootstrap effect: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
 - Settings runtime capability label derivation: `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
+- Settings bootstrap loader/effects: `src/views/settings-panel/hooks/useSettingsBootstrap.js`
+- Settings popup disclosure wiring: `src/views/settings-panel/hooks/useSettingsDisclosures.js`
+- Settings home-row toggle/reorder handlers: `src/views/settings-panel/hooks/useSettingsHomeRows.js`
+- Settings option selection handlers: `src/views/settings-panel/hooks/useSettingsOptionHandlers.js`
+- Settings system/server/log/cache handlers: `src/views/settings-panel/hooks/useSettingsSystemHandlers.js`
 - Settings boolean toggle/persistence handlers: `src/views/settings-panel/hooks/useSettingsToggleHandlers.js`
 - Settings display/label/panel-back handlers: `src/views/settings-panel/hooks/useSettingsDisplayHandlers.js`
 

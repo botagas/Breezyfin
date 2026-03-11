@@ -1,6 +1,6 @@
 # Breezyfin TODOs
 
-This is the most recent TO-DO backlog file. It is updated actively with changes.
+Backlog for unfinished/planned work only.
 
 Rule:
 - Keep this file for unfinished / planned tasks only.
@@ -15,6 +15,7 @@ Rule:
 
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
 - Continue opportunistic style decomposition for remaining larger style files where ownership boundaries are still mixed.
+- Add targeted automated regression coverage for Media Details section-switch focus handoff (smooth-scroll + deferred focus).
 
 ## Long-term goals
 

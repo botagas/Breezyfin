@@ -18,9 +18,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 ## Current capabilities
 
 > [!NOTE]
-> The app has undergone major refactoring efforts, so please do report any issues if you encounter any.
->
-> [Read more in the v0.1.5 announcement](https://github.com/botagas/Breezyfin/discussions/6)
+> The app has undergone major refactoring efforts. If you upgrade from an older build, run **Wipe Cache and Reload (Keep Login)** once, and report issues you encounter.
 
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
@@ -132,12 +130,14 @@ Diagnostics currently include:
 
 - Performance Overlay (`FPS`, `Input`, `Mode`)
 - Playback toast with active dynamic range / play method (for quick validation)
+- Extended Player debug overlay (stream/session/range/focus details for troubleshooting)
 - Subtitle burn-in controls (enable/disable, per-codec formats, and HDR/DV override force option)
+- Playback container controls (`Enable fMP4-HLS container preference`, `Force fMP4-HLS container preference`) plus `Force DV (Debug)`
 - Device playback capability summary in Settings (DV/HDR/codec support + WebP image decode support)
 - Configurable capability check refresh period (default 30 days) with optional manual "Refresh now" action
 - Relaxed Playback Profile toggle
 - Logs viewer and clear action
-- Wipe App Cache (clears local/session storage, cache storage, IndexedDB, unregisters service workers, then reloads)
+- Wipe App Cache action with optional login preservation (`Wipe (Keep Login) & Reload`)
 
 ## Production build
 

@@ -476,6 +476,13 @@ const SettingsSections = ({
 					</SwitchItem>
 					<SwitchItem
 						className={css.switchItem}
+						onToggle={settingToggleHandlers.showFocusDebugOverlay}
+						selected={settings.showFocusDebugOverlay === true}
+					>
+						Focus Debug Overlay (All Panels)
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
 						onToggle={settingToggleHandlers.forceDolbyVision}
 						selected={settings.forceDolbyVision === true}
 					>

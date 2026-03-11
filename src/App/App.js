@@ -4,6 +4,7 @@ import Spotlight from '@enact/spotlight';
 import { Panels } from '../components/BreezyPanels';
 
 import PerformanceOverlay from '../components/PerformanceOverlay';
+import FocusDebugOverlay from '../components/FocusDebugOverlay';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
@@ -29,7 +30,8 @@ const resolveInitialVisualSettings = () => {
 		animationsDisabled: settings.disableAnimations !== false,
 		allAnimationsDisabled: settings.disableAllAnimations === true,
 		navbarTheme: settings.navbarTheme === 'classic' ? 'classic' : 'elegant',
-		performanceOverlayEnabled: settings.showPerformanceOverlay === true
+		performanceOverlayEnabled: settings.showPerformanceOverlay === true,
+		focusDebugOverlayEnabled: settings.showFocusDebugOverlay === true
 	};
 };
 
@@ -53,6 +55,7 @@ const App = (props) => {
 	const [allAnimationsDisabled, setAllAnimationsDisabled] = useState(initialVisualSettingsRef.current.allAnimationsDisabled);
 	const [navbarTheme, setNavbarTheme] = useState(initialVisualSettingsRef.current.navbarTheme);
 	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
+	const [focusDebugOverlayEnabled, setFocusDebugOverlayEnabled] = useState(initialVisualSettingsRef.current.focusDebugOverlayEnabled);
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
@@ -182,6 +185,7 @@ const App = (props) => {
 		setAllAnimationsDisabled(settings.disableAllAnimations === true);
 		setNavbarTheme(settings.navbarTheme === 'classic' ? 'classic' : 'elegant');
 		setPerformanceOverlayEnabled(settings.showPerformanceOverlay === true);
+		setFocusDebugOverlayEnabled(settings.showFocusDebugOverlay === true);
 	}, []);
 
 	useBreezyfinSettingsSync(applyVisualSettings);
@@ -556,9 +560,14 @@ const App = (props) => {
 						noAnimation
 					>
 					{panelChildren}
-				</Panels>
-				<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />
-			</div>
+					</Panels>
+					<FocusDebugOverlay
+						enabled={focusDebugOverlayEnabled}
+						currentView={currentView}
+						inputMode={inputMode}
+					/>
+					<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />
+				</div>
 		);
 	};
 

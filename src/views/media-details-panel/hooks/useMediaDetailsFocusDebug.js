@@ -1,6 +1,19 @@
-import {useCallback, useEffect, useMemo} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import Spotlight from '@enact/spotlight';
 import {describeDomNode} from '../../../utils/domNodeDescription';
+import {readBreezyfinSettings} from '../../../utils/settingsStorage';
+import {useBreezyfinSettingsSync} from '../../../hooks/useBreezyfinSettingsSync';
+
+const isLegacyFocusDebugEnabled = () => {
+	if (typeof window === 'undefined') return false;
+	try {
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('bfFocusDebug') === '1') return true;
+		return localStorage.getItem('breezyfinFocusDebug') === '1';
+	} catch (_) {
+		return false;
+	}
+};
 
 export const useMediaDetailsFocusDebug = ({
 	isActive,
@@ -10,16 +23,17 @@ export const useMediaDetailsFocusDebug = ({
 	debugLastScrollTopRef,
 	debugLastScrollTimeRef
 }) => {
-	const detailsDebugEnabled = useMemo(() => {
-		if (typeof window === 'undefined') return false;
-		try {
-			const params = new URLSearchParams(window.location.search);
-			if (params.get('bfFocusDebug') === '1') return true;
-			return localStorage.getItem('breezyfinFocusDebug') === '1';
-		} catch (_) {
-			return false;
-		}
+	const [detailsDebugEnabled, setDetailsDebugEnabled] = useState(() => {
+		const settings = readBreezyfinSettings();
+		return settings.showFocusDebugOverlay === true || isLegacyFocusDebugEnabled();
+	});
+
+	const syncDebugSetting = useCallback((settingsPayload) => {
+		const settings = settingsPayload || {};
+		setDetailsDebugEnabled(settings.showFocusDebugOverlay === true || isLegacyFocusDebugEnabled());
 	}, []);
+
+	useBreezyfinSettingsSync(syncDebugSetting);
 
 	const describeNode = useCallback((node) => {
 		return describeDomNode(node);

@@ -75,6 +75,7 @@ Do not add duplicate hooks/helpers for behavior already covered by shared module
 - All focusable interactions must behave in both `5way` and `pointer` modes.
 - Do not rely on hover-only affordances for critical actions.
 - Popups should autofocus first actionable item on open via `usePopupInitialFocus`.
+- In Media Details, keep first-section focus playback-first (`Audio -> Subtitle -> Play`) and avoid automatic Favorite/Watched focus fallback.
 - Preserve layered back behavior:
   1. close local disclosure(s)
   2. run toolbar/panel-local back handler
@@ -153,7 +154,7 @@ Rule from repo docs:
 3. Focus chains in Media Details and Player.
 4. Popup behavior and first-focus correctness.
 5. webOS 6 / legacy compatibility rules.
-6. Runtime capability probing/cache behavior in `src/utils/platformCapabilities.js` and related modules.
+6. Runtime capability probing/cache behavior in `src/utils/platformCapabilities.js` and `src/utils/platform-capabilities/*`.
 
 For these areas, include explicit manual test notes in the handoff.
 
@@ -175,4 +176,3 @@ Use absolute file paths when referencing edited files.
 - Adding panel-specific one-off versions of shared primitives (toasts/loading/popup shells/status badges) without clear need.
 - Growing `jellyfinService.js` with domain logic that belongs in `src/services/jellyfin/*`.
 - Leaving feature behavior undocumented when it changes shared architecture or conventions.
-

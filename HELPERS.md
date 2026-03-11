@@ -56,7 +56,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize Settings panel server/session/log/cache orchestration | `useSettingsSystemHandlers` |
 | Centralize Settings panel boolean-setting toggle handlers + persistence writes | `useSettingsToggleHandlers` |
 | Centralize Settings panel display/label/diagnostic + panel-back handlers | `useSettingsDisplayHandlers` |
-| Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` |
+| Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` / `refreshRuntimePlatformCapabilitiesWithLuna` |
 
 ---
 
@@ -387,7 +387,7 @@ const loadVideo = usePlayerVideoLoader({
 - File: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
 - Purpose: centralize Media Details focus routing/orchestration:
   - pointer-to-focus sync and guard behavior
-  - initial focus seeding for series/non-series
+  - initial focus seeding for series/non-series with playback-first order (`Audio -> Subtitle -> Play`)
   - focus target helper methods used by interaction handlers
   - cast/season focus scrolling behavior
 - Returns key methods:
@@ -397,17 +397,22 @@ const loadVideo = usePlayerVideoLoader({
   - `focusSeasonCardByIndex()`, `focusSeasonWatchedButton()`, `focusBelowSeasons()`
   - `focusNonSeriesAudioSelector()`, `focusNonSeriesSubtitleSelector()`, `focusNonSeriesPrimaryPlay()`
   - `handleDetailsPointerDownCapture()`, `handleDetailsPointerClickCapture()`
+- Focus policy note:
+  - prefer playback controls for first-section targeting (`Audio -> Subtitle -> Play`), then fall back as needed.
+  - do not use header favorite/watched actions as automatic first-focus targets.
 
 ### `useMediaDetailsSectionNavigation`
 - File: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
 - Purpose: centralize intro/content section navigation behavior for Media Details:
   - section snap thresholds and wheel capture
   - focus-driven section switching
+  - smooth-scroll-preserving focus handoff when returning from section two to section one
   - intro top-nav `DOWN` routing and section primary focus targets
   - scroller stop snap behavior
 - Returns key methods:
   - `hasSecondarySection`
   - `focusSectionOnePrimary()`
+  - `focusAndShowFirstSection()`
   - `focusAndShowSecondSection()`
   - `focusIntroTopNavigation()`
   - `handleIntroActionKeyDown(event)`
@@ -638,7 +643,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
   - centralizes pointer/5-way focus routing and initial focus seeding.
 - `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
-  - centralizes section snap + first/second section focus switch behavior.
+  - centralizes section snap + first/second section focus switch behavior (including deferred first-section focus after smooth scroll).
 - `src/views/media-details-panel/hooks/useMediaDetailsKeyboardShortcuts.js`
   - centralizes details panel BACK/PLAY key handling and pointer-mode guard behavior.
 - `src/views/media-details-panel/hooks/useMediaDetailsTrackOptions.js`
@@ -723,6 +728,12 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - `JELLYFIN_TICKS_PER_SECOND` for consistent Jellyfin tick/second conversion across services and player hooks.
 - `src/constants/toast.js`
   - `PANEL_TOAST_CONFIG` shared toast timing preset for panel toasts.
+
+### Runtime capability helpers
+- `src/utils/platformCapabilities.js`
+  - public runtime capability facade (probe cache, refresh TTL, and Luna refresh entrypoint).
+- `src/utils/platform-capabilities/*`
+  - decomposed internals (`runtimeComputation`, `runtimeCache`, `lunaProbe`, `lunaOverrides`, `runtimeSignature`, and related helpers).
 
 ### Runtime image format helpers
 - `src/utils/imageFormat.js`

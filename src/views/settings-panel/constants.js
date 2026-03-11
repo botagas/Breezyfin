@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
 	useSidewaysEpisodeList: true,
 	showPerformanceOverlay: false,
 	showExtendedPlayerDebugOverlay: false,
+	showFocusDebugOverlay: false,
 	forceDolbyVision: false,
 	enableFmp4HlsContainerPreference: true,
 	forceFmp4HlsContainerPreference: false,
