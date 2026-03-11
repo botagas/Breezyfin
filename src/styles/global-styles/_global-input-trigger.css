@@ -1,0 +1,69 @@
+/* Sandstone Input trigger (used in Login/Search panels) */
+.bf-input-trigger {
+	background: transparent !important;
+	border: none !important;
+	border-radius: 999px !important;
+	box-shadow: none !important;
+	filter: none !important;
+	color: var(--bf-theme-input-trigger-fg) !important;
+	margin: 0 !important;
+	overflow: hidden !important;
+	transition: transform 0.14s ease, box-shadow 0.14s ease !important;
+}
+
+.bf-input-trigger.focusExpand {
+	margin: 0.03rem !important;
+}
+
+.bf-input-trigger::before,
+.bf-input-trigger::after,
+.bf-input-trigger > div:first-of-type,
+.bf-input-trigger > div:nth-of-type(2) {
+	box-shadow: none !important;
+	filter: none !important;
+}
+
+.bf-input-trigger::before,
+.bf-input-trigger::after {
+	content: none !important;
+	display: none !important;
+}
+
+.bf-input-trigger > div:first-of-type {
+	background: var(--bf-theme-input-trigger-bg-rest) !important;
+	border: 1px solid var(--bf-theme-input-trigger-border-rest) !important;
+	border-radius: 999px !important;
+	opacity: 1 !important;
+	transform: none !important;
+	transition: background 0.14s ease, border-color 0.14s ease !important;
+}
+
+.bf-input-trigger:hover > div:first-of-type,
+.bf-input-trigger:focus > div:first-of-type,
+.bf-input-trigger:active > div:first-of-type,
+.bf-input-trigger.spottable:focus > div:first-of-type {
+	background: var(--bf-theme-input-trigger-bg-hover) !important;
+	border-color: var(--bf-theme-input-trigger-border-hover) !important;
+	opacity: 1 !important;
+	transform: none !important;
+}
+
+.bf-input-trigger:hover,
+.bf-input-trigger:focus,
+.bf-input-trigger:active,
+.bf-input-trigger.spottable:focus {
+	transform: scale(1.01) !important;
+}
+
+[data-bf-input-mode='5way'] .bf-input-trigger:hover > div:first-of-type {
+	background: var(--bf-theme-input-trigger-bg-rest) !important;
+	border-color: var(--bf-theme-input-trigger-border-rest) !important;
+}
+
+[data-bf-input-mode='5way'] .bf-input-trigger:hover {
+	transform: none !important;
+}
+
+.bf-input-trigger * {
+	color: var(--bf-theme-input-trigger-fg) !important;
+}

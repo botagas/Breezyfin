@@ -16,8 +16,8 @@
 }
 
 .loadingGlassSpinner {
-	--bg-color: var(--bf-loading-glass-bg, var(--bf-theme-loading-glass-bg, rgba(255, 255, 255, 0.25)));
-	--highlight: var(--bf-loading-glass-highlight, var(--bf-theme-loading-glass-highlight, rgba(255, 255, 255, 0.75)));
+	--bg-color: var(--bf-loading-glass-bg);
+	--highlight: var(--bf-loading-glass-highlight);
 	--spinner-size: 5rem;
 	--ring-size: 4rem;
 	--core-size: 1.5rem;
@@ -69,8 +69,8 @@
 	width: var(--ring-size);
 	height: var(--ring-size);
 	border: 2px solid transparent;
-	border-top-color: var(--bf-theme-loading-ring-primary, var(--bf-theme-player-loading-ring-primary, rgba(255, 255, 255, 0.8)));
-	border-right-color: var(--bf-theme-loading-ring-secondary, var(--bf-theme-player-loading-ring-secondary, rgba(255, 255, 255, 0.6)));
+	border-top-color: var(--bf-theme-loading-ring-primary);
+	border-right-color: var(--bf-theme-loading-ring-secondary);
 	border-radius: 50%;
 	animation: breezy-loading-spin 1s linear infinite;
 }
@@ -78,7 +78,7 @@
 .loadingSpinnerCore {
 	width: var(--core-size);
 	height: var(--core-size);
-	background: var(--bf-theme-loading-core-bg, var(--bf-theme-player-loading-core-bg, rgba(255, 255, 255, 0.9)));
+	background: var(--bf-theme-loading-core-bg);
 	border-radius: 50%;
 	animation: breezy-loading-pulse 1s ease-in-out infinite alternate;
 }

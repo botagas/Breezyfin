@@ -1,0 +1,94 @@
+.favoritesContainer {
+	.panel-fill-container(transparent);
+}
+
+.favoritesContent {
+	--bf-favorites-action-surface-bg: var(--bf-theme-favorites-action-surface-bg);
+	--bf-favorites-action-surface-border: var(--bf-theme-favorites-action-surface-border);
+	--bf-favorites-action-surface-hover-bg: var(--bf-theme-favorites-action-surface-hover-bg);
+	--bf-favorites-action-surface-hover-border: var(--bf-theme-favorites-action-surface-hover-border);
+	--bf-favorites-unfavorite-bg: var(--bf-theme-favorites-unfavorite-bg);
+	--bf-favorites-unfavorite-border: var(--bf-theme-favorites-unfavorite-border);
+	--bf-favorites-unfavorite-hover-bg: var(--bf-theme-favorites-unfavorite-hover-bg);
+	--bf-favorites-watched-bg: var(--bf-theme-favorites-watched-bg);
+	--bf-favorites-watched-border: var(--bf-theme-favorites-watched-border);
+	--bf-favorites-watched-hover-bg: var(--bf-theme-favorites-watched-hover-bg);
+	--bf-favorites-icon-favorite: var(--bf-theme-favorites-icon-favorite);
+	--bf-favorites-icon-favorite-hover: var(--bf-theme-favorites-icon-favorite-hover);
+	--bf-favorites-icon-watched: var(--bf-theme-favorites-icon-watched);
+	--bf-favorites-icon-watched-active: var(--bf-theme-favorites-icon-watched-active);
+	--bf-favorites-icon-watched-hover: var(--bf-theme-favorites-icon-watched-hover);
+	min-height: 100%;
+	background: var(--bf-theme-panel-bg);
+	display: flex;
+	flex-direction: column;
+}
+
+.favoritesBody {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.filters {
+	display: flex;
+	gap: 0.75rem;
+	padding: calc(var(--bf-panel-top-offset) - 0.75rem) 4rem 1.5rem;
+	background: transparent;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+}
+
+.filterButton {
+	.filter-chip-button();
+}
+
+.loadingState {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	min-height: 0;
+}
+
+.emptyState {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	min-height: 0;
+	text-align: center;
+	padding: 2rem 4rem;
+	width: 100%;
+	max-width: none;
+	box-sizing: border-box;
+}
+
+.emptyTitle {
+	font-size: 1.5em;
+	margin-bottom: 1rem;
+}
+
+.emptyMessage {
+	opacity: 0.6;
+	max-width: 100%;
+}
+
+.favoritesScroller {
+	flex: 1;
+	min-height: 0;
+	background: var(--bf-theme-panel-bg);
+	overscroll-behavior: contain;
+}
+
+.favoritesGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+	gap: 1.5rem;
+	padding: 0.75rem 4rem clamp(2rem, var(--bf-panel-content-bottom-padding), 4rem);
+	background: var(--bf-theme-panel-bg);
+	.panel-grid-performance();
+}

@@ -1,0 +1,73 @@
+.loginBox {
+	--bf-login-box-bg: var(--bf-theme-login-surface-bg);
+	--bf-login-box-border: var(--bf-theme-login-surface-border);
+	--bf-login-box-shadow: var(--bf-theme-login-surface-shadow);
+	--bf-login-control-fg: var(--bf-theme-text-primary);
+	--bf-login-control-surface: var(--bf-theme-login-control-surface);
+	--bf-login-control-border: var(--bf-theme-login-control-border);
+	--bf-login-control-hover-bg: var(--bf-theme-login-control-hover-bg);
+	--bf-login-control-hover-border: var(--bf-theme-login-control-hover-border);
+	--bf-login-subtle-text: var(--bf-theme-login-subtle-text);
+	--bf-login-saved-focus-border: var(--bf-theme-login-saved-focus-border);
+	--bf-login-saved-active-border: var(--bf-theme-login-saved-active-border);
+	--bf-login-avatar-bg: var(--bf-theme-login-avatar-bg);
+	--bf-login-avatar-border: var(--bf-theme-login-avatar-border);
+	--bf-login-avatar-placeholder-gradient: var(--bf-theme-login-avatar-placeholder-gradient);
+	position: relative;
+	z-index: 1;
+	max-width: 100%;
+	width: min(92vw, 50%);
+	background: var(--bf-login-box-bg);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	padding: 64px 72px 72px;
+	border-radius: 16px;
+	border: 1px solid var(--bf-login-box-border);
+	box-shadow: var(--bf-login-box-shadow);
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	align-items: stretch;
+	box-sizing: border-box;
+
+	> * {
+		width: 100%;
+		margin: 0;
+	}
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	margin-bottom: 8px;
+	width: 100%;
+	text-align: center;
+	background: transparent !important;
+}
+
+.inlineSpinner {
+	margin-left: auto;
+}
+
+.lead {
+	margin-bottom: 24px;
+	opacity: 0.85;
+	width: 100%;
+	text-align: center;
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	width: 100%;
+}
+
+/* Force form direct children (including Sandstone Button wrappers) to full width */
+.form > * {
+	width: 100%;
+	max-width: none !important;
+	margin: 0 !important;
+}

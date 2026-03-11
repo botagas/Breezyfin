@@ -1,0 +1,64 @@
+.episodeInfo {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	overflow: hidden;
+}
+
+.episodeMetaTop {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.7rem;
+}
+
+.episodeDate {
+	font-size: 0.8em;
+	color: var(--bf-md-text-date);
+	white-space: nowrap;
+}
+
+.episodeNumber {
+	font-size: 0.9em;
+	color: var(--bf-md-text-dim);
+	font-weight: 600;
+}
+
+.episodeName {
+	font-size: 1.2em;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--bf-md-text-primary);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.episodeOverview {
+	font-size: 0.95em;
+	line-height: 1.5;
+	color: var(--bf-md-text-episode-overview);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.episodeStatRow {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+}
+
+.episodeStat {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.28rem;
+	font-size: 0.82em;
+	color: var(--bf-md-text-stat);
+}

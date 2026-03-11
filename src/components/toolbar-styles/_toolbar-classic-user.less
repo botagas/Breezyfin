@@ -1,0 +1,100 @@
+.userContainer {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.userButton {
+	min-width: 80px !important;
+	min-height: 48px !important;
+	padding: 20px !important;
+	font-size: 0.9em !important;
+	transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, outline-color 0.2s ease;
+	flex-shrink: 0;
+	background: transparent !important;
+	border: none !important;
+	overflow: visible !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	border-radius: 8px !important;
+
+	& * {
+		background: transparent !important;
+	}
+
+	&:focus {
+		background: var(--bf-theme-toolbar-focus-bg) !important;
+		transform: scale(1.05);
+		outline: 2px solid var(--bf-theme-toolbar-focus-outline) !important;
+		outline-offset: 2px;
+	}
+
+	&:hover {
+		background: var(--bf-theme-toolbar-hover-bg) !important;
+	}
+}
+
+.userMenu {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 8px;
+	background: transparent;
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	border: 1px solid var(--bf-theme-toolbar-menu-surface-border);
+	border-radius: 8px;
+	padding: 4px;
+	box-shadow: var(--bf-theme-toolbar-menu-surface-shadow);
+	z-index: 1000;
+	min-width: 100px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	overflow: hidden;
+	isolation: isolate;
+}
+
+.userMenu::before {
+	.toolbarBackdropSurface();
+}
+
+.userMenuInner {
+	position: relative;
+	z-index: 4;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.menuButton {
+	min-width: auto !important;
+	width: 100% !important;
+	min-height: 32px !important;
+	max-height: 32px !important;
+	padding: 1rem !important;
+	font-size: 0.8em !important;
+	background: transparent !important;
+	border: none !important;
+	text-align: left !important;
+	border-radius: 4px !important;
+	margin: 0 !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important;
+
+	/* Override Enact's button background */
+	& * {
+		background: transparent !important;
+	}
+
+	&:hover {
+		background: var(--bf-theme-toolbar-menu-item-hover-bg) !important;
+	}
+
+	&:focus {
+		background: var(--bf-theme-toolbar-menu-item-focus-bg) !important;
+		outline: 2px solid var(--bf-theme-toolbar-focus-outline) !important;
+	}
+}

@@ -1,0 +1,50 @@
+.loginBox :global(.bf-button),
+.loginBox :global(.bf-button:hover),
+.loginBox :global(.bf-button:focus),
+.loginBox :global(.bf-button:active),
+.loginBox :global(.bf-button *) {
+	color: var(--bf-login-control-fg) !important;
+}
+
+.loginBox :global(.bf-button-bg) {
+	background: var(--bf-login-control-surface) !important;
+	background-image: none !important;
+	border: 1px solid var(--bf-login-control-border) !important;
+	border-radius: 999px !important;
+	box-shadow: none !important;
+}
+
+.loginBox :global(.bg) {
+	background: var(--bf-login-control-surface) !important;
+	background-image: none !important;
+	border: 1px solid var(--bf-login-control-border) !important;
+	border-radius: 999px !important;
+	box-shadow: none !important;
+}
+
+.loginBox :global(.bf-button:hover .bf-button-bg),
+.loginBox :global(.bf-button:focus .bf-button-bg),
+.loginBox :global(.bf-button:active .bf-button-bg) {
+	background: var(--bf-login-control-hover-bg) !important;
+	border-color: var(--bf-login-control-hover-border) !important;
+}
+
+.loginBox :global(.bf-button:hover .bg),
+.loginBox :global(.bf-button:focus .bg),
+.loginBox :global(.bf-button:active .bg) {
+	background: var(--bf-login-control-hover-bg) !important;
+	border-color: var(--bf-login-control-hover-border) !important;
+}
+
+.inputField {
+	background: transparent !important;
+	border: none !important;
+	border-radius: 999px !important;
+	padding: 0 0.25rem !important;
+	margin: 0 !important;
+
+	:global(input) {
+		background: transparent !important;
+		color: var(--bf-login-control-fg) !important;
+	}
+}

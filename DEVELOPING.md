@@ -25,6 +25,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Input mode sync (`pointer`/`5way`): `src/hooks/useInputMode.js`
 - Popup/menu state: `src/hooks/useDisclosureMap.js`
 - Popup/menu handler map: `src/hooks/useDisclosureHandlers.js`
+- Popup first-action focus-on-open helper: `src/hooks/usePopupInitialFocus.js`
 - Map lookups by id/key: `src/hooks/useMapById.js`
 - Item metadata fetch/state: `src/hooks/useItemMetadata.js`
 - Toast lifecycle: `src/hooks/useToastMessage.js`
@@ -34,10 +35,14 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Runtime platform/playback capability detection + cache controls: `src/utils/platformCapabilities.js`
 - Runtime image format preference + fallback helpers: `src/utils/imageFormat.js`
 - Player remote/media-key handler: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
+- Player controls-visibility synchronization: `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
 - Player video load/session orchestration: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
+- Player playback option/session-context derivation: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
 - Player skip/prompt state machine: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
 - Player seek/track-switch flow: `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
+- Player track-popup click handlers: `src/views/player-panel/hooks/usePlayerTrackPopupHandlers.js`
 - Player play/pause/retry/end command handlers: `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
+- Player episode/surface interaction handlers: `src/views/player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers.js`
 - Player recovery/fallback handlers: `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
 - Player lifecycle effects: `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
 - Media details focus debug tracing: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
@@ -47,8 +52,14 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Media details picker handlers: `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
 - Media details interaction handlers: `src/views/media-details-panel/hooks/useMediaDetailsInteractionHandlers.js`
 - Media details data loader: `src/views/media-details-panel/hooks/useMediaDetailsDataLoader.js`
+- Media details DOM scroll/focus helper callbacks: `src/views/media-details-panel/hooks/useMediaDetailsDomHelpers.js`
+- Media details overview overflow + play-label derivation: `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
+- Media details panel sync effects: `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
+- Media details per-item bootstrap effect: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
 - Settings runtime capability label derivation: `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
+- Settings boolean toggle/persistence handlers: `src/views/settings-panel/hooks/useSettingsToggleHandlers.js`
+- Settings display/label/panel-back handlers: `src/views/settings-panel/hooks/useSettingsDisplayHandlers.js`
 
 Preferred panel scroll cache wiring:
 - `src/hooks/usePanelScrollState.js`
@@ -78,7 +89,11 @@ Other shared utilities:
 - Reusable media-card overlays: `src/components/MediaCardStatusOverlay.js`
 - Shared toolbar focus helper: `src/utils/toolbarFocus.js`
 - Shared home row order constant: `src/constants/homeRows.js`
+- Shared Jellyfin tick conversion constant: `src/constants/time.js`
+- Shared panel toast timing preset: `src/constants/toast.js`
 - Shared poster card class helper: `src/utils/posterCardClassProps.js`
+- Shared integer parser helper: `src/utils/numberParsing.js`
+- Shared DOM node debug descriptor helper: `src/utils/domNodeDescription.js`
 - Shared player view helpers: `src/views/player-panel/utils/playerPanelHelpers.js`
 - Shared episode next/previous helpers: `src/views/player-panel/utils/episodeNavigation.js`
 - Shared media details formatting/image helpers: `src/views/media-details-panel/utils/mediaDetailsHelpers.js`

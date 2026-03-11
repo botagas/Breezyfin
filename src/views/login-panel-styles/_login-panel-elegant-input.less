@@ -1,0 +1,43 @@
+.inputField {
+	border-radius: 0.65rem !important;
+	padding: 0 !important;
+}
+
+.inputField :global(.bf-input-trigger),
+.inputField :global(.bf-input-trigger.focusExpand),
+.inputField :global(.bf-input-trigger:hover),
+.inputField :global(.bf-input-trigger:focus),
+.inputField :global(.bf-input-trigger:active),
+.inputField :global(.bf-input-trigger.spottable:focus) {
+	margin: 0 !important;
+	transform: none !important;
+	border-radius: 0.65rem !important;
+	background: transparent !important;
+}
+
+.inputField :global(.bf-input-trigger > div:first-of-type) {
+	background: var(--bf-login-elegant-input-bg-rest) !important;
+	border: 1px solid var(--bf-login-elegant-input-border-rest) !important;
+	border-radius: 0.65rem !important;
+	box-shadow: none !important;
+	transition: border-color 0.3s ease, background 0.3s ease !important;
+}
+
+.inputField:hover :global(.bf-input-trigger > div:first-of-type) {
+	background: var(--bf-login-elegant-input-bg-hover) !important;
+	border-color: var(--bf-login-elegant-input-border-hover) !important;
+}
+
+.inputField:focus-within :global(.bf-input-trigger > div:first-of-type),
+.inputField:global(.spottable):focus :global(.bf-input-trigger > div:first-of-type) {
+	background: var(--bf-login-elegant-input-bg-focus) !important;
+	border-color: var(--bf-login-elegant-input-border-focus) !important;
+}
+
+.inputField :global(input) {
+	color: var(--bf-login-elegant-input-text) !important;
+}
+
+.inputField :global(input::placeholder) {
+	color: var(--bf-login-elegant-input-placeholder) !important;
+}

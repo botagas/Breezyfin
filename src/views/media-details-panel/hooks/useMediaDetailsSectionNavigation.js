@@ -1,9 +1,10 @@
-import {useCallback, useEffect, useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {KeyCodes} from '../../../utils/keyCodes';
 
 const SECTION_SNAP_TOLERANCE_PX = 8;
 const SECTION_WHEEL_DELTA_THRESHOLD = 18;
 const SECTION_SNAP_THRESHOLD_RATIO = 0.45;
+const SECTION_FOCUS_SETTLE_TIMEOUT_MS = 420;
 
 export const useMediaDetailsSectionNavigation = ({
 	itemType,
@@ -18,20 +19,31 @@ export const useMediaDetailsSectionNavigation = ({
 	css,
 	firstSectionRef,
 	contentSectionRef,
-	favoriteActionButtonRef,
-	watchedActionButtonRef,
 	audioSelectorButtonRef,
 	subtitleSelectorButtonRef,
 	playPrimaryButtonRef,
 	getDetailsScrollElement,
 	handleDetailsScrollMemoryStop,
 	focusNodeWithoutScroll,
-	focusTopHeaderAction,
 	focusNonSeriesPrimaryPlay,
 	focusNonSeriesAudioSelector,
 	focusNonSeriesSubtitleSelector,
 	focusEpisodeSelector
 }) => {
+	const introFocusRafRef = useRef(null);
+	const introFocusTimeoutRef = useRef(null);
+
+	const cancelPendingIntroFocus = useCallback(() => {
+		if (introFocusRafRef.current !== null) {
+			window.cancelAnimationFrame(introFocusRafRef.current);
+			introFocusRafRef.current = null;
+		}
+		if (introFocusTimeoutRef.current !== null) {
+			window.clearTimeout(introFocusTimeoutRef.current);
+			introFocusTimeoutRef.current = null;
+		}
+	}, []);
+
 	const hasSecondarySection = useMemo(() => {
 		if (Array.isArray(cast) && cast.length > 0) return true;
 		if (itemType === 'Series') return seasons.length > 0 || episodes.length > 0;
@@ -47,22 +59,27 @@ export const useMediaDetailsSectionNavigation = ({
 		return Math.max(0, scrollEl.scrollTop + (contentRect.top - scrollRect.top));
 	}, [contentSectionRef, getDetailsScrollElement]);
 
+	const focusBackNavigation = useCallback(() => {
+		const backTarget = firstSectionRef.current?.querySelector('[data-bf-md-nav="back"]');
+		if (!backTarget?.focus) return false;
+		focusNodeWithoutScroll(backTarget);
+		return true;
+	}, [firstSectionRef, focusNodeWithoutScroll]);
+
 	const focusSectionOnePrimary = useCallback(() => {
-		if (focusTopHeaderAction()) return true;
-		if (focusNonSeriesPrimaryPlay()) return true;
 		if (focusNonSeriesAudioSelector()) return true;
-		return focusNonSeriesSubtitleSelector();
+		if (focusNonSeriesSubtitleSelector()) return true;
+		if (focusNonSeriesPrimaryPlay()) return true;
+		return focusBackNavigation();
 	}, [
+		focusBackNavigation,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
-		focusNonSeriesSubtitleSelector,
-		focusTopHeaderAction
+		focusNonSeriesSubtitleSelector
 	]);
 
-	const focusSectionOnePrimaryFromTopNav = useCallback(() => {
+	const focusSectionOneControls = useCallback(() => {
 		const candidateTargets = [
-			favoriteActionButtonRef.current?.nodeRef?.current || favoriteActionButtonRef.current,
-			watchedActionButtonRef.current?.nodeRef?.current || watchedActionButtonRef.current,
 			audioSelectorButtonRef.current?.nodeRef?.current || audioSelectorButtonRef.current,
 			subtitleSelectorButtonRef.current?.nodeRef?.current || subtitleSelectorButtonRef.current,
 			playPrimaryButtonRef.current?.nodeRef?.current || playPrimaryButtonRef.current
@@ -74,8 +91,9 @@ export const useMediaDetailsSectionNavigation = ({
 		}
 		const introRoot = firstSectionRef.current;
 		if (introRoot) {
-			const fallbackTarget = introRoot.querySelector(
-				`.${css.actionButton}, .${css.trackSelectorPrimary}, .${css.primaryButton}, .bf-button, .spottable`
+			const controlsRoot = introRoot.querySelector(`.${css.introControlsRow}`);
+			const fallbackTarget = controlsRoot?.querySelector(
+				`.${css.compactSelectorButton}, .${css.trackSelectorPrimary}, .${css.primaryButton}, .bf-button, .spottable, button`
 			);
 			if (fallbackTarget?.focus) {
 				focusNodeWithoutScroll(fallbackTarget);
@@ -85,17 +103,24 @@ export const useMediaDetailsSectionNavigation = ({
 		return focusSectionOnePrimary();
 	}, [
 		audioSelectorButtonRef,
-		css.actionButton,
+		css.compactSelectorButton,
+		css.introControlsRow,
 		css.primaryButton,
 		css.trackSelectorPrimary,
-		favoriteActionButtonRef,
 		firstSectionRef,
 		focusNodeWithoutScroll,
 		focusSectionOnePrimary,
 		playPrimaryButtonRef,
 		subtitleSelectorButtonRef,
-		watchedActionButtonRef
 	]);
+
+	const focusSectionOnePrimaryFromTopNav = useCallback(() => {
+		return focusSectionOneControls();
+	}, [focusSectionOneControls]);
+
+	const focusSectionOnePrimaryFromIntroAction = useCallback(() => {
+		return focusSectionOneControls();
+	}, [focusSectionOneControls]);
 
 	const focusIntroTopNavigation = useCallback(() => {
 		const introRoot = firstSectionRef.current;
@@ -181,13 +206,66 @@ export const useMediaDetailsSectionNavigation = ({
 		return true;
 	}, [focusSectionTwoPrimary, scrollToDetailsSection]);
 
+	const focusFirstSectionAfterScrollSettles = useCallback((scrollEl) => {
+		if (!scrollEl) return focusSectionOnePrimary();
+		cancelPendingIntroFocus();
+
+		const startedAt = Date.now();
+		let lastTop = scrollEl.scrollTop;
+		let stableFrames = 0;
+
+		const finish = () => {
+			cancelPendingIntroFocus();
+			focusSectionOnePrimary();
+		};
+
+		const watchScrollSettle = () => {
+			const currentTop = scrollEl.scrollTop;
+			const nearIntroTop = currentTop <= SECTION_SNAP_TOLERANCE_PX;
+			if (nearIntroTop) {
+				finish();
+				return;
+			}
+			const delta = Math.abs(currentTop - lastTop);
+			stableFrames = delta < 0.5 ? stableFrames + 1 : 0;
+			lastTop = currentTop;
+			const timedOut = (Date.now() - startedAt) >= SECTION_FOCUS_SETTLE_TIMEOUT_MS;
+			if (stableFrames >= 2 || timedOut) {
+				finish();
+				return;
+			}
+			introFocusRafRef.current = window.requestAnimationFrame(watchScrollSettle);
+		};
+
+		introFocusRafRef.current = window.requestAnimationFrame(watchScrollSettle);
+		introFocusTimeoutRef.current = window.setTimeout(finish, SECTION_FOCUS_SETTLE_TIMEOUT_MS + 120);
+		return true;
+	}, [cancelPendingIntroFocus, focusSectionOnePrimary]);
+
+	const focusAndShowFirstSection = useCallback(() => {
+		const scrollEl = getDetailsScrollElement();
+		if (!scrollEl) return focusSectionOnePrimary();
+		if (scrollEl.scrollTop <= SECTION_SNAP_TOLERANCE_PX) {
+			return focusSectionOnePrimary();
+		}
+		cancelPendingIntroFocus();
+		scrollToDetailsSection('intro', {animate: true, focusTarget: false});
+		return focusFirstSectionAfterScrollSettles(scrollEl);
+	}, [
+		cancelPendingIntroFocus,
+		focusFirstSectionAfterScrollSettles,
+		focusSectionOnePrimary,
+		getDetailsScrollElement,
+		scrollToDetailsSection
+	]);
+
 	const handleIntroActionKeyDown = useCallback((event) => {
 		const code = event.keyCode || event.which;
 		if (code !== KeyCodes.DOWN) return;
-		if (!focusAndShowSecondSection()) return;
+		if (!focusSectionOnePrimaryFromIntroAction()) return;
 		event.preventDefault();
 		event.stopPropagation();
-	}, [focusAndShowSecondSection]);
+	}, [focusSectionOnePrimaryFromIntroAction]);
 
 	const handleIntroTopNavKeyDown = useCallback((event) => {
 		if (event.defaultPrevented) return;
@@ -285,9 +363,14 @@ export const useMediaDetailsSectionNavigation = ({
 		});
 	}, [getContentSectionTop, getDetailsScrollElement, handleDetailsScrollMemoryStop, hasSecondarySection]);
 
+	useEffect(() => () => {
+		cancelPendingIntroFocus();
+	}, [cancelPendingIntroFocus]);
+
 	return {
 		hasSecondarySection,
 		focusSectionOnePrimary,
+		focusAndShowFirstSection,
 		focusAndShowSecondSection,
 		focusIntroTopNavigation,
 		handleIntroActionKeyDown,

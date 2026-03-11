@@ -1,0 +1,56 @@
+.serverInfo {
+	opacity: 0.75;
+	font-size: 0.95em;
+	text-align: center;
+}
+
+.buttonRow {
+	display: flex;
+	gap: 12px;
+	width: 100%;
+	align-items: stretch;
+}
+
+.buttonRow > * {
+	flex: 1 1 0;
+	min-width: 0;
+	width: 0;
+	max-width: none !important;
+	margin: 0 !important;
+}
+
+.authTextButton {
+	:global(.bf-button-bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:active :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: transparent !important;
+		border: none !important;
+	}
+
+	:global(.bf-button),
+	:global(.bf-button *) {
+		color: var(--bf-login-subtle-text) !important;
+	}
+
+	&:hover :global(.bf-button),
+	&:hover :global(.bf-button *),
+	&:focus :global(.bf-button),
+	&:focus :global(.bf-button *),
+	&:active :global(.bf-button),
+	&:active :global(.bf-button *) {
+		color: var(--bf-login-control-fg) !important;
+	}
+}
+
+.status {
+	margin-top: 16px;
+	opacity: 0.8;
+	text-align: center;
+}

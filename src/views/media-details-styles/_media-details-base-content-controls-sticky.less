@@ -1,0 +1,104 @@
+.stickyControls {
+	position: sticky;
+	top: 0.5rem;
+	padding: 16px 24px;
+	border-radius: var(--bf-media-details-control-radius);
+	.popupSurface(
+		var(--bf-theme-popup-bg);
+		var(--bf-theme-popup-border);
+		var(--bf-theme-popup-shadow);
+		20px;
+		var(--bf-theme-popup-saturate)
+	);
+	margin-bottom: 32px;
+	z-index: 10;
+	display: flex;
+	flex-direction: row;
+	gap: 24px;
+	align-items: center;
+	flex-wrap: wrap;
+	overflow: hidden;
+}
+
+.stickyControlsInline {
+	position: relative;
+	top: auto;
+}
+
+.controlsMain {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+.episodeSelectorButton {
+	max-width: 100%;
+	min-width: 0 !important;
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.client) {
+		width: 100%;
+		max-width: 100%;
+		min-width: 0 !important;
+	}
+
+	:global(.client) {
+		display: block !important;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 0.9rem !important;
+	}
+
+	.mdControlHoverSurface(var(--bf-theme-tab-hover-bg));
+}
+
+.controlsActions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.compactSelectorButton {
+	max-width: 24rem;
+	min-width: 0 !important;
+	text-align: left !important;
+	border-radius: 0.9rem !important;
+	background: transparent !important;
+	border: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		border-radius: 0.9rem !important;
+		box-shadow: none !important;
+		transition:
+			background 180ms ease,
+			border-color 180ms ease,
+			transform 180ms ease,
+			margin 180ms ease !important;
+	}
+
+	:global(.client) {
+		display: block !important;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.mdControlHoverSurface(var(--bf-theme-tab-hover-bg));
+}

@@ -1,4 +1,5 @@
 import {useCallback} from 'react';
+import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
 
 export const usePlayerSeekAndTrackSwitching = ({
@@ -77,7 +78,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (isHls) {
 			videoRef.current.currentTime = seekTime;
-			const seekTicks = Math.floor(seekTime * 10000000);
+			const seekTicks = Math.floor(seekTime * JELLYFIN_TICKS_PER_SECOND);
 			await jellyfinService.reportPlaybackProgress(
 				item.Id,
 				seekTicks,
@@ -89,10 +90,11 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (isCurrentTranscoding) {
 			try {
-				const seekTicks = Math.floor(seekTime * 10000000);
+				const seekTicks = Math.floor(seekTime * JELLYFIN_TICKS_PER_SECOND);
 				setLoading(true);
 				playbackOverrideRef.current = {
 					...(playbackOptions || {}),
+					mediaSourceId: mediaSourceData?.Id || playbackOptions?.mediaSourceId,
 					audioStreamIndex: Number.isInteger(currentAudioTrack) ? currentAudioTrack : undefined,
 					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
 					startTimeTicks: seekTicks,
@@ -132,6 +134,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		const currentPosition = videoRef.current.currentTime || 0;
 		playbackOverrideRef.current = {
 			...(playbackOptions || {}),
+			mediaSourceId: mediaSourceData?.Id || playbackOptions?.mediaSourceId,
 			audioStreamIndex: Number.isInteger(audioIndex) ? audioIndex : undefined,
 			subtitleStreamIndex: (subtitleIndex === -1 || Number.isInteger(subtitleIndex)) ? subtitleIndex : undefined,
 			seekSeconds: currentPosition,
@@ -140,7 +143,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		setLoading(true);
 		await handleStop();
 		loadVideo();
-	}, [handleStop, loadVideo, playbackOptions, playbackOverrideRef, setLoading, videoRef]);
+	}, [handleStop, loadVideo, mediaSourceData?.Id, playbackOptions, playbackOverrideRef, setLoading, videoRef]);
 
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);

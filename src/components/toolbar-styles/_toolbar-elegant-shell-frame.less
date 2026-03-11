@@ -1,0 +1,41 @@
+.toolbarElegant {
+	--bf-navbar-fade-color: var(--bf-theme-header-fade-color);
+	--bf-elegant-tab-bg: var(--bf-theme-tab-bg);
+	--bf-elegant-tab-active-bg: var(--bf-theme-tab-hover-bg);
+	--bf-elegant-accent: var(--bf-theme-accent);
+	--bf-elegant-accent-rgb: var(--bf-theme-accent-rgb);
+	--bf-elegant-text-base: var(--bf-theme-text-primary);
+	--bf-elegant-text-soft: var(--bf-theme-text-primary);
+	--bf-elegant-text-regular: var(--bf-theme-text-primary);
+	--bf-elegant-text-mid: var(--bf-theme-text-primary);
+	--bf-elegant-text-bright: var(--bf-theme-text-primary);
+	--bf-elegant-surface-border-soft: var(--bf-theme-surface-border);
+	--bf-elegant-surface-border: var(--bf-theme-surface-border);
+	--bf-elegant-popup-bg: var(--bf-theme-popup-bg);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 clamp(0.75rem, 1.7vw, 2.4rem) !important;
+	min-height: var(--bf-toolbar-height);
+	background: transparent !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	border-bottom: none !important;
+	isolation: isolate;
+	top: 0;
+	z-index: 120;
+}
+
+.glassNav {
+	position: relative;
+	width: 100%;
+	max-width: min(116rem, 100%);
+	height: calc(var(--bf-toolbar-height) - 0.7rem);
+	border-radius: 1rem;
+	overflow: visible;
+	box-shadow: 0 0.35rem 1.25rem rgba(0, 0, 0, 0.14);
+}
+
+.toolbarElegant::after {
+	display: none;
+}

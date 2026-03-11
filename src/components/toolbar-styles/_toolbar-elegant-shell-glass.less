@@ -1,0 +1,69 @@
+.glassFilter,
+.glassOverlay,
+.glassSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+.glassFilter {
+	z-index: 1;
+	backdrop-filter: blur(0.85rem);
+	-webkit-backdrop-filter: blur(0.85rem);
+	filter: var(--bf-glass-distortion-filter) saturate(1.22) brightness(1.08);
+}
+
+.glassOverlay {
+	z-index: 2;
+	background: transparent;
+}
+
+.glassSpecular {
+	z-index: 3;
+	background:
+		radial-gradient(170% 130% at 15% -60%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.03) 58%),
+		radial-gradient(130% 120% at 88% -50%, rgba(232, 245, 255, 0.2), rgba(232, 245, 255, 0) 54%),
+		linear-gradient(180deg, rgba(16, 22, 31, 0.16), rgba(12, 18, 28, 0.23));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.34),
+		inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.liquidLayerFilter,
+.liquidLayerOverlay,
+.liquidLayerSpecular {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+.liquidLayerFilter {
+	z-index: 1;
+	backdrop-filter: blur(0.8rem);
+	-webkit-backdrop-filter: blur(0.8rem);
+	filter: var(--bf-glass-distortion-filter) saturate(1.2) brightness(1.07);
+}
+
+.liquidLayerFilterMuted {
+	backdrop-filter: blur(0.56rem);
+	-webkit-backdrop-filter: blur(0.56rem);
+	filter: none;
+}
+
+.liquidLayerOverlay {
+	z-index: 2;
+	background: var(--bf-theme-liquid-overlay-bg);
+}
+
+.liquidLayerSpecular {
+	z-index: 3;
+	background:
+		radial-gradient(170% 130% at 15% -65%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 58%),
+		radial-gradient(130% 120% at 88% -55%, rgba(232, 245, 255, 0.14), rgba(232, 245, 255, 0) 54%),
+		linear-gradient(180deg, rgba(12, 18, 28, 0.24), rgba(10, 16, 24, 0.34));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.2),
+		inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}

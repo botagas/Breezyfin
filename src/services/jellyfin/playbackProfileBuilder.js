@@ -159,10 +159,14 @@ export const buildDirectPlayProfiles = (forceTranscoding, relaxedPlaybackProfile
 	return directPlayProfiles;
 };
 
-export const buildTranscodingProfiles = (relaxedPlaybackProfile, playbackCapabilities) => {
+export const buildTranscodingProfiles = (
+	relaxedPlaybackProfile,
+	playbackCapabilities,
+	{preferFmp4Mp4 = true} = {}
+) => {
 	const maxAudioChannels = String(playbackCapabilities.maxAudioChannels || 6);
 	const supportsHevc = playbackCapabilities.supportsHevc !== false;
-	const hlsContainer = playbackCapabilities.nativeHlsFmp4 ? 'mp4' : 'ts';
+	const hlsContainer = preferFmp4Mp4 && playbackCapabilities.nativeHlsFmp4 ? 'mp4' : 'ts';
 	const hlsAudioCodecs = Array.from(
 		new Set(
 			getContainerAudioCodecs(playbackCapabilities, 'hls').filter((codec) => ['aac', 'ac3', 'eac3', 'mp3'].includes(codec))
@@ -234,22 +238,41 @@ export const buildTranscodingProfiles = (relaxedPlaybackProfile, playbackCapabil
 	return transcodingProfiles;
 };
 
-export const buildSubtitleProfiles = ({relaxedPlaybackProfile, forceSubtitleBurnIn}) => {
+export const buildSubtitleProfiles = ({
+	relaxedPlaybackProfile,
+	forceSubtitleBurnIn,
+	subtitleBurnInTextCodecs = []
+}) => {
 	const textFormats = ['srt', 'subrip', 'vtt', 'webvtt', 'ass', 'ssa', 'smi', 'sami', 'ttml', 'dfxp'];
 	const imageFormats = ['pgs', 'pgssub', 'dvbsub', 'dvdsub'];
+	const burnInPreferredTextFormats = Array.isArray(subtitleBurnInTextCodecs)
+		? subtitleBurnInTextCodecs
+		: [];
+	const addUniqueProfile = (target, format, method) => {
+		if (target.some((profile) => profile.Format === format && profile.Method === method)) {
+			return;
+		}
+		target.push({Format: format, Method: method});
+	};
 
 	if (forceSubtitleBurnIn) {
 		return [...textFormats, ...imageFormats].map((format) => ({Format: format, Method: 'Encode'}));
 	}
 
 	const profiles = textFormats.map((format) => ({Format: format, Method: 'External'}));
+	burnInPreferredTextFormats
+		.map((format) => String(format || '').trim().toLowerCase())
+		.filter((format) => textFormats.includes(format))
+		.forEach((format) => {
+			addUniqueProfile(profiles, format, 'Encode');
+		});
 	if (relaxedPlaybackProfile) {
 		textFormats.forEach((format) => {
-			profiles.push({Format: format, Method: 'Encode'});
+			addUniqueProfile(profiles, format, 'Encode');
 		});
 	}
 	imageFormats.forEach((format) => {
-		profiles.push({Format: format, Method: 'Encode'});
+		addUniqueProfile(profiles, format, 'Encode');
 	});
 	return profiles;
 };
@@ -347,7 +370,26 @@ export const buildPlaybackRequestContext = (options = {}) => {
 	const relaxedPlaybackProfile = options.relaxedPlaybackProfile === true;
 	const forceTranscoding = options.forceTranscoding === true;
 	const enableTranscoding = options.enableTranscoding !== false;
+	const legacyPreferFmp4Preference = typeof options.preferDolbyVisionMp4 === 'boolean'
+		? options.preferDolbyVisionMp4
+		: undefined;
+	const hasEnableFmp4Preference = typeof options.enableFmp4HlsContainerPreference === 'boolean';
+	const enableFmp4HlsContainerPreference = hasEnableFmp4Preference
+		? options.enableFmp4HlsContainerPreference === true
+		: (legacyPreferFmp4Preference ?? true);
+	const forceFmp4HlsContainerPreference =
+		options.forceFmp4HlsContainerPreference === true &&
+		enableFmp4HlsContainerPreference === true;
+	// Keep base payload conservative for HDR/DV. Non-forced preference is applied later as a source probe.
+	const preferFmp4Mp4 = forceFmp4HlsContainerPreference || (!hasEnableFmp4Preference && legacyPreferFmp4Preference === true);
 	const forceSubtitleBurnIn = options.forceSubtitleBurnIn === true;
+	const enableSubtitleBurnIn = options.enableSubtitleBurnIn !== false;
+	const allowSubtitleBurnInOnHdr = options.forceSubtitleBurnInOnHdr === true;
+	const subtitleBurnInTextCodecs = Array.isArray(options.subtitleBurnInTextCodecs)
+		? options.subtitleBurnInTextCodecs
+			.map((codec) => String(codec || '').trim().toLowerCase())
+			.filter(Boolean)
+		: [];
 	const dynamicRangeCap = normalizeDynamicRangeCap(options.dynamicRangeCap);
 	const allowStreamCopyOnTranscode = options.allowStreamCopyOnTranscode !== false;
 	const allowStreamCopy = enableTranscoding && (!forceTranscoding || allowStreamCopyOnTranscode);
@@ -358,8 +400,16 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		forceSubtitleBurnIn
 	});
 	const directPlayProfiles = buildDirectPlayProfiles(forceTranscoding, relaxedPlaybackProfile, playbackCapabilities);
-	const transcodingProfiles = buildTranscodingProfiles(relaxedPlaybackProfile, playbackCapabilities);
-	const subtitleProfiles = buildSubtitleProfiles({relaxedPlaybackProfile, forceSubtitleBurnIn});
+	const transcodingProfiles = buildTranscodingProfiles(
+		relaxedPlaybackProfile,
+		playbackCapabilities,
+		{preferFmp4Mp4}
+	);
+	const subtitleProfiles = buildSubtitleProfiles({
+		relaxedPlaybackProfile,
+		forceSubtitleBurnIn,
+		subtitleBurnInTextCodecs
+	});
 
 	payload.EnableDirectPlay = !forceTranscoding;
 	payload.EnableDirectStream = !forceTranscoding;
@@ -386,6 +436,9 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		enableTranscoding,
 		requestedAudioStreamIndex,
 		forceSubtitleBurnIn,
+		enableSubtitleBurnIn,
+		allowSubtitleBurnInOnHdr,
+		subtitleBurnInTextCodecs,
 		dynamicRangeCap
 	};
 };

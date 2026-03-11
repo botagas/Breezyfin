@@ -1,0 +1,77 @@
+.filterTriggerButton {
+	--bf-search-filter-size: 2.35rem;
+	position: relative;
+	min-width: var(--bf-search-filter-size) !important;
+	width: var(--bf-search-filter-size) !important;
+	height: var(--bf-search-filter-size) !important;
+	padding: 0 !important;
+	flex-shrink: 0;
+	overflow: hidden !important;
+	border-radius: 999px !important;
+	border: none !important;
+	background: transparent !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-sizing: border-box !important;
+	box-shadow: none !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 999px !important;
+		width: 100% !important;
+		height: 100% !important;
+		min-height: var(--bf-search-filter-size) !important;
+	}
+
+	:global(.bf-button) {
+		border-radius: 999px !important;
+		width: 100% !important;
+		height: 100% !important;
+		min-height: var(--bf-search-filter-size) !important;
+		padding: 0 !important;
+	}
+
+	:global(.client) {
+		line-height: 1 !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+		border: none !important;
+	}
+
+	:global(.icon) {
+		font-size: 1.05rem !important;
+	}
+}
+
+.filterAppliedBadge {
+	position: absolute;
+	top: -0.28rem;
+	right: -0.28rem;
+	min-width: 1.05rem;
+	height: 1.05rem;
+	padding: 0 0.25rem;
+	border-radius: 999px;
+	background: var(--bf-theme-filter-badge-bg);
+	color: var(--bf-theme-filter-badge-color);
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1.05rem;
+	text-align: center;
+	box-shadow: var(--bf-theme-filter-badge-shadow);
+	pointer-events: none;
+}
+
+.filterTriggerButton:global(.focusExpand) {
+	margin: 0 !important;
+	transform: none !important;
+}

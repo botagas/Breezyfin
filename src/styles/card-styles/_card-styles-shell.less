@@ -1,0 +1,161 @@
+.card-shell() {
+	border-radius: 1.1rem;
+	outline: none;
+	transform: translateZ(0);
+	transition: transform 180ms ease, filter 180ms ease;
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		transition: none !important;
+		transform: none !important;
+		filter: none !important;
+	}
+}
+
+.card-focus-expand-reset() {
+	&:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+}
+
+.card-focus-lift() {
+	transform: translateY(-6px) scale(1.025);
+	z-index: 12;
+	filter: saturate(1.06);
+
+	:global([data-bf-animations='off']) & {
+		transform: none;
+		filter: none;
+		z-index: auto;
+	}
+}
+
+.card-image-shell(@ratio) {
+	width: 100%;
+	aspect-ratio: ~"@{ratio}";
+	background: @card-surface-gradient;
+	border-radius: 1rem;
+	overflow: hidden;
+	position: relative;
+	border: 1px solid @card-border-rest;
+	box-shadow: @card-shadow-rest;
+	transition: box-shadow 180ms ease, border-color 180ms ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	/* Runtime compatibility switch for engines without aspect-ratio support (webOS 22 / 6). */
+	:global([data-bf-aspect-ratio='off']) & {
+		aspect-ratio: auto;
+		height: 0;
+		padding-top: calc(100% / (@ratio));
+		display: block;
+
+		> img,
+		> [class*='placeholderInner'] {
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+	}
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		box-shadow: none;
+		transition: none !important;
+	}
+}
+
+.card-image-overlays() {
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		background: @card-hover-overlay-gradient;
+		opacity: 0;
+		transition: opacity 220ms ease;
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	.card-image-bottom-fade-overlay();
+
+	:global([data-bf-animations='off']) &::before,
+	:global([data-bf-animations='off']) &::after,
+	:global([data-bf-all-animations='off']) &::before,
+	:global([data-bf-all-animations='off']) &::after {
+		display: none;
+		opacity: 0 !important;
+	}
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 340ms ease, filter 340ms ease;
+	}
+
+	:global([data-bf-animations='off']) & img,
+	:global([data-bf-all-animations='off']) & img {
+		transform: none !important;
+		filter: none !important;
+		transition: none !important;
+	}
+}
+
+.card-image-bottom-fade-overlay() {
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 45%;
+		background: @card-bottom-fade-gradient;
+		pointer-events: none;
+		z-index: 1;
+	}
+}
+
+.card-image-focus() {
+	border-color: @card-border-focus;
+	box-shadow: @card-shadow-focus;
+
+	&::before {
+		opacity: 1;
+	}
+
+	img {
+		transform: scale(1.04);
+		filter: saturate(1.06);
+	}
+
+	:global([data-bf-animations='off']) & {
+		box-shadow: none;
+	}
+
+	:global([data-bf-animations='off']) &::before,
+	:global([data-bf-all-animations='off']) &::before {
+		opacity: 0 !important;
+	}
+
+	:global([data-bf-animations='off']) & img,
+	:global([data-bf-all-animations='off']) & img {
+		transform: none !important;
+		filter: none !important;
+	}
+}
+
+.panel-grid-performance() {
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 1400px;
+}

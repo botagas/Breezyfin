@@ -1,0 +1,95 @@
+/* Performance mode for lower-end TVs: reduce expensive motion but keep nav/header blur. */
+[data-bf-animations='off'] .focusExpand,
+[data-bf-animations='off'] .spottable:focus,
+[data-bf-animations='off'] [data-webos-voice-focused='true'] {
+	transform: none !important;
+	filter: none !important;
+}
+
+[data-bf-animations='off'] .bf-input-trigger:hover,
+[data-bf-animations='off'] .bf-input-trigger:focus,
+[data-bf-animations='off'] .bf-input-trigger:active,
+[data-bf-animations='off'] .bf-input-trigger.spottable:focus {
+	transform: none !important;
+}
+
+[data-bf-animations='off'] .bf-button-bg,
+[data-bf-animations='off'] .bf-header {
+	box-shadow: none !important;
+}
+
+[data-bf-animations='off'] .bf-input-trigger > div:first-of-type {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+/* Strict mode: disable every animation/transition for maximum performance. */
+[data-bf-all-animations='off'],
+[data-bf-all-animations='off'] * {
+	scroll-behavior: auto !important;
+}
+
+[data-bf-all-animations='off'] *,
+[data-bf-all-animations='off'] *::before,
+[data-bf-all-animations='off'] *::after {
+	animation: none !important;
+	transition-property: none !important;
+	transition-duration: 0s !important;
+	transition-delay: 0s !important;
+}
+
+[data-bf-all-animations='off'] .focusExpand,
+[data-bf-all-animations='off'] .spottable:focus,
+[data-bf-all-animations='off'] [data-webos-voice-focused='true'] {
+	transform: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] .bf-input-trigger > div:first-of-type {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] .bf-header,
+[data-bf-all-animations='off'] [data-bf-navbar='true'] {
+	background: var(--bf-theme-overlay-ultra-bg) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='filter'] {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='overlay'] {
+	background: var(--bf-theme-overlay-ultra-bg) !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'] [data-bf-glass-layer='specular'] {
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+/* Elegant theme in ultra mode: use the same solid semi-transparent surface as classic (no blur). */
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] {
+	background: var(--bf-theme-overlay-ultra-bg) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='filter'] {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	filter: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='overlay'] {
+	background: var(--bf-theme-overlay-ultra-bg) !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {
+	background: transparent !important;
+	box-shadow: none !important;
+}

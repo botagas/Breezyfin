@@ -1,0 +1,80 @@
+.episodeBreadcrumb {
+	margin: 0;
+	max-width: 100%;
+	min-width: 0;
+	position: relative;
+	z-index: 1;
+}
+
+.episodeNavActions {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	flex-wrap: wrap;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.breadcrumbDivider {
+	flex: 0 0 auto;
+	font-size: 0.82rem;
+	line-height: 1;
+	color: var(--bf-md-text-breadcrumb);
+}
+
+.episodeNavButton {
+	--bf-button-fg: var(--bf-md-text-solid);
+	--bf-button-fg-hover: var(--bf-md-text-on-light);
+	--bf-button-fg-active: var(--bf-md-text-on-light);
+	max-width: min(32rem, 100%) !important;
+	min-width: 0 !important;
+	flex: 0 1 auto;
+
+	.mdControlFocusExpandReset();
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.client) {
+		max-width: 100% !important;
+		min-width: 0 !important;
+		transform: none !important;
+	}
+
+	:global(.client) {
+		display: block !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		white-space: nowrap !important;
+		font-size: 0.86em !important;
+		line-height: 1.15 !important;
+	}
+
+	.mdControlSurface(transparent; 1px solid var(--bf-md-control-border-strong); 999px);
+	.mdControlHoverSurface(var(--bf-md-text-solid));
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		transition: background 0.16s ease, border-color 0.16s ease !important;
+	}
+}
+
+.episodeSeriesButton {
+	max-width: min(34rem, 100%) !important;
+}
+
+.episodeCurrentButton {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: rgba(var(--bf-md-intro-accent-rgb), 0.2) !important;
+		border-color: rgba(var(--bf-md-intro-accent-rgb), 0.58) !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(var(--bf-md-intro-accent-rgb), 0.28) !important;
+	}
+}

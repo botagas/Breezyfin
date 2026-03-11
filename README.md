@@ -28,7 +28,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
 - Player with dynamic-range-aware direct play/direct stream/transcode fallback paths (DV -> HDR -> SDR)
-- Subtitle/audio compatibility fallbacks for webOS playback paths, with optional subtitle burn-in policy
+- Subtitle/audio compatibility fallbacks for webOS playback paths, with quality-first default subtitle behavior and UX-oriented per-format burn-in policy
 - Adaptive image delivery path: request WebP when supported, with automatic non-WebP retry fallback on image load failure
 - Built-in runtime diagnostics for playback validation and troubleshooting
 
@@ -39,16 +39,19 @@ Watch repository releases for prebuilt IPK artifacts.
 1. Download the latest IPK from Releases.
 2. Install it with webOS Dev Manager (or your preferred webOS install tool).
 
-## Install on TV (Homebrew dev repo)
+## Install on TV via Homebrew Channel
 
-Breezyfin is not yet listed in the main Homebrew catalog, but you can add the dev feed now.
+Breezyfin is listed in the main Homebrew catalog. You can install it from the official catalog.
 
+You may also install the app using the `develop` branch:
 1. Open Homebrew Channel on your TV.
 2. Go to Repositories / Manage Repositories.
 3. Add this repo URL:
 `https://raw.githubusercontent.com/botagas/Breezyfin/develop/homebrew-dev.json`
 4. Refresh repositories.
 5. Install `Breezyfin` from the newly added source.
+
+Beware, `develop` may include breaking changes.
 
 ## Local development
 
@@ -94,15 +97,11 @@ The app supports build-time/runtime debug behavior through environment flags:
 
 Defaults:
 
-- In non-production builds, Style Debug and Persistent app logging features are enabled by default.
-- In production builds, both are off unless explicitly enabled by flags.
+- In non-production builds, persistent app logging is enabled by default.
+- In production builds, persistent app logging is off unless explicitly enabled by flags.
 
 Flags:
 
-- `REACT_APP_ENABLE_STYLE_DEBUG=1`
-  - Forces Styling Debug panel/features on.
-- `REACT_APP_DISABLE_STYLE_DEBUG=1`
-  - Forces Styling Debug panel/features off.
 - `REACT_APP_ENABLE_PERSISTENT_LOGS=1`
   - Forces persistent app log capture on (stored in `localStorage`).
 - `REACT_APP_DISABLE_PERSISTENT_LOGS=1`
@@ -114,8 +113,8 @@ Examples:
 # Development server with persistent logs enabled
 REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run serve
 
-# Production build with Style Debug enabled and persistent logs on
-REACT_APP_ENABLE_STYLE_DEBUG=1 REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run pack-p
+# Production build with persistent logs on
+REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run pack-p
 ```
 
 Media Details focus tracing (runtime toggle):
@@ -133,10 +132,10 @@ Diagnostics currently include:
 
 - Performance Overlay (`FPS`, `Input`, `Mode`)
 - Playback toast with active dynamic range / play method (for quick validation)
+- Subtitle burn-in controls (enable/disable, per-codec formats, and HDR/DV override force option)
 - Device playback capability summary in Settings (DV/HDR/codec support + WebP image decode support)
 - Configurable capability check refresh period (default 30 days) with optional manual "Refresh now" action
-- Relaxed Playback Profile toggle (debug-only)
-- Styling Debug Panel shortcut (debug-only)
+- Relaxed Playback Profile toggle
 - Logs viewer and clear action
 - Wipe App Cache (clears local/session storage, cache storage, IndexedDB, unregisters service workers, then reloads)
 

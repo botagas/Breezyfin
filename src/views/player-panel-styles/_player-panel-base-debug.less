@@ -1,0 +1,83 @@
+.debugOverlay {
+	position: absolute;
+	top: 1rem;
+	left: 1rem;
+	right: auto;
+	z-index: 2147483647;
+	width: min(92vw, 56rem);
+	max-height: min(78vh, 42rem);
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 0.55rem 0.75rem;
+	.debug-overlay-surface(0.8rem);
+	pointer-events: auto;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+	font-size: 0.75rem;
+	letter-spacing: 0.01em;
+	line-height: 1.32;
+	color: var(--bf-theme-debug-value-color);
+	.debug-overlay-scrollbar();
+}
+
+.debugOverlayHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
+	margin-bottom: 0.45rem;
+}
+
+.debugOverlayTitle {
+	margin: 0;
+	.debug-overlay-label();
+	font-weight: 700;
+	letter-spacing: 0.05em;
+}
+
+.debugOverlayCloseButton {
+	--bf-button-fg: var(--bf-theme-debug-value-color);
+	--bf-button-fg-hover: var(--bf-theme-text-primary);
+	--bf-button-fg-active: var(--bf-theme-text-primary);
+	min-width: auto !important;
+	padding: 0.1rem 0.7rem !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	font-size: 0.68rem !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: rgba(255, 255, 255, 0.1) !important;
+		border: 1px solid rgba(255, 255, 255, 0.22) !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(255, 255, 255, 0.2) !important;
+		border-color: rgba(255, 255, 255, 0.35) !important;
+	}
+}
+
+.debugOverlayRow {
+	display: grid;
+	grid-template-columns: 86px minmax(0, 1fr);
+	column-gap: 0.4rem;
+	padding: 0.1rem 0;
+}
+
+.debugOverlayLabel {
+	.debug-overlay-label();
+	font-weight: 600;
+}
+
+.debugOverlayValue {
+	.debug-overlay-value();
+	word-break: break-word;
+}

@@ -1,0 +1,41 @@
+.controls {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	background: linear-gradient(
+		to bottom,
+		var(--bf-theme-player-controls-grad-edge) 0%,
+		var(--bf-theme-player-controls-grad-center) 20%,
+		var(--bf-theme-player-controls-grad-center) 80%,
+		var(--bf-theme-player-controls-grad-edge) 100%
+	);
+	pointer-events: none;
+
+	> * {
+		pointer-events: auto;
+	}
+}
+
+.topBar {
+	display: flex;
+	align-items: center;
+	padding: 64px;
+	gap: 24px;
+}
+
+.title {
+	font-size: 1.8em;
+	font-weight: 600;
+	line-height: 1.2;
+	margin: 0;
+	padding: 0;
+}
+
+.bottomBar {
+	padding: 32px 64px 64px;
+}

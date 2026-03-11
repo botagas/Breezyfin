@@ -1,0 +1,17 @@
+.settings-pill-interactive-surface(@bg; @border: none) {
+	&&:hover :global(.bf-button-bg),
+	&&:focus :global(.bf-button-bg),
+	&&:global(.spottable):focus :global(.bf-button-bg),
+	&&:global(.spotlight) :global(.bf-button-bg),
+	&&:global([data-webos-voice-focused='true']) :global(.bf-button-bg),
+	&&:hover :global(.bg),
+	&&:focus :global(.bg),
+	&&:global(.spottable):focus :global(.bg),
+	&&:global(.spotlight) :global(.bg),
+	&&:global([data-webos-voice-focused='true']) :global(.bg),
+	&&:global(.selected) :global(.bf-button-bg),
+	&&:global(.selected) :global(.bg) {
+		background: @bg !important;
+		border: @border !important;
+	}
+}

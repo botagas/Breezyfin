@@ -1,74 +1,25 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Panel } from '../components/BreezyPanels';
-import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
-import Input from '@enact/sandstone/Input';
 import Spottable from '@enact/spotlight/Spottable';
 import jellyfinService from '../services/jellyfinService';
 import {getUserErrorMessage} from '../utils/errorMessages';
-import { shuffleArray } from '../utils/arrayUtils';
 import { useMapById } from '../hooks/useMapById';
 import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
-import {applyImageFormatFallbackFromEvent, applyPreferredImageFormatToParams} from '../utils/imageFormat';
+import {buildUserPrimaryImageUrl} from './login-panel/utils/loginImageUrls';
+import {useLoginBackdrops} from './login-panel/hooks/useLoginBackdrops';
+import LoginBackdropLayer from './login-panel/components/LoginBackdropLayer';
+import LoginSavedAccountsStep from './login-panel/components/LoginSavedAccountsStep';
+import LoginServerConnectStep from './login-panel/components/LoginServerConnectStep';
+import LoginCredentialsStep from './login-panel/components/LoginCredentialsStep';
 
 import css from './LoginPanel.module.less';
+import imageLoadCss from '../components/ImageLoadReveal.module.less';
 
 const SpottableDiv = Spottable('div');
-
-const LOGIN_BACKDROP_ITEM_LIMIT = 40;
-const LOGIN_BACKDROP_WIDTH = 1920;
-const LOGIN_BACKDROP_MAX_IMAGES = 24;
-const LOGIN_BACKDROP_ROTATE_INTERVAL_MS = 9000;
-const LOGIN_BACKDROP_TRANSITION_MS = 500;
-const LOGIN_BACKDROP_IMAGE_FIELDS = [
-	'BackdropImageTags',
-	'ImageTags',
-	'PrimaryImageTag',
-	'SeriesId',
-	'SeriesPrimaryImageTag',
-	'ParentBackdropItemId',
-	'ParentBackdropImageTags'
-].join(',');
-
-const getFirstImageTag = (value) => (
-	Array.isArray(value) && typeof value[0] === 'string' && value[0]
-		? value[0]
-		: null
-);
-
-const buildItemImageUrl = ({ baseUrl, itemId, imageType, accessToken, width, tag = null, index = null }) => {
-	if (!baseUrl || !itemId || !imageType || !accessToken) return '';
-	const normalizedBase = baseUrl.replace(/\/+$/, '');
-	const params = new URLSearchParams({
-		width: String(width),
-		api_key: accessToken
-	});
-	if (tag) {
-		params.set('tag', tag);
-	}
-	applyPreferredImageFormatToParams(params);
-	const imageSuffix = index == null ? imageType : `${imageType}/${index}`;
-	return `${normalizedBase}/Items/${itemId}/Images/${imageSuffix}?${params.toString()}`;
-};
-
-const buildUserPrimaryImageUrl = ({ baseUrl, userId, accessToken, width, tag = null }) => {
-	if (!baseUrl || !userId || !accessToken || !tag) return '';
-	const normalizedBase = baseUrl.replace(/\/+$/, '');
-	const params = new URLSearchParams({
-		width: String(width),
-		api_key: accessToken,
-		tag
-	});
-	applyPreferredImageFormatToParams(params);
-	return `${normalizedBase}/Users/${userId}/Images/Primary?${params.toString()}`;
-};
-
-const normalizeImageTag = (value) => (
-	typeof value === 'string' && value ? value : null
-);
 
 const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
@@ -81,34 +32,29 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'login'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
-	const [loginBackdropUrls, setLoginBackdropUrls] = useState([]);
-	const [activeBackdropIndex, setActiveBackdropIndex] = useState(0);
-	const [previousBackdropIndex, setPreviousBackdropIndex] = useState(null);
-	const [isBackdropTransitioning, setIsBackdropTransitioning] = useState(false);
-	const [backdropImageErrors, setBackdropImageErrors] = useState({});
-	const backdropRotateTimerRef = useRef(null);
-	const backdropTransitionTimerRef = useRef(null);
+	const [loadedSavedAvatarKeys, setLoadedSavedAvatarKeys] = useState(() => new Set());
 	const savedServerKeySelector = useCallback(
 		(entry) => `${entry.serverId}:${entry.userId}`,
 		[]
 	);
 	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
-	const currentBackdropUrl = loginBackdropUrls[activeBackdropIndex] || '';
-	const previousBackdropUrl =
-		previousBackdropIndex === null || previousBackdropIndex === activeBackdropIndex
-			? ''
-			: loginBackdropUrls[previousBackdropIndex] || '';
-
-	useEffect(() => () => {
-		if (backdropRotateTimerRef.current) {
-			clearInterval(backdropRotateTimerRef.current);
-			backdropRotateTimerRef.current = null;
-		}
-		if (backdropTransitionTimerRef.current) {
-			clearTimeout(backdropTransitionTimerRef.current);
-			backdropTransitionTimerRef.current = null;
-		}
-	}, []);
+	const {
+		currentBackdropUrl,
+		previousBackdropUrl,
+		isBackdropTransitioning,
+		backdropImageErrors,
+		currentBackdropLoaded,
+		previousBackdropLoaded,
+		handleBackdropLoad,
+		handleBackdropError
+	} = useLoginBackdrops({
+		isActive,
+		savedServers
+	});
+	const savedAvatarKeysSignature = useMemo(
+		() => savedServers.map((entry) => `${entry.serverId}:${entry.userId}`).join('|'),
+		[savedServers]
+	);
 
 	const getInitialStep = useCallback((entries) => {
 		return entries.length > 0 ? 'saved' : 'server';
@@ -158,233 +104,9 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		};
 	}, [sessionNotice, sessionNoticeNonce]);
 
-	const fetchBackdropsForSavedServer = useCallback(async (entry, signal) => {
-		if (!entry?.url || !entry?.userId || !entry?.accessToken) return [];
-		const baseUrl = entry.url.replace(/\/+$/, '');
-		const requestUrls = [
-			`${baseUrl}/Users/${entry.userId}/Items?includeItemTypes=Movie,Series,Episode&recursive=true&limit=${LOGIN_BACKDROP_ITEM_LIMIT}&sortBy=DateCreated&sortOrder=Descending&fields=${LOGIN_BACKDROP_IMAGE_FIELDS}&imageTypeLimit=1&enableTotalRecordCount=false`,
-			`${baseUrl}/Users/${entry.userId}/Items/Resume?limit=${LOGIN_BACKDROP_ITEM_LIMIT}&fields=${LOGIN_BACKDROP_IMAGE_FIELDS}&imageTypeLimit=1`
-		];
-
-		try {
-			const responses = await Promise.all(
-				requestUrls.map((requestUrl) => (
-					fetch(requestUrl, {
-						headers: {
-							'X-Emby-Token': entry.accessToken
-						},
-						signal
-					}).catch(() => null)
-				))
-			);
-			const payloads = await Promise.all(
-				responses
-					.filter((response) => response?.ok)
-					.map((response) => response.json().catch(() => null))
-			);
-			const items = [];
-			payloads.forEach((data) => {
-				if (Array.isArray(data?.Items)) {
-					items.push(...data.Items);
-				}
-			});
-			if (items.length === 0) return [];
-			const urls = [];
-			const addImageUrl = (itemId, imageType, tag = null, index = null) => {
-				const imageUrl = buildItemImageUrl({
-					baseUrl,
-					itemId,
-					imageType,
-					accessToken: entry.accessToken,
-					width: LOGIN_BACKDROP_WIDTH,
-					tag,
-					index
-				});
-				if (imageUrl) {
-					urls.push(imageUrl);
-				}
-			};
-
-			items.forEach((item) => {
-				if (!item?.Id) return;
-				const backdropTag = getFirstImageTag(item.BackdropImageTags)
-					|| (typeof item.ImageTags?.Backdrop === 'string' && item.ImageTags.Backdrop ? item.ImageTags.Backdrop : null);
-				if (backdropTag) {
-					addImageUrl(item.Id, 'Backdrop', backdropTag, 0);
-				}
-
-				const primaryTag = item.PrimaryImageTag || item.ImageTags?.Primary || null;
-				if (primaryTag) {
-					addImageUrl(item.Id, 'Primary', primaryTag);
-				}
-
-				if (item.SeriesId && item.SeriesPrimaryImageTag) {
-					addImageUrl(item.SeriesId, 'Primary', item.SeriesPrimaryImageTag);
-				}
-
-				if (item.ParentBackdropItemId) {
-					const parentBackdropTag = getFirstImageTag(item.ParentBackdropImageTags);
-					if (parentBackdropTag) {
-						addImageUrl(item.ParentBackdropItemId, 'Backdrop', parentBackdropTag, 0);
-					}
-				}
-			});
-			return [...new Set(urls)];
-		} catch (err) {
-			if (err?.name === 'AbortError') return [];
-			return [];
-		}
-	}, []);
-
-	const resolveSavedUserBackdrop = useCallback(async (entry, signal) => {
-		if (!entry?.url || !entry?.userId || !entry?.accessToken) return '';
-		const baseUrl = entry.url.replace(/\/+$/, '');
-		let tag = normalizeImageTag(entry.avatarTag);
-
-		if (!tag) {
-			try {
-				const response = await fetch(`${baseUrl}/Users/${entry.userId}`, {
-					headers: {
-						'X-Emby-Token': entry.accessToken
-					},
-					signal
-				});
-				if (response?.ok) {
-					const data = await response.json().catch(() => null);
-					tag = normalizeImageTag(data?.PrimaryImageTag);
-				}
-			} catch (err) {
-				if (err?.name === 'AbortError') return '';
-			}
-		}
-
-		return buildUserPrimaryImageUrl({
-			baseUrl: entry.url,
-			userId: entry.userId,
-			accessToken: entry.accessToken,
-			width: LOGIN_BACKDROP_WIDTH,
-			tag
-		});
-	}, []);
-
 	useEffect(() => {
-		if (!isActive) {
-			setLoginBackdropUrls([]);
-			setBackdropImageErrors({});
-			return undefined;
-		}
-
-		const availableServers = (savedServers || [])
-			.filter((entry) => entry?.url && entry?.userId && entry?.accessToken)
-			.slice(0, 4);
-		if (availableServers.length === 0) {
-			setLoginBackdropUrls([]);
-			setBackdropImageErrors({});
-			return undefined;
-		}
-
-		const controller = new AbortController();
-		let isCancelled = false;
-
-		const loadBackdrops = async () => {
-			try {
-				const [perServerBackdrops, fallbackUserBackdrops] = await Promise.all([
-					Promise.all(
-						availableServers.map((entry) => fetchBackdropsForSavedServer(entry, controller.signal))
-					),
-					Promise.all(
-						availableServers.map((entry) => resolveSavedUserBackdrop(entry, controller.signal))
-					)
-				]);
-				if (isCancelled) return;
-				const uniqueBackdrops = [...new Set(perServerBackdrops.flat().filter(Boolean))];
-				const candidateBackdrops = [...new Set([
-					...uniqueBackdrops,
-					...fallbackUserBackdrops.filter(Boolean)
-				])];
-				const nextBackdrops = shuffleArray(candidateBackdrops).slice(0, LOGIN_BACKDROP_MAX_IMAGES);
-				setLoginBackdropUrls(nextBackdrops);
-				setBackdropImageErrors({});
-			} catch (err) {
-				if (isCancelled || err?.name === 'AbortError') return;
-				setLoginBackdropUrls([]);
-				setBackdropImageErrors({});
-			}
-		};
-
-		loadBackdrops();
-
-		return () => {
-			isCancelled = true;
-			controller.abort();
-		};
-	}, [fetchBackdropsForSavedServer, isActive, resolveSavedUserBackdrop, savedServers]);
-
-	useEffect(() => {
-		setActiveBackdropIndex(0);
-		setPreviousBackdropIndex(null);
-		setIsBackdropTransitioning(false);
-	}, [loginBackdropUrls]);
-
-	const advanceBackdrop = useCallback(() => {
-		setActiveBackdropIndex((previousIndex) => {
-			if (loginBackdropUrls.length < 2) return previousIndex;
-			const nextIndex = (previousIndex + 1) % loginBackdropUrls.length;
-			if (nextIndex === previousIndex) return previousIndex;
-			setPreviousBackdropIndex(previousIndex);
-			return nextIndex;
-		});
-	}, [loginBackdropUrls.length]);
-
-	useEffect(() => {
-		if (!isActive || loginBackdropUrls.length < 2) return undefined;
-		if (backdropRotateTimerRef.current) {
-			clearInterval(backdropRotateTimerRef.current);
-		}
-		backdropRotateTimerRef.current = setInterval(
-			advanceBackdrop,
-			LOGIN_BACKDROP_ROTATE_INTERVAL_MS
-		);
-		return () => {
-			if (backdropRotateTimerRef.current) {
-				clearInterval(backdropRotateTimerRef.current);
-				backdropRotateTimerRef.current = null;
-			}
-		};
-	}, [advanceBackdrop, isActive, loginBackdropUrls.length]);
-
-	useEffect(() => {
-		if (previousBackdropIndex === null || previousBackdropIndex === activeBackdropIndex) return undefined;
-		setIsBackdropTransitioning(true);
-		if (backdropTransitionTimerRef.current) {
-			clearTimeout(backdropTransitionTimerRef.current);
-		}
-		backdropTransitionTimerRef.current = setTimeout(() => {
-			setIsBackdropTransitioning(false);
-			setPreviousBackdropIndex(null);
-			backdropTransitionTimerRef.current = null;
-		}, LOGIN_BACKDROP_TRANSITION_MS);
-		return () => {
-			if (backdropTransitionTimerRef.current) {
-				clearTimeout(backdropTransitionTimerRef.current);
-				backdropTransitionTimerRef.current = null;
-			}
-		};
-	}, [activeBackdropIndex, previousBackdropIndex]);
-
-	const handleBackdropError = useCallback((event) => {
-		const source = event.currentTarget?.currentSrc || event.currentTarget?.src;
-		if (!source) return;
-		if (applyImageFormatFallbackFromEvent(event)) return;
-		setBackdropImageErrors((previous) => (
-			previous[source] ? previous : { ...previous, [source]: true }
-		));
-		setLoginBackdropUrls((previous) => (
-			previous.includes(source)
-				? previous.filter((url) => url !== source)
-				: previous
-		));
-	}, []);
+		setLoadedSavedAvatarKeys(new Set());
+	}, [savedAvatarKeysSignature]);
 
 	const normalizedServerUrl = useMemo(
 		() => serverUrl.trim().replace(/\/+$/, ''),
@@ -416,8 +138,9 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	}, [normalizedServerUrl, serverUrlValid]);
 
 	const handleLogin = useCallback(async () => {
-		if (!username || !password) {
-			setError('Username and password are required.');
+		const normalizedUsername = String(username || '').trim();
+		if (!normalizedUsername) {
+			setError('Username is required.');
 			return;
 		}
 
@@ -426,7 +149,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		setStatus('Signing in...');
 
 		try {
-			await jellyfinService.authenticate(username, password);
+			await jellyfinService.authenticate(normalizedUsername, String(password || ''));
 			onLogin();
 		} catch (err) {
 			setError(getUserErrorMessage(err, 'Login failed. Please check your credentials.'));
@@ -522,7 +245,29 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		});
 	}, []);
 
-	const handleSavedAvatarError = useImageErrorFallback();
+	const handleSavedAvatarLoad = useCallback((event) => {
+		const avatarKey = event.currentTarget?.dataset?.savedAvatarKey;
+		if (!avatarKey) return;
+		setLoadedSavedAvatarKeys((currentKeys) => {
+			if (currentKeys.has(avatarKey)) return currentKeys;
+			const nextKeys = new Set(currentKeys);
+			nextKeys.add(avatarKey);
+			return nextKeys;
+		});
+	}, []);
+
+	const handleSavedAvatarError = useImageErrorFallback(null, {
+		onError: (_, {image}) => {
+			const avatarKey = image?.dataset?.savedAvatarKey;
+			if (!avatarKey) return;
+			setLoadedSavedAvatarKeys((currentKeys) => {
+				if (!currentKeys.has(avatarKey)) return currentKeys;
+				const nextKeys = new Set(currentKeys);
+				nextKeys.delete(avatarKey);
+				return nextKeys;
+			});
+		}
+	});
 
 	const headingText = step === 'saved'
 		? 'Choose Account'
@@ -539,25 +284,18 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		<Panel {...rest} noCloseButton>
 			<Scroller>
 				<div className={css.page}>
-					<div className={css.backdropLayer} aria-hidden="true">
-						{isBackdropTransitioning && previousBackdropUrl && !backdropImageErrors[previousBackdropUrl] ? (
-							<img
-								src={previousBackdropUrl}
-								alt=""
-								className={`${css.backdropImage} ${css.backdropImageOutgoing}`}
-								onError={handleBackdropError}
-							/>
-						) : null}
-						{currentBackdropUrl && !backdropImageErrors[currentBackdropUrl] ? (
-							<img
-								src={currentBackdropUrl}
-								alt=""
-								className={`${css.backdropImage} ${isBackdropTransitioning ? css.backdropImageIncoming : css.backdropImageCurrent}`}
-								onError={handleBackdropError}
-							/>
-						) : null}
-						<div className={css.backdropGradient} />
-					</div>
+					<LoginBackdropLayer
+						css={css}
+						imageLoadCss={imageLoadCss}
+						isBackdropTransitioning={isBackdropTransitioning}
+						previousBackdropUrl={previousBackdropUrl}
+						currentBackdropUrl={currentBackdropUrl}
+						backdropImageErrors={backdropImageErrors}
+						previousBackdropLoaded={previousBackdropLoaded}
+						currentBackdropLoaded={currentBackdropLoaded}
+						onBackdropLoad={handleBackdropLoad}
+						onBackdropError={handleBackdropError}
+					/>
 					<div className={css.loginBox}>
 						<div className={css.header}>
 							<Heading size="large" spacing="medium">
@@ -569,110 +307,44 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 						<BodyText className={css.lead}>{leadText}</BodyText>
 
 						{step === 'saved' ? (
-							<div className={css.savedServers}>
-								<div className={css.savedList}>
-									{savedServers.map((entry) => {
-										const key = `${entry.serverId}:${entry.userId}`;
-										const isResuming = resumingKey === key;
-										const userInitial = (entry.username || '?').charAt(0).toUpperCase();
-										const avatarUrl = getSavedUserAvatarUrl(entry);
-										return (
-											<SpottableDiv
-												key={key}
-												data-resume-key={key}
-												className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
-												onClick={handleResumeClick}
-											>
-												<div className={css.savedAvatar}>
-													{avatarUrl && (
-														<img
-															src={avatarUrl}
-															alt={`${entry.username || 'User'} avatar`}
-															onError={handleSavedAvatarError}
-														/>
-													)}
-													<span className={css.savedAvatarFallback}>{userInitial}</span>
-												</div>
-												<BodyText className={css.savedName}>
-													{entry.username || 'User'}
-												</BodyText>
-												<BodyText className={css.savedState}>
-													{isResuming ? 'Opening...' : (entry.serverName || 'Jellyfin Server')}
-												</BodyText>
-											</SpottableDiv>
-										);
-									})}
-								</div>
-								<Button
-									onClick={handleManualLogin}
-									disabled={loading}
-									size="large"
-									className={css.manualLoginButton}
-								>
-									Log in manually
-								</Button>
-							</div>
+							<LoginSavedAccountsStep
+								SavedItemComponent={SpottableDiv}
+								savedServers={savedServers}
+								resumingKey={resumingKey}
+								loading={loading}
+								loadedSavedAvatarKeys={loadedSavedAvatarKeys}
+								getSavedUserAvatarUrl={getSavedUserAvatarUrl}
+								onResumeClick={handleResumeClick}
+								onManualLogin={handleManualLogin}
+								onSavedAvatarLoad={handleSavedAvatarLoad}
+								onSavedAvatarError={handleSavedAvatarError}
+								css={css}
+								imageLoadCss={imageLoadCss}
+							/>
 						) : step === 'server' ? (
-							<div className={css.form}>
-								<Input
-									type="url"
-									placeholder="http://192.168.1.100:8096"
-									value={serverUrl}
-									onChange={handleServerUrlChange}
-									onKeyDown={handleServerUrlKeyDown}
-									disabled={loading}
-									invalid={!serverUrlValid}
-									className={`bf-input-trigger ${css.inputField}`}
-								/>
-								<Button
-									onClick={handleConnect}
-									disabled={!serverUrlValid || loading}
-									size="large"
-								>
-									{loading ? 'Connecting...' : 'Connect'}
-								</Button>
-							</div>
+							<LoginServerConnectStep
+								serverUrl={serverUrl}
+								loading={loading}
+								serverUrlValid={serverUrlValid}
+								onServerUrlChange={handleServerUrlChange}
+								onServerUrlKeyDown={handleServerUrlKeyDown}
+								onConnect={handleConnect}
+								css={css}
+							/>
 						) : (
-							<div className={css.form}>
-								<BodyText className={css.serverInfo}>Server: {serverUrl}</BodyText>
-								<Input
-									placeholder="Username"
-									value={username}
-									onChange={handleUsernameChange}
-									disabled={loading}
-									onKeyDown={handleUsernameKeyDown}
-									className={`bf-input-trigger ${css.inputField}`}
-								/>
-								<Input
-									type="password"
-									placeholder="Password"
-									value={password}
-									onChange={handlePasswordChange}
-									onKeyDown={handlePasswordKeyDown}
-									disabled={loading}
-									className={`bf-input-trigger ${css.inputField}`}
-								/>
-								<div className={css.buttonRow}>
-									<Button
-										onClick={handleBack}
-										disabled={loading}
-										size="large"
-										focusEffect="static"
-										className={css.authTextButton}
-									>
-										Back
-									</Button>
-									<Button
-										onClick={handleLogin}
-										disabled={!username || !password || loading}
-										size="large"
-										focusEffect="static"
-										className={css.authTextButton}
-									>
-										{loading ? 'Signing In...' : 'Sign In'}
-									</Button>
-								</div>
-							</div>
+							<LoginCredentialsStep
+								serverUrl={serverUrl}
+								username={username}
+								password={password}
+								loading={loading}
+								onUsernameChange={handleUsernameChange}
+								onUsernameKeyDown={handleUsernameKeyDown}
+								onPasswordChange={handlePasswordChange}
+								onPasswordKeyDown={handlePasswordKeyDown}
+								onBack={handleBack}
+								onLogin={handleLogin}
+								css={css}
+							/>
 						)}
 
 						{status && <BodyText className={css.status}>{status}</BodyText>}

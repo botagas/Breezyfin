@@ -4,7 +4,9 @@ export const DEFAULT_SETTINGS = {
 	maxBitrate: '40',
 	enableTranscoding: true,
 	forceTranscoding: false,
+	enableSubtitleBurnIn: true,
 	forceTranscodingWithSubtitles: false,
+	subtitleBurnInTextCodecs: ['ass', 'ssa'],
 	relaxedPlaybackProfile: false,
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
@@ -21,6 +23,10 @@ export const DEFAULT_SETTINGS = {
 	showSeasonImages: false,
 	useSidewaysEpisodeList: true,
 	showPerformanceOverlay: false,
+	showExtendedPlayerDebugOverlay: false,
+	forceDolbyVision: false,
+	enableFmp4HlsContainerPreference: true,
+	forceFmp4HlsContainerPreference: false,
 	homeRows: {
 		recentlyAdded: true,
 		continueWatching: true,
@@ -68,11 +74,21 @@ export const CAPABILITY_PROBE_REFRESH_OPTIONS = [
 	{value: '90', label: '90 days'}
 ];
 
+export const SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS = [
+	{value: 'ass', label: 'ASS'},
+	{value: 'ssa', label: 'SSA'},
+	{value: 'srt', label: 'SRT/SubRip'},
+	{value: 'webvtt', label: 'WebVTT'},
+	{value: 'sami', label: 'SAMI/SMI'},
+	{value: 'ttml', label: 'TTML/DFXP'}
+];
+
 export const SETTINGS_DISCLOSURE_KEYS = {
 	BITRATE: 'bitratePopup',
 	CAPABILITY_PROBE_REFRESH: 'capabilityProbeRefreshPopup',
 	AUDIO_LANGUAGE: 'audioLanguagePopup',
 	SUBTITLE_LANGUAGE: 'subtitleLanguagePopup',
+	SUBTITLE_BURN_IN_TEXT_CODECS: 'subtitleBurnInTextCodecsPopup',
 	NAVBAR_THEME: 'navbarThemePopup',
 	PLAY_NEXT_PROMPT_MODE: 'playNextPromptModePopup',
 	LOGOUT_CONFIRM: 'logoutConfirmPopup',
@@ -85,6 +101,7 @@ export const SETTINGS_DISCLOSURE_KEY_LIST = [
 	SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH,
 	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
 	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
 	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
 	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
@@ -97,6 +114,7 @@ export const INITIAL_SETTINGS_DISCLOSURES = {
 	[SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH]: false,
 	[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS]: false,
 	[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME]: false,
 	[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM]: false,
@@ -111,6 +129,7 @@ export const DISCLOSURE_BACK_PRIORITY = [
 	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
 	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
 	SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.BITRATE

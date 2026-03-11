@@ -1,0 +1,69 @@
+.userMenuElegant .menuButton {
+	--bf-button-fg: var(--bf-elegant-text-base);
+	--bf-button-fg-hover: var(--bf-elegant-accent);
+	--bf-button-fg-active: var(--bf-elegant-accent);
+	font-family: 'Noto Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
+	font-weight: 300 !important;
+	line-height: 2 !important;
+	letter-spacing: 0.03em;
+	min-height: 2.05rem !important;
+	max-height: 2.05rem !important;
+	padding: 0.95rem !important;
+	border-radius: 0.62rem !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+	transform: none !important;
+}
+
+.userMenuElegant .menuButton::before,
+.userMenuElegant .menuButton::after {
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+}
+
+.userMenuElegant .menuButton :global(.bf-button-bg),
+.userMenuElegant .menuButton :global(.bg) {
+	background: transparent !important;
+	border: none !important;
+	border-radius: inherit !important;
+	box-shadow: none !important;
+	opacity: 1 !important;
+	transform: none !important;
+	filter: none !important;
+	transition: none !important;
+	will-change: auto !important;
+}
+
+.userMenuElegant .menuButton :global(.client),
+.userMenuElegant .menuButton :global(.marquee) {
+	font-family: inherit !important;
+	font-weight: 300 !important;
+	line-height: 1 !important;
+	letter-spacing: 0.03em !important;
+	color: inherit !important;
+}
+
+.userMenuElegant .menuButton:hover,
+.userMenuElegant .menuButton:focus,
+.userMenuElegant .menuButton:global(.spottable):focus {
+	background: var(--bf-elegant-tab-active-bg) !important;
+	border: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+.userMenuElegant .menuButton:hover :global(.bf-button-bg),
+.userMenuElegant .menuButton:focus :global(.bf-button-bg),
+.userMenuElegant .menuButton:global(.spottable):focus :global(.bf-button-bg),
+.userMenuElegant .menuButton:hover :global(.bg),
+.userMenuElegant .menuButton:focus :global(.bg),
+.userMenuElegant .menuButton:global(.spottable):focus :global(.bg) {
+	background: transparent !important;
+	border: none !important;
+	transform: none !important;
+	filter: none !important;
+	box-shadow: none !important;
+}

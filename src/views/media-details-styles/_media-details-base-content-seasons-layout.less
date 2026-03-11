@@ -1,0 +1,33 @@
+.seriesContent {
+	margin-bottom: 32px;
+}
+
+.sectionHeading {
+	margin-bottom: 20px;
+	color: var(--bf-md-text-primary);
+	font-weight: 600;
+}
+
+.seasonsSection {
+	margin-bottom: 48px;
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 24rem;
+}
+
+.seasonCards {
+	display: flex;
+	gap: 1rem;
+	overflow-x: auto;
+	overflow-y: visible;
+	padding: 1rem;
+	scroll-behavior: smooth;
+	contain: layout style;
+
+	// Hide scrollbar but keep functionality
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}

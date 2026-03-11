@@ -1,6 +1,8 @@
+import { useState, useEffect, useCallback } from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
-import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
+import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import imageLoadCss from './ImageLoadReveal.module.less';
 
 const SpottableDiv = Spottable('div');
 
@@ -28,11 +30,33 @@ const PosterMediaCard = ({
 	usePlaceholderClassWhenNoImage = false,
 	...rest
 }) => {
-	const handleImageError = useImageErrorFallback(placeholderClassName);
+	const [imageLoaded, setImageLoaded] = useState(false);
+	const [imageFailed, setImageFailed] = useState(false);
 	const hasImage = Boolean(imageUrl);
+
+	useEffect(() => {
+		setImageLoaded(false);
+		setImageFailed(false);
+	}, [imageUrl]);
+
+	const handleImageLoad = useCallback(() => {
+		setImageLoaded(true);
+	}, []);
+
+	const handleImageError = useCallback((event) => {
+		if (applyImageFormatFallbackFromEvent(event)) {
+			setImageLoaded(false);
+			return;
+		}
+		setImageLoaded(false);
+		setImageFailed(true);
+	}, []);
+
+	const showImage = hasImage && !imageFailed;
+	const showLoadingHint = showImage && !imageLoaded;
 	const imageContainerClassName = joinClasses(
 		imageClassName,
-		!hasImage && usePlaceholderClassWhenNoImage && placeholderClassName
+		((!hasImage && usePlaceholderClassWhenNoImage) || imageFailed) && placeholderClassName
 	);
 
 	return (
@@ -46,10 +70,15 @@ const PosterMediaCard = ({
 			{...rest}
 		>
 			<div className={imageContainerClassName}>
-				{hasImage ? (
+				{showImage ? (
 					<img
 						src={imageUrl}
 						alt={imageAlt || title}
+						className={joinClasses(
+							imageLoadCss.imageReveal,
+							imageLoaded && imageLoadCss.imageRevealLoaded
+						)}
+						onLoad={handleImageLoad}
 						onError={handleImageError}
 						loading="lazy"
 						decoding="async"
@@ -59,6 +88,12 @@ const PosterMediaCard = ({
 					<div className={placeholderInnerClassName}>
 						<BodyText>{placeholderText}</BodyText>
 					</div>
+				) : null}
+				{showLoadingHint ? (
+					<div
+						className={imageLoadCss.imageLoadingHint}
+						aria-hidden="true"
+					/>
 				) : null}
 				{overlayContent}
 			</div>

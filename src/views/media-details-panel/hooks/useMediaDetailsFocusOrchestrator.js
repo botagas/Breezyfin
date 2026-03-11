@@ -2,6 +2,15 @@ import {useCallback, useEffect} from 'react';
 import Spotlight from '@enact/spotlight';
 import {scrollElementIntoHorizontalView} from '../../../utils/horizontalScroll';
 
+const STABLE_DETAILS_SPOTLIGHT_IDS = new Set([
+	'episode-selector-button'
+]);
+
+const resolveRefNode = (ref) => ref?.current?.nodeRef?.current || ref?.current || null;
+const isNodeWithinTarget = (node, target) => (
+	Boolean(node && target && (node === target || target.contains?.(node)))
+);
+
 export const useMediaDetailsFocusOrchestrator = ({
 	item,
 	isActive,
@@ -43,7 +52,7 @@ export const useMediaDetailsFocusOrchestrator = ({
 			window.clearTimeout(castFocusScrollTimeoutRef.current);
 		}
 		castFocusScrollTimeoutRef.current = window.setTimeout(() => {
-			scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10});
+			scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
 			castFocusScrollTimeoutRef.current = null;
 		}, 45);
 	}, [castFocusScrollTimeoutRef, castScrollerRef]);
@@ -132,7 +141,9 @@ export const useMediaDetailsFocusOrchestrator = ({
 		const cards = Array.from(episodesListRef.current?.querySelectorAll(`.${css.episodeCard}`) || []);
 		if (index >= 0 && index < cards.length) {
 			cards[index].focus();
+			return true;
 		}
+		return false;
 	}, [css.episodeCard, episodesListRef]);
 
 	const focusEpisodeInfoButtonByIndex = useCallback((index) => {
@@ -183,98 +194,102 @@ export const useMediaDetailsFocusOrchestrator = ({
 		return false;
 	}, [episodeSelectorButtonRef]);
 
+	const getAudioSelectorTarget = useCallback(() => (
+		resolveRefNode(audioSelectorButtonRef) ||
+		detailsContainerRef.current?.querySelector?.('[aria-label^="Audio track"]') ||
+		null
+	), [audioSelectorButtonRef, detailsContainerRef]);
+
+	const getSubtitleSelectorTarget = useCallback(() => (
+		resolveRefNode(subtitleSelectorButtonRef) ||
+		detailsContainerRef.current?.querySelector?.('[aria-label^="Subtitle track"]') ||
+		null
+	), [detailsContainerRef, subtitleSelectorButtonRef]);
+
+	const getPrimaryPlayTarget = useCallback(() => (
+		resolveRefNode(playPrimaryButtonRef) ||
+		detailsContainerRef.current?.querySelector?.(`.${css.introPlayButton}, .${css.primaryButton}`) ||
+		null
+	), [css.introPlayButton, css.primaryButton, detailsContainerRef, playPrimaryButtonRef]);
+
+	const getBackNavigationTarget = useCallback(() => (
+		detailsContainerRef.current?.querySelector?.('[data-bf-md-nav="back"]') || null
+	), [detailsContainerRef]);
+
 	const focusBelowSeasons = useCallback(() => {
 		if (focusEpisodeSelector()) return;
 		focusEpisodeCardByIndex(0);
 	}, [focusEpisodeCardByIndex, focusEpisodeSelector]);
 
 	const focusNonSeriesAudioSelector = useCallback(() => {
-		const target = audioSelectorButtonRef.current?.nodeRef?.current || audioSelectorButtonRef.current;
-		if (target?.focus) {
-			target.focus({preventScroll: true});
-			return true;
-		}
-		return false;
-	}, [audioSelectorButtonRef]);
-
-	const focusNonSeriesSubtitleSelector = useCallback(() => {
-		const target = subtitleSelectorButtonRef.current?.nodeRef?.current || subtitleSelectorButtonRef.current;
-		if (target?.focus) {
-			target.focus({preventScroll: true});
-			return true;
-		}
-		return false;
-	}, [subtitleSelectorButtonRef]);
-
-	const focusNonSeriesPrimaryPlay = useCallback(() => {
-		const target = playPrimaryButtonRef.current?.nodeRef?.current || playPrimaryButtonRef.current;
+		const target = getAudioSelectorTarget();
 		if (target?.focus) {
 			focusNodeWithoutScroll(target);
 			return true;
 		}
 		return false;
-	}, [focusNodeWithoutScroll, playPrimaryButtonRef]);
+	}, [focusNodeWithoutScroll, getAudioSelectorTarget]);
 
-	const focusHeaderActionNoScroll = useCallback(() => {
-		const favoriteTarget = document.querySelector('[data-spotlight-id="details-favorite-action"]') ||
-			favoriteActionButtonRef.current?.nodeRef?.current ||
-			favoriteActionButtonRef.current;
-		const watchedTarget = document.querySelector('[data-spotlight-id="details-watched-action"]') ||
-			watchedActionButtonRef.current?.nodeRef?.current ||
-			watchedActionButtonRef.current;
-
-		if (favoriteTarget?.focus) {
-			focusNodeWithoutScroll(favoriteTarget);
-			return true;
-		}
-		if (watchedTarget?.focus) {
-			focusNodeWithoutScroll(watchedTarget);
+	const focusNonSeriesSubtitleSelector = useCallback(() => {
+		const target = getSubtitleSelectorTarget();
+		if (target?.focus) {
+			focusNodeWithoutScroll(target);
 			return true;
 		}
 		return false;
-	}, [favoriteActionButtonRef, focusNodeWithoutScroll, watchedActionButtonRef]);
+	}, [focusNodeWithoutScroll, getSubtitleSelectorTarget]);
+
+	const focusNonSeriesPrimaryPlay = useCallback(() => {
+		const target = getPrimaryPlayTarget();
+		if (target?.focus) {
+			focusNodeWithoutScroll(target);
+			return true;
+		}
+		return false;
+	}, [focusNodeWithoutScroll, getPrimaryPlayTarget]);
+
+	const focusBackNavigationNoScroll = useCallback(() => {
+		const target = getBackNavigationTarget();
+		if (!target?.focus) return false;
+		focusNodeWithoutScroll(target);
+		return true;
+	}, [focusNodeWithoutScroll, getBackNavigationTarget]);
 
 	const focusInitialDetailsControl = useCallback(() => {
 		const container = detailsContainerRef.current;
 		const activeElement = document.activeElement;
 		if (container && activeElement && container.contains(activeElement)) {
+			const anchoredSpotlightId = activeElement.closest?.('[data-spotlight-id]')?.getAttribute('data-spotlight-id');
+			if (STABLE_DETAILS_SPOTLIGHT_IDS.has(anchoredSpotlightId)) {
+				logDetailsDebug('focus-seed-skip-stable-active-inside', {
+					active: describeNode(activeElement),
+					spotlightId: anchoredSpotlightId,
+					scroll: getScrollSnapshot()
+				});
+				return true;
+			}
+			const stablePrimaryTargets = [
+				getAudioSelectorTarget(),
+				getSubtitleSelectorTarget(),
+				getPrimaryPlayTarget()
+			];
+			const stabilizedByPrimaryControl = stablePrimaryTargets.some((target) => (
+				isNodeWithinTarget(activeElement, target)
+			));
+			if (stabilizedByPrimaryControl) {
+				logDetailsDebug('focus-seed-skip-stable-active-inside', {
+					active: describeNode(activeElement),
+					spotlightId: anchoredSpotlightId || null,
+					scroll: getScrollSnapshot()
+				});
+				return true;
+			}
 			logDetailsDebug('focus-seed-skip-already-inside', {
 				active: describeNode(activeElement),
 				scroll: getScrollSnapshot()
 			});
-			return true;
 		}
 
-		if (item?.Type === 'Series') {
-			if (focusHeaderActionNoScroll()) {
-				logDetailsDebug('focus-seed-series-header-action', {
-					active: describeNode(document.activeElement),
-					scroll: getScrollSnapshot()
-				});
-				return true;
-			}
-			if (focusEpisodeSelector()) {
-				logDetailsDebug('focus-seed-series-episode-selector', {
-					active: describeNode(document.activeElement),
-					scroll: getScrollSnapshot()
-				});
-				return true;
-			}
-			focusEpisodeCardByIndex(0);
-			logDetailsDebug('focus-seed-series-first-episode-card', {
-				active: describeNode(document.activeElement),
-				scroll: getScrollSnapshot()
-			});
-			return true;
-		}
-
-		if (focusNonSeriesPrimaryPlay()) {
-			logDetailsDebug('focus-seed-primary-play', {
-				active: describeNode(document.activeElement),
-				scroll: getScrollSnapshot()
-			});
-			return true;
-		}
 		if (focusNonSeriesAudioSelector()) {
 			logDetailsDebug('focus-seed-audio-selector', {
 				active: describeNode(document.activeElement),
@@ -282,23 +297,56 @@ export const useMediaDetailsFocusOrchestrator = ({
 			});
 			return true;
 		}
-		const subtitleFocused = focusNonSeriesSubtitleSelector();
-		logDetailsDebug('focus-seed-subtitle-selector', {
-			focused: subtitleFocused,
+		if (focusNonSeriesSubtitleSelector()) {
+			logDetailsDebug('focus-seed-subtitle-selector', {
+				active: describeNode(document.activeElement),
+				scroll: getScrollSnapshot()
+			});
+			return true;
+		}
+		if (focusNonSeriesPrimaryPlay()) {
+			logDetailsDebug('focus-seed-primary-play', {
+				active: describeNode(document.activeElement),
+				scroll: getScrollSnapshot()
+			});
+			return true;
+		}
+		if (item?.Type === 'Series') {
+			if (focusEpisodeSelector()) {
+				logDetailsDebug('focus-seed-series-episode-selector', {
+					active: describeNode(document.activeElement),
+					scroll: getScrollSnapshot()
+				});
+				return true;
+			}
+			if (focusEpisodeCardByIndex(0)) {
+				logDetailsDebug('focus-seed-series-first-episode-card', {
+					active: describeNode(document.activeElement),
+					scroll: getScrollSnapshot()
+				});
+				return true;
+			}
+		}
+		const backFocused = focusBackNavigationNoScroll();
+		logDetailsDebug('focus-seed-back-fallback', {
+			focused: backFocused,
 			active: describeNode(document.activeElement),
 			scroll: getScrollSnapshot()
 		});
-		return subtitleFocused;
+		return backFocused;
 	}, [
 		describeNode,
 		detailsContainerRef,
 		focusEpisodeCardByIndex,
 		focusEpisodeSelector,
-		focusHeaderActionNoScroll,
+		focusBackNavigationNoScroll,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesSubtitleSelector,
+		getAudioSelectorTarget,
+		getPrimaryPlayTarget,
 		getScrollSnapshot,
+		getSubtitleSelectorTarget,
 		item?.Type,
 		logDetailsDebug
 	]);

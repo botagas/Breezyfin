@@ -82,9 +82,42 @@ const clearServiceWorkers = async () => {
 	}
 };
 
-export const wipeAllAppCache = async () => {
+const normalizePreservedLocalStorageKeys = (keys) => {
+	if (!Array.isArray(keys)) return new Set();
+	return new Set(
+		keys
+			.map((key) => String(key || '').trim())
+			.filter(Boolean)
+	);
+};
+
+const clearLocalStorage = (preservedKeys = new Set()) => {
+	if (typeof window === 'undefined' || !window.localStorage) return false;
+	try {
+		const storage = window.localStorage;
+		const keys = [];
+		for (let index = 0; index < storage.length; index += 1) {
+			const key = storage.key(index);
+			if (typeof key === 'string' && key.length > 0) {
+				keys.push(key);
+			}
+		}
+		keys.forEach((key) => {
+			if (!preservedKeys.has(key)) {
+				storage.removeItem(key);
+			}
+		});
+		return true;
+	} catch (_) {
+		return false;
+	}
+};
+
+export const wipeAllAppCache = async ({preserveLocalStorageKeys = []} = {}) => {
+	const preservedKeys = normalizePreservedLocalStorageKeys(preserveLocalStorageKeys);
 	const summary = {
 		localStorageCleared: false,
+		preservedLocalStorageKeys: Array.from(preservedKeys),
 		sessionStorageCleared: false,
 		cacheStorage: {supported: false, deleted: 0, attempted: 0},
 		indexedDb: {supported: false, deleted: 0, attempted: 0},
@@ -95,12 +128,7 @@ export const wipeAllAppCache = async () => {
 		return summary;
 	}
 
-	try {
-		window.localStorage.clear();
-		summary.localStorageCleared = true;
-	} catch (_) {
-		summary.localStorageCleared = false;
-	}
+	summary.localStorageCleared = clearLocalStorage(preservedKeys);
 
 	try {
 		window.sessionStorage.clear();

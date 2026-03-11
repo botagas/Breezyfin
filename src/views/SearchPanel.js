@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Input from '@enact/sandstone/Input';
 import Button from '../components/BreezyButton';
-import SandstoneButton from '@enact/sandstone/Button';
 import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
@@ -20,6 +19,7 @@ import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 
 import css from './SearchPanel.module.less';
@@ -96,6 +96,7 @@ const SearchPanel = ({
 	const searchDebounceRef = useRef(null);
 	const activeSearchRequestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const filterPopupContentRef = useRef(null);
 	const lastCachedStateRef = useRef(cachedState);
 	const paginationRef = useRef({
 		nextStartIndex: getCachedNextStartIndex(cachedState?.nextStartIndex) ?? (
@@ -116,6 +117,7 @@ const SearchPanel = ({
 		() => (selectedFilterIds.length < FILTER_OPTIONS.length ? selectedFilterIds.length : 0),
 		[selectedFilterIds]
 	);
+	usePopupInitialFocus(filterPopupOpen, filterPopupContentRef);
 
 	useEffect(() => {
 		const hadCachedState = lastCachedStateRef.current !== null;
@@ -519,19 +521,23 @@ const SearchPanel = ({
 				</Scroller>
 
 				<Popup open={filterPopupOpen} onClose={closeFilterPopup} css={popupShellCss}>
-					<div className={`${popupStyles.popupSurface} ${css.filterPopupContent}`}>
+					<div
+						ref={filterPopupContentRef}
+						className={`${popupStyles.popupSurface} ${css.filterPopupContent}`}
+						data-popup-focus-scope="true"
+					>
 						<BodyText className={css.filterPopupTitle}>Search Filters</BodyText>
 						<div className={css.filterPopupActions}>
-							<SandstoneButton size="small" onClick={handleSelectAllFilters} className={css.filterPopupActionButton}>
+							<Button size="small" onClick={handleSelectAllFilters} className={css.filterPopupActionButton}>
 								Select All
-							</SandstoneButton>
-							<SandstoneButton size="small" onClick={closeFilterPopup} className={css.filterPopupActionButton}>
+							</Button>
+							<Button size="small" onClick={closeFilterPopup} className={css.filterPopupActionButton}>
 								Done
-							</SandstoneButton>
+							</Button>
 						</div>
 						<div className={css.filterPopupOptions}>
 							{FILTER_OPTIONS.map((filter) => (
-								<SandstoneButton
+								<Button
 									key={filter.id}
 									data-filter-id={filter.id}
 									selected={selectedFilterIds.includes(filter.id)}
@@ -540,7 +546,7 @@ const SearchPanel = ({
 									className={css.filterPopupOptionButton}
 								>
 									{filter.label}
-								</SandstoneButton>
+								</Button>
 							))}
 						</div>
 					</div>

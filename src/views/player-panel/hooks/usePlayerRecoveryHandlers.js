@@ -186,6 +186,10 @@ export const usePlayerRecoveryHandlers = ({
 		if (playbackFailureLockedRef.current) {
 			return false;
 		}
+		if (playbackSettingsRef.current.forceDolbyVision === true) {
+			setToastMessage('Force DV is enabled. Disable it to allow HDR/transcode fallback.');
+			return false;
+		}
 		const reasonText = typeof reason === 'string' ? reason.toLowerCase() : '';
 		const currentDynamicRangeCap = normalizeDynamicRangeCap(playbackSettingsRef.current.dynamicRangeCap);
 		const dynamicRangeInfo = getDynamicRangeInfo(mediaSourceData);
@@ -211,7 +215,8 @@ export const usePlayerRecoveryHandlers = ({
 						: undefined,
 				seekSeconds: videoRef.current?.currentTime || 0,
 				forceNewSession: true,
-				dynamicRangeCap: nextDynamicRangeCap
+				dynamicRangeCap: nextDynamicRangeCap,
+				avoidDolbyVision: true
 			};
 			try {
 				await handleStop();

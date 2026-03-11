@@ -1,0 +1,21 @@
+.libraryNativeContentGlass {
+	position: relative;
+	border-radius: 1rem;
+	overflow: hidden;
+	isolation: isolate;
+	background: transparent;
+	border: 1px solid var(--bf-elegant-surface-border);
+	box-shadow: var(--bf-theme-surface-shadow);
+	backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+}
+
+.libraryNativeContentGlass::before {
+	.toolbarBackdropSurface();
+}
+
+.libraryNativeContentGlass .libraryNativeInner {
+	position: relative;
+	z-index: 4;
+	padding: 0.95rem 1rem 1rem;
+}

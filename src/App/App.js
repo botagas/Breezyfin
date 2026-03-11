@@ -10,7 +10,6 @@ import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { useInputMode } from '../hooks/useInputMode';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
-import {isStyleDebugEnabled} from '../utils/featureFlags';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import AppCrashBoundary from './AppCrashBoundary';
 import {normalizePanelStatePayload, upsertKeyedPanelState, clearKeyedPanelState} from './utils/panelStateCache';
@@ -23,12 +22,6 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
-const STYLE_DEBUG_ENABLED = isStyleDebugEnabled();
-let StyleDebugPanel = null;
-if (STYLE_DEBUG_ENABLED) {
-	// Keep debug-only panel and assets out of stable production bundles.
-	StyleDebugPanel = require('../views/StyleDebugPanel').default;
-}
 
 const resolveInitialVisualSettings = () => {
 	const settings = readBreezyfinSettings();
@@ -72,8 +65,7 @@ const App = (props) => {
 			libraryBackHandlerRef,
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
-			settingsBackHandlerRef,
-			styleDebugBackHandlerRef
+			settingsBackHandlerRef
 		},
 		runPanelBackHandler,
 		registerDetailsBackHandler,
@@ -82,8 +74,7 @@ const App = (props) => {
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
-		registerSettingsBackHandler,
-		registerStyleDebugBackHandler
+		registerSettingsBackHandler
 	} = usePanelBackHandlerRegistry();
 	const {
 		pushPanelHistory,
@@ -233,12 +224,6 @@ const App = (props) => {
 		};
 	}, [handleSessionExpired]);
 
-	useEffect(() => {
-		if (!STYLE_DEBUG_ENABLED && currentView === 'styleDebug') {
-			setCurrentView('settings');
-		}
-	}, [currentView]);
-
 	const runtimeDataAttributes = useMemo(() => (
 		buildRuntimeDataAttributes({
 			navbarTheme,
@@ -284,8 +269,6 @@ const App = (props) => {
 				return handleSectionBack(favoritesBackHandlerRef, 'home');
 			case 'settings':
 				return handleSectionBack(settingsBackHandlerRef, 'home');
-			case 'styleDebug':
-				return handleSectionBack(styleDebugBackHandlerRef, 'settings');
 			case 'details':
 				if (runPanelBackHandler(detailsBackHandlerRef)) return true;
 				return navigateBackFromDetails();
@@ -320,8 +303,7 @@ const App = (props) => {
 			searchBackHandlerRef,
 			syncPlayerBackTargetDetailsItem,
 			runPanelBackHandler,
-			settingsBackHandlerRef,
-			styleDebugBackHandlerRef
+			settingsBackHandlerRef
 		]);
 
 	useEffect(() => {
@@ -415,8 +397,7 @@ const App = (props) => {
 			targetView === 'library' ||
 			targetView === 'search' ||
 			targetView === 'favorites' ||
-			targetView === 'settings' ||
-			(STYLE_DEBUG_ENABLED && targetView === 'styleDebug')
+			targetView === 'settings'
 				? (targetView !== currentView || nextLibraryId !== currentLibraryId)
 				: false;
 		if (shouldTrackHistory) {
@@ -461,8 +442,7 @@ const App = (props) => {
 			case 'search':
 			case 'favorites':
 			case 'settings':
-			case 'styleDebug':
-				setCurrentView(section === 'styleDebug' && !STYLE_DEBUG_ENABLED ? 'settings' : section);
+				setCurrentView(section);
 				setSelectedItem(null);
 				setSelectedLibrary(null);
 				setPlaybackOptions(null);
@@ -537,8 +517,6 @@ const App = (props) => {
 		favoritesPanelState,
 		settingsPanelState,
 		detailsPanelStateByItemId,
-		styleDebugEnabled: STYLE_DEBUG_ENABLED,
-		StyleDebugPanel,
 		handleLogin,
 		handleItemSelect,
 		handleNavigate,
@@ -562,7 +540,6 @@ const App = (props) => {
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
 		registerSettingsBackHandler,
-		registerStyleDebugBackHandler,
 		registerDetailsBackHandler,
 		registerPlayerBackHandler
 	});
@@ -574,8 +551,9 @@ const App = (props) => {
 				{...props}
 				>
 					<Panels
-						index={getPanelIndexForView(currentView, STYLE_DEBUG_ENABLED)}
+						index={getPanelIndexForView(currentView)}
 						onBack={handleBack}
+						noAnimation
 					>
 					{panelChildren}
 				</Panels>

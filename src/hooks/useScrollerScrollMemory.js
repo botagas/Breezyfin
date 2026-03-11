@@ -8,10 +8,13 @@ export const normalizeScrollTop = (value) => {
 
 const schedule = (callback) => {
 	if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-		window.requestAnimationFrame(callback);
-		return;
+		const frameId = window.requestAnimationFrame(callback);
+		return () => {
+			window.cancelAnimationFrame(frameId);
+		};
 	}
 	callback();
+	return () => {};
 };
 
 export const useCachedScrollTopState = (cachedScrollTop = 0) => {
@@ -33,6 +36,7 @@ export const useScrollerScrollMemory = ({
 	const scrollToRef = useRef(null);
 	const targetScrollTopRef = useRef(normalizeScrollTop(scrollTop));
 	const lastKnownScrollTopRef = useRef(null);
+	const cancelScheduledRestoreRef = useRef(() => {});
 
 	useEffect(() => {
 		targetScrollTopRef.current = normalizeScrollTop(scrollTop);
@@ -46,26 +50,44 @@ export const useScrollerScrollMemory = ({
 		const lastTop = lastKnownScrollTopRef.current;
 		if (!force && lastTop !== null && Math.abs(targetTop - lastTop) < 1) return;
 
-		if (targetTop <= 0) {
-			scrollToRef.current({align: 'top', animate: false});
-		} else {
-			scrollToRef.current({position: {y: targetTop}, animate: false});
+		try {
+			if (targetTop <= 0) {
+				scrollToRef.current({align: 'top', animate: false});
+			} else {
+				scrollToRef.current({position: {y: targetTop}, animate: false});
+			}
+		} catch (error) {
+			console.warn('Scroller scroll restore skipped due to unavailable scroller surface:', error);
+			scrollToRef.current = null;
+			return;
 		}
 		lastKnownScrollTopRef.current = targetTop;
 	}, [isActive]);
 
 	useEffect(() => {
+		cancelScheduledRestoreRef.current();
+		cancelScheduledRestoreRef.current = () => {};
 		if (!isActive) {
 			lastKnownScrollTopRef.current = null;
+			scrollToRef.current = null;
 			return;
 		}
-		schedule(() => applyScrollRestore());
+		cancelScheduledRestoreRef.current = schedule(() => applyScrollRestore());
 	}, [applyScrollRestore, isActive, scrollTop]);
 
+	useEffect(() => {
+		return () => {
+			cancelScheduledRestoreRef.current();
+			cancelScheduledRestoreRef.current = () => {};
+			scrollToRef.current = null;
+		};
+	}, []);
+
 	const captureScrollTo = useCallback((fn) => {
-		scrollToRef.current = fn;
+		scrollToRef.current = typeof fn === 'function' ? fn : null;
 		if (!isActive || typeof fn !== 'function') return;
-		schedule(() => applyScrollRestore());
+		cancelScheduledRestoreRef.current();
+		cancelScheduledRestoreRef.current = schedule(() => applyScrollRestore());
 	}, [applyScrollRestore, isActive]);
 
 	const handleScrollStop = useCallback((event) => {

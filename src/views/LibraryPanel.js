@@ -48,6 +48,8 @@ const LibraryPanel = ({
 	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const activeLibraryId = library?.Id || null;
+	const activeLibraryCollectionType = library?.CollectionType || null;
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -68,15 +70,15 @@ const LibraryPanel = ({
 		requireCacheKey: true
 	});
 
-	const getItemTypesForLibrary = useCallback((libraryValue) => {
-		if (!libraryValue) return undefined;
-		if (libraryValue.CollectionType === 'movies') return ['Movie'];
-		if (libraryValue.CollectionType === 'tvshows') return ['Series'];
+	const getItemTypesForLibrary = useCallback((collectionType) => {
+		if (!collectionType) return undefined;
+		if (collectionType === 'movies') return ['Movie'];
+		if (collectionType === 'tvshows') return ['Series'];
 		return undefined;
 	}, []);
 
 	const loadNextPage = useCallback(async () => {
-		if (!library || loading || !hasMore || loadingMoreRef.current) return;
+		if (!activeLibraryId || loading || !hasMore || loadingMoreRef.current) return;
 
 		loadingMoreRef.current = true;
 		setLoadingMore(true);
@@ -85,7 +87,7 @@ const LibraryPanel = ({
 
 		try {
 			const nextBatch = await jellyfinService.getLibraryItems(
-				library.Id,
+				activeLibraryId,
 				itemTypes,
 				LIBRARY_PAGE_SIZE,
 				nextStartIndex
@@ -115,13 +117,13 @@ const LibraryPanel = ({
 			}
 			loadingMoreRef.current = false;
 		}
-	}, [hasMore, library, loading]);
+	}, [activeLibraryId, hasMore, loading]);
 
 	const loadLibraryItems = useCallback(async () => {
-		if (!library) return;
+		if (!activeLibraryId) return;
 		const requestId = requestIdRef.current + 1;
 		requestIdRef.current = requestId;
-		const itemTypes = getItemTypesForLibrary(library);
+		const itemTypes = getItemTypesForLibrary(activeLibraryCollectionType);
 		paginationRef.current = { nextStartIndex: 0, itemTypes };
 		loadingMoreRef.current = false;
 		setLoading(true);
@@ -130,7 +132,7 @@ const LibraryPanel = ({
 		setHasMore(false);
 		try {
 			const firstBatch = await jellyfinService.getLibraryItems(
-				library.Id,
+				activeLibraryId,
 				itemTypes,
 				LIBRARY_PAGE_SIZE,
 				0
@@ -148,13 +150,13 @@ const LibraryPanel = ({
 				setLoading(false);
 			}
 		}
-	}, [getItemTypesForLibrary, library]);
+	}, [activeLibraryCollectionType, activeLibraryId, getItemTypesForLibrary]);
 
 	useEffect(() => {
-		if (library) {
+		if (activeLibraryId) {
 			loadLibraryItems();
 		}
-	}, [library, loadLibraryItems]);
+	}, [activeLibraryId, loadLibraryItems]);
 
 	const handleGridCardClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;

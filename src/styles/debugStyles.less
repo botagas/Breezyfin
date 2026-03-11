@@ -1,0 +1,25 @@
+.debug-overlay-surface(@radius: 0.8rem) {
+	border-radius: @radius;
+	border: 1px solid var(--bf-theme-debug-surface-border);
+	background: var(--bf-theme-debug-surface-bg);
+	backdrop-filter: blur(var(--bf-theme-debug-surface-blur));
+	-webkit-backdrop-filter: blur(var(--bf-theme-debug-surface-blur));
+	box-shadow: var(--bf-theme-debug-surface-shadow);
+}
+
+.debug-overlay-label() {
+	color: var(--bf-theme-debug-label-color);
+	text-transform: uppercase;
+	font-size: 0.64rem;
+}
+
+.debug-overlay-value() {
+	color: var(--bf-theme-debug-value-color);
+	font-weight: 600;
+}
+
+.debug-overlay-scrollbar() {
+	scrollbar-width: thin;
+	scrollbar-color: var(--bf-theme-debug-scrollbar-thumb) var(--bf-theme-debug-scrollbar-track);
+}
+

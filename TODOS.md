@@ -6,43 +6,24 @@ Rule:
 - Keep this file for unfinished / planned tasks only.
 - Move validation/test items to `CHECKS.md` only after the related TODO is completed (if needed).
 
-## High priority
+## Next-release changes (High priority)
 
-- Continue decomposing large panel orchestrators:
-  - `src/views/PlayerPanel.js`
-  - reduce remaining orchestration weight in `src/views/MediaDetailsPanel.js`
-  - reduce remaining orchestration weight in `src/views/SettingsPanel.js`
-- Fix webOS 6 login/switch-user backdrop rendering reliability (fallback imagery still does not render reliably on simulator):
-  - `src/views/LoginPanel.js`
-  - `src/views/login-panel-styles/_login-panel-compat-webos6.less`
-- Expand Jellyfin service tests to cover extracted modules directly:
-  - `src/services/jellyfin/playbackApi.js`
-  - `src/services/jellyfin/libraryApi.js`
-  - `src/services/jellyfin/sessionApi.js`
-- Add focused test coverage for image format preference/fallback:
-  - `src/utils/imageFormat.js`
-  - `src/services/jellyfinService.js`
-- Identify the cause for FPS drops in Media Details panel when scrolling. Loading delay in panels might be directly related to the FPS drops since they are not present in Simulator tests. This might cause issues for TVs that were released in 2022 or prior. It could be related to backdrop/cast/episode image quality or complexity as not all media causes this behavior. Performance Mode should be improved in episode list to reduce heavyweight styling.
-- Identify the cause of loading delay in panels as well as panel reloads when switching between panels without waiting for a proper load. This might be caused by one of our early refactors.
+- Add a small script/report for style token adoption (remaining raw color usage).
+- Align episode/season watched-action styling in Media Details with the shared token/mixin approach used in Favorites and other panels.
 
-## Medium priority
+## Near-term improvements (Medium priority)
 
-- Normalize remaining hardcoded color/rgba values into `--bf-theme-*` tokens where practical, starting with Player/MediaDetails/Toolbar style files.
-- Audit and reduce custom per-file CSS variables that overlap with global theme tokens.
-- Keep compat behavior isolated in compat files; document intentional exceptions when global shared fallbacks are required.
-- Continue splitting very large style surfaces into smaller units with clearer ownership:
-  - `src/views/player-panel-styles/_player-panel-base.less`
-  - `src/views/style-debug-panel-styles/_style-debug-panel-snipzy.less`
-  - `src/views/login-panel-styles/_login-panel-base.less`
-- Fix badge spacing/sizing and missing badge visibility issues on webOS 6 (Favorites/Search).
-- Fix extra whitespace before the first library option on webOS 6.
-
-## Low priority
-
-- Add a lightweight architecture index in docs mapping:
-  - panel-level decomposition folders
-  - shared hooks/utilities
-  - service domain modules
-- Add a small script/report for style token adoption (where raw color usage still remains).
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
-- Align episode/season watched-action styling in Media Details to the same shared token/mixin approach used in Favorites and other panels.
+- Continue opportunistic style decomposition for remaining larger style files where ownership boundaries are still mixed.
+
+## Long-term goals
+
+- Identify and fix panel loading delay and unintended panel reload behavior when switching between panels.
+- Improve webOS 6 login/switch-user backdrop reliability in `src/views/LoginPanel.js` and `src/views/login-panel-styles/_login-panel-compat-webos6.less`.
+- Fix webOS 6 badge spacing/sizing and missing badge visibility issues (Favorites/Search).
+- Fix extra whitespace before the first library option on webOS 6.
+- Implement Discovery media rows via Seerr integration (likely requires Jellyfin plugin support).
+- Implement Watchlist support (evaluate Jellyfin Enhanced/KefinTweaks Watchlist compatibility and integration path).
+- Add a Calendar for Sonarr/Radarr release information (likely via plugin/API integration).
+- Set up a GitHub Pages demo connected to a resettable Jellyfin demo instance.
+- Investigate Media Details FPS drops during scrolling on real devices; verify whether panel loading delay and heavy image/styling paths are contributing factors.

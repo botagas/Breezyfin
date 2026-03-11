@@ -1,7 +1,33 @@
 import serverManager from '../serverManager';
-import {APP_VERSION} from '../../utils/appInfo';
+import {getAppVersion} from '../../utils/appInfo';
+import {getDeviceId} from '../../utils/deviceIdentity';
 
 const LEGACY_AUTH_KEY = 'jellyfinAuth';
+
+const normalizeAuthPassword = (password) => {
+	if (password === null || password === undefined) return '';
+	return typeof password === 'string' ? password : String(password);
+};
+
+const resolveAuthVersion = async (service) => {
+	if (typeof service?.resolveClientVersion === 'function') {
+		await service.resolveClientVersion();
+	}
+	if (typeof service?.getClientVersion === 'function') {
+		return service.getClientVersion();
+	}
+	return getAppVersion();
+};
+
+const resolveAuthDeviceId = (service) => {
+	if (typeof service?.getDeviceId === 'function') {
+		return service.getDeviceId();
+	}
+	if (typeof service?.deviceId === 'string' && service.deviceId.trim()) {
+		return service.deviceId.trim();
+	}
+	return getDeviceId();
+};
 
 const clearRuntimeSession = (service) => {
 	service.api = null;
@@ -43,17 +69,20 @@ export const connectToServer = async (service, serverUrl) => {
 
 export const authenticateWithServer = async (service, username, password) => {
 	try {
+		const appVersion = await resolveAuthVersion(service);
+		const deviceId = resolveAuthDeviceId(service);
+		const normalizedPassword = normalizeAuthPassword(password);
 		const response = await fetch(
 			`${service.serverUrl}/Users/AuthenticateByName`,
 			{
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'X-Emby-Authorization': `MediaBrowser Client="Breezyfin", Device="webOS", DeviceId="breezyfin-webos", Version="${APP_VERSION}"`
+					'X-Emby-Authorization': `MediaBrowser Client="Breezyfin", Device="webOS", DeviceId="${deviceId}", Version="${appVersion}"`
 				},
 				body: JSON.stringify({
 					Username: username,
-					Pw: password
+					Pw: normalizedPassword
 				})
 			}
 		);

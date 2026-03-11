@@ -1,0 +1,70 @@
+/* Popup track picker */
+.popupSurface {
+	min-width: min(44rem, 92vw);
+	padding: 0.4rem;
+}
+
+.popupHeading {
+	margin: 0 0 12px 0;
+}
+
+.popupScroller {
+	max-height: 60vh;
+	width: 100%;
+}
+
+.popupList {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.popupButton {
+	width: 100%;
+	text-align: left;
+	border-radius: 0.8rem !important;
+	background: transparent !important;
+	border: none !important;
+	overflow: hidden;
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.bg),
+	:global(.client) {
+		border-radius: 0.8rem !important;
+	}
+
+	:global(.bf-button),
+	:global(.bf-button-bg),
+	:global(.bg) {
+		overflow: hidden !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 0.8rem !important;
+	}
+
+	:global(.bf-button-bg)::before,
+	:global(.bg)::before,
+	:global(.bf-button-bg)::after,
+	:global(.bg)::after,
+	:global(.client)::before {
+		content: none !important;
+		display: none !important;
+	}
+
+	.mdControlFocusExpandReset();
+
+	.mdControlHoverSurface(var(--bf-theme-tab-hover-bg));
+
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
+		background: rgba(var(--bf-theme-accent-rgb), 0.2) !important;
+		border: 1px solid rgba(var(--bf-theme-accent-rgb), 0.52) !important;
+		border-radius: 0.8rem !important;
+	}
+}

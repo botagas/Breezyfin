@@ -22,7 +22,9 @@ const PlayerControlsOverlay = ({
 		audioTracks,
 		subtitleTracks,
 		muted,
-		volume
+		volume,
+		debugOverlayEnabled,
+		debugOverlayVisible
 	} = state;
 	const {
 		handleBackButton,
@@ -34,7 +36,8 @@ const PlayerControlsOverlay = ({
 		openAudioPopup,
 		openSubtitlePopup,
 		toggleMute,
-		handleVolumeChange
+		handleVolumeChange,
+		handleToggleDebugOverlay
 	} = actions;
 	const {controlsRef, playPauseButtonRef} = refs;
 
@@ -49,6 +52,15 @@ const PlayerControlsOverlay = ({
 					icon="arrowlargeleft"
 					className={css.playerBackButton}
 				/>
+				{debugOverlayEnabled && (
+					<Button
+						onClick={handleToggleDebugOverlay}
+						size="small"
+						className={css.playerDebugToggleButton}
+					>
+						{debugOverlayVisible ? 'Hide Debug' : 'Show Debug'}
+					</Button>
+				)}
 				<BodyText className={css.title}>{getPlayerHeaderTitle(item)}</BodyText>
 			</div>
 

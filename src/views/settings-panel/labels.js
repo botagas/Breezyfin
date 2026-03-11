@@ -25,3 +25,13 @@ export const getCapabilityProbeRefreshLabel = (value) => {
 	if (days === 1) return '1 day';
 	return `${Math.trunc(days)} days`;
 };
+
+export const getSubtitleBurnInTextCodecsLabel = (selectedCodecs, options) => {
+	const normalizedSelection = Array.isArray(selectedCodecs) ? selectedCodecs : [];
+	if (normalizedSelection.length === 0) return 'None (Quality first)';
+	const labels = normalizedSelection.map((codec) => {
+		const match = options.find((option) => option.value === codec);
+		return match?.label || codec;
+	});
+	return labels.join(', ');
+};

@@ -1,9 +1,11 @@
+import {useCallback, useEffect, useState} from 'react';
 import Icon from '@enact/sandstone/Icon';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../BreezyButton';
 import ToolbarUserMenu from './ToolbarUserMenu';
 import ToolbarLibraryPicker from './ToolbarLibraryPicker';
 import css from '../Toolbar.module.less';
+import imageLoadCss from '../ImageLoadReveal.module.less';
 
 const ToolbarElegantLayout = ({
 	SpottableDiv,
@@ -34,6 +36,25 @@ const ToolbarElegantLayout = ({
 	handleSwitchUserClick,
 	handleExitClick
 }) => {
+	const [avatarLoaded, setAvatarLoaded] = useState(false);
+
+	useEffect(() => {
+		setAvatarLoaded(false);
+	}, [userAvatarUrl]);
+
+	const handleAvatarLoad = useCallback(() => {
+		setAvatarLoaded(true);
+	}, []);
+
+	const handleAvatarError = useCallback((event) => {
+		setAvatarLoaded(false);
+		if (typeof handleUserAvatarError === 'function') {
+			handleUserAvatarError(event);
+		}
+	}, [handleUserAvatarError]);
+
+	const showAvatarLoadingHint = Boolean(userAvatarUrl) && !avatarLoaded;
+
 	return (
 		<>
 			{shouldRenderElegantDistortion && (
@@ -140,12 +161,21 @@ const ToolbarElegantLayout = ({
 									spotlightId="toolbar-user"
 								>
 									{userAvatarUrl ? (
-										<img
-											src={userAvatarUrl}
-											alt={`${userName} avatar`}
-											className={css.userAvatar}
-											onError={handleUserAvatarError}
-										/>
+										<>
+											<img
+												src={userAvatarUrl}
+												alt={`${userName} avatar`}
+												className={`${css.userAvatar} ${imageLoadCss.imageReveal} ${avatarLoaded ? imageLoadCss.imageRevealLoaded : ''}`}
+												onLoad={handleAvatarLoad}
+												onError={handleAvatarError}
+												loading="lazy"
+												decoding="async"
+												draggable={false}
+											/>
+											{showAvatarLoadingHint ? (
+												<div className={`${imageLoadCss.imageLoadingHint} ${css.userAvatarLoadingHint}`} aria-hidden="true" />
+											) : null}
+										</>
 									) : (
 										<Icon size="small">profile</Icon>
 									)}

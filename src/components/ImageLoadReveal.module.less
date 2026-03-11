@@ -1,0 +1,36 @@
+.imageReveal {
+	opacity: 0;
+	filter: blur(var(--bf-image-load-blur-radius));
+	transition: opacity 220ms ease-out, filter 260ms ease-out, transform 340ms ease;
+	will-change: opacity, filter;
+}
+
+.imageRevealLoaded {
+	opacity: 1;
+	filter: none;
+}
+
+.imageLoadingHint {
+	position: absolute;
+	inset: 0;
+	background: var(--bf-theme-image-loading-surface);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	opacity: 1;
+	visibility: visible;
+	transition: opacity 180ms ease-out, visibility 0s linear 180ms;
+	pointer-events: none;
+	z-index: 2;
+}
+
+.imageLoadingHintHidden {
+	opacity: 0;
+	visibility: hidden;
+}
+
+:global([data-bf-animations='off']) .imageReveal,
+:global([data-bf-all-animations='off']) .imageReveal,
+:global([data-bf-animations='off']) .imageLoadingHint,
+:global([data-bf-all-animations='off']) .imageLoadingHint {
+	transition: none !important;
+}

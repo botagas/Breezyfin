@@ -1,0 +1,20 @@
+:global([data-bf-input-mode='5way']) .iconButton:hover:not(.selected),
+:global([data-bf-input-mode='5way']) .toolbarButton:hover,
+:global([data-bf-input-mode='5way']) .userButton:hover {
+	background: transparent !important;
+	box-shadow: none !important;
+	transform: none !important;
+}
+
+:global([data-bf-input-mode='5way']) .tabButton:hover:not(.tabSelected) :global(.bf-button-bg) {
+	background: var(--bf-elegant-tab-bg) !important;
+}
+
+.tabButton:global(.focusExpand),
+.libraryNativeButton:global(.focusExpand),
+.menuButton:global(.focusExpand),
+.userIconButton:global(.focusExpand),
+.elegantBackButton:global(.focusExpand) {
+	margin: 0 !important;
+	transform: none !important;
+}

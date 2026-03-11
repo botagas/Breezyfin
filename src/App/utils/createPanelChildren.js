@@ -20,8 +20,6 @@ export const createPanelChildren = ({
 	favoritesPanelState,
 	settingsPanelState,
 	detailsPanelStateByItemId,
-	styleDebugEnabled,
-	StyleDebugPanel,
 	handleLogin,
 	handleItemSelect,
 	handleNavigate,
@@ -45,7 +43,6 @@ export const createPanelChildren = ({
 	registerSearchBackHandler,
 	registerFavoritesBackHandler,
 	registerSettingsBackHandler,
-	registerStyleDebugBackHandler,
 	registerDetailsBackHandler,
 	registerPlayerBackHandler
 }) => {
@@ -124,21 +121,6 @@ export const createPanelChildren = ({
 			noCloseButton
 		/>
 	];
-
-	if (styleDebugEnabled && StyleDebugPanel) {
-		panelChildren.push(
-			<StyleDebugPanel
-				key="styleDebug"
-				isActive={currentView === 'styleDebug'}
-				onNavigate={handleNavigate}
-				onSwitchUser={handleSwitchUser}
-				onLogout={handleLogout}
-				onExit={handleExit}
-				registerBackHandler={registerStyleDebugBackHandler}
-				noCloseButton
-			/>
-		);
-	}
 
 	panelChildren.push(
 		<MediaDetailsPanel

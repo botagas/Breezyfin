@@ -1,9 +1,11 @@
+import {useCallback, useEffect, useState} from 'react';
 import Heading from '@enact/sandstone/Heading';
 import BodyText from '@enact/sandstone/BodyText';
 import Icon from '@enact/sandstone/Icon';
 import Button from '../../../components/BreezyButton';
 import MediaTrackSelectorRow from './MediaTrackSelectorRow';
 import css from '../../MediaDetailsPanel.module.less';
+import imageLoadCss from '../../../components/ImageLoadReveal.module.less';
 
 const MediaDetailsIntroSection = ({
 	details,
@@ -62,6 +64,22 @@ const MediaDetailsIntroSection = ({
 		subtitleSelectorButtonRef,
 		playPrimaryButtonRef
 	} = refs;
+	const [headerLogoLoaded, setHeaderLogoLoaded] = useState(false);
+
+	useEffect(() => {
+		setHeaderLogoLoaded(false);
+	}, [headerLogoUrl, useHeaderLogo]);
+
+	const handleHeaderLogoLoad = useCallback(() => {
+		setHeaderLogoLoaded(true);
+	}, []);
+
+	const handleHeaderLogoError = useCallback((event) => {
+		setHeaderLogoLoaded(false);
+		if (typeof onHeaderLogoError === 'function') {
+			onHeaderLogoError(event);
+		}
+	}, [onHeaderLogoError]);
 
 	if (!item) return null;
 
@@ -129,16 +147,23 @@ const MediaDetailsIntroSection = ({
 					<div className={css.introTopSpacer} />
 					<div className={css.introHeaderRow}>
 						<div className={css.pageHeader}>
-							{useHeaderLogo ? (
-								<div className={css.headerLogoWrap}>
-									<img
-										src={headerLogoUrl}
-										alt={item?.Name || 'Details'}
-										className={css.headerLogo}
-										onError={onHeaderLogoError}
-									/>
-								</div>
-							) : (
+								{useHeaderLogo ? (
+									<div className={css.headerLogoWrap}>
+										<img
+											src={headerLogoUrl}
+											alt={item?.Name || 'Details'}
+											className={`${css.headerLogo} ${imageLoadCss.imageReveal} ${headerLogoLoaded ? imageLoadCss.imageRevealLoaded : ''}`}
+											onLoad={handleHeaderLogoLoad}
+											onError={handleHeaderLogoError}
+											loading="lazy"
+											decoding="async"
+											draggable={false}
+										/>
+										{!headerLogoLoaded ? (
+											<div className={`${imageLoadCss.imageLoadingHint} ${css.headerLogoLoadingHint}`} aria-hidden="true" />
+										) : null}
+									</div>
+								) : (
 								<Heading size="large" className={css.pageHeaderTitle}>
 									{headerTitle}
 								</Heading>

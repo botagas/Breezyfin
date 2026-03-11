@@ -1,0 +1,81 @@
+.episodeBadge {
+	position: absolute;
+	top: 0.5rem;
+	left: 0.5rem;
+	z-index: 3;
+	padding: 0.18rem 0.45rem;
+	border-radius: 999px;
+	font-size: 0.72em;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	color: rgba(235, 246, 255, 0.96);
+	background: rgba(7, 13, 21, 0.62);
+	border: 1px solid var(--bf-md-badge-border-soft);
+}
+
+.episodeStatusBadges {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	z-index: 3;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.35rem;
+}
+
+.episodeFavoriteBadge {
+	.status-badge-favorite();
+	font-size: 0.86em;
+	letter-spacing: 0;
+}
+
+.episodeWatchedBadge {
+	.status-badge-success();
+}
+
+.episodeImageMetaBadges {
+	position: absolute;
+	left: 0.55rem;
+	right: 0.55rem;
+	bottom: 0.55rem;
+	z-index: 3;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.36rem;
+	pointer-events: none;
+}
+
+.episodeImageMetaBadge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	padding: 0.2rem 0.46rem;
+	border-radius: 999px;
+	font-size: 0.68em;
+	font-weight: 650;
+	line-height: 1.14;
+	color: rgba(239, 247, 255, 0.96);
+	background: rgba(6, 12, 21, 0.72);
+	border: 1px solid var(--bf-md-badge-border);
+
+	:global(.Icon) {
+		overflow: visible !important;
+	}
+}
+
+.episodeImageMetaBadgeRating {
+	color: rgba(255, 241, 188, 0.96);
+}
+
+.episodeImageMetaStar {
+	font-size: 0.78rem !important;
+	width: 0.78rem !important;
+	height: 0.78rem !important;
+	line-height: 0.78rem !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	overflow: visible !important;
+	color: var(--bf-md-star-color) !important;
+}

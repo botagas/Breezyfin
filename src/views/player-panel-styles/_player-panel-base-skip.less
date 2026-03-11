@@ -1,0 +1,68 @@
+.skipOverlay {
+	position: absolute;
+	top: 32px;
+	right: 32px;
+	z-index: 120;
+	pointer-events: none;
+}
+
+.skipPill {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	border-radius: 12px;
+	padding: 12px 14px;
+	.popupSurface(
+		var(--bf-theme-popup-bg);
+		var(--bf-theme-popup-border);
+		var(--bf-theme-popup-shadow)
+	);
+	pointer-events: auto;
+}
+
+.skipPillCompact {
+	gap: 10px;
+	padding: 8px 10px;
+	border-radius: 999px;
+	background: var(--bf-theme-popup-bg);
+	border-color: var(--bf-theme-popup-border);
+	box-shadow: var(--bf-theme-popup-shadow);
+}
+
+.skipCountdownCompact {
+	opacity: 0.88;
+	font-size: 0.85em;
+	font-weight: 700;
+	min-width: 52px;
+	text-align: center;
+	align-self: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 34px;
+	margin: 0;
+	padding: 0 6px;
+	line-height: 1;
+	color: var(--bf-theme-player-skip-countdown-color);
+}
+
+.skipButton {
+	--bf-button-fg: var(--bf-theme-player-skip-action-fg);
+	--bf-button-fg-hover: var(--bf-theme-input-trigger-fg);
+	--bf-button-fg-active: var(--bf-theme-input-trigger-fg);
+	min-width: 120px;
+	.playerButtonShell();
+	.playerButtonSurface(var(--bf-theme-player-skip-button-bg); 1px solid var(--bf-theme-player-skip-button-border));
+	.playerButtonHover(var(--bf-theme-player-skip-button-hover-bg); var(--bf-theme-player-skip-button-hover-border));
+	.playerButtonActive(var(--bf-theme-player-skip-button-active-bg));
+}
+
+.skipCloseButton {
+	--bf-button-fg: var(--bf-theme-player-skip-close-fg);
+	--bf-button-fg-hover: var(--bf-theme-input-trigger-fg);
+	--bf-button-fg-active: var(--bf-theme-input-trigger-fg);
+	min-width: 56px;
+	.playerButtonShell();
+	.playerButtonSurface(var(--bf-theme-player-skip-close-bg); 1px solid var(--bf-theme-player-skip-close-border));
+	.playerButtonHover(var(--bf-theme-player-skip-close-hover-bg); var(--bf-theme-player-skip-close-hover-border));
+}

@@ -1,0 +1,38 @@
+.controls {
+	position: relative;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 12px;
+	width: 100%;
+}
+
+.navButton {
+	min-width: auto;
+}
+
+.indicators {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.indicator {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--bf-hero-indicator-bg);
+	cursor: pointer;
+	transition: background-color 0.3s ease, transform 0.3s ease, width 0.3s ease, border-radius 0.3s ease;
+
+	&:hover {
+		background: var(--bf-hero-indicator-hover-bg);
+		transform: scale(1.2);
+	}
+
+	&.active {
+		background: var(--bf-hero-indicator-active-bg);
+		width: 24px;
+		border-radius: 4px;
+	}
+}

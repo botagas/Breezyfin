@@ -1,0 +1,81 @@
+.favoriteCard {
+	cursor: pointer;
+	.card-shell();
+	position: relative;
+
+	&:global(.focusExpand) {
+		margin: 0 !important;
+	}
+
+	&:hover,
+	&:global(.spottable):focus {
+		.card-focus-lift();
+
+		.cardImage {
+			.card-image-focus();
+		}
+
+		.unfavoriteButton,
+		.watchedToggleButton {
+			opacity: 1;
+		}
+	}
+
+	&:hover .unfavoriteButton,
+	&:hover .watchedToggleButton {
+		opacity: 1;
+	}
+}
+
+.cardImage {
+	.card-image-shell(2/3);
+	.card-image-overlays();
+
+	&.placeholder {
+		.card-placeholder-surface();
+
+		&::after {
+			.card-placeholder-no-image-label();
+		}
+	}
+}
+
+.placeholderInner {
+	.card-placeholder-inner-content();
+}
+
+.favoriteOverlayFrame {
+	position: absolute;
+	inset: 0;
+	padding: 8px;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.favoriteBadgeColumn,
+.favoriteActionColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.favoriteBadgeColumn {
+	align-items: flex-start;
+}
+
+.favoriteActionColumn {
+	align-items: flex-end;
+}
+
+.favoriteBadge {
+	.status-badge-favorite();
+	font-size: 0.86em;
+	letter-spacing: 0;
+}
+
+.watchedBadge {
+	.status-badge-success();
+}

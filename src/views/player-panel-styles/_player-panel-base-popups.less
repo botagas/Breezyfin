@@ -1,0 +1,59 @@
+.errorPopupBody {
+	padding: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	width: 100vw !important;
+	min-height: 100vh !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+}
+
+.errorPopupContent {
+	width: min(94vw, var(--bf-theme-error-surface-max-width));
+	max-width: 94vw;
+}
+
+.popupTitle {
+	font-size: 1.2em;
+	font-weight: 600;
+	margin: 0 0 0.85rem;
+	text-align: center;
+	line-height: 1.25;
+}
+
+.errorMessage {
+	margin: 0 0 0.95rem;
+	text-align: center;
+	opacity: 0.9;
+	font-size: 0.9em;
+	line-height: 1.4;
+	color: var(--bf-theme-message-color);
+}
+
+.errorActions {
+	display: flex;
+	justify-content: center;
+	gap: 12px;
+}
+
+.errorActionButton {
+	--bf-button-fg: var(--bf-theme-text-primary);
+	--bf-button-fg-hover: var(--bf-theme-accent);
+	--bf-button-fg-active: var(--bf-theme-accent);
+	.playerButtonShell();
+	.playerButtonSurface(transparent; none);
+	.playerButtonHover(var(--bf-theme-tab-hover-bg));
+}
+
+.trackList {
+	max-height: 55vh;
+	width: 100%;
+}
+
+.trackOption {
+	.playerButtonShell(0.8rem);
+	.playerButtonSurface(transparent; none; 0.8rem);
+	.playerButtonHover(var(--bf-theme-tab-hover-bg));
+}

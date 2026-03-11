@@ -48,7 +48,7 @@
 	},
 	"devDependencies": {
 		"@enact/cli": "^7.2.1",
-		"baseline-browser-mapping": "^2.9.19",
+		"baseline-browser-mapping": "^2.10.0",
 		"eslint-config-enact-proxy": "^1.0.7"
 	}
 }

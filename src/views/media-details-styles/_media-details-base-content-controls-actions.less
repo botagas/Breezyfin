@@ -1,0 +1,47 @@
+.episodeActions {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	flex-shrink: 0;
+}
+
+.episodeActionsRow {
+	flex-direction: row;
+	align-items: center;
+}
+
+.episodeInfoButton,
+.episodeFavoriteButton,
+.episodeWatchedButton {
+	min-width: 3rem !important;
+	width: 3rem !important;
+	height: 3rem !important;
+	padding: 0 !important;
+
+	:global(.Icon) {
+		font-size: 1rem !important;
+		width: 1rem !important;
+		height: 1rem !important;
+	}
+
+	.mdControlSurface(
+		var(--bf-theme-card-filter-chip-bg);
+		1px solid var(--bf-theme-card-filter-chip-border);
+		999px
+	);
+	.mdControlHoverSurface(rgba(var(--bf-theme-accent-rgb), 0.22));
+}
+
+.episodeFavoriteButtonActive :global(.bf-button-bg),
+.episodeFavoriteButtonActive :global(.bg) {
+	background: rgba(var(--bf-theme-favorite-rgb), 0.2) !important;
+	border-color: rgba(var(--bf-theme-favorite-rgb), 0.54) !important;
+}
+
+.episodeWatchedButtonActive :global(.bf-button-bg),
+.episodeWatchedButtonActive :global(.bg) {
+	background: rgba(var(--bf-theme-success-rgb), 0.2) !important;
+	border-color: rgba(var(--bf-theme-success-rgb), 0.56) !important;
+}

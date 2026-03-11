@@ -1,5 +1,6 @@
 import { Jellyfin } from '@jellyfin/sdk';
-import {APP_VERSION} from '../utils/appInfo';
+import {getAppVersion, loadAppVersion} from '../utils/appInfo';
+import {getDeviceId} from '../utils/deviceIdentity';
 import {applyPreferredImageFormatToParams} from '../utils/imageFormat';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {
@@ -50,16 +51,10 @@ import {
 
 class JellyfinService {
 	constructor() {
-		this.jellyfin = new Jellyfin({
-			clientInfo: {
-				name: 'Breezyfin',
-				version: APP_VERSION
-			},
-			deviceInfo: {
-				name: 'webOS TV',
-				id: 'webos-tv-' + Date.now()
-			}
-		});
+		this.deviceId = getDeviceId();
+		this.clientVersion = getAppVersion();
+		this.clientVersionPromise = null;
+		this.jellyfin = this._createJellyfinClient(this.clientVersion);
 		this.api = null;
 		this.userId = null;
 		this.serverUrl = null;
@@ -67,6 +62,52 @@ class JellyfinService {
 		this.serverName = null;
 		this.username = null;
 		this.sessionExpiredNotified = false;
+		void this.resolveClientVersion();
+	}
+
+	_createJellyfinClient(version) {
+		return new Jellyfin({
+			clientInfo: {
+				name: 'Breezyfin',
+				version
+			},
+			deviceInfo: {
+				name: 'webOS TV',
+				id: this.deviceId
+			}
+		});
+	}
+
+	_applyClientVersion(version) {
+		if (!version || version === this.clientVersion) return;
+		this.clientVersion = version;
+		this.jellyfin = this._createJellyfinClient(version);
+		if (this.serverUrl) {
+			this.api = this.jellyfin.createApi(this.serverUrl, this.accessToken || undefined);
+		}
+	}
+
+	getClientVersion() {
+		return this.clientVersion || getAppVersion();
+	}
+
+	getDeviceId() {
+		return this.deviceId || getDeviceId();
+	}
+
+	async resolveClientVersion() {
+		if (this.clientVersionPromise) return this.clientVersionPromise;
+		this.clientVersionPromise = (async () => {
+			const resolvedVersion = await loadAppVersion().catch(() => null);
+			const nextVersion = resolvedVersion || getAppVersion();
+			this._applyClientVersion(nextVersion);
+			return this.getClientVersion();
+		})();
+		try {
+			return await this.clientVersionPromise;
+		} finally {
+			this.clientVersionPromise = null;
+		}
 	}
 
 	_isAuthFailureStatus(status) {
@@ -336,8 +377,8 @@ class JellyfinService {
 		return getPublicSystemInfo(this);
 	}
 
-	async getMediaSegments(itemId) {
-		return getItemMediaSegments(this, itemId);
+	async getMediaSegments(itemId, options = {}) {
+		return getItemMediaSegments(this, itemId, options);
 	}
 }
 

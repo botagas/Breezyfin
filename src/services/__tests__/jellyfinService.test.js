@@ -23,6 +23,7 @@ jest.mock('../serverManager', () => ({
 
 import jellyfinService from '../jellyfinService';
 import serverManager from '../serverManager';
+import {getDeviceId} from '../../utils/deviceIdentity';
 
 const jsonResponse = (data, ok = true, status = 200) => ({
 	ok,
@@ -37,6 +38,8 @@ const resetServiceState = () => {
 	jellyfinService.accessToken = null;
 	jellyfinService.serverName = null;
 	jellyfinService.username = null;
+	jellyfinService.sessionExpiredNotified = false;
+	jellyfinService.clientVersionPromise = null;
 };
 
 describe('jellyfinService', () => {
@@ -57,6 +60,10 @@ describe('jellyfinService', () => {
 		warnSpy.mockRestore();
 	});
 
+	it('reuses the shared persisted device id', () => {
+		expect(jellyfinService.getDeviceId()).toBe(getDeviceId());
+	});
+
 	it('connects to server and stores server metadata', async () => {
 		global.fetch.mockResolvedValue(jsonResponse({ServerName: 'My Jellyfin'}));
 
@@ -69,6 +76,31 @@ describe('jellyfinService', () => {
 		expect(jellyfinService.jellyfin.createApi).toHaveBeenCalledWith('http://media.local:8096');
 	});
 
+	it('builds authenticated image urls with optional tag and explicit format', () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'token-123';
+
+		const imageUrl = jellyfinService.getImageUrl('item-1', 'Primary', 320, {
+			tag: 'tag-1',
+			format: 'Jpg'
+		});
+
+		const parsedImageUrl = new URL(imageUrl);
+		expect(parsedImageUrl.origin).toBe('http://media.local');
+		expect(parsedImageUrl.pathname).toBe('/Items/item-1/Images/Primary');
+		expect(parsedImageUrl.searchParams.get('api_key')).toBe('token-123');
+		expect(parsedImageUrl.searchParams.get('width')).toBe('320');
+		expect(parsedImageUrl.searchParams.get('tag')).toBe('tag-1');
+		expect(parsedImageUrl.searchParams.get('format')).toBe('Jpg');
+	});
+
+	it('returns null image url when required context is missing', () => {
+		jellyfinService.serverUrl = null;
+		jellyfinService.accessToken = null;
+		expect(jellyfinService.getImageUrl('item-1')).toBe(null);
+		expect(jellyfinService.getImageUrl(null)).toBe(null);
+	});
+
 	it('throws when server is not reachable during connect', async () => {
 		global.fetch.mockResolvedValue(jsonResponse({}, false, 500));
 
@@ -78,6 +110,8 @@ describe('jellyfinService', () => {
 	it('authenticates and persists active session', async () => {
 		jellyfinService.serverUrl = 'http://media.local';
 		jellyfinService.api = {};
+		const resolveClientVersionSpy = jest.spyOn(jellyfinService, 'resolveClientVersion').mockResolvedValue('9.9.9');
+		const getClientVersionSpy = jest.spyOn(jellyfinService, 'getClientVersion').mockReturnValue('9.9.9');
 		serverManager.addServer.mockReturnValue({serverId: 'srv1', userId: 'user1'});
 		global.fetch.mockResolvedValue(
 			jsonResponse({
@@ -86,40 +120,51 @@ describe('jellyfinService', () => {
 				ServerName: 'Living Room'
 			})
 		);
+		try {
+			const user = await jellyfinService.authenticate('Alice', 'secret');
 
-		const user = await jellyfinService.authenticate('Alice', 'secret');
+			expect(global.fetch).toHaveBeenCalledWith(
+				'http://media.local/Users/AuthenticateByName',
+				expect.objectContaining({
+					method: 'POST',
+					headers: expect.objectContaining({
+						'X-Emby-Authorization': expect.stringContaining(`DeviceId="${jellyfinService.getDeviceId()}"`)
+					}),
+					body: JSON.stringify({Username: 'Alice', Pw: 'secret'})
+				})
+			);
+			const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.['X-Emby-Authorization'] || '';
+			expect(authHeader).toContain('Version="9.9.9"');
+			expect(resolveClientVersionSpy).toHaveBeenCalledTimes(1);
+			expect(getClientVersionSpy).toHaveBeenCalled();
+			expect(user).toEqual({Id: 'user1', Name: 'Alice', PrimaryImageTag: 'avatar-tag-1'});
+			expect(jellyfinService.accessToken).toBe('token-123');
+			expect(jellyfinService.userId).toBe('user1');
+			expect(jellyfinService.username).toBe('Alice');
+			expect(jellyfinService.serverName).toBe('Living Room');
+			expect(jellyfinService.api.accessToken).toBe('token-123');
+			expect(serverManager.addServer).toHaveBeenCalledWith(
+				expect.objectContaining({
+					serverUrl: 'http://media.local',
+					serverName: 'Living Room',
+					userId: 'user1',
+					username: 'Alice',
+					accessToken: 'token-123',
+					avatarTag: 'avatar-tag-1'
+				})
+			);
+			expect(serverManager.setActiveServer).toHaveBeenCalledWith('srv1', 'user1');
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			'http://media.local/Users/AuthenticateByName',
-			expect.objectContaining({
-				method: 'POST',
-				body: JSON.stringify({Username: 'Alice', Pw: 'secret'})
-			})
-		);
-		expect(user).toEqual({Id: 'user1', Name: 'Alice', PrimaryImageTag: 'avatar-tag-1'});
-		expect(jellyfinService.accessToken).toBe('token-123');
-		expect(jellyfinService.userId).toBe('user1');
-		expect(jellyfinService.username).toBe('Alice');
-		expect(jellyfinService.serverName).toBe('Living Room');
-		expect(jellyfinService.api.accessToken).toBe('token-123');
-		expect(serverManager.addServer).toHaveBeenCalledWith(
-			expect.objectContaining({
+			const savedAuth = JSON.parse(localStorage.getItem('jellyfinAuth'));
+			expect(savedAuth).toEqual({
 				serverUrl: 'http://media.local',
-				serverName: 'Living Room',
-				userId: 'user1',
-				username: 'Alice',
 				accessToken: 'token-123',
-				avatarTag: 'avatar-tag-1'
-			})
-		);
-		expect(serverManager.setActiveServer).toHaveBeenCalledWith('srv1', 'user1');
-
-		const savedAuth = JSON.parse(localStorage.getItem('jellyfinAuth'));
-		expect(savedAuth).toEqual({
-			serverUrl: 'http://media.local',
-			accessToken: 'token-123',
-			userId: 'user1'
-		});
+				userId: 'user1'
+			});
+		} finally {
+			resolveClientVersionSpy.mockRestore();
+			getClientVersionSpy.mockRestore();
+		}
 	});
 
 	it('restores active session from serverManager state', () => {

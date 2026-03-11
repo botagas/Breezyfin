@@ -1,0 +1,27 @@
+.settingItem,
+.switchItem {
+	background: transparent !important;
+	padding: 0.85rem 0;
+	border-bottom: 1px solid var(--settings-row-divider);
+	transition: none;
+
+	&:last-of-type {
+		border-bottom: none;
+	}
+
+	&:global(.spottable):focus {
+		background: var(--settings-focus) !important;
+		border-radius: 8px;
+		border-bottom-color: var(--settings-focus-border);
+	}
+}
+
+.settingItem {
+	cursor: pointer;
+}
+
+.loadingItem {
+	display: flex;
+	justify-content: center;
+	padding: 2rem;
+}

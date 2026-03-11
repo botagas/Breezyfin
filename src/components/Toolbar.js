@@ -8,6 +8,7 @@ import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
 import { useDismissOnOutsideInteraction } from '../hooks/useDismissOnOutsideInteraction';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
+import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 import ToolbarLibraryPicker from './toolbar/ToolbarLibraryPicker';
@@ -52,11 +53,13 @@ const Toolbar = ({
 	const centerRef = useRef(null);
 	const userMenuScopeRef = useRef(null);
 	const libraryMenuScopeRef = useRef(null);
+	const librariesPopupContentRef = useRef(null);
 	const userMenuCloseTimerRef = useRef(null);
 	const suppressUserMenuUntilRef = useRef(0);
 	const librariesById = useMapById(libraries);
 	const isElegantTheme = toolbarTheme === TOOLBAR_THEME_ELEGANT;
 	const isHomeSection = activeSection === 'home';
+	usePopupInitialFocus(showLibrariesPopup, librariesPopupContentRef);
 	const elegantPanelTitle = useMemo(() => {
 		if (isHomeSection) return '';
 		if (activeSection === 'library') {
@@ -388,13 +391,15 @@ const Toolbar = ({
 
 			{!isElegantTheme && (
 				<Popup open={showLibrariesPopup} onClose={handleCloseLibrariesPopup} style={toolbarStyle} css={popupShellCss}>
-					<ToolbarLibraryPicker
-						useElegantGlass={false}
-						libraries={libraries}
-						activeSection={activeSection}
-						activeLibraryId={activeLibraryId}
-						onLibrarySelect={handleLibraryPopupSelect}
-					/>
+					<div ref={librariesPopupContentRef}>
+						<ToolbarLibraryPicker
+							useElegantGlass={false}
+							libraries={libraries}
+							activeSection={activeSection}
+							activeLibraryId={activeLibraryId}
+							onLibrarySelect={handleLibraryPopupSelect}
+						/>
+					</div>
 				</Popup>
 			)}
 		</div>

@@ -1,0 +1,47 @@
+.scrollerElegant {
+	margin-top: 0;
+}
+
+.elegantMode {
+	background-color: rgb(var(--bf-media-details-base-rgb));
+	background: linear-gradient(
+		to bottom,
+		rgba(var(--bf-media-details-base-rgb), 0.98) 0%,
+		rgb(var(--bf-media-details-base-rgb)) 120px
+	);
+}
+
+.backdropElegant img {
+	opacity: 0.92;
+	filter: none;
+	transform: none;
+}
+
+.gradientElegant {
+	background: linear-gradient(
+		to bottom,
+		rgba(7, 12, 19, 0.03) 0%,
+		rgba(7, 12, 19, 0.08) 30%,
+		rgba(7, 12, 19, 0.55) 58%,
+		rgba(12, 16, 23, 0.9) 74%,
+		rgb(var(--bf-media-details-base-rgb)) 100%
+	);
+}
+
+.contentElegant {
+	--bf-md-content-top-padding: 0.25rem;
+	--bf-md-hero-top-padding: var(--bf-md-hero-top-padding-elegant);
+	padding-top: 0.25rem;
+}
+
+.introSectionElegant {
+	min-height: 0;
+}
+
+.episodeDetailsMode .contentElegant {
+	--bf-md-hero-top-padding: var(--bf-md-hero-top-padding-elegant);
+}
+
+.episodeDetailsMode .introSectionElegant {
+	min-height: 0;
+}

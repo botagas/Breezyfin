@@ -1,0 +1,67 @@
+.libraryNativeContentGlass .libraryNativeButton {
+	--bf-button-fg: var(--bf-elegant-text-regular);
+	--bf-button-fg-hover: var(--bf-elegant-accent);
+	--bf-button-fg-active: var(--bf-elegant-accent);
+	border-radius: 0.72rem !important;
+	border: 1px solid var(--bf-elegant-surface-border-soft) !important;
+	background: transparent !important;
+	overflow: hidden !important;
+	box-shadow: none !important;
+	outline: none !important;
+	transition: background 0.16s ease, border-color 0.16s ease !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton::before,
+.libraryNativeContentGlass .libraryNativeButton::after {
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton :global(.bf-button-bg) {
+	background: transparent !important;
+	border: none !important;
+	border-radius: inherit !important;
+	box-shadow: none !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton :global(.client) {
+	color: inherit !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton:hover :global(.bf-button-bg),
+.libraryNativeContentGlass .libraryNativeButton:focus :global(.bf-button-bg),
+.libraryNativeContentGlass .libraryNativeButton:global(.spottable):focus :global(.bf-button-bg) {
+	background: transparent !important;
+	border: none !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton:hover,
+.libraryNativeContentGlass .libraryNativeButton:focus,
+.libraryNativeContentGlass .libraryNativeButton:global(.spottable):focus {
+	background: rgba(var(--bf-elegant-accent-rgb), 0.16) !important;
+	border-color: rgba(var(--bf-elegant-accent-rgb), 0.55) !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton:global(.selected) {
+	--bf-button-fg: var(--bf-elegant-accent);
+	--bf-button-fg-hover: var(--bf-elegant-accent);
+	--bf-button-fg-active: var(--bf-elegant-accent);
+	border-color: rgba(var(--bf-elegant-accent-rgb), 0.62) !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton:global(.selected) :global(.bf-button-bg) {
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+}
+
+.libraryNativeContentGlass .libraryNativeButton:global(.selected):hover,
+.libraryNativeContentGlass .libraryNativeButton:global(.selected):focus,
+.libraryNativeContentGlass .libraryNativeButton:global(.selected):global(.spottable):focus {
+	background: rgba(var(--bf-elegant-accent-rgb), 0.22) !important;
+	border-color: rgba(var(--bf-elegant-accent-rgb), 0.72) !important;
+	box-shadow: none !important;
+}

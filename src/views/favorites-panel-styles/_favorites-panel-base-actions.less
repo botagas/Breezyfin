@@ -1,0 +1,116 @@
+.favoriteActionButtonSurface() {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-favorites-action-surface-bg) !important;
+		border: 1px solid var(--bf-favorites-action-surface-border) !important;
+		border-radius: 999px !important;
+	}
+}
+
+.favoriteActionButtonHoverSurface() {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-favorites-action-surface-hover-bg) !important;
+		border-color: var(--bf-favorites-action-surface-hover-border) !important;
+	}
+}
+
+.unfavoriteButton {
+	pointer-events: auto;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 6;
+	.icon-circle-button-dimensions(2.35rem);
+	.favoriteActionButtonSurface();
+
+	:global(.bf-button-bg) {
+		background: var(--bf-favorites-unfavorite-bg) !important;
+		border: 1px solid var(--bf-favorites-unfavorite-border) !important;
+		border-radius: 999px !important;
+	}
+
+	:global(.bg) {
+		background: var(--bf-favorites-unfavorite-bg) !important;
+		border: 1px solid var(--bf-favorites-unfavorite-border) !important;
+		border-radius: 999px !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-favorites-unfavorite-hover-bg) !important;
+	}
+
+	&:focus,
+	&:global(.spottable):focus {
+		opacity: 1;
+	}
+}
+
+.watchedToggleButton {
+	pointer-events: auto;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 6;
+	.icon-circle-button-dimensions(2.35rem);
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-favorites-watched-bg) !important;
+		border: 1px solid var(--bf-favorites-watched-border) !important;
+		border-radius: 999px !important;
+	}
+
+	&:focus,
+	&:global(.spottable):focus {
+		opacity: 1;
+	}
+
+	&:hover,
+	&:focus,
+	&:global(.spottable):focus {
+		:global(.bf-button-bg),
+		:global(.bg) {
+			background: var(--bf-favorites-watched-hover-bg) !important;
+		}
+	}
+}
+
+.favoriteActionIcon {
+	font-size: 1rem !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	line-height: 1rem !important;
+	margin: 0 !important;
+	display: block !important;
+	color: var(--bf-favorites-icon-favorite) !important;
+}
+
+.unfavoriteButton:hover .favoriteActionIcon,
+.unfavoriteButton:active .favoriteActionIcon,
+.unfavoriteButton:global(.spottable):focus .favoriteActionIcon {
+	color: var(--bf-favorites-icon-favorite-hover) !important;
+}
+
+.watchedActionIcon {
+	font-size: 1rem !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	line-height: 1rem !important;
+	margin: 0 !important;
+	display: block !important;
+	color: var(--bf-favorites-icon-watched) !important;
+}
+
+.watchedToggleButtonActive .watchedActionIcon {
+	color: var(--bf-favorites-icon-watched-active) !important;
+}
+
+.watchedToggleButton:hover .watchedActionIcon,
+.watchedToggleButton:active .watchedActionIcon,
+.watchedToggleButton:global(.spottable):focus .watchedActionIcon {
+	color: var(--bf-favorites-icon-watched-hover) !important;
+}

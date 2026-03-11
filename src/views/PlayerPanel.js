@@ -1,26 +1,33 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Panel } from '../components/BreezyPanels';
-import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
-import {getPlaybackErrorMessage, isFatalPlaybackError} from '../utils/errorMessages';
 import {
 	getPlayerTrackLabel,
 	getPlayerErrorBackdropUrl,
 	getSkipSegmentLabel
 } from './player-panel/utils/playerPanelHelpers';
-import {getNextEpisodeForItem, getPreviousEpisodeForItem} from './player-panel/utils/episodeNavigation';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { usePlayerKeyboardShortcuts } from './player-panel/hooks/usePlayerKeyboardShortcuts';
 import { usePlayerLifecycleEffects } from './player-panel/hooks/usePlayerLifecycleEffects';
 import { useTrackPreferences } from '../hooks/useTrackPreferences';
 import { useToastMessage } from '../hooks/useToastMessage';
-import { useDisclosureMap } from '../hooks/useDisclosureMap';
+import { PLAYER_PANEL_TOAST_CONFIG } from '../constants/toast';
 import { usePlayerRecoveryHandlers } from './player-panel/hooks/usePlayerRecoveryHandlers';
 import { usePlayerVideoLoader } from './player-panel/hooks/usePlayerVideoLoader';
 import { usePlayerSkipOverlayState } from './player-panel/hooks/usePlayerSkipOverlayState';
 import { usePlayerSeekAndTrackSwitching } from './player-panel/hooks/usePlayerSeekAndTrackSwitching';
 import { usePlayerPlaybackCommands } from './player-panel/hooks/usePlayerPlaybackCommands';
+import { usePlayerDisclosures } from './player-panel/hooks/usePlayerDisclosures';
+import { usePlayerEpisodeProgress } from './player-panel/hooks/usePlayerEpisodeProgress';
+import { usePlayerEpisodeAndSurfaceHandlers } from './player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers';
+import { usePlayerCoreControls } from './player-panel/hooks/usePlayerCoreControls';
+import { usePlayerBackNavigation } from './player-panel/hooks/usePlayerBackNavigation';
+import { usePlayerMediaEventHandlers } from './player-panel/hooks/usePlayerMediaEventHandlers';
+import { usePlayerVisibilitySync } from './player-panel/hooks/usePlayerVisibilitySync';
+import { usePlayerPlaybackContext } from './player-panel/hooks/usePlayerPlaybackContext';
+import { usePlayerTrackPopupHandlers } from './player-panel/hooks/usePlayerTrackPopupHandlers';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
 import PlayerErrorPopup from './player-panel/components/PlayerErrorPopup';
 import PlayerTrackPopup from './player-panel/components/PlayerTrackPopup';
 import PlayerLoadingOverlay from './player-panel/components/PlayerLoadingOverlay';
@@ -28,6 +35,7 @@ import PlayerSkipOverlay from './player-panel/components/PlayerSkipOverlay';
 import PlayerControlsOverlay from './player-panel/components/PlayerControlsOverlay';
 import PlayerSeekFeedback from './player-panel/components/PlayerSeekFeedback';
 import PlayerToast from './player-panel/components/PlayerToast';
+import PlayerDebugOverlay from './player-panel/components/PlayerDebugOverlay';
 
 import css from './PlayerPanel.module.less';
 
@@ -46,18 +54,6 @@ const HLS_PLAYER_CONFIG = {
 	levelLoadingMaxRetry: 4,
 	startLevel: -1
 };
-const PLAYER_DISCLOSURE_KEYS = {
-	AUDIO_TRACKS: 'audioTracksPopup',
-	SUBTITLE_TRACKS: 'subtitleTracksPopup'
-};
-const INITIAL_PLAYER_DISCLOSURES = {
-	[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS]: false,
-	[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS]: false
-};
-const PLAYER_DISCLOSURE_KEY_LIST = [
-	PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS,
-	PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS
-];
 
 const PlayerPanel = ({
 	item,
@@ -70,6 +66,12 @@ const PlayerPanel = ({
 	registerBackHandler,
 	...rest
 }) => {
+	const [extendedDebugOverlayEnabled, setExtendedDebugOverlayEnabled] = useState(
+		() => readBreezyfinSettings().showExtendedPlayerDebugOverlay === true
+	);
+	const [debugOverlayVisible, setDebugOverlayVisible] = useState(
+		() => readBreezyfinSettings().showExtendedPlayerDebugOverlay === true
+	);
 	const videoRef = useRef(null);
 	const hlsRef = useRef(null);
 	const progressIntervalRef = useRef(null);
@@ -110,7 +112,7 @@ const PlayerPanel = ({
 		toastMessage,
 		toastVisible,
 		setToastMessage
-	} = useToastMessage({durationMs: 2050, fadeOutMs: 350});
+	} = useToastMessage(PLAYER_PANEL_TOAST_CONFIG);
 	const {
 		loadTrackPreferences,
 		pickPreferredAudio,
@@ -133,24 +135,14 @@ const PlayerPanel = ({
 	const [currentAudioTrack, setCurrentAudioTrack] = useState(null);
 	const [currentSubtitleTrack, setCurrentSubtitleTrack] = useState(null);
 	const {
-		disclosures,
-		openDisclosure,
-		closeDisclosure
-	} = useDisclosureMap(INITIAL_PLAYER_DISCLOSURES);
-	const disclosureHandlers = useDisclosureHandlers(
-		PLAYER_DISCLOSURE_KEY_LIST,
-		openDisclosure,
-		closeDisclosure
-	);
-	const showAudioPopup = disclosures[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS] === true;
-	const showSubtitlePopup = disclosures[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS] === true;
-	const openAudioPopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS].open;
-	const closeAudioPopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.AUDIO_TRACKS].close;
-	const openSubtitlePopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS].open;
-	const closeSubtitlePopup = disclosureHandlers[PLAYER_DISCLOSURE_KEYS.SUBTITLE_TRACKS].close;
+		showAudioPopup,
+		showSubtitlePopup,
+		openAudioPopup,
+		closeAudioPopup,
+		openSubtitlePopup,
+		closeSubtitlePopup
+	} = usePlayerDisclosures();
 	const [mediaSourceData, setMediaSourceData] = useState(null);
-	const [hasNextEpisode, setHasNextEpisode] = useState(false);
-	const [hasPreviousEpisode, setHasPreviousEpisode] = useState(false);
 	const [mediaSegments, setMediaSegments] = useState([]);
 	const [currentSkipSegment, setCurrentSkipSegment] = useState(null);
 	const [skipCountdown, setSkipCountdown] = useState(null);
@@ -158,180 +150,68 @@ const PlayerPanel = ({
 	const [dismissedSkipSegmentId, setDismissedSkipSegmentId] = useState(null);
 	const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false);
 	const [nextEpisodePromptDismissed, setNextEpisodePromptDismissed] = useState(false);
-	const [nextEpisodeData, setNextEpisodeData] = useState(null);
 	const [seekFeedback, setSeekFeedback] = useState('');
 	const isCurrentTranscoding = mediaSourceData?.__selectedPlayMethod === 'Transcode';
 
-	useEffect(() => {
-		if (typeof requestedControlsVisible === 'boolean') {
-			setShowControls((prev) => (
-				prev === requestedControlsVisible ? prev : requestedControlsVisible
-			));
-		}
-	}, [requestedControlsVisible]);
+	useBreezyfinSettingsSync((settings) => {
+		setExtendedDebugOverlayEnabled(settings?.showExtendedPlayerDebugOverlay === true);
+	}, {enabled: true, applyOnMount: true});
 
 	useEffect(() => {
-		if (typeof onControlsVisibilityChange === 'function') {
-			onControlsVisibilityChange(showControls);
-		}
-	}, [onControlsVisibilityChange, showControls]);
+		setDebugOverlayVisible(extendedDebugOverlayEnabled);
+	}, [extendedDebugOverlayEnabled]);
 
-	const buildPlaybackOptions = useCallback(() => {
-		const opts = { ...playbackSettingsRef.current };
-		if (Number.isInteger(currentAudioTrack)) {
-			opts.audioStreamIndex = currentAudioTrack;
-		}
-		if (currentSubtitleTrack === -1 || Number.isInteger(currentSubtitleTrack)) {
-			opts.subtitleStreamIndex = currentSubtitleTrack;
-		}
-		return opts;
-	}, [currentAudioTrack, currentSubtitleTrack]);
+	usePlayerVisibilitySync({
+		requestedControlsVisible,
+		onControlsVisibilityChange,
+		showControls,
+		setShowControls
+	});
 
-	useEffect(() => {
-		currentAudioTrackRef.current = currentAudioTrack;
-	}, [currentAudioTrack]);
+	const {
+		buildPlaybackOptions,
+		getPlaybackSessionContext
+	} = usePlayerPlaybackContext({
+		playbackSettingsRef,
+		playbackSessionRef,
+		currentAudioTrack,
+		currentSubtitleTrack,
+		currentAudioTrackRef,
+		currentSubtitleTrackRef
+	});
 
-	useEffect(() => {
-		currentSubtitleTrackRef.current = currentSubtitleTrack;
-	}, [currentSubtitleTrack]);
+	const {
+		hasNextEpisode,
+		hasPreviousEpisode,
+		nextEpisodeData,
+		getNextEpisode,
+		getPreviousEpisode,
+		startProgressReporting
+	} = usePlayerEpisodeProgress({
+		item,
+		videoRef,
+		progressIntervalRef,
+		getPlaybackSessionContext
+	});
 
-	const getPlaybackSessionContext = useCallback(() => ({
-		...playbackSessionRef.current,
-		audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
-		subtitleStreamIndex: (currentSubtitleTrackRef.current === -1 || Number.isInteger(currentSubtitleTrackRef.current))
-			? currentSubtitleTrackRef.current
-			: undefined
-	}), []);
-
-	const getNextEpisode = useCallback(async (currentItem) => {
-		return getNextEpisodeForItem(jellyfinService, currentItem);
-	}, []);
-
-	const getPreviousEpisode = useCallback(async (currentItem) => {
-		return getPreviousEpisodeForItem(jellyfinService, currentItem);
-	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-		const checkNext = async () => {
-			if (!item || item.Type !== 'Episode') {
-				if (!cancelled) {
-					setHasNextEpisode(false);
-					setHasPreviousEpisode(false);
-					setNextEpisodeData(null);
-				}
-				return;
-			}
-			try {
-				const nextEp = await getNextEpisode(item);
-				const prevEp = await getPreviousEpisode(item);
-				if (!cancelled) {
-					setHasNextEpisode(!!nextEp);
-					setHasPreviousEpisode(!!prevEp);
-					setNextEpisodeData(nextEp || null);
-				}
-			} catch (err) {
-				console.error('Failed to check next episode:', err);
-				if (!cancelled) {
-					setHasNextEpisode(false);
-					setHasPreviousEpisode(false);
-					setNextEpisodeData(null);
-				}
-			}
-		};
-		checkNext();
-		return () => { cancelled = true; };
-	}, [getNextEpisode, getPreviousEpisode, item]);
-
-	const startProgressReporting = useCallback(() => {
-		if (progressIntervalRef.current) {
-			clearInterval(progressIntervalRef.current);
-		}
-
-		progressIntervalRef.current = setInterval(async () => {
-			if (videoRef.current && item) {
-				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-				await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, false, getPlaybackSessionContext());
-			}
-		}, 10000);
-	}, [getPlaybackSessionContext, item]);
-
-	const clearStartWatch = useCallback(() => {
-		if (startWatchTimerRef.current) {
-			clearTimeout(startWatchTimerRef.current);
-			startWatchTimerRef.current = null;
-		}
-		if (failStartTimerRef.current) {
-			clearTimeout(failStartTimerRef.current);
-			failStartTimerRef.current = null;
-		}
-	}, []);
-
-	const focusSkipOverlayAction = useCallback(() => {
-		if (skipFocusRetryTimerRef.current) {
-			clearTimeout(skipFocusRetryTimerRef.current);
-			skipFocusRetryTimerRef.current = null;
-		}
-
-		let attempts = 0;
-		const maxAttempts = 10;
-		const tryFocus = () => {
-			Spotlight.focus('skip-overlay-action');
-			const target = skipButtonRef.current?.nodeRef?.current || skipButtonRef.current;
-			if (target?.focus) {
-				target.focus({ preventScroll: true });
-			}
-			const active = document.activeElement;
-			const focused = !!(active && skipOverlayRef.current && skipOverlayRef.current.contains(active));
-			if (!focused && attempts < maxAttempts) {
-				attempts += 1;
-				skipFocusRetryTimerRef.current = setTimeout(tryFocus, 40);
-			} else {
-				skipFocusRetryTimerRef.current = null;
-			}
-		};
-		tryFocus();
-	}, []);
-
-	const handleStop = useCallback(async () => {
-		if (progressIntervalRef.current) {
-			clearInterval(progressIntervalRef.current);
-			progressIntervalRef.current = null;
-		}
-		if (startupFallbackTimerRef.current) {
-			clearTimeout(startupFallbackTimerRef.current);
-			startupFallbackTimerRef.current = null;
-		}
-		clearStartWatch();
-
-		if (hlsRef.current) {
-			try {
-				hlsRef.current.destroy();
-			} catch (err) {
-				console.warn('Error destroying HLS instance:', err);
-			}
-			hlsRef.current = null;
-		}
-
-		if (videoRef.current && item) {
-			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-			try {
-				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks, getPlaybackSessionContext());
-			} catch (err) {
-				console.warn('Failed to report playback stopped:', err);
-			}
-		}
-
-		if (videoRef.current) {
-			videoRef.current.removeAttribute('src');
-			videoRef.current.load();
-		}
-		playbackSessionRef.current = {
-			playSessionId: null,
-			mediaSourceId: null,
-			playMethod: 'DirectStream'
-		};
-	}, [clearStartWatch, getPlaybackSessionContext, item]);
+	const {
+		clearStartWatch,
+		focusSkipOverlayAction,
+		handleStop
+	} = usePlayerCoreControls({
+		item,
+		videoRef,
+		hlsRef,
+		playbackSessionRef,
+		progressIntervalRef,
+		startupFallbackTimerRef,
+		startWatchTimerRef,
+		failStartTimerRef,
+		skipFocusRetryTimerRef,
+		skipButtonRef,
+		skipOverlayRef,
+		getPlaybackSessionContext
+	});
 
 	const {
 		resetRecoveryGuards,
@@ -447,88 +327,42 @@ const PlayerPanel = ({
 		isCurrentTranscoding
 	});
 
-	const handleLoadedMetadata = useCallback(() => {
-		if (videoRef.current) {
-			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
-			if (typeof overrideSeek === 'number') {
-				videoRef.current.currentTime = overrideSeek;
-				setCurrentTime(overrideSeek);
-			} else if (item.UserData?.PlaybackPositionTicks) {
-				const startPosition = item.UserData.PlaybackPositionTicks / 10000000;
-				videoRef.current.currentTime = startPosition;
-				setCurrentTime(startPosition);
-			}
-		}
-	}, [item]);
-
-	const handleLoadedData = useCallback(async () => {
-		if (loading && videoRef.current) {
-			setLoading(false);
-			try {
-				await videoRef.current.play();
-			} catch (playError) {
-				// Ignore non-fatal autoplay interruptions; surface unsupported formats immediately.
-				if (isFatalPlaybackError(playError)) {
-					showPlaybackError(getPlaybackErrorMessage(playError));
-				}
-			}
-		}
-	}, [loading, showPlaybackError]);
-
-	const handleCanPlay = useCallback(async () => {
-		if (!videoRef.current || !loading) return;
-
-		setLoading(false);
-
-		try {
-			await videoRef.current.play();
-			setPlaying(true);
-			if (pendingOverrideClearRef.current) {
-				playbackOverrideRef.current = null;
-				pendingOverrideClearRef.current = false;
-			}
-			clearStartWatch();
-			if (startupFallbackTimerRef.current) {
-				clearTimeout(startupFallbackTimerRef.current);
-				startupFallbackTimerRef.current = null;
-			}
-
-				const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
-			await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
-			startProgressReporting();
-		} catch (playError) {
-			console.error('Auto-play failed:', playError);
-			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
-			setPlaying(false);
-
-			if (isFatalPlaybackError(playError)) {
-				const didFallback = await tryPlaybackFallbackOnCanPlayError(errorMessage);
-				if (didFallback) {
-					return;
-				}
-			}
-			if (isFatalPlaybackError(playError)) {
-				showPlaybackError(errorMessage);
-			} else {
-				setToastMessage('Playback failed to start. Press Play/Retry.');
-			}
-		}
-	}, [clearStartWatch, getPlaybackSessionContext, loading, item, setToastMessage, showPlaybackError, startProgressReporting, tryPlaybackFallbackOnCanPlayError]);
-
-	const handlePlayNextEpisode = useCallback(async () => {
-		if (!item || item.Type !== 'Episode' || !onPlay || !hasNextEpisode) return;
-		try {
-			const nextEpisode = nextEpisodeData || await getNextEpisode(item);
-			if (nextEpisode) {
-				const opts = buildPlaybackOptions();
-				playbackOverrideRef.current = { ...opts, forceNewSession: true };
-				await handleStop();
-				onPlay(nextEpisode, opts);
-			}
-		} catch (err) {
-			console.error('Failed to play next episode:', err);
-		}
-	}, [buildPlaybackOptions, getNextEpisode, handleStop, hasNextEpisode, item, nextEpisodeData, onPlay]);
+	const {
+		handlePlayNextEpisode,
+		handlePlayPreviousEpisode,
+		handleVideoSurfaceClick,
+		handleVolumeChange,
+		toggleMute,
+		handleVideoPlaying,
+		handleVideoPause,
+		clearError
+	} = usePlayerEpisodeAndSurfaceHandlers({
+		item,
+		onPlay,
+		hasNextEpisode,
+		nextEpisodeData,
+		getNextEpisode,
+		hasPreviousEpisode,
+		getPreviousEpisode,
+		buildPlaybackOptions,
+		playbackOverrideRef,
+		handleStop,
+		loading,
+		error,
+		showAudioPopup,
+		showSubtitlePopup,
+		showControls,
+		playing,
+		handlePause,
+		handlePlay,
+		lastInteractionRef,
+		videoRef,
+		muted,
+		setMuted,
+		setVolume,
+		setPlaying,
+		setError
+	});
 
 	const {
 		checkSkipSegments,
@@ -554,62 +388,6 @@ const PlayerPanel = ({
 		setNextEpisodePromptDismissed,
 		handlePlayNextEpisode
 	});
-
-	const handleTimeUpdate = useCallback(() => {
-		if (videoRef.current) {
-			const actualTime = videoRef.current.currentTime + seekOffsetRef.current;
-			setCurrentTime(actualTime);
-			checkSkipSegments(actualTime);
-			lastProgressRef.current = { time: actualTime, timestamp: Date.now() };
-		}
-	}, [checkSkipSegments]);
-
-	const handleVideoError = useCallback(async (e) => {
-		if (playbackFailureLockedRef.current) return;
-		const video = videoRef.current;
-		const mediaError = video?.error;
-
-		console.error('=== Video Error ===');
-		console.error('Event:', e);
-		console.error('Video src:', video?.src);
-		console.error('Network state:', video?.networkState);
-		console.error('Ready state:', video?.readyState);
-
-		let errorMessage = 'Failed to play video';
-		if (mediaError) {
-			const errorMessages = {
-				1: 'Playback aborted',
-				2: 'Network error',
-				3: 'Decode error',
-				4: 'Format not supported'
-			};
-			errorMessage = errorMessages[mediaError.code] || `Error code: ${mediaError.code}`;
-			console.error('MediaError code:', mediaError.code, '-', errorMessage);
-		}
-		if (isSubtitleCompatibilityError(errorMessage) && playbackSettingsRef.current.strictTranscodingMode) {
-			showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
-			return;
-		}
-
-		const subtitleFallbackWorked = await attemptSubtitleCompatibilityFallback(errorMessage);
-		if (subtitleFallbackWorked) {
-			return;
-		}
-
-		if (!isCurrentTranscoding) {
-			const didFallback = await attemptTranscodeFallback(errorMessage);
-			if (didFallback) {
-				return;
-			}
-		}
-
-		try {
-			await handleStop();
-		} catch (stopErr) {
-			console.warn('Error while handling playback failure:', stopErr);
-		}
-		showPlaybackError(errorMessage);
-	}, [attemptSubtitleCompatibilityFallback, attemptTranscodeFallback, handleStop, isCurrentTranscoding, isSubtitleCompatibilityError, showPlaybackError]);
 
 	const {
 		isSeekContext,
@@ -650,98 +428,74 @@ const PlayerPanel = ({
 		setToastMessage
 	});
 
-	const handleVolumeChange = useCallback((e) => {
-		lastInteractionRef.current = Date.now();
-		if (videoRef.current) {
-			const newVolume = e.value;
-			videoRef.current.volume = newVolume / 100;
-			setVolume(newVolume);
-			if (newVolume > 0) setMuted(false);
-		}
-	}, []);
+	const {
+		handleLoadedMetadata,
+		handleLoadedData,
+		handleCanPlay,
+		handleTimeUpdate,
+		handleVideoError
+	} = usePlayerMediaEventHandlers({
+		item,
+		loading,
+		videoRef,
+		playbackOverrideRef,
+		setCurrentTime,
+		setLoading,
+		showPlaybackError,
+		setPlaying,
+		pendingOverrideClearRef,
+		clearStartWatch,
+		startupFallbackTimerRef,
+		getPlaybackSessionContext,
+		startProgressReporting,
+		setToastMessage,
+		tryPlaybackFallbackOnCanPlayError,
+		checkSkipSegments,
+		seekOffsetRef,
+		lastProgressRef,
+		playbackFailureLockedRef,
+		playbackSettingsRef,
+		isSubtitleCompatibilityError,
+		attemptSubtitleCompatibilityFallback,
+		isCurrentTranscoding,
+		attemptTranscodeFallback,
+		handleStop
+	});
 
-	const toggleMute = useCallback(() => {
-		lastInteractionRef.current = Date.now();
-		if (videoRef.current) {
-			const newMuted = !muted;
-			videoRef.current.muted = newMuted;
-			setMuted(newMuted);
-		}
-	}, [muted]);
-
-	const handlePlayPreviousEpisode = useCallback(async () => {
-		if (!item || item.Type !== 'Episode' || !onPlay || !hasPreviousEpisode) return;
-		try {
-			const prevEpisode = await getPreviousEpisode(item);
-			if (prevEpisode) {
-				const opts = buildPlaybackOptions();
-				playbackOverrideRef.current = { ...opts, forceNewSession: true };
-				await handleStop();
-				onPlay(prevEpisode, opts);
-			}
-		} catch (err) {
-			console.error('Failed to play previous episode:', err);
-		}
-	}, [buildPlaybackOptions, getPreviousEpisode, handleStop, hasPreviousEpisode, item, onPlay]);
-
-	const handleVideoSurfaceClick = useCallback(() => {
-		if (loading || error || showAudioPopup || showSubtitlePopup) return;
-		lastInteractionRef.current = Date.now();
-		const keepHidden = !showControls;
-		if (playing) {
-			handlePause({keepHidden});
-		} else {
-			handlePlay({keepHidden});
-		}
-	}, [error, handlePause, handlePlay, loading, playing, showAudioPopup, showControls, showSubtitlePopup]);
 	const errorBackdropUrl = getPlayerErrorBackdropUrl(item, jellyfinService);
 	const hasErrorBackdrop = Boolean(errorBackdropUrl);
 
-	const handleVideoPlaying = useCallback(() => {
-		setPlaying(true);
+	const {
+		handleAudioTrackItemClick,
+		handleSubtitleTrackItemClick
+	} = usePlayerTrackPopupHandlers({
+		handleAudioTrackChange,
+		handleSubtitleTrackChange
+	});
+
+	const handleToggleDebugOverlay = useCallback(() => {
+		if (!extendedDebugOverlayEnabled) return;
+		setDebugOverlayVisible((current) => !current);
+	}, [extendedDebugOverlayEnabled]);
+
+	const handleCloseDebugOverlay = useCallback(() => {
+		setDebugOverlayVisible(false);
 	}, []);
 
-	const handleVideoPause = useCallback(() => {
-		setPlaying(false);
-	}, []);
-
-	const clearError = useCallback(() => {
-		setError(null);
-	}, []);
-
-	const handleAudioTrackItemClick = useCallback((event) => {
-		const trackIndex = Number(event.currentTarget.dataset.trackIndex);
-		if (!Number.isFinite(trackIndex)) return;
-		handleAudioTrackChange(trackIndex);
-	}, [handleAudioTrackChange]);
-
-	const handleSubtitleTrackItemClick = useCallback((event) => {
-		const trackIndex = Number(event.currentTarget.dataset.trackIndex);
-		if (!Number.isFinite(trackIndex)) return;
-		handleSubtitleTrackChange(trackIndex);
-	}, [handleSubtitleTrackChange]);
-
-	const handleInternalBack = useCallback(() => {
-		if (showAudioPopup) {
-			closeAudioPopup();
-			return true;
-		}
-		if (showSubtitlePopup) {
-			closeSubtitlePopup();
-			return true;
-		}
-		if (skipOverlayVisible) {
-			handleDismissSkipOverlay();
-			return true;
-		}
-		if (showControls) {
-			setShowControls(false);
-			return true;
-		}
-		return false;
-	}, [closeAudioPopup, closeSubtitlePopup, handleDismissSkipOverlay, showAudioPopup, showControls, showSubtitlePopup, skipOverlayVisible]);
-	const getMediaSegmentsForItem = useCallback((itemId) => {
-		return jellyfinService.getMediaSegments(itemId);
+	const {
+		handleInternalBack
+	} = usePlayerBackNavigation({
+		showAudioPopup,
+		closeAudioPopup,
+		showSubtitlePopup,
+		closeSubtitlePopup,
+		skipOverlayVisible,
+		handleDismissSkipOverlay,
+		showControls,
+		setShowControls
+	});
+	const getMediaSegmentsForItem = useCallback((itemId, options = {}) => {
+		return jellyfinService.getMediaSegments(itemId, options);
 	}, []);
 
 	usePlayerLifecycleEffects({
@@ -817,7 +571,9 @@ const PlayerPanel = ({
 		audioTracks,
 		subtitleTracks,
 		muted,
-		volume
+		volume,
+		debugOverlayEnabled: extendedDebugOverlayEnabled,
+		debugOverlayVisible
 	};
 	const playerControlsActions = {
 		handleBackButton,
@@ -829,7 +585,8 @@ const PlayerPanel = ({
 		openAudioPopup,
 		openSubtitlePopup,
 		toggleMute,
-		handleVolumeChange
+		handleVolumeChange,
+		handleToggleDebugOverlay
 	};
 	const playerControlsRefs = {
 		controlsRef,
@@ -857,7 +614,15 @@ const PlayerPanel = ({
 				/>
 				{error && (
 					<div className={`${css.errorBackdrop} ${hasErrorBackdrop ? '' : css.errorBackdropFallback}`}>
-						{hasErrorBackdrop && <img src={errorBackdropUrl} alt={item?.Name || 'Playback error'} />}
+						{hasErrorBackdrop && (
+							<img
+								src={errorBackdropUrl}
+								alt={item?.Name || 'Playback error'}
+								loading="lazy"
+								decoding="async"
+								draggable={false}
+							/>
+						)}
 						<div className={css.errorBackdropGradient} />
 					</div>
 				)}
@@ -887,6 +652,26 @@ const PlayerPanel = ({
 				/>
 
 				<PlayerToast message={toastMessage} visible={toastVisible && !error} />
+				<PlayerDebugOverlay
+					enabled={extendedDebugOverlayEnabled && debugOverlayVisible}
+					onClose={handleCloseDebugOverlay}
+					item={item}
+					mediaSourceData={mediaSourceData}
+					playbackSession={playbackSessionRef.current}
+					videoRef={videoRef}
+					hlsRef={hlsRef}
+					loading={loading}
+					error={error}
+					playing={playing}
+					showControls={showControls}
+					currentTime={currentTime}
+					duration={duration}
+					currentAudioTrack={currentAudioTrack}
+					currentSubtitleTrack={currentSubtitleTrack}
+					isCurrentTranscoding={isCurrentTranscoding}
+					skipOverlayVisible={skipOverlayVisible}
+					showNextEpisodePrompt={showNextEpisodePrompt}
+				/>
 
 					<PlayerControlsOverlay
 						state={playerControlsState}

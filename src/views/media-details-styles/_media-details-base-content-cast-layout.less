@@ -1,0 +1,48 @@
+.castScroller {
+	overflow-x: auto;
+	padding-bottom: 8px;
+	scroll-behavior: smooth;
+	contain: layout style;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+.castRow {
+	display: flex;
+	gap: 12px;
+}
+
+.castCard {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.2rem;
+	background: transparent;
+	border-radius: 10px;
+	padding: 12px;
+	text-align: center;
+	min-width: 15rem;
+	outline: none;
+	border: 1px solid transparent;
+	box-shadow: none;
+	transition: transform 140ms ease;
+
+	&:hover,
+	&:focus,
+	&:global(.spottable):focus {
+		transform: translateY(-2px);
+	}
+}
+
+.castCard:hover .castAvatar,
+.castCard:focus .castAvatar,
+.castCard:global(.spottable):focus .castAvatar {
+	border-color: var(--bf-theme-card-border-focus);
+	box-shadow:
+		0 0 0 0.14rem rgba(167, 214, 255, 0.38),
+		0 8px 16px rgba(0, 0, 0, 0.28);
+}

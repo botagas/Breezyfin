@@ -8,12 +8,14 @@ import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 
 import css from './HeroBanner.module.less';
+import imageLoadCss from './ImageLoadReveal.module.less';
 
 const AUTO_ROTATE_INTERVAL_MS = 8000;
 const TRANSITION_DURATION_MS = 420;
 const HERO_PRELOAD_ADJACENT = 2;
 const HERO_PRELOAD_CACHE_LIMIT = 48;
 const heroBackdropPreloadCache = new Map();
+const joinClasses = (...classNames) => classNames.filter(Boolean).join(' ');
 
 const pruneHeroPreloadCache = () => {
 	if (heroBackdropPreloadCache.size <= HERO_PRELOAD_CACHE_LIMIT) return;
@@ -68,6 +70,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 	const [previousIndex, setPreviousIndex] = useState(null);
 	const [isTransitioning, setIsTransitioning] = useState(false);
 	const [imageErrors, setImageErrors] = useState({});
+	const [loadedBackdropUrls, setLoadedBackdropUrls] = useState({});
 	const [performanceModeEnabled, setPerformanceModeEnabled] = useState(false);
 	const [heroVisible, setHeroVisible] = useState(true);
 	const heroRootRef = useRef(null);
@@ -173,6 +176,21 @@ const HeroBanner = ({ items, onPlayClick }) => {
 		});
 	}, [backdropUrlsByIndex, currentIndex, itemCount, preloadAdjacentCount]);
 
+	useEffect(() => {
+		if (!Array.isArray(backdropUrlsByIndex) || backdropUrlsByIndex.length === 0) return;
+		setLoadedBackdropUrls((prev) => {
+			let next = prev;
+			backdropUrlsByIndex.forEach((url) => {
+				if (!url || prev[url]) return;
+				const cacheEntry = heroBackdropPreloadCache.get(url);
+				if (cacheEntry?.status !== 'loaded') return;
+				if (next === prev) next = { ...prev };
+				next[url] = true;
+			});
+			return next;
+		});
+	}, [backdropUrlsByIndex]);
+
 	const currentItem = useMemo(() => (
 		itemCount > 0 ? items[currentIndex % itemCount] : null
 	), [currentIndex, itemCount, items]);
@@ -193,6 +211,24 @@ const HeroBanner = ({ items, onPlayClick }) => {
 		if (!itemId) return;
 		if (applyImageFormatFallbackFromEvent(event)) return;
 		setImageErrors((prev) => (prev[itemId] ? prev : { ...prev, [itemId]: true }));
+	}, []);
+
+	const handleBackdropLoad = useCallback((event) => {
+		const image = event?.currentTarget;
+		if (!image) return;
+		const requestedUrl = image.dataset.bfSrcKey;
+		const resolvedUrl = image.currentSrc || image.src;
+		if (!requestedUrl && !resolvedUrl) return;
+		setLoadedBackdropUrls((prev) => {
+			const hasRequested = requestedUrl ? prev[requestedUrl] : true;
+			const hasResolved = resolvedUrl ? prev[resolvedUrl] : true;
+			if (hasRequested && hasResolved) return prev;
+			return {
+				...prev,
+				...(requestedUrl ? { [requestedUrl]: true } : {}),
+				...(resolvedUrl ? { [resolvedUrl]: true } : {})
+			};
+		});
 	}, []);
 
 	const handleCurrentImageError = useCallback((event) => {
@@ -235,6 +271,8 @@ const HeroBanner = ({ items, onPlayClick }) => {
 
 	const currentHasImageError = Boolean(imageErrors[currentItem.Id]);
 	const previousHasImageError = previousItem ? Boolean(imageErrors[previousItem.Id]) : false;
+	const currentBackdropLoaded = Boolean(backdropUrl && loadedBackdropUrls[backdropUrl]);
+	const previousBackdropLoaded = Boolean(previousBackdropUrl && loadedBackdropUrls[previousBackdropUrl]);
 
 	return (
 		<div
@@ -246,13 +284,25 @@ const HeroBanner = ({ items, onPlayClick }) => {
 				{!reducedMotionMode && isTransitioning && previousItem && (
 					<div className={`${css.backdropLayer} ${css.backdropLayerOutgoing}`}>
 						{!previousHasImageError ? (
-							<img
-								src={previousBackdropUrl}
-								alt={previousItem.Name}
-								loading="eager"
-								decoding="async"
-								onError={handlePreviousImageError}
-							/>
+							<>
+								<img
+									src={previousBackdropUrl}
+									alt={previousItem.Name}
+									data-bf-src-key={previousBackdropUrl}
+									className={joinClasses(
+										imageLoadCss.imageReveal,
+										css.backdropImage,
+										previousBackdropLoaded && imageLoadCss.imageRevealLoaded
+									)}
+									loading="eager"
+									decoding="async"
+									onLoad={handleBackdropLoad}
+									onError={handlePreviousImageError}
+								/>
+								{!previousBackdropLoaded ? (
+									<div className={joinClasses(imageLoadCss.imageLoadingHint, css.backdropLoadingHint)} aria-hidden="true" />
+								) : null}
+							</>
 						) : (
 							<div className={css.backdropFallback} />
 						)}
@@ -260,13 +310,25 @@ const HeroBanner = ({ items, onPlayClick }) => {
 				)}
 				<div className={`${css.backdropLayer} ${isTransitioning ? css.backdropLayerIncoming : css.backdropLayerCurrent}`}>
 					{!currentHasImageError ? (
-						<img
-							src={backdropUrl}
-							alt={currentItem.Name}
-							loading="eager"
-							decoding="async"
-							onError={handleCurrentImageError}
-						/>
+						<>
+							<img
+								src={backdropUrl}
+								alt={currentItem.Name}
+								data-bf-src-key={backdropUrl}
+								className={joinClasses(
+									imageLoadCss.imageReveal,
+									css.backdropImage,
+									currentBackdropLoaded && imageLoadCss.imageRevealLoaded
+								)}
+								loading="eager"
+								decoding="async"
+								onLoad={handleBackdropLoad}
+								onError={handleCurrentImageError}
+							/>
+							{!currentBackdropLoaded ? (
+								<div className={joinClasses(imageLoadCss.imageLoadingHint, css.backdropLoadingHint)} aria-hidden="true" />
+							) : null}
+						</>
 					) : (
 						<div className={css.backdropFallback} />
 					)}
@@ -282,6 +344,9 @@ const HeroBanner = ({ items, onPlayClick }) => {
 								src={logoUrl}
 								alt={currentItem.Name}
 								className={`${css.logo} ${css.logoTransition}`}
+								loading="lazy"
+								decoding="async"
+								draggable={false}
 							/>
 						) : (
 							<Heading size="large" className={`${css.title} ${css.textTransition}`}>

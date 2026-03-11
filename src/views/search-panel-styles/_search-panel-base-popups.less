@@ -1,0 +1,53 @@
+.filterPopupContent {
+	padding: 0.4rem;
+	min-width: min(28rem, 92vw);
+}
+
+.filterPopupTitle {
+	margin: 0 0 0.8rem;
+}
+
+.filterPopupActions {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+.filterPopupOptions {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+}
+
+.filterPopupActionButton,
+.filterPopupOptionButton {
+	border-radius: 999px !important;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		border-radius: 999px !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+		border: none !important;
+	}
+
+	&:hover,
+	&:focus,
+	&:global(.spottable):focus,
+	&:global(.selected) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+	}
+}

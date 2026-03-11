@@ -1,5 +1,6 @@
 import {useCallback} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
+import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
 
 export const usePlayerPlaybackCommands = ({
@@ -54,7 +55,7 @@ export const usePlayerPlaybackCommands = ({
 			setPlaying(true);
 			setShowControls(keepHidden ? false : !resumeFromPaused);
 
-			const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
+			const positionTicks = Math.floor(videoRef.current.currentTime * JELLYFIN_TICKS_PER_SECOND);
 			await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
 			startProgressReporting();
 		} catch (err) {
@@ -83,7 +84,7 @@ export const usePlayerPlaybackCommands = ({
 		setPlaying(false);
 		setShowControls(!keepHidden);
 
-		const positionTicks = Math.floor(videoRef.current.currentTime * 10000000);
+		const positionTicks = Math.floor(videoRef.current.currentTime * JELLYFIN_TICKS_PER_SECOND);
 		await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, true, getPlaybackSessionContext());
 	}, [getPlaybackSessionContext, item, setPlaying, setShowControls, videoRef]);
 

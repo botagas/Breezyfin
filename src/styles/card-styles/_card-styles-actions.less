@@ -1,0 +1,44 @@
+.icon-circle-button-dimensions(@size: 2.35rem) {
+	min-width: @size !important;
+	width: @size !important;
+	height: @size !important;
+	min-height: @size !important;
+	padding: 0 !important;
+
+	:global(.bf-button) {
+		min-width: @size !important;
+		width: @size !important;
+		height: @size !important;
+		min-height: @size !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		line-height: @size !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: visible !important;
+	}
+
+	:global(.client) {
+		width: 100% !important;
+		height: 100% !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: visible !important;
+	}
+}
+
+.filter-chip-button() {
+	min-width: 7rem !important;
+	padding: 0.5rem 1.25rem !important;
+	background: var(--bf-theme-card-filter-chip-bg) !important;
+	border: 1px solid var(--bf-theme-card-filter-chip-border) !important;
+
+	&:global(.selected),
+	&[aria-pressed='true'] {
+		background: var(--bf-theme-card-filter-chip-active-bg) !important;
+		border-color: var(--bf-theme-card-filter-chip-active-border) !important;
+	}
+}

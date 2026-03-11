@@ -1,0 +1,54 @@
+.searchContainer {
+	--bf-search-offset: calc(var(--bf-panel-top-offset) + var(--bf-search-panel-offset-adjust));
+	--bf-search-controls-height: 4.2rem;
+	--bf-search-overlay-height: calc(var(--bf-search-offset) + var(--bf-search-controls-height));
+	--bf-search-filter-trigger-off-bg: var(--bf-theme-search-filter-trigger-off-bg);
+	--bf-search-filter-trigger-off-border: var(--bf-theme-search-filter-trigger-off-border);
+	.panel-fill-container(transparent);
+}
+
+.resultsContent {
+	min-height: 100%;
+	background: var(--bf-theme-panel-bg);
+	display: flex;
+	flex-direction: column;
+	padding-top: var(--bf-search-overlay-height);
+}
+
+.resultsBody {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.searchBox {
+	padding: var(--bf-search-offset) 4rem 0.95rem;
+	background: transparent;
+	width: 100%;
+	box-sizing: border-box;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 40;
+	isolation: isolate;
+	pointer-events: none;
+}
+
+.searchControls {
+	display: flex;
+	align-items: center;
+	gap: 0.52rem;
+	padding: 0.34rem 0.38rem;
+	border-radius: 999px;
+	background: var(--bf-theme-surface-bg);
+	border: 1px solid var(--bf-theme-surface-border);
+	backdrop-filter: blur(0.65rem);
+	-webkit-backdrop-filter: blur(0.65rem);
+	box-shadow: var(--bf-theme-surface-shadow);
+	box-sizing: border-box;
+	position: relative;
+	z-index: 1;
+	pointer-events: auto;
+}

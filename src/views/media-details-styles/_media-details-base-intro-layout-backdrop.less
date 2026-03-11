@@ -1,0 +1,70 @@
+.loading {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 80vh;
+}
+
+.backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	height: 100vh;
+	overflow: hidden;
+	z-index: 0;
+	pointer-events: none;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0.6;
+		filter: blur(18px);
+		transform: scale(1.05);
+	}
+}
+
+.backdropImage {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.6;
+	filter: blur(18px);
+	transform: scale(1.05);
+	display: block;
+	transition: opacity 220ms ease;
+}
+
+.backdropImageHidden {
+	opacity: 0 !important;
+}
+
+.backdropLoadingHint {
+	z-index: 0;
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.14) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.13) 0%, rgba(0, 216, 195, 0) 60%),
+		linear-gradient(160deg, rgba(19, 23, 34, 0.48) 0%, rgba(15, 18, 26, 0.48) 45%, rgba(16, 16, 16, 0.48) 100%);
+}
+
+.gradient {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.55) 0%,
+		rgba(0, 0, 0, 0.35) 35%,
+		rgba(var(--bf-media-details-base-rgb), 0.85) 75%,
+		rgb(var(--bf-media-details-base-rgb)) 100%
+	);
+	z-index: 1;
+}
+
+.backdropFallback {
+	background: var(--bf-theme-backdrop-fallback);
+}

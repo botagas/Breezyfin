@@ -1,0 +1,52 @@
+/* Remove Panel body horizontal padding app-wide */
+.bf-panel-body {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+	overflow: hidden !important;
+}
+
+.bf-panel,
+.bf-panel-body {
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+/* Hide native scrollbar paint on Sandstone scrollers while keeping scroll behavior */
+[data-webos-voice-intent='Scroll'] {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+	overscroll-behavior: none !important;
+	overscroll-behavior-y: none !important;
+}
+
+[data-webos-voice-intent='Scroll']::-webkit-scrollbar {
+	width: 0 !important;
+	height: 0 !important;
+	display: none !important;
+}
+
+/* Make panel headers transparent so backdrop imagery remains visible */
+.bf-header {
+	--bf-header-fade-color: var(--bf-theme-header-fade-color);
+	background: var(--bf-theme-header-bg) !important;
+	border-bottom: none !important;
+	backdrop-filter: blur(0.15rem) !important;
+	-webkit-backdrop-filter: blur(0.15rem) !important;
+	box-shadow: none !important;
+	position: relative;
+	isolation: isolate;
+	z-index: 120 !important;
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: -1rem;
+		height: 1rem;
+		background: linear-gradient(to bottom, var(--bf-header-fade-color), transparent);
+		pointer-events: none;
+		z-index: 0;
+	}
+}

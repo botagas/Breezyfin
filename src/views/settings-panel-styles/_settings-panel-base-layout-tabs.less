@@ -1,0 +1,64 @@
+.settingsTabsRow {
+	grid-column: 1 / -1;
+	display: flex;
+	justify-content: center;
+	margin-bottom: 0.2rem;
+}
+
+.settingsTabs {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	width: min(74rem, 100%);
+	padding: 0.4rem;
+	border-radius: 999px;
+	.popupSurface(var(--settings-tab-surface); var(--settings-tab-border); var(--settings-tab-shadow));
+}
+
+.settingsTabButton {
+	--bf-button-fg: var(--bf-theme-text-primary);
+	--bf-button-fg-hover: var(--settings-accent);
+	--bf-button-fg-active: var(--settings-accent);
+	font-family: 'Noto Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
+	font-size: 0.82em !important;
+	font-weight: 300 !important;
+	letter-spacing: 0.03em;
+	min-width: auto !important;
+	height: 2.25rem !important;
+	min-height: 2.25rem !important;
+	padding: 0 1.2rem !important;
+	border: none !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	box-shadow: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--settings-tab-bg) !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	:global(.client),
+	:global(.marquee) {
+		font-family: inherit !important;
+		font-weight: 300 !important;
+		letter-spacing: inherit !important;
+	}
+
+	.settings-pill-interactive-surface(var(--settings-tab-active-bg); none);
+}
+
+.settingsTabButtonSelected {
+	--bf-button-fg: var(--bf-theme-text-primary);
+	--bf-button-fg-hover: var(--settings-accent);
+	--bf-button-fg-active: var(--settings-accent);
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--settings-tab-active-bg) !important;
+	}
+}

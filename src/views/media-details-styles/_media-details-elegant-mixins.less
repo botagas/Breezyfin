@@ -1,0 +1,44 @@
+.elegantPopupChrome() {
+	.popupSurface();
+}
+
+.elegantPopupChromeImportant() {
+	.popupSurfaceImportant();
+}
+
+.elegantControlSurfaceBase() {
+	.popupPillSurfaceImportant(var(--bf-md-elegant-control-surface-bg); var(--bf-md-elegant-control-surface-border));
+}
+
+.elegantControlSurfaceHover() {
+	background: var(--bf-md-elegant-control-hover-bg) !important;
+}
+
+.elegantControlButtonCore() {
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		.elegantControlSurfaceBase();
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		.elegantControlSurfaceHover();
+	}
+
+	:global(.bf-button-bg)::before,
+	:global(.bg)::before,
+	:global(.bf-button-bg)::after,
+	:global(.bg)::after,
+	:global(.client)::before {
+		content: none !important;
+		display: none !important;
+	}
+}

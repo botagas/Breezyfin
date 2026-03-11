@@ -1,0 +1,156 @@
+html,
+body,
+#root {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+:root {
+	/* Shared layout tokens so panel offsets track navbar/header height changes */
+	--bf-header-height: 7.5rem;
+	--bf-toolbar-height-classic: 3.5rem;
+	--bf-toolbar-height-elegant: 5.5rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-top-chrome-height: calc(var(--bf-header-height) + var(--bf-toolbar-height));
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height));
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: 0rem;
+	--bf-search-panel-offset-adjust: -3.25rem;
+	--bf-panel-scroller-offset-nudge: 0rem;
+	--bf-home-hero-nudge: 0rem;
+	--bf-panel-content-bottom-padding-classic: 7rem;
+	--bf-panel-content-bottom-padding-elegant: 3.75rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
+	--bf-glass-distortion-filter: none;
+	--bf-image-load-blur-radius: 12px;
+
+	/* Shared theme tokens used by both Classic and Elegant */
+	--bf-theme-accent: rgba(var(--bf-theme-accent-rgb), 0.98);
+	--bf-theme-accent-rgb: 157, 207, 255;
+	--bf-theme-favorite-rgb: 255, 107, 127;
+	--bf-theme-success-rgb: 109, 220, 154;
+	--bf-theme-text-solid: #ffffff;
+	--bf-theme-text-on-light: #111111;
+	--bf-theme-text-primary: rgba(244, 249, 255, 0.95);
+	--bf-button-fg: var(--bf-theme-text-solid);
+	--bf-button-fg-hover: var(--bf-button-fg);
+	--bf-button-fg-active: var(--bf-button-fg-hover);
+	--bf-theme-tab-bg: transparent;
+	--bf-theme-tab-hover-bg: rgba(255, 255, 255, 0.12);
+	--bf-theme-overlay-ultra-bg: rgba(9, 13, 19, 0.84);
+	--bf-theme-overlay-ultra-soft-bg: rgba(9, 13, 19, 0.42);
+	--bf-theme-liquid-overlay-bg: rgba(168, 188, 213, 0.08);
+	--bf-theme-filter-badge-bg: rgba(63, 184, 255, 0.95);
+	--bf-theme-filter-badge-color: #04111e;
+	--bf-theme-filter-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.35);
+	--bf-theme-search-filter-trigger-off-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-search-filter-trigger-off-border: rgba(255, 255, 255, 0.22);
+	--bf-theme-toolbar-hover-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-toolbar-focus-bg: rgba(240, 235, 235, 0.1);
+	--bf-theme-toolbar-focus-outline: rgba(255, 255, 255, 0.3);
+	--bf-theme-toolbar-menu-surface-bg: rgba(18, 18, 18, 0.95);
+	--bf-theme-toolbar-menu-surface-border: rgba(255, 255, 255, 0.2);
+	--bf-theme-toolbar-menu-surface-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+	--bf-theme-toolbar-menu-item-hover-bg: rgba(255, 255, 255, 0.1);
+	--bf-theme-toolbar-menu-item-focus-bg: rgba(255, 255, 255, 0.15);
+	--bf-theme-input-trigger-fg: var(--bf-theme-text-solid);
+	--bf-theme-input-trigger-bg-rest: rgba(255, 255, 255, 0.015);
+	--bf-theme-input-trigger-bg-hover: rgba(255, 255, 255, 0.03);
+	--bf-theme-input-trigger-border-rest: rgba(255, 255, 255, 0.22);
+	--bf-theme-input-trigger-border-hover: rgba(255, 255, 255, 0.32);
+
+	--bf-theme-card-surface-gradient: linear-gradient(160deg, rgba(32, 41, 57, 0.95) 0%, rgba(17, 24, 36, 0.95) 100%);
+	--bf-theme-card-hover-overlay-gradient: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
+	--bf-theme-card-bottom-fade-gradient: linear-gradient(0deg, rgba(6, 10, 17, 0.92) 0%, rgba(6, 10, 17, 0) 100%);
+	--bf-theme-card-placeholder-gradient: linear-gradient(145deg, rgba(42, 54, 72, 0.85), rgba(24, 32, 47, 0.85));
+	--bf-theme-card-border-rest: rgba(255, 255, 255, 0.16);
+	--bf-theme-card-border-focus: rgba(212, 226, 255, 0.9);
+	--bf-theme-card-shadow-rest: 0 10px 20px rgba(0, 0, 0, 0.35);
+	--bf-theme-card-shadow-focus: 0 18px 28px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(22, 39, 68, 0.6);
+	--bf-theme-card-status-badge-bg: rgba(37, 108, 186, 0.92);
+	--bf-theme-card-status-badge-border: rgba(198, 226, 255, 0.44);
+	--bf-theme-card-status-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+	--bf-theme-card-success-badge-bg: rgba(148, 233, 183, 0.94);
+	--bf-theme-card-success-badge-color: #03140e;
+	--bf-theme-card-success-badge-border: rgba(148, 233, 183, 0.65);
+	--bf-theme-card-success-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	--bf-theme-card-favorite-badge-bg: rgba(255, 107, 127, 0.92);
+	--bf-theme-card-favorite-badge-color: #fff4f6;
+	--bf-theme-card-favorite-badge-border: rgba(255, 166, 181, 0.7);
+	--bf-theme-card-favorite-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+	--bf-theme-card-progress-track: rgba(255, 255, 255, 0.22);
+	--bf-theme-card-progress-fill: #3cb2f0;
+	--bf-theme-card-filter-chip-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-card-filter-chip-border: rgba(255, 255, 255, 0.2);
+	--bf-theme-card-filter-chip-active-bg: rgba(138, 180, 248, 0.3);
+	--bf-theme-card-filter-chip-active-border: rgba(138, 180, 248, 0.8);
+	--bf-theme-card-title-color: rgba(236, 241, 247, 0.96);
+	--bf-theme-card-subtitle-color: rgba(173, 185, 203, 0.88);
+
+	--bf-theme-player-loading-ring-primary: rgba(255, 255, 255, 0.8);
+	--bf-theme-player-loading-ring-secondary: rgba(255, 255, 255, 0.6);
+	--bf-theme-player-loading-core-bg: rgba(255, 255, 255, 0.9);
+	--bf-theme-loading-glass-bg: rgba(255, 255, 255, 0.25);
+	--bf-theme-loading-glass-highlight: rgba(255, 255, 255, 0.75);
+	--bf-loading-glass-bg: var(--bf-theme-loading-glass-bg);
+	--bf-loading-glass-highlight: var(--bf-theme-loading-glass-highlight);
+	--bf-theme-loading-ring-primary: var(--bf-theme-player-loading-ring-primary);
+	--bf-theme-loading-ring-secondary: var(--bf-theme-player-loading-ring-secondary);
+	--bf-theme-loading-core-bg: var(--bf-theme-player-loading-core-bg);
+	--bf-theme-image-loading-surface: linear-gradient(160deg, rgba(40, 52, 70, 0.42) 0%, rgba(18, 27, 42, 0.42) 100%);
+	--bf-theme-player-bg: #000;
+	--bf-theme-player-error-grad-start: rgba(0, 0, 0, 0.55);
+	--bf-theme-player-error-grad-mid: rgba(0, 0, 0, 0.35);
+	--bf-theme-player-error-grad-end: rgba(18, 18, 18, 0.85);
+	--bf-theme-player-error-grad-solid: #121212;
+	--bf-theme-player-controls-grad-edge: rgba(0, 0, 0, 0.7);
+	--bf-theme-player-controls-grad-center: rgba(0, 0, 0, 0);
+	--bf-theme-player-control-active-bg: rgba(255, 255, 255, 0.18);
+	--bf-theme-player-seek-text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+	--bf-theme-player-seek-ring: rgba(255, 255, 255, 0.75);
+	--bf-theme-player-seek-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 8px 18px rgba(0, 0, 0, 0.3);
+	--bf-theme-player-skip-countdown-color: rgba(218, 246, 255, 0.95);
+	--bf-theme-player-skip-action-fg: rgba(235, 246, 255, 0.95);
+	--bf-theme-player-skip-close-fg: rgba(238, 245, 255, 0.9);
+	--bf-theme-player-skip-button-bg: rgba(var(--bf-theme-accent-rgb), 0.16);
+	--bf-theme-player-skip-button-border: rgba(var(--bf-theme-accent-rgb), 0.62);
+	--bf-theme-player-skip-button-hover-bg: rgba(var(--bf-theme-accent-rgb), 0.3);
+	--bf-theme-player-skip-button-hover-border: rgba(192, 228, 255, 0.88);
+	--bf-theme-player-skip-button-active-bg: rgba(var(--bf-theme-accent-rgb), 0.4);
+	--bf-theme-player-skip-close-bg: rgba(255, 255, 255, 0.08);
+	--bf-theme-player-skip-close-border: rgba(255, 255, 255, 0.24);
+	--bf-theme-player-skip-close-hover-bg: rgba(255, 128, 146, 0.22);
+	--bf-theme-player-skip-close-hover-border: rgba(255, 180, 196, 0.72);
+	--bf-theme-backdrop-fallback:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+	--bf-theme-error-surface-max-width: 64rem;
+	--bf-theme-error-surface-padding: 1.85rem 1.6rem 1.3rem;
+	--bf-theme-error-surface-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+	--bf-theme-debug-surface-bg: rgba(5, 10, 18, 0.72);
+	--bf-theme-debug-surface-border: rgba(255, 255, 255, 0.24);
+	--bf-theme-debug-surface-blur: 0.45rem;
+	--bf-theme-debug-surface-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.35);
+	--bf-theme-debug-label-color: rgba(232, 238, 248, 0.72);
+	--bf-theme-debug-value-color: #f8fbff;
+	--bf-theme-debug-scrollbar-thumb: rgba(170, 204, 232, 0.55);
+	--bf-theme-debug-scrollbar-track: rgba(255, 255, 255, 0.08);
+}
+
+/* Explicit classic token reset so switching away from Elegant always restores baseline layout geometry. */
+[data-bf-nav-theme='classic'] {
+	--bf-header-height: 0rem;
+	--bf-toolbar-height: var(--bf-toolbar-height-classic);
+	--bf-panel-top-offset: calc(var(--bf-top-chrome-height) - var(--bf-header-height) + 1rem);
+	--bf-home-scroller-overlap: var(--bf-toolbar-height);
+	--bf-home-content-offset: 0rem;
+	--bf-search-panel-offset-adjust: 0rem;
+	/* Non-home panels need a small upward correction to align under classic toolbar chrome. */
+	--bf-panel-scroller-offset-nudge: -1rem;
+	--bf-home-hero-nudge: 0rem;
+	--bf-panel-content-bottom-padding: var(--bf-panel-content-bottom-padding-classic);
+}
