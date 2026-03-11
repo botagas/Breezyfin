@@ -4,17 +4,6 @@ import {describeDomNode} from '../../../utils/domNodeDescription';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 import {useBreezyfinSettingsSync} from '../../../hooks/useBreezyfinSettingsSync';
 
-const isLegacyFocusDebugEnabled = () => {
-	if (typeof window === 'undefined') return false;
-	try {
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('bfFocusDebug') === '1') return true;
-		return localStorage.getItem('breezyfinFocusDebug') === '1';
-	} catch (_) {
-		return false;
-	}
-};
-
 export const useMediaDetailsFocusDebug = ({
 	isActive,
 	item,
@@ -25,12 +14,12 @@ export const useMediaDetailsFocusDebug = ({
 }) => {
 	const [detailsDebugEnabled, setDetailsDebugEnabled] = useState(() => {
 		const settings = readBreezyfinSettings();
-		return settings.showFocusDebugOverlay === true || isLegacyFocusDebugEnabled();
+		return settings.showFocusDebugOverlay === true;
 	});
 
 	const syncDebugSetting = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		setDetailsDebugEnabled(settings.showFocusDebugOverlay === true || isLegacyFocusDebugEnabled());
+		setDetailsDebugEnabled(settings.showFocusDebugOverlay === true);
 	}, []);
 
 	useBreezyfinSettingsSync(syncDebugSetting);

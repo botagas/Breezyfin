@@ -68,76 +68,29 @@ npm run serve
 ```
 Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
-## Developer guidelines
+## Developer docs
 
-Start with these principles:
-- Reuse existing hooks/components before adding new abstractions.
-- Keep panel logic modular by using panel-local `components/`, `hooks/`, and `utils/`.
-- Keep large behavior flows in dedicated panel hooks (e.g. player load/skip/seek/commands, media details focus/actions).
-- Keep `jellyfinService` as a thin facade; place domain logic in `src/services/jellyfin/*`.
-- Keep styling token-driven and consistent across themes.
-- Reuse shared status badge primitives for watched/favorite/count states instead of panel-specific badge variants.
-- For webOS 6 / legacy compat, prefer concrete dimensions in compat files when implicit sizing causes unstable layout.
-- Keep comments minimal; document only non-obvious constraints/tradeoffs.
+For implementation and workflow details, use:
 
-For the full development guide (shared building blocks, panel patterns, style references, and conventions), see:
-- [`DEVELOPING.md`](./DEVELOPING.md)
-- [`HELPERS.md`](./HELPERS.md)
-- [`THEMES.md`](./THEMES.md)
-- [`COMPONENTS.md`](./COMPONENTS.md)
-- [`VIEWS.md`](./VIEWS.md)
-- [`CHECKS.md`](./CHECKS.md)
-- [`TODOS.md`](./TODOS.md)
+- [`DEVELOPING.md`](./DEVELOPING.md) for architecture conventions, decomposition rules, shared hooks/utilities, and style patterns
+- [`HELPERS.md`](./HELPERS.md), [`THEMES.md`](./THEMES.md), [`COMPONENTS.md`](./COMPONENTS.md), [`VIEWS.md`](./VIEWS.md) for focused references
+- [`CHECKS.md`](./CHECKS.md) for recurring validation and pre-release verification
+- [`TODOS.md`](./TODOS.md) for prioritized planned work
 
-## Debug flags
+## Diagnostics and debug
 
-The app supports build-time/runtime debug behavior through environment flags:
+Primary diagnostics are runtime toggles under **Settings > Diagnostics** and **Settings > Device Playback Capabilities**.
+This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics, logs, and cache wipe actions.
 
-Defaults:
+Build-time log capture flags:
 
-- In non-production builds, persistent app logging is enabled by default.
-- In production builds, persistent app logging is off unless explicitly enabled by flags.
-
-Flags:
-
-- `REACT_APP_ENABLE_PERSISTENT_LOGS=1`
-  - Forces persistent app log capture on (stored in `localStorage`).
-- `REACT_APP_DISABLE_PERSISTENT_LOGS=1`
-  - Forces persistent app log capture off.
-
-Examples:
+- `REACT_APP_ENABLE_PERSISTENT_LOGS=1` to force persistent app logs on
+- `REACT_APP_DISABLE_PERSISTENT_LOGS=1` to force persistent app logs off
 
 ```sh
 # Development server with persistent logs enabled
 REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run serve
-
-# Production build with persistent logs on
-REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run pack-p
 ```
-
-Media Details focus tracing (runtime toggle):
-
-- Query param: `?bfFocusDebug=1`
-- Or from browser console:
-
-```js
-localStorage.setItem('breezyfinFocusDebug', '1');
-```
-
-## Runtime diagnostics (Settings panel)
-
-Diagnostics currently include:
-
-- Performance Overlay (`FPS`, `Input`, `Mode`)
-- Playback toast with active dynamic range / play method (for quick validation)
-- Extended Player debug overlay (stream/session/range/focus details for troubleshooting)
-- Subtitle burn-in controls (enable/disable, per-codec formats, and HDR/DV override force option)
-- Playback container controls (`Enable fMP4-HLS container preference`, `Force fMP4-HLS container preference`) plus `Force DV (Debug)`
-- Device playback capability summary in Settings (DV/HDR/codec support + WebP image decode support)
-- Configurable capability check refresh period (default 30 days) with optional manual "Refresh now" action
-- Relaxed Playback Profile toggle
-- Logs viewer and clear action
-- Wipe App Cache action with optional login preservation (`Wipe (Keep Login) & Reload`)
 
 ## Production build
 
@@ -153,18 +106,10 @@ Output will be in the `dist/` folder.
 
 For the full recurring validation checklist, use [`CHECKS.md`](./CHECKS.md).
 
-## Possible improvements
+## Roadmap and validation
 
-- Stabilize playback across edge-case media by improving server capability checks and fallback messaging.
-- Expand hardware / software compatibility by testing across multiple webOS versions and TV chipsets.
-- Continue reducing remote-input latency and focus jitter in dense UI views.
-- Improve consistency of themed components and shared style tokens across all panels.
-- Expand diagnostics with actionable playback telemetry export for issue reports.
-- Add automated test coverage for panel navigation, playback recovery paths, and settings persistence.
-- Add CI quality gates for lint/test/build plus release artifact checks.
-- Improve accessibility/readability options (larger text mode, stronger contrast presets, clearer focus indicators).
-
-See [`TODOS.md`](./TODOS.md) for the prioritized implementation backlog, and [`CHECKS.md`](./CHECKS.md) for recurring validation commands.
+Planned work is tracked in [`TODOS.md`](./TODOS.md).
+Recurring validation and release checks are tracked in [`CHECKS.md`](./CHECKS.md).
 
 ## Release automation
 
