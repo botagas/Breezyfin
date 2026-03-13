@@ -5,6 +5,7 @@ import {
 	createAudioPreference,
 	createSubtitlePreference
 } from '../utils/trackPreferences';
+import {isSupportedAudioCodec} from '../services/jellyfin/playbackSelection';
 
 const isInteger = (value) => Number.isInteger(value);
 
@@ -12,6 +13,29 @@ const matchesLanguage = (stream, language) =>
 	Boolean(stream?.Language) &&
 	Boolean(language) &&
 	String(stream.Language).toLowerCase() === String(language).toLowerCase();
+
+const isCompatibleAudioStream = (stream) => isSupportedAudioCodec(stream?.Codec);
+
+const pickBestCompatibleAudioTrack = (audioStreams = []) => {
+	if (!Array.isArray(audioStreams) || audioStreams.length === 0) return null;
+	const preferredCodecs = ['eac3', 'ec3', 'ac3', 'aac', 'mp3', 'mp2'];
+	const normalizedCodec = (value) => String(value || '').trim().toLowerCase();
+	let best = null;
+	audioStreams.forEach((stream, order) => {
+		if (!isCompatibleAudioStream(stream)) return;
+		const index = stream?.Index;
+		if (!isInteger(index)) return;
+		const codec = normalizedCodec(stream?.Codec);
+		const codecPriority = preferredCodecs.indexOf(codec);
+		const priorityScore = codecPriority >= 0 ? (preferredCodecs.length - codecPriority) : 1;
+		const channels = Number.isFinite(stream?.Channels) ? Number(stream.Channels) : 0;
+		const score = priorityScore * 100 + channels;
+		if (!best || score > best.score || (score === best.score && order < best.order)) {
+			best = {index, score, order};
+		}
+	});
+	return best?.index ?? null;
+};
 
 export const useTrackPreferences = () => {
 	const preferencesRef = useRef(readTrackPreferences() || {});
@@ -31,15 +55,27 @@ export const useTrackPreferences = () => {
 	const pickPreferredAudio = useCallback((audioStreams = [], providedAudio = null, defaultAudio = null) => {
 		if (!audioStreams.length) return null;
 		const preference = preferencesRef.current?.audio;
-		if (isInteger(preference?.index) && audioStreams.some((stream) => stream.Index === preference.index)) {
-			return preference.index;
-		}
 		if (isInteger(providedAudio) && audioStreams.some((stream) => stream.Index === providedAudio)) {
 			return providedAudio;
 		}
+		if (
+			isInteger(preference?.index) &&
+			audioStreams.some((stream) => stream.Index === preference.index && isCompatibleAudioStream(stream))
+		) {
+			return preference.index;
+		}
 		if (preference?.language) {
-			const languageMatch = audioStreams.find((stream) => matchesLanguage(stream, preference.language));
+			const languageMatch = audioStreams.find(
+				(stream) => matchesLanguage(stream, preference.language) && isCompatibleAudioStream(stream)
+			);
 			if (languageMatch) return languageMatch.Index;
+		}
+		if (isCompatibleAudioStream(defaultAudio)) {
+			return defaultAudio?.Index ?? null;
+		}
+		const compatibleFallback = pickBestCompatibleAudioTrack(audioStreams);
+		if (isInteger(compatibleFallback)) {
+			return compatibleFallback;
 		}
 		return defaultAudio?.Index ?? audioStreams[0]?.Index ?? null;
 	}, []);
@@ -127,4 +163,3 @@ export const useTrackPreferences = () => {
 		saveSubtitleSelection
 	};
 };
-

@@ -8,6 +8,7 @@ Rule:
 
 ## Next-release changes (High priority)
 
+- Stabilize playback startup negotiation flow for DV/HDR: enforce deterministic decision order (`source -> audio compatibility -> optional container preference -> final play method`), add a single decision snapshot for diagnostics, and expand regression coverage for startup-only paths (no manual track switch).
 - Add a small script/report for style token adoption (remaining raw color usage).
 - Align episode/season watched-action styling in Media Details with the shared token/mixin approach used in Favorites and other panels.
 
@@ -16,6 +17,9 @@ Rule:
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
 - Continue opportunistic style decomposition for remaining larger style files where ownership boundaries are still mixed.
 - Add targeted automated regression coverage for Media Details section-switch focus handoff (smooth-scroll + deferred focus).
+- Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
+- Implement manual-login server selection UX (URL input + selectable saved server list in the same flow).
+- Inspect style token usage for potential over-tokenization and simplify cases where indirection adds noise without practical reuse.
 
 ## Long-term goals
 

@@ -78,13 +78,13 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			throw new Error('Force DV is enabled, but this TV does not report Dolby Vision support.');
 		}
 		const avoidDolbyVision = !forceDolbyVision && options.avoidDolbyVision === true;
-		const legacyPreferFmp4Preference = typeof options.preferDolbyVisionMp4 === 'boolean'
-			? options.preferDolbyVisionMp4
-			: undefined;
-		const hasEnableFmp4Preference = typeof options.enableFmp4HlsContainerPreference === 'boolean';
-		const enableFmp4HlsContainerPreference = hasEnableFmp4Preference
-			? options.enableFmp4HlsContainerPreference === true
-			: (legacyPreferFmp4Preference ?? true);
+			const legacyPreferFmp4Preference = typeof options.preferDolbyVisionMp4 === 'boolean'
+				? options.preferDolbyVisionMp4
+				: undefined;
+			const hasEnableFmp4Preference = typeof options.enableFmp4HlsContainerPreference === 'boolean';
+			const enableFmp4HlsContainerPreference = hasEnableFmp4Preference
+				? options.enableFmp4HlsContainerPreference === true
+				: (legacyPreferFmp4Preference ?? false);
 		const forceFmp4HlsContainerPreference =
 			options.forceFmp4HlsContainerPreference === true &&
 			enableFmp4HlsContainerPreference === true;
@@ -148,17 +148,36 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 				toast: 'Playback source optimized for this TV.'
 			});
 		}
-		if (sourceSelection.reason === 'avoidDolbyVision') {
-			adjustments.push({
-				type: 'dolbyVisionFallbackSource',
-				toast: 'Dolby Vision fallback: using a non-DV source.'
-			});
-		}
+			if (sourceSelection.reason === 'avoidDolbyVision') {
+				adjustments.push({
+					type: 'dolbyVisionFallbackSource',
+					toast: 'Dolby Vision fallback: using a non-DV source.'
+				});
+			}
 
-		if (canUseFmp4HlsContainerPreference && selectedSource) {
-			const baseSource = selectedSource;
-			const baseRangeId = getMediaSourceDynamicRangeInfo(baseSource)?.id || 'SDR';
-			const basePriority = getDynamicRangePriority(baseSource);
+			const directAudioProbeResult = await attemptDirectAudioCompatibilityProbe({
+				service,
+				itemId,
+				activePayload,
+				selectedSource,
+				options,
+				forceTranscoding,
+				forceDolbyVision,
+				requestedAudioStreamIndex,
+				createSourceSelectionOptions
+			});
+			if (directAudioProbeResult) {
+				data = directAudioProbeResult.data;
+				selectedSource = directAudioProbeResult.selectedSource;
+				activePayload = directAudioProbeResult.activePayload;
+				requestedAudioStreamIndex = directAudioProbeResult.requestedAudioStreamIndex;
+				adjustments.push(directAudioProbeResult.adjustment);
+			}
+
+			if (canUseFmp4HlsContainerPreference && selectedSource) {
+				const baseSource = selectedSource;
+				const baseRangeId = getMediaSourceDynamicRangeInfo(baseSource)?.id || 'SDR';
+				const basePriority = getDynamicRangePriority(baseSource);
 			const shouldSkipHdrSourcePreference =
 				forceFmp4HlsContainerPreference !== true &&
 				HDR_DYNAMIC_RANGE_IDS.has(baseRangeId);
@@ -244,32 +263,14 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 										? 'Force fMP4-HLS container preference: default profile fallback.'
 										: 'Enable fMP4-HLS container preference: default profile fallback.'
 							});
+							}
 						}
 					}
 				}
-			}
-		const directAudioProbeResult = await attemptDirectAudioCompatibilityProbe({
-			service,
-			itemId,
-			activePayload,
-			selectedSource,
-			options,
-			forceTranscoding,
-			forceDolbyVision,
-			requestedAudioStreamIndex,
-			createSourceSelectionOptions
-		});
-		if (directAudioProbeResult) {
-			data = directAudioProbeResult.data;
-			selectedSource = directAudioProbeResult.selectedSource;
-			activePayload = directAudioProbeResult.activePayload;
-			requestedAudioStreamIndex = directAudioProbeResult.requestedAudioStreamIndex;
-			adjustments.push(directAudioProbeResult.adjustment);
-		}
 
-		const dvMkvRetryResult = await attemptDolbyVisionMkvCompatibilityRetry({
-			service,
-			itemId,
+			const dvMkvRetryResult = await attemptDolbyVisionMkvCompatibilityRetry({
+				service,
+				itemId,
 			activePayload,
 			selectedSource,
 			forceTranscoding,

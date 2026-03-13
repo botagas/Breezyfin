@@ -421,4 +421,48 @@ describe('playbackApi', () => {
 		expect(audioProbePayload.AudioStreamIndex).toBe(1);
 		expect(audioProbePayload.EnableTranscoding).toBe(false);
 	});
+
+	it('probes compatible audio even when source reports direct-play support but starts in transcoding', async () => {
+		const service = createService();
+		global.fetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					PlaySessionId: 'session-1',
+					MediaSources: [
+						createDvSourceWithAudioFallbackCandidate({
+							supportsDirectPlay: true,
+							supportsDirectStream: true,
+							supportsTranscoding: true,
+							transcodingUrl: '/Videos/item-1/master.m3u8?TranscodeReasons=AudioCodecNotSupported',
+							defaultAudioStreamIndex: 0
+						})
+					]
+				})
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					PlaySessionId: 'session-2',
+					MediaSources: [
+						createDvSourceWithAudioFallbackCandidate({
+							supportsDirectPlay: true,
+							supportsDirectStream: true,
+							supportsTranscoding: false,
+							transcodingUrl: null,
+							defaultAudioStreamIndex: 1
+						})
+					]
+				})
+			});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			forceDolbyVision: true
+		});
+
+		expect(global.fetch).toHaveBeenCalledTimes(2);
+		expect(playbackInfo?.__breezyfin?.playMethod).toBe('DirectPlay');
+		expect(playbackInfo?.__breezyfin?.selectedAudioStreamIndex).toBe(1);
+		expect(playbackInfo?.__breezyfin?.adjustments?.some((entry) => entry?.type === 'audioDirectPathProbe')).toBe(true);
+	});
 });

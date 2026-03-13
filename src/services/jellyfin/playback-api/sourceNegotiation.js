@@ -11,6 +11,27 @@ import {
 import {hasNonTranscodingDirectPath, usesMkvContainer} from './dolbyVision';
 import {fetchPlaybackInfo} from './network';
 
+const parseTranscodeReasons = (transcodingUrl) => {
+	if (!transcodingUrl) return [];
+	try {
+		const searchParams = new URL(transcodingUrl, 'https://breezyfin.invalid').searchParams;
+		const value = searchParams.get('TranscodeReasons') || searchParams.get('transcodeReasons') || '';
+		if (!value) return [];
+		return value
+			.split(',')
+			.map((reason) => String(reason || '').trim())
+			.filter(Boolean);
+	} catch (_) {
+		return [];
+	}
+};
+
+const hasAudioRelatedTranscodeReason = (mediaSource) => {
+	const reasons = parseTranscodeReasons(mediaSource?.TranscodingUrl);
+	if (!reasons.length) return false;
+	return reasons.some((reason) => reason.toLowerCase().startsWith('audio') || reason === 'UnknownAudioStreamInfo');
+};
+
 export const attemptDirectAudioCompatibilityProbe = async ({
 	service,
 	itemId,
@@ -25,9 +46,7 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 	const canAttemptDirectAudioCompatibilityProbe =
 		!forceTranscoding &&
 		!Number.isInteger(options.audioStreamIndex) &&
-		selectedSource?.TranscodingUrl &&
-		!selectedSource?.SupportsDirectPlay &&
-		!selectedSource?.SupportsDirectStream;
+		selectedSource?.TranscodingUrl;
 
 	if (!canAttemptDirectAudioCompatibilityProbe) {
 		return null;
@@ -40,6 +59,13 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 	const currentAudioStream = getAudioStreams(selectedSource)
 		.find((stream) => toInteger(stream?.Index) === currentAudioIndex);
 	const currentAudioLanguage = String(currentAudioStream?.Language || '').trim().toLowerCase();
+	const shouldProbeForAudioCompatibility =
+		forceDolbyVision ||
+		!isSupportedAudioCodec(currentAudioStream?.Codec) ||
+		hasAudioRelatedTranscodeReason(selectedSource);
+	if (!shouldProbeForAudioCompatibility) {
+		return null;
+	}
 	const compatibleAudioProbeIndexes = getAudioStreams(selectedSource)
 		.map((stream, order) => ({
 			index: toInteger(stream?.Index),

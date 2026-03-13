@@ -134,7 +134,7 @@ export const usePlayerVideoLoader = ({
 					: undefined;
 				const enableFmp4HlsContainerPreference = typeof settings.enableFmp4HlsContainerPreference === 'boolean'
 					? settings.enableFmp4HlsContainerPreference
-					: (legacyPreferFmp4Preference ?? true);
+					: (legacyPreferFmp4Preference ?? false);
 				const forceFmp4HlsContainerPreference =
 					settings.forceFmp4HlsContainerPreference === true &&
 					enableFmp4HlsContainerPreference === true;

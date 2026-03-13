@@ -26,7 +26,7 @@ export const DEFAULT_SETTINGS = {
 	showExtendedPlayerDebugOverlay: false,
 	showFocusDebugOverlay: false,
 	forceDolbyVision: false,
-	enableFmp4HlsContainerPreference: true,
+	enableFmp4HlsContainerPreference: false,
 	forceFmp4HlsContainerPreference: false,
 	homeRows: {
 		recentlyAdded: true,

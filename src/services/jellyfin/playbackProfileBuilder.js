@@ -376,7 +376,7 @@ export const buildPlaybackRequestContext = (options = {}) => {
 	const hasEnableFmp4Preference = typeof options.enableFmp4HlsContainerPreference === 'boolean';
 	const enableFmp4HlsContainerPreference = hasEnableFmp4Preference
 		? options.enableFmp4HlsContainerPreference === true
-		: (legacyPreferFmp4Preference ?? true);
+		: (legacyPreferFmp4Preference ?? false);
 	const forceFmp4HlsContainerPreference =
 		options.forceFmp4HlsContainerPreference === true &&
 		enableFmp4HlsContainerPreference === true;

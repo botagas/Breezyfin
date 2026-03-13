@@ -405,6 +405,7 @@ const PlayerPanel = ({
 		mediaSourceData,
 		checkSkipSegments,
 		playbackOptions,
+		playbackSettingsRef,
 		currentAudioTrack,
 		currentSubtitleTrack,
 		getPlaybackSessionContext,

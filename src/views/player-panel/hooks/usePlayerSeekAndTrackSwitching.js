@@ -1,6 +1,7 @@
 import {useCallback} from 'react';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
+import {shouldTranscodeForSubtitleSelection} from '../../../services/jellyfin/playbackSelection';
 
 export const usePlayerSeekAndTrackSwitching = ({
 	item,
@@ -11,6 +12,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 	mediaSourceData,
 	checkSkipSegments,
 	playbackOptions,
+	playbackSettingsRef,
 	currentAudioTrack,
 	currentSubtitleTrack,
 	getPlaybackSessionContext,
@@ -145,6 +147,16 @@ export const usePlayerSeekAndTrackSwitching = ({
 		loadVideo();
 	}, [handleStop, loadVideo, mediaSourceData?.Id, playbackOptions, playbackOverrideRef, setLoading, videoRef]);
 
+	const shouldForceSubtitleReload = useCallback((trackIndex) => {
+		if (!(Number.isInteger(trackIndex) && trackIndex >= 0)) return false;
+		const settings = playbackSettingsRef?.current || {};
+		return shouldTranscodeForSubtitleSelection(mediaSourceData, trackIndex, {
+			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
+			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
+			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
+		});
+	}, [mediaSourceData, playbackSettingsRef]);
+
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);
 		closeAudioPopup();
@@ -176,6 +188,12 @@ export const usePlayerSeekAndTrackSwitching = ({
 		closeSubtitlePopup();
 		saveSubtitleSelection(trackIndex, subtitleTracks);
 
+		if (shouldForceSubtitleReload(trackIndex)) {
+			setToastMessage('Subtitle burn-in requires stream reload.');
+			reloadWithTrackSelection(currentAudioTrack, trackIndex);
+			return;
+		}
+
 		if (hlsRef.current) {
 			if (typeof hlsRef.current.subtitleTrack === 'number' && hlsRef.current.subtitleTracks) {
 				const hlsTrackIndex = hlsRef.current.subtitleTracks.findIndex((track) => {
@@ -198,6 +216,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		reloadWithTrackSelection,
 		saveSubtitleSelection,
 		setCurrentSubtitleTrack,
+		shouldForceSubtitleReload,
 		setToastMessage,
 		subtitleTracks
 	]);
