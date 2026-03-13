@@ -1,0 +1,82 @@
+.actionButton {
+	.icon-circle-button-dimensions(2.35rem);
+
+	.mdControlSurface(var(--bf-md-control-bg-soft); 1px solid var(--bf-md-control-border-soft); 999px);
+
+	.mdControlHoverSurface(var(--bf-md-control-bg-hover));
+}
+
+.actionIcon {
+	font-size: 1rem !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	line-height: 1rem !important;
+	margin: 0 !important;
+	display: block !important;
+	color: currentColor !important;
+}
+
+.favoriteAction {
+	&.favoriteActive {
+		:global(.bf-button-bg),
+		:global(.bg) {
+			background: rgba(var(--bf-theme-favorite-rgb), 0.14) !important;
+			border: 1px solid rgba(var(--bf-theme-favorite-rgb), 0.5) !important;
+		}
+
+		.actionIcon {
+			color: rgba(var(--bf-theme-favorite-rgb), 1) !important;
+		}
+
+		&:hover .actionIcon,
+		&:active .actionIcon,
+		&:global(.spottable):focus .actionIcon {
+			color: var(--bf-md-text-solid) !important;
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg),
+		&:hover :global(.bg),
+		&:focus :global(.bg),
+		&:global(.spottable):focus :global(.bg) {
+			background: rgba(var(--bf-theme-favorite-rgb), 0.28) !important;
+		}
+	}
+}
+
+.watchedAction {
+	&.watchedActive {
+		:global(.bf-button-bg),
+		:global(.bg) {
+			background: rgba(var(--bf-theme-success-rgb), 0.14) !important;
+			border: 1px solid rgba(var(--bf-theme-success-rgb), 0.5) !important;
+		}
+
+		.actionIcon {
+			color: rgba(var(--bf-theme-success-rgb), 1) !important;
+		}
+
+		&:hover .actionIcon,
+		&:active .actionIcon,
+		&:global(.spottable):focus .actionIcon {
+			color: var(--bf-md-text-solid) !important;
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg),
+		&:hover :global(.bg),
+		&:focus :global(.bg),
+		&:global(.spottable):focus :global(.bg) {
+			background: rgba(var(--bf-theme-success-rgb), 0.28) !important;
+		}
+	}
+}
+
+.actionsRow {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-shrink: 0;
+}

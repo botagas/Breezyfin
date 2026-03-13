@@ -1,0 +1,77 @@
+.infoItem {
+	background: transparent !important;
+	padding: 0.85rem 0;
+	border-bottom: 1px solid var(--settings-row-divider);
+
+	:global(.itemContent),
+	:global(.slotAfter) {
+		min-width: 0;
+	}
+
+	:global(.content),
+	:global(.label),
+	:global(.slotAfter) {
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	:global(.itemContent) {
+		flex: 1 1 0 !important;
+	}
+
+	:global(.slotAfter) {
+		flex: 1 1 0 !important;
+		line-height: normal !important;
+		text-align: right;
+	}
+
+	:global(.slotAfter > *) {
+		display: block;
+		min-width: 0;
+		max-width: 100%;
+	}
+
+	&:last-of-type {
+		border-bottom: none;
+	}
+}
+
+.collapsibleInfoItem {
+	cursor: pointer;
+
+	&:global(.spottable):focus {
+		background: var(--settings-focus) !important;
+		border-radius: 8px;
+		border-bottom-color: var(--settings-focus-border);
+	}
+}
+
+.collapsibleInfoItemExpanded {
+	height: auto !important;
+	min-height: 3.25rem;
+	align-items: flex-start;
+
+	:global(.slotAfter) {
+		overflow: visible;
+		white-space: normal;
+		text-overflow: clip;
+	}
+}
+
+.infoItemValueWrap {
+	display: block;
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 1.3em;
+	text-align: right;
+}
+
+.infoItemValueWrapExpanded {
+	white-space: normal;
+	word-break: break-word;
+	overflow-wrap: anywhere;
+}

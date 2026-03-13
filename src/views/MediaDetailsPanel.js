@@ -1,39 +1,37 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import Scroller from '../components/AppScroller';
-import Spinner from '@enact/sandstone/Spinner';
 import Icon from '@enact/sandstone/Icon';
-import jellyfinService from '../services/jellyfinService';
-import {KeyCodes} from '../utils/keyCodes';
+import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {
-	getEpisodeActionBadge,
 	getEpisodeAirDate,
 	getEpisodeBadge,
-	getEpisodeImageUrl as resolveEpisodeImageUrl,
-	getEpisodeRuntime,
-	getSeasonImageUrl as resolveSeasonImageUrl,
-	isEpisodeInProgress,
-	isEpisodePlayed
+	getEpisodeRuntime
 } from './media-details-panel/utils/mediaDetailsHelpers';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useTrackPreferences } from '../hooks/useTrackPreferences';
 import { useToastMessage } from '../hooks/useToastMessage';
-import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
-import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useMapById } from '../hooks/useMapById';
 import { useItemMetadata } from '../hooks/useItemMetadata';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { PANEL_TOAST_CONFIG } from '../constants/toast';
 import { useMediaDetailsKeyboardShortcuts } from './media-details-panel/hooks/useMediaDetailsKeyboardShortcuts';
 import { useMediaDetailsTrackOptions } from './media-details-panel/hooks/useMediaDetailsTrackOptions';
 import { useMediaCredits } from './media-details-panel/hooks/useMediaCredits';
+import { useMediaDetailsDisclosures } from './media-details-panel/hooks/useMediaDetailsDisclosures';
+import { useMediaDetailsImages } from './media-details-panel/hooks/useMediaDetailsImages';
 import { useMediaDetailsInteractionHandlers } from './media-details-panel/hooks/useMediaDetailsInteractionHandlers';
 import { useMediaDetailsDataLoader } from './media-details-panel/hooks/useMediaDetailsDataLoader';
 import { useMediaDetailsItemActions } from './media-details-panel/hooks/useMediaDetailsItemActions';
 import { useMediaDetailsPickerHandlers } from './media-details-panel/hooks/useMediaDetailsPickerHandlers';
+import { useMediaDetailsPrimaryActions } from './media-details-panel/hooks/useMediaDetailsPrimaryActions';
 import { useMediaDetailsFocusDebug } from './media-details-panel/hooks/useMediaDetailsFocusDebug';
 import { useMediaDetailsFocusOrchestrator } from './media-details-panel/hooks/useMediaDetailsFocusOrchestrator';
+import { useMediaDetailsSectionNavigation } from './media-details-panel/hooks/useMediaDetailsSectionNavigation';
+import { useMediaDetailsDomHelpers } from './media-details-panel/hooks/useMediaDetailsDomHelpers';
+import { useMediaDetailsOverviewState } from './media-details-panel/hooks/useMediaDetailsOverviewState';
+import { useMediaDetailsPanelSync } from './media-details-panel/hooks/useMediaDetailsPanelSync';
+import { useMediaDetailsItemBootstrap } from './media-details-panel/hooks/useMediaDetailsItemBootstrap';
 import MediaDetailsToast from './media-details-panel/components/MediaDetailsToast';
 import MediaTrackPickerPopup from './media-details-panel/components/MediaTrackPickerPopup';
 import MediaEpisodePickerPopup from './media-details-panel/components/MediaEpisodePickerPopup';
@@ -44,25 +42,7 @@ import MediaEpisodesSection from './media-details-panel/components/MediaEpisodes
 import MediaDetailsIntroSection from './media-details-panel/components/MediaDetailsIntroSection';
 
 import css from './MediaDetailsPanel.module.less';
-
-const MEDIA_DETAILS_DISCLOSURE_KEYS = {
-	AUDIO_PICKER: 'audioPickerPopup',
-	SUBTITLE_PICKER: 'subtitlePickerPopup',
-	EPISODE_PICKER: 'episodePickerPopup'
-};
-const INITIAL_MEDIA_DETAILS_DISCLOSURES = {
-	[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER]: false,
-	[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER]: false,
-	[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER]: false
-};
-const MEDIA_DETAILS_DISCLOSURE_KEY_LIST = [
-	MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER,
-	MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER,
-	MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER
-];
-const SECTION_SNAP_TOLERANCE_PX = 8;
-const SECTION_WHEEL_DELTA_THRESHOLD = 18;
-const SECTION_SNAP_THRESHOLD_RATIO = 0.45;
+import imageLoadCss from '../components/ImageLoadReveal.module.less';
 
 const MediaDetailsPanel = ({
 	item,
@@ -84,25 +64,16 @@ const MediaDetailsPanel = ({
 	const [selectedSeason, setSelectedSeason] = useState(null);
 	const [selectedEpisode, setSelectedEpisode] = useState(null);
 	const {
-		disclosures,
-		openDisclosure,
-		closeDisclosure
-	} = useDisclosureMap(INITIAL_MEDIA_DETAILS_DISCLOSURES);
-	const disclosureHandlers = useDisclosureHandlers(
-		MEDIA_DETAILS_DISCLOSURE_KEY_LIST,
-		openDisclosure,
-		closeDisclosure
-	);
-	const showAudioPicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER] === true;
-	const showSubtitlePicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER] === true;
-	const showEpisodePicker = disclosures[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER] === true;
-	const openAudioPicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER].open;
-	const closeAudioPicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.AUDIO_PICKER].close;
-	const openSubtitlePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER].open;
-	const closeSubtitlePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.SUBTITLE_PICKER].close;
-	const openEpisodePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER].open;
-	const closeEpisodePicker = disclosureHandlers[MEDIA_DETAILS_DISCLOSURE_KEYS.EPISODE_PICKER].close;
-	const [headerLogoUnavailable, setHeaderLogoUnavailable] = useState(false);
+		showAudioPicker,
+		showSubtitlePicker,
+		showEpisodePicker,
+		openAudioPicker,
+		closeAudioPicker,
+		openSubtitlePicker,
+		closeSubtitlePicker,
+		openEpisodePicker,
+		closeEpisodePicker
+	} = useMediaDetailsDisclosures();
 	const [episodeNavList, setEpisodeNavList] = useState([]);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
@@ -111,8 +82,6 @@ const MediaDetailsPanel = ({
 	const [useSidewaysEpisodeList, setUseSidewaysEpisodeList] = useState(true);
 	const [isCastCollapsed, setIsCastCollapsed] = useState(false);
 	const [overviewExpanded, setOverviewExpanded] = useState(false);
-	const [hasOverviewOverflow, setHasOverviewOverflow] = useState(false);
-	const [backdropUnavailable, setBackdropUnavailable] = useState(false);
 	const detailMetadata = useItemMetadata(item?.Id, {
 		enabled: Boolean(item?.Id),
 		errorContext: 'item metadata'
@@ -170,23 +139,12 @@ const MediaDetailsPanel = ({
 		toastMessage,
 		toastVisible,
 		setToastMessage
-	} = useToastMessage({durationMs: 2050, fadeOutMs: 350});
-	const getDetailsScrollElement = useCallback(() => {
-		const container = detailsContainerRef.current;
-		if (!container) return null;
-		const contentNode = container.closest?.('[id$="_content"]');
-		if (contentNode && typeof contentNode.scrollTop === 'number') return contentNode;
-		return container.closest?.('[data-webos-voice-intent="Scroll"]') || null;
-	}, []);
-	const getScrollSnapshot = useCallback(() => {
-		const scrollEl = getDetailsScrollElement();
-		if (!scrollEl) return null;
-		return {
-			top: scrollEl.scrollTop,
-			clientHeight: scrollEl.clientHeight,
-			scrollHeight: scrollEl.scrollHeight
-		};
-	}, [getDetailsScrollElement]);
+	} = useToastMessage(PANEL_TOAST_CONFIG);
+	const {
+		getDetailsScrollElement,
+		getScrollSnapshot,
+		focusNodeWithoutScroll
+	} = useMediaDetailsDomHelpers({detailsContainerRef});
 	const {
 		detailsDebugEnabled,
 		describeNode,
@@ -199,14 +157,6 @@ const MediaDetailsPanel = ({
 		debugLastScrollTopRef,
 		debugLastScrollTimeRef
 	});
-	const focusNodeWithoutScroll = useCallback((node) => {
-		if (!node?.focus) return;
-		try {
-			node.focus({preventScroll: true});
-		} catch (error) {
-			node.focus();
-		}
-	}, []);
 	const seasonsById = useMapById(seasons);
 	const episodesById = useMapById(episodes);
 	const popupEpisodesById = useMemo(() => {
@@ -217,45 +167,20 @@ const MediaDetailsPanel = ({
 		});
 		return map;
 	}, [episodeNavList, episodesById]);
+	const isElegantTheme = navbarTheme === 'elegant';
+	const hasOverviewText = Boolean(item?.Overview && String(item.Overview).trim().length > 0);
 
-	useEffect(() => {
-		setHeaderLogoUnavailable(false);
-	}, [item?.Id, item?.SeriesId, item?.Type]);
-
-	useEffect(() => {
-		setBackdropUnavailable(false);
-	}, [item?.Id, item?.SeriesId, item?.Type]);
-
-	useEffect(() => {
-		setOverviewExpanded(false);
-		setIsCastCollapsed(false);
-	}, [item?.Id, item?.SeriesId, item?.Type]);
-
-	useEffect(() => {
-		return () => {
-			if (castFocusScrollTimeoutRef.current) {
-				window.clearTimeout(castFocusScrollTimeoutRef.current);
-				castFocusScrollTimeoutRef.current = null;
-			}
-			if (seasonFocusScrollTimeoutRef.current) {
-				window.clearTimeout(seasonFocusScrollTimeoutRef.current);
-				seasonFocusScrollTimeoutRef.current = null;
-			}
-			if (episodeFocusScrollTimeoutRef.current) {
-				window.clearTimeout(episodeFocusScrollTimeoutRef.current);
-				episodeFocusScrollTimeoutRef.current = null;
-			}
-		};
-	}, []);
-
-	const applyPanelSettings = useCallback((settingsPayload) => {
-		const settings = settingsPayload || {};
-		setNavbarTheme(settings.navbarTheme === 'classic' ? 'classic' : 'elegant');
-		setShowSeasonImages(settings.showSeasonImages === true);
-		setUseSidewaysEpisodeList(settings.useSidewaysEpisodeList !== false);
-	}, []);
-
-	useBreezyfinSettingsSync(applyPanelSettings);
+	useMediaDetailsPanelSync({
+		item,
+		setOverviewExpanded,
+		setIsCastCollapsed,
+		castFocusScrollTimeoutRef,
+		seasonFocusScrollTimeoutRef,
+		episodeFocusScrollTimeoutRef,
+		setNavbarTheme,
+		setShowSeasonImages,
+		setUseSidewaysEpisodeList
+	});
 	const {
 		applyDefaultTracks,
 		loadPlaybackInfo,
@@ -284,66 +209,22 @@ const MediaDetailsPanel = ({
 		episodesCacheRef
 	});
 
-	const handlePlay = useCallback(() => {
-		const mediaSourceId = playbackInfo?.MediaSources?.[0]?.Id || null;
-		const options = { mediaSourceId };
-		if (Number.isInteger(selectedAudioTrack)) {
-			options.audioStreamIndex = selectedAudioTrack;
-		}
-		if (selectedSubtitleTrack === -1 || Number.isInteger(selectedSubtitleTrack)) {
-			options.subtitleStreamIndex = selectedSubtitleTrack;
-		}
-
-		if (item?.Type === 'Series') {
-			if (selectedEpisode) {
-				onPlay(selectedEpisode, options);
-			} else {
-				console.error('No episode selected');
-			}
-		} else {
-			onPlay(item, options);
-		}
-	}, [item, onPlay, playbackInfo, selectedAudioTrack, selectedEpisode, selectedSubtitleTrack]);
-
-	const handleBack = useCallback(() => {
-		onBack();
-	}, [onBack]);
-
-	useEffect(() => {
-		playbackInfoRequestRef.current += 1;
-		episodesRequestRef.current += 1;
-		seasonsRequestRef.current += 1;
-		setPlaybackInfo(null);
-		applyDefaultTracks(null);
-		loadPlaybackInfo();
-		if (item?.Type === 'Series') {
-			loadSeasons();
-		} else {
-			setSeasons([]);
-			setEpisodes([]);
-			setSelectedSeason(null);
-			setSelectedEpisode(null);
-		}
-		setIsFavorite(Boolean(item?.UserData?.IsFavorite));
-		setIsWatched(Boolean(item?.UserData?.Played));
-	}, [applyDefaultTracks, item, loadPlaybackInfo, loadSeasons]);
-
-	const handleInternalBack = useCallback(() => {
-		if (showEpisodePicker) {
-			closeEpisodePicker();
-			return true;
-		}
-		if (showAudioPicker) {
-			closeAudioPicker();
-			return true;
-		}
-		if (showSubtitlePicker) {
-			closeSubtitlePicker();
-			return true;
-		}
-		handleBack();
-		return true;
-	}, [closeAudioPicker, closeEpisodePicker, closeSubtitlePicker, handleBack, showAudioPicker, showEpisodePicker, showSubtitlePicker]);
+	useMediaDetailsItemBootstrap({
+		item,
+		playbackInfoRequestRef,
+		episodesRequestRef,
+		seasonsRequestRef,
+		setPlaybackInfo,
+		applyDefaultTracks,
+		loadPlaybackInfo,
+		loadSeasons,
+		setSeasons,
+		setEpisodes,
+		setSelectedSeason,
+		setSelectedEpisode,
+		setIsFavorite,
+		setIsWatched
+	});
 
 	const {
 		handleToggleFavorite,
@@ -361,6 +242,49 @@ const MediaDetailsPanel = ({
 		setSelectedEpisode,
 		setToastMessage
 	});
+	const {
+		hasOverviewOverflow,
+		seriesPlayLabel,
+		overviewPlayLabel
+	} = useMediaDetailsOverviewState({
+		item,
+		episodes,
+		selectedEpisode,
+		isElegantTheme,
+		hasOverviewText,
+		overviewTextRef,
+		overviewCollapsedClass: css.overviewCollapsed
+	});
+
+	const {
+		handlePlay,
+		handleBack,
+		handleInternalBack,
+		handleOpenEpisodeSeries,
+		handleToggleWatchedMain,
+		toggleCastCollapsed,
+		handleOverviewActivate
+	} = useMediaDetailsPrimaryActions({
+		item,
+		onPlay,
+		onBack,
+		playbackInfo,
+		selectedAudioTrack,
+		selectedSubtitleTrack,
+		selectedEpisode,
+		showEpisodePicker,
+		closeEpisodePicker,
+		showAudioPicker,
+		closeAudioPicker,
+		showSubtitlePicker,
+		closeSubtitlePicker,
+		openSeriesFromEpisode,
+		handleToggleWatched,
+		setIsCastCollapsed,
+		isElegantTheme,
+		hasOverviewOverflow,
+		setOverviewExpanded
+	});
 
 	useMediaDetailsKeyboardShortcuts({
 		isActive,
@@ -374,42 +298,26 @@ const MediaDetailsPanel = ({
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
 
-	const backdropUrl = (() => {
-		if (item?.BackdropImageTags && item.BackdropImageTags.length > 0) {
-			return jellyfinService.getBackdropUrl(item.Id, 0, 1920);
-		}
-		if (item?.SeriesId) {
-			return jellyfinService.getBackdropUrl(item.SeriesId, 0, 1920);
-		}
-		return '';
-	})();
-	const hasBackdropImage = Boolean(backdropUrl) && !backdropUnavailable;
-	const isElegantTheme = navbarTheme === 'elegant';
+	const {
+		backdropUrl,
+		hasBackdropImage,
+		isBackdropImageLoaded,
+		headerLogoUrl,
+		useHeaderLogo,
+		headerTitle,
+		handleHeaderLogoError,
+		handleBackdropImageError,
+		handleBackdropImageLoad,
+		handleCastImageError,
+		getCastImageUrl,
+		getSeasonImageUrl,
+		getEpisodeImageUrl,
+		handleSeasonImageError,
+		handleEpisodeImageError
+	} = useMediaDetailsImages({item});
 	const shouldShowSeasonPosters = !isElegantTheme || showSeasonImages;
 	const isSidewaysEpisodeLayout = isElegantTheme && useSidewaysEpisodeList;
-
-	const headerLogoUrl = useMemo(() => {
-		if (!item) return '';
-		const logoItemId = item.Type === 'Episode' && item.SeriesId ? item.SeriesId : item.Id;
-		if (!logoItemId) return '';
-		return jellyfinService.getImageUrl(logoItemId, 'Logo', 1600) || '';
-	}, [item]);
-
-	const useHeaderLogo = Boolean(headerLogoUrl) && !headerLogoUnavailable;
-	const headerTitle = useHeaderLogo ? undefined : (item?.Name || 'Details');
 	const pageTitle = item?.Name || item?.SeriesName || 'Details';
-	const hasOverviewText = Boolean(item?.Overview && String(item.Overview).trim().length > 0);
-	const handleHeaderLogoError = useImageErrorFallback(null, {
-		onError: () => setHeaderLogoUnavailable(true)
-	});
-	const handleBackdropImageError = useImageErrorFallback(null, {
-		onError: () => setBackdropUnavailable(true)
-	});
-	const handleCastImageError = useImageErrorFallback();
-	const hideImageOnError = useImageErrorFallback();
-	const getCastImageUrl = useCallback((personId) => {
-		return jellyfinService.getImageUrl(personId, 'Primary', 240);
-	}, []);
 	const {
 		audioTracks,
 		subtitleTracks,
@@ -483,364 +391,63 @@ const MediaDetailsPanel = ({
 		seasonFocusScrollTimeoutRef
 	});
 
-	const getSeasonImageUrl = useCallback((season) => {
-		return resolveSeasonImageUrl(season, item, jellyfinService);
-	}, [item]);
-
-	const getEpisodeImageUrl = useCallback((episode) => {
-		return resolveEpisodeImageUrl(episode, item, jellyfinService);
-	}, [item]);
-
-	useEffect(() => {
-		if (!isElegantTheme || !hasOverviewText) {
-			setHasOverviewOverflow(false);
-			return undefined;
-		}
-
-		let frameId = 0;
-		const measureOverviewOverflow = () => {
-			const overviewElement = overviewTextRef.current;
-			if (!overviewElement) {
-				setHasOverviewOverflow(false);
-				return;
-			}
-			const collapsedClass = css.overviewCollapsed;
-			const hadCollapsedClass = overviewElement.classList.contains(collapsedClass);
-			if (!hadCollapsedClass) {
-				overviewElement.classList.add(collapsedClass);
-			}
-			const hasOverflow = (overviewElement.scrollHeight - overviewElement.clientHeight) > 1;
-			if (!hadCollapsedClass) {
-				overviewElement.classList.remove(collapsedClass);
-			}
-			setHasOverviewOverflow(hasOverflow);
-		};
-		const scheduleOverviewMeasurement = () => {
-			window.cancelAnimationFrame(frameId);
-			frameId = window.requestAnimationFrame(measureOverviewOverflow);
-		};
-
-		scheduleOverviewMeasurement();
-		window.addEventListener('resize', scheduleOverviewMeasurement);
-		return () => {
-			window.cancelAnimationFrame(frameId);
-			window.removeEventListener('resize', scheduleOverviewMeasurement);
-		};
-	}, [hasOverviewText, isElegantTheme, item?.Id]);
-
-	const shouldShowContinue = useMemo(() => {
-		if (item?.Type === 'Series') return false;
-		if (!item?.UserData) return false;
-		const playbackPosition = item?.UserData?.PlaybackPositionTicks || 0;
-		if (playbackPosition > 0) return true;
-		const percentage = item?.UserData?.PlayedPercentage || 0;
-		return percentage > 0 && percentage < 100;
-	}, [item]);
-
-	const seriesHasWatchHistory = useMemo(() => {
-		if (item?.Type !== 'Series') return false;
-		if (episodes.some((episode) => isEpisodeInProgress(episode) || isEpisodePlayed(episode))) return true;
-		const userData = item?.UserData;
-		if (!userData) return false;
-		if ((userData.PlaybackPositionTicks || 0) > 0) return true;
-		if ((userData.PlayedPercentage || 0) > 0) return true;
-		return userData.Played === true;
-	}, [episodes, item]);
-
-	const seriesPlayLabel = useMemo(() => {
-		if (item?.Type !== 'Series') return 'Play';
-		const targetEpisode =
-			selectedEpisode ||
-			episodes.find((episode) => !isEpisodePlayed(episode)) ||
-			episodes[0] ||
-			null;
-		if (!targetEpisode) return 'Play';
-		const badge = getEpisodeActionBadge(targetEpisode);
-		const withBadge = (label) => (badge ? `${label} ${badge}` : label);
-		if (isEpisodeInProgress(targetEpisode)) {
-			return withBadge('Continue');
-		}
-		if (!isEpisodePlayed(targetEpisode) && seriesHasWatchHistory) {
-			return withBadge('Next Up');
-		}
-		if (!isEpisodePlayed(targetEpisode)) {
-			return withBadge('Play');
-		}
-		return withBadge('Play');
-	}, [episodes, item?.Type, selectedEpisode, seriesHasWatchHistory]);
-
-	const overviewPlayLabel = item?.Type === 'Series'
-		? seriesPlayLabel
-		: (shouldShowContinue ? 'Continue' : 'Play');
-	const hasSecondarySection = useMemo(() => {
-		if (Array.isArray(cast) && cast.length > 0) return true;
-		if (item?.Type === 'Series') return seasons.length > 0 || episodes.length > 0;
-		return false;
-	}, [cast, episodes.length, item?.Type, seasons.length]);
-
 	const captureDetailsScrollTo = useCallback((fn) => {
 		detailsScrollToRef.current = fn;
 		captureDetailsScrollRestore(fn);
 	}, [captureDetailsScrollRestore]);
-
-	const getContentSectionTop = useCallback(() => {
-		const scrollEl = getDetailsScrollElement();
-		const contentSection = contentSectionRef.current;
-		if (!scrollEl || !contentSection) return null;
-		const scrollRect = scrollEl.getBoundingClientRect();
-		const contentRect = contentSection.getBoundingClientRect();
-		return Math.max(0, scrollEl.scrollTop + (contentRect.top - scrollRect.top));
-	}, [getDetailsScrollElement]);
-
-	const focusSectionOnePrimary = useCallback(() => {
-		if (focusTopHeaderAction()) return true;
-		if (focusNonSeriesPrimaryPlay()) return true;
-		if (focusNonSeriesAudioSelector()) return true;
-		return focusNonSeriesSubtitleSelector();
-	}, [
-		focusNonSeriesAudioSelector,
-		focusNonSeriesPrimaryPlay,
-		focusNonSeriesSubtitleSelector,
-		focusTopHeaderAction
-	]);
-
-	const focusSectionOnePrimaryFromTopNav = useCallback(() => {
-		const candidateTargets = [
-			favoriteActionButtonRef.current?.nodeRef?.current || favoriteActionButtonRef.current,
-			watchedActionButtonRef.current?.nodeRef?.current || watchedActionButtonRef.current,
-			audioSelectorButtonRef.current?.nodeRef?.current || audioSelectorButtonRef.current,
-			subtitleSelectorButtonRef.current?.nodeRef?.current || subtitleSelectorButtonRef.current,
-			playPrimaryButtonRef.current?.nodeRef?.current || playPrimaryButtonRef.current
-		];
-		for (const target of candidateTargets) {
-			if (!target?.focus) continue;
-			focusNodeWithoutScroll(target);
-			return true;
-		}
-		const introRoot = firstSectionRef.current;
-		if (introRoot) {
-			const fallbackTarget = introRoot.querySelector(
-				`.${css.actionButton}, .${css.trackSelectorPrimary}, .${css.primaryButton}, .bf-button, .spottable`
-			);
-			if (fallbackTarget?.focus) {
-				focusNodeWithoutScroll(fallbackTarget);
-				return true;
-			}
-		}
-		return focusSectionOnePrimary();
-	}, [
-		audioSelectorButtonRef,
-		favoriteActionButtonRef,
-		focusNodeWithoutScroll,
-		focusSectionOnePrimary,
-		playPrimaryButtonRef,
-		subtitleSelectorButtonRef,
-		watchedActionButtonRef
-	]);
-
-	const focusIntroTopNavigation = useCallback(() => {
-		const introRoot = firstSectionRef.current;
-		if (!introRoot) return false;
-		const breadcrumbTarget = introRoot.querySelector('[data-bf-md-nav="breadcrumb"]');
-		if (breadcrumbTarget?.focus) {
-			focusNodeWithoutScroll(breadcrumbTarget);
-			return true;
-		}
-		const backTarget = introRoot.querySelector('[data-bf-md-nav="back"]');
-		if (backTarget?.focus) {
-			focusNodeWithoutScroll(backTarget);
-			return true;
-		}
-		return false;
-	}, [focusNodeWithoutScroll]);
-
-	const focusSectionTwoPrimary = useCallback(() => {
-		if (!hasSecondarySection) return false;
-		const castTarget = contentSectionRef.current?.querySelector?.(`.${css.castToggleRow}, .${css.castCard}`);
-		if (castTarget?.focus) {
-			focusNodeWithoutScroll(castTarget);
-			return true;
-		}
-		if (focusEpisodeSelector()) return true;
-		const seasonTarget = contentSectionRef.current?.querySelector?.(`.${css.seasonCard}`);
-		if (seasonTarget?.focus) {
-			focusNodeWithoutScroll(seasonTarget);
-			return true;
-		}
-		const episodeTarget = contentSectionRef.current?.querySelector?.(`.${css.episodeCard}`);
-		if (episodeTarget?.focus) {
-			focusNodeWithoutScroll(episodeTarget);
-			return true;
-		}
-		return false;
-	}, [
-		focusEpisodeSelector,
-		focusNodeWithoutScroll,
-		hasSecondarySection
-	]);
-
-	const scrollToDetailsSection = useCallback((sectionKey, options = {}) => {
-		const {
-			animate = true,
-			focusTarget = false
-		} = options;
-		if (sectionKey === 'content' && !hasSecondarySection) return false;
-		const scrollEl = getDetailsScrollElement();
-		if (!scrollEl) return false;
-		const sectionTwoTop = getContentSectionTop();
-		if (sectionTwoTop === null) return false;
-		const nextTop = sectionKey === 'content' ? sectionTwoTop : 0;
-		if (Math.abs(scrollEl.scrollTop - nextTop) > 1) {
-			scrollEl.scrollTo({top: nextTop, behavior: animate ? 'smooth' : 'auto'});
-		}
-		if (focusTarget) {
-			window.requestAnimationFrame(() => {
-				if (sectionKey === 'content') {
-					focusSectionTwoPrimary();
-				} else {
-					focusSectionOnePrimary();
-				}
-			});
-		}
-		return true;
-	}, [
-		focusSectionOnePrimary,
-		focusSectionTwoPrimary,
-		getContentSectionTop,
-		getDetailsScrollElement,
-		hasSecondarySection
-	]);
-
-	const focusAndShowSecondSection = useCallback(() => {
-		if (!focusSectionTwoPrimary()) return false;
-		scrollToDetailsSection('content', {animate: true, focusTarget: false});
-		return true;
-	}, [focusSectionTwoPrimary, scrollToDetailsSection]);
-
-	const handleIntroActionKeyDown = useCallback((event) => {
-		const code = event.keyCode || event.which;
-		if (code !== KeyCodes.DOWN) return;
-		if (!focusAndShowSecondSection()) return;
-		event.preventDefault();
-		event.stopPropagation();
-	}, [focusAndShowSecondSection]);
-
-	const handleIntroTopNavKeyDown = useCallback((event) => {
-		if (event.defaultPrevented) return;
-		const code = event.keyCode || event.which;
-		if (code !== KeyCodes.DOWN) return;
-		event.preventDefault();
-		event.stopPropagation();
-		if (focusSectionOnePrimaryFromTopNav()) return;
-		window.requestAnimationFrame(() => {
-			focusSectionOnePrimaryFromTopNav();
-		});
-	}, [focusSectionOnePrimaryFromTopNav]);
-
-	const handleSectionWheelCapture = useCallback((event) => {
-		if (!isActive || !hasSecondarySection) return;
-		if (showAudioPicker || showSubtitlePicker || showEpisodePicker) return;
-		const scrollEl = getDetailsScrollElement();
-		const sectionTwoTop = getContentSectionTop();
-		if (!scrollEl || sectionTwoTop === null) return;
-		const deltaY = Number(event.deltaY || 0);
-		if (Math.abs(deltaY) < SECTION_WHEEL_DELTA_THRESHOLD) return;
-		const currentTop = scrollEl.scrollTop;
-		if (deltaY > 0 && currentTop < (sectionTwoTop - SECTION_SNAP_TOLERANCE_PX)) {
-			event.preventDefault();
-			event.stopPropagation();
-			scrollToDetailsSection('content');
-		} else if (deltaY < 0 && currentTop <= (sectionTwoTop + SECTION_SNAP_TOLERANCE_PX)) {
-			event.preventDefault();
-			event.stopPropagation();
-			scrollToDetailsSection('intro');
-		}
-	}, [
-		getContentSectionTop,
-		getDetailsScrollElement,
+	const {
 		hasSecondarySection,
-		isActive,
-		scrollToDetailsSection,
-		showAudioPicker,
-		showEpisodePicker,
-		showSubtitlePicker
-	]);
-
-	useEffect(() => {
-		if (!isActive || !hasSecondarySection || loading) return undefined;
-		if (showAudioPicker || showSubtitlePicker || showEpisodePicker) return undefined;
-
-		const handleFocusIn = (event) => {
-			const target = event.target;
-			if (!target || target.nodeType !== 1) return;
-			const targetNode = target;
-			const scrollEl = getDetailsScrollElement();
-			const sectionTwoTop = getContentSectionTop();
-			if (!scrollEl || sectionTwoTop === null) return;
-
-			if (firstSectionRef.current?.contains(targetNode)) {
-				if (scrollEl.scrollTop > SECTION_SNAP_TOLERANCE_PX) {
-					scrollToDetailsSection('intro');
-				}
-				return;
-			}
-			if (!contentSectionRef.current?.contains(targetNode)) return;
-			if (scrollEl.scrollTop < (sectionTwoTop - SECTION_SNAP_TOLERANCE_PX)) {
-				scrollToDetailsSection('content');
-			}
-		};
-
-		document.addEventListener('focusin', handleFocusIn, true);
-		return () => document.removeEventListener('focusin', handleFocusIn, true);
-	}, [
-		getContentSectionTop,
-		getDetailsScrollElement,
-		hasSecondarySection,
+		sectionSwitchInProgress,
+		isSectionSwitchInProgress,
+		focusAndShowFirstSection,
+		focusAndShowSecondSection,
+		focusIntroTopNavigation,
+		handleIntroActionKeyDown,
+		handleIntroTopNavKeyDown,
+		handleSectionSwitchKeyDownCapture,
+		handleSectionWheelCapture,
+		handleDetailsScrollerScrollStop
+	} = useMediaDetailsSectionNavigation({
+		itemType: item?.Type,
+		cast,
+		seasons,
+		episodes,
 		isActive,
 		loading,
-		scrollToDetailsSection,
 		showAudioPicker,
+		showSubtitlePicker,
 		showEpisodePicker,
-		showSubtitlePicker
-	]);
-
-	const handleDetailsScrollerScrollStop = useCallback((event) => {
-		handleDetailsScrollMemoryStop(event);
-		if (!hasSecondarySection) return;
-		const scrollEl = getDetailsScrollElement();
-		const sectionTwoTop = getContentSectionTop();
-		if (!scrollEl || sectionTwoTop === null) return;
-		const currentTop = scrollEl.scrollTop;
-		if (currentTop <= SECTION_SNAP_TOLERANCE_PX || currentTop >= sectionTwoTop) return;
-		const snapThreshold = sectionTwoTop * SECTION_SNAP_THRESHOLD_RATIO;
-		scrollEl.scrollTo({
-			top: currentTop <= snapThreshold ? 0 : sectionTwoTop,
-			behavior: 'smooth'
-		});
-	}, [getContentSectionTop, getDetailsScrollElement, handleDetailsScrollMemoryStop, hasSecondarySection]);
-
-	const handleOpenEpisodeSeries = useCallback(() => {
-		openSeriesFromEpisode(item?.SeasonId || null);
-	}, [item?.SeasonId, openSeriesFromEpisode]);
-
-	const handleToggleWatchedMain = useCallback(() => {
-		handleToggleWatched();
-	}, [handleToggleWatched]);
-
-	const toggleCastCollapsed = useCallback(() => {
-		setIsCastCollapsed((currentValue) => !currentValue);
-	}, []);
-
-	const handleOverviewActivate = useCallback((event) => {
-		if (!isElegantTheme || !hasOverviewOverflow) return;
-		if (event?.type === 'keydown') {
-			const code = event.keyCode || event.which;
-			if (code !== KeyCodes.ENTER && code !== KeyCodes.OK && code !== KeyCodes.SPACE) return;
+		css,
+		firstSectionRef,
+		contentSectionRef,
+		audioSelectorButtonRef,
+		subtitleSelectorButtonRef,
+		playPrimaryButtonRef,
+		getDetailsScrollElement,
+		handleDetailsScrollMemoryStop,
+		focusNodeWithoutScroll,
+		focusNonSeriesPrimaryPlay,
+		focusNonSeriesAudioSelector,
+		focusNonSeriesSubtitleSelector,
+		focusEpisodeSelector
+	});
+	const handleSectionSwitchPointerCapture = useCallback((event) => {
+		if (!isSectionSwitchInProgress()) return false;
+		if (event.cancelable) {
 			event.preventDefault();
-			event.stopPropagation();
 		}
-		setOverviewExpanded((currentValue) => !currentValue);
-	}, [hasOverviewOverflow, isElegantTheme]);
+		event.stopPropagation();
+		event.stopImmediatePropagation?.();
+		return true;
+	}, [isSectionSwitchInProgress]);
+	const handleDetailsMouseDownCapture = useCallback((event) => {
+		if (handleSectionSwitchPointerCapture(event)) return;
+		handleDetailsPointerDownCapture(event);
+	}, [handleDetailsPointerDownCapture, handleSectionSwitchPointerCapture]);
+	const handleDetailsClickCapture = useCallback((event) => {
+		if (handleSectionSwitchPointerCapture(event)) return;
+		handleDetailsPointerClickCapture(event);
+	}, [handleDetailsPointerClickCapture, handleSectionSwitchPointerCapture]);
 
 	const {
 		handleTrackSelect,
@@ -894,50 +501,28 @@ const MediaDetailsPanel = ({
 		focusSeasonWatchedButton,
 		focusBelowSeasons,
 		handleToggleWatched,
-		focusTopHeaderAction,
 		episodesById,
 		handleEpisodeClick,
 		isSidewaysEpisodeLayout,
-		episodesListRef,
-		episodeFocusScrollTimeoutRef,
-		focusEpisodeCardByIndex,
-		focusEpisodeInfoButtonByIndex,
-		focusEpisodeFavoriteButtonByIndex,
-		focusEpisodeWatchedButtonByIndex,
-		focusEpisodeSelector,
-		handleToggleFavoriteById,
-		focusNonSeriesSubtitleSelector,
-		focusNonSeriesPrimaryPlay,
-		focusNonSeriesAudioSelector,
-		focusIntroTopNavigation,
-		focusFirstSectionPrimary: focusSectionOnePrimary,
-		focusSecondSectionPrimary: focusAndShowSecondSection,
-		showEpisodeInfoButton: typeof onItemSelect === 'function',
-		css
-	});
-
-	const handleSeasonImageError = useCallback((e) => {
-		if (item?.ImageTags?.Primary) {
-			e.target.src = jellyfinService.getImageUrl(item.Id, 'Primary', 500);
-		} else {
-			hideImageOnError(e);
-		}
-	}, [hideImageOnError, item]);
-	const handleEpisodeImageError = useCallback((e) => {
-		const imageElement = e.currentTarget;
-		const fallbackStep = imageElement.dataset.fallbackStep || '0';
-		if (fallbackStep === '0' && item?.BackdropImageTags?.length > 0) {
-			imageElement.dataset.fallbackStep = '1';
-			imageElement.src = jellyfinService.getBackdropUrl(item.Id, 0, 960);
-			return;
-		}
-		if (fallbackStep !== '2' && item?.ImageTags?.Primary) {
-			imageElement.dataset.fallbackStep = '2';
-			imageElement.src = jellyfinService.getImageUrl(item.Id, 'Primary', 760);
-			return;
-		}
-		hideImageOnError(e);
-	}, [hideImageOnError, item]);
+			episodesListRef,
+			episodeFocusScrollTimeoutRef,
+			focusEpisodeCardByIndex,
+			focusEpisodeInfoButtonByIndex,
+			focusEpisodeFavoriteButtonByIndex,
+			focusEpisodeWatchedButtonByIndex,
+			focusEpisodeSelector,
+			handleToggleFavoriteById,
+			focusNonSeriesSubtitleSelector,
+			focusNonSeriesPrimaryPlay,
+			focusNonSeriesAudioSelector,
+			focusNodeWithoutScroll,
+			focusIntroTopNavigation,
+			focusTopHeaderAction,
+			focusFirstSectionPrimary: focusAndShowFirstSection,
+			focusSecondSectionPrimary: focusAndShowSecondSection,
+			showEpisodeInfoButton: typeof onItemSelect === 'function',
+			css
+		});
 
 	if (!item) return null;
 	const isSeriesMode = item.Type === 'Series';
@@ -1004,11 +589,12 @@ const MediaDetailsPanel = ({
 					onScrollStop={handleDetailsScrollerScrollStop}
 				>
 					<div
-						className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''} ${item.Type === 'Episode' ? css.episodeDetailsMode : ''}`}
+						className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''} ${item.Type === 'Episode' ? css.episodeDetailsMode : ''} ${sectionSwitchInProgress ? css.sectionSwitchLocked : ''}`}
 						ref={detailsContainerRef}
 						tabIndex={-1}
-						onMouseDownCapture={handleDetailsPointerDownCapture}
-						onClickCapture={handleDetailsPointerClickCapture}
+						onKeyDownCapture={handleSectionSwitchKeyDownCapture}
+						onMouseDownCapture={handleDetailsMouseDownCapture}
+						onClickCapture={handleDetailsClickCapture}
 						onWheelCapture={handleSectionWheelCapture}
 				>
 					{!loading && (
@@ -1016,16 +602,25 @@ const MediaDetailsPanel = ({
 							{hasBackdropImage && (
 								<img
 									src={backdropUrl}
+									data-bf-src-key={backdropUrl}
 									alt={item.Name}
+									className={`${css.backdropImage} ${isBackdropImageLoaded ? '' : css.backdropImageHidden}`}
+									onLoad={handleBackdropImageLoad}
 									onError={handleBackdropImageError}
+									loading="lazy"
+									decoding="async"
+									draggable={false}
 								/>
 							)}
+							{hasBackdropImage && !isBackdropImageLoaded ? (
+								<div className={`${imageLoadCss.imageLoadingHint} ${css.backdropLoadingHint}`} aria-hidden="true" />
+							) : null}
 							<div className={`${css.gradient} ${isElegantTheme ? css.gradientElegant : ''}`} />
 						</div>
 					)}
 					{loading ? (
 						<div className={css.loading}>
-							<Spinner />
+							<BreezyLoadingOverlay />
 						</div>
 					) : (
 						<>

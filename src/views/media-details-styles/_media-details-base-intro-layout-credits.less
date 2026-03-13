@@ -1,0 +1,57 @@
+.introHeaderRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	flex-wrap: nowrap;
+	gap: 1rem 1.4rem;
+}
+
+.introCredits {
+	flex: 0 0 min(30rem, 34%);
+	max-width: min(30rem, 34%);
+	min-width: 14rem;
+	margin-top: 0;
+	padding: 0.2rem 0 0 0.5rem;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.38rem;
+	text-align: right;
+}
+
+.creditLine {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	row-gap: 0.08rem;
+	text-align: right;
+	width: 100%;
+	margin: 0;
+	font-size: 0.83em;
+	line-height: 1.35;
+	color: var(--bf-md-text-credit);
+	max-width: 100%;
+	text-shadow: 0 0.16rem 0.62rem rgba(0, 0, 0, 0.42);
+}
+
+.creditLabel {
+	display: block;
+	min-width: 0;
+	text-align: right;
+	font-weight: 700;
+	color: var(--bf-md-text-credit-label);
+}
+
+.creditNames {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	text-align: right;
+	white-space: normal;
+	color: var(--bf-md-text-credit-names);
+}
+
+.creditNameItem {
+	display: block;
+	line-height: 1.25;
+}

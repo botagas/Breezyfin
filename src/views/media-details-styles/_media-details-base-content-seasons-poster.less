@@ -1,0 +1,31 @@
+.seasonPoster {
+	width: 100%;
+	aspect-ratio: 2/3;
+	object-fit: cover;
+	display: block;
+	transition: opacity 180ms ease;
+}
+
+.seasonPosterWrap {
+	position: relative;
+	overflow: hidden;
+	border-bottom: 1px solid var(--bf-md-divider-soft);
+
+	&::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(145deg, rgba(63, 102, 170, 0.34), rgba(38, 76, 136, 0.24));
+		opacity: 0;
+		transition: opacity 220ms ease;
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	.card-image-bottom-fade-overlay();
+}
+
+.seasonPosterLoadingHint {
+	z-index: 2;
+	background: linear-gradient(155deg, rgba(65, 84, 113, 0.38), rgba(34, 48, 71, 0.26));
+}

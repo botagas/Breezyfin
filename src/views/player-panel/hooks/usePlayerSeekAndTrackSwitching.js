@@ -1,5 +1,7 @@
 import {useCallback} from 'react';
+import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
+import {shouldTranscodeForSubtitleSelection} from '../../../services/jellyfin/playbackSelection';
 
 export const usePlayerSeekAndTrackSwitching = ({
 	item,
@@ -10,6 +12,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 	mediaSourceData,
 	checkSkipSegments,
 	playbackOptions,
+	playbackSettingsRef,
 	currentAudioTrack,
 	currentSubtitleTrack,
 	getPlaybackSessionContext,
@@ -77,7 +80,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (isHls) {
 			videoRef.current.currentTime = seekTime;
-			const seekTicks = Math.floor(seekTime * 10000000);
+			const seekTicks = Math.floor(seekTime * JELLYFIN_TICKS_PER_SECOND);
 			await jellyfinService.reportPlaybackProgress(
 				item.Id,
 				seekTicks,
@@ -89,10 +92,11 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (isCurrentTranscoding) {
 			try {
-				const seekTicks = Math.floor(seekTime * 10000000);
+				const seekTicks = Math.floor(seekTime * JELLYFIN_TICKS_PER_SECOND);
 				setLoading(true);
 				playbackOverrideRef.current = {
 					...(playbackOptions || {}),
+					mediaSourceId: mediaSourceData?.Id || playbackOptions?.mediaSourceId,
 					audioStreamIndex: Number.isInteger(currentAudioTrack) ? currentAudioTrack : undefined,
 					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
 					startTimeTicks: seekTicks,
@@ -132,6 +136,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		const currentPosition = videoRef.current.currentTime || 0;
 		playbackOverrideRef.current = {
 			...(playbackOptions || {}),
+			mediaSourceId: mediaSourceData?.Id || playbackOptions?.mediaSourceId,
 			audioStreamIndex: Number.isInteger(audioIndex) ? audioIndex : undefined,
 			subtitleStreamIndex: (subtitleIndex === -1 || Number.isInteger(subtitleIndex)) ? subtitleIndex : undefined,
 			seekSeconds: currentPosition,
@@ -140,7 +145,17 @@ export const usePlayerSeekAndTrackSwitching = ({
 		setLoading(true);
 		await handleStop();
 		loadVideo();
-	}, [handleStop, loadVideo, playbackOptions, playbackOverrideRef, setLoading, videoRef]);
+	}, [handleStop, loadVideo, mediaSourceData?.Id, playbackOptions, playbackOverrideRef, setLoading, videoRef]);
+
+	const shouldForceSubtitleReload = useCallback((trackIndex) => {
+		if (!(Number.isInteger(trackIndex) && trackIndex >= 0)) return false;
+		const settings = playbackSettingsRef?.current || {};
+		return shouldTranscodeForSubtitleSelection(mediaSourceData, trackIndex, {
+			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
+			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
+			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
+		});
+	}, [mediaSourceData, playbackSettingsRef]);
 
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
 		setCurrentAudioTrack(trackIndex);
@@ -173,6 +188,12 @@ export const usePlayerSeekAndTrackSwitching = ({
 		closeSubtitlePopup();
 		saveSubtitleSelection(trackIndex, subtitleTracks);
 
+		if (shouldForceSubtitleReload(trackIndex)) {
+			setToastMessage('Subtitle burn-in requires stream reload.');
+			reloadWithTrackSelection(currentAudioTrack, trackIndex);
+			return;
+		}
+
 		if (hlsRef.current) {
 			if (typeof hlsRef.current.subtitleTrack === 'number' && hlsRef.current.subtitleTracks) {
 				const hlsTrackIndex = hlsRef.current.subtitleTracks.findIndex((track) => {
@@ -195,6 +216,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		reloadWithTrackSelection,
 		saveSubtitleSelection,
 		setCurrentSubtitleTrack,
+		shouldForceSubtitleReload,
 		setToastMessage,
 		subtitleTracks
 	]);

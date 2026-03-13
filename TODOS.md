@@ -1,58 +1,34 @@
 # Breezyfin TODOs
 
-This is the current backlog for v0.1.5 release. Should be updated with further releases.
+Backlog for unfinished/planned work only.
 
-## High priority
+Rule:
+- Keep this file for unfinished / planned tasks only.
+- Move validation/test items to `CHECKS.md` only after the related TODO is completed (if needed).
 
-- Decompose remaining large panels:
-  - `src/views/PlayerPanel.js`
-  - `src/views/MediaDetailsPanel.js`
-  - `src/App/App.js`
-- Investigate webOS 6 login/switch-user backdrop rendering (requests now avoid hard failures, but fallback imagery still does not render reliably on sim):
-  - `src/views/LoginPanel.js`
-  - `src/views/login-panel-styles/_login-panel-compat-webos6.less`
-- Continue splitting very large style surfaces into smaller units with clearer ownership:
-  - `src/views/media-details-styles/_media-details-base.less`
-  - `src/components/Toolbar.module.less`
-  - `src/views/player-panel-styles/_player-panel-base.less`
-- Expand Jellyfin service tests to cover extracted modules directly:
-  - `src/services/jellyfin/playbackApi.js`
-  - `src/services/jellyfin/libraryApi.js`
-  - `src/services/jellyfin/sessionApi.js`
-- Identify the cause for FPS drops in Media Details panel when scrolling. Loading delay in panels might be directly related to the FPS drops since they are not present in Simulator tests. This might cause issues for TVs that were released in 2022 or prior. It could be related to backdrop/cast/episode image quality or complexity as not all media causes this behavior. Performance Mode should be improved in episode list to reduce heavyweight styling.
-- Could consider using WEBP for images to increase performance. 
+## Next-release changes (High priority)
 
-## Medium priority
+- Stabilize playback startup negotiation flow for DV/HDR: enforce deterministic decision order (`source -> audio compatibility -> optional container preference -> final play method`), add a single decision snapshot for diagnostics, and expand regression coverage for startup-only paths (no manual track switch).
 
-- Normalize remaining hardcoded color/rgba values into `--bf-theme-*` tokens where practical, starting with Player/MediaDetails/Toolbar style files.
-- Audit and reduce custom per-file CSS variables that overlap with global theme tokens.
-- Keep compat behavior isolated in compat files; document intentional exceptions when global shared fallbacks are required.
-- Normalize Search panel filter popup handlers to `useDisclosureHandlers` (replace manual open/close callbacks).
-- Standardize watched-status badge usage across all item-card panels so watched state uses the same badge system everywhere it is shown:
-  - `src/views/HomePanel.js`
-  - `src/views/LibraryPanel.js`
-  - `src/views/SearchPanel.js`
-- Standardize count/status badges to shared badge primitives with tokenized color variants (for example episode-count badges), instead of panel-specific one-off styling:
-  - `src/components/MediaRow.module.less`
-  - `src/views/library-panel-styles/_library-panel-base.less`
-  - `src/views/search-panel-styles/_search-panel-base.less`
+## Near-term improvements (Medium priority)
 
-## Secondary improvements
+- Run a post-decomposition style analysis pass to identify remaining hotspots/overlap and prioritize practical style cleanup improvements.
+- Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
+- Implement manual-login server selection UX (URL input + selectable saved server list in the same flow).
+- Inspect style token usage for potential over-tokenization and simplify cases where indirection adds noise without practical reuse.
 
-- Add a lightweight architecture index in docs mapping:
-  - panel-level decomposition folders
-  - shared hooks/utilities
-  - service domain modules
-- Add a small script/report for style token adoption (where raw color usage still remains).
+## Long-term goals
+
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
-- Inspect button styling in Favorites panel to ensure we're using already existing mixins. Alter Mark Watched button hover background color to match the icon color (already done for Favorite button) via shared styles or mixins and ensure that is also used in episode list and favorite panels. 
-- Fix badge spacing and sizing on webOS 6. We also need to make sure badges actually appear in Favorites and Search panel on webOS 6.
-- Inspect the cause for the first library option having extra whitespace separating it from the second option in webOS 6. 
-- Apply our PlayerPanel loading animation to all panels that would replace the default loading animation.
+- Identify and fix panel loading delay and unintended panel reload behavior when switching between panels. Needs inspection as it might not be caused by the app.
+- Implement Discovery media rows via Seerr integration (likely requires Jellyfin plugin support).
+- Implement Watchlist support (evaluate Jellyfin Enhanced/KefinTweaks Watchlist compatibility and integration path).
+- Add a Calendar for Sonarr/Radarr release information (likely via plugin/API integration).
+- Set up a GitHub Pages demo connected to a resettable Jellyfin demo instance.
+- Investigate Media Details FPS drops during scrolling on real devices; verify whether panel loading delay and heavy image/styling paths are contributing factors.
 
-## Maintenance checks (recurring)
+## Compatibility goals
 
-- `npm run lint`
-- `npm run test -- --watch=false --runInBand`
-- `npm run audit:styles`
-- `npm run audit:duplicates`
+- Improve webOS 6 login/switch-user backdrop reliability in `src/views/LoginPanel.js` and `src/views/login-panel-styles/_login-panel-compat-webos6.less`.
+- Fix webOS 6 badge spacing/sizing and missing badge visibility issues (Favorites/Search).
+- Fix extra whitespace before the first library option on webOS 6.

@@ -1,0 +1,48 @@
+/* Strip default Sandstone button chrome from Breezy button wrapper */
+.bf-button,
+.bf-button:hover,
+.bf-button:focus,
+.bf-button:active,
+.bf-button::before,
+.bf-button::after {
+	box-shadow: none !important;
+	background: transparent !important;
+	filter: none !important;
+	max-width: none !important;
+}
+
+.bf-button-bg {
+	box-shadow: none !important;
+	background: transparent !important;
+}
+
+.bf-button,
+.bf-button .client,
+.bf-button .icon {
+	color: var(--bf-button-fg) !important;
+}
+
+.bf-button:hover,
+.bf-button:hover .client,
+.bf-button:hover .icon,
+.bf-button:focus,
+.bf-button:focus .client,
+.bf-button:focus .icon,
+.bf-button[data-webos-voice-focused='true'],
+.bf-button[data-webos-voice-focused='true'] .client,
+.bf-button[data-webos-voice-focused='true'] .icon {
+	color: var(--bf-button-fg-hover) !important;
+}
+
+.bf-button:active,
+.bf-button:active .client,
+.bf-button:active .icon {
+	color: var(--bf-button-fg-active) !important;
+}
+
+/* In 5-way mode, ignore stale mouse-hover paint so only Spotlight focus is visually active. */
+[data-bf-input-mode='5way'] .bf-button:hover,
+[data-bf-input-mode='5way'] .bf-button:hover .client,
+[data-bf-input-mode='5way'] .bf-button:hover .icon {
+	color: var(--bf-button-fg) !important;
+}

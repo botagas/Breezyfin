@@ -1,0 +1,89 @@
+:global([data-bf-animations='off']),
+:global([data-bf-all-animations='off']) {
+	.castCard,
+	.castAvatar,
+	.castAvatarImage,
+	.castAvatarLoadingHint,
+	.seasonCard,
+	.seasonPoster,
+	.seasonPosterLoadingHint,
+	.episodeCard,
+	.episodeImageContainer,
+	.episodeImage,
+	.episodeImageLoadingHint {
+		transition: none !important;
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.castAvatarLoadingHint {
+		opacity: 0.45 !important;
+	}
+
+	.castCard:hover,
+	.castCard:focus,
+	.seasonCard:hover,
+	.seasonCard:focus,
+	.seasonCard:global(.spottable):focus,
+	.episodeCard:hover,
+	.episodeCard:focus,
+	.episodeCard:global(.spottable):focus,
+	.episodeCardSideways:hover,
+	.episodeCardSideways:focus,
+	.episodeCardSideways:global(.spottable):focus {
+		transform: none !important;
+		filter: none !important;
+	}
+
+	.seasonCard,
+	.episodeCard {
+		box-shadow: none !important;
+	}
+
+	.seasonCard {
+		&:hover,
+		&:focus,
+		&:global(.spottable):focus {
+			--seasonCardBorderColor: rgba(var(--bf-theme-accent-rgb), 0.9);
+			background: rgba(30, 40, 56, 0.9);
+		}
+	}
+
+	.episodeCard {
+		background: var(--bf-md-episode-bg-reduced);
+		border-color: var(--bf-md-episode-border-reduced);
+
+		&:hover,
+		&:focus,
+		&:global(.spottable):focus {
+			background: var(--bf-md-episode-hover-bg-reduced);
+			border-color: rgba(var(--bf-theme-accent-rgb), 0.48);
+			box-shadow: none;
+		}
+	}
+
+	.episodeImageContainer {
+		box-shadow: none;
+		border-color: var(--bf-md-episode-border-reduced);
+
+		&::before,
+		&::after {
+			content: none;
+			display: none;
+		}
+	}
+
+	.seasonPosterWrap::before,
+	.seasonPosterWrap::after {
+		content: none !important;
+		display: none !important;
+	}
+}
+
+:global([data-bf-all-animations='off']) {
+	.castScroller,
+	.seasonCards,
+	.episodeCardsSideways {
+		scroll-behavior: auto !important;
+	}
+}

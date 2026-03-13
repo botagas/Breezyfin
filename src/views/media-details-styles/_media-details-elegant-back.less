@@ -1,0 +1,32 @@
+.detailsBackButton {
+	--bf-button-fg: var(--bf-md-elegant-text-primary);
+	--bf-button-fg-hover: var(--bf-md-elegant-text-primary);
+	--bf-button-fg-active: var(--bf-md-elegant-text-primary);
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: 1px solid transparent !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+		transition: background 180ms ease, border-color 180ms ease, transform 180ms ease !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+		border-color: var(--bf-theme-surface-border) !important;
+	}
+
+	&:active :global(.bf-button-bg),
+	&:active :global(.bg) {
+		background: var(--bf-md-elegant-back-active-bg) !important;
+		border-color: var(--bf-md-elegant-back-active-border) !important;
+	}
+}

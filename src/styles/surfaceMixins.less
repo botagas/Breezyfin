@@ -1,0 +1,56 @@
+.popupSurface(
+	@bg: var(--bf-theme-popup-bg);
+	@borderColor: var(--bf-theme-popup-border);
+	@shadow: var(--bf-theme-popup-shadow);
+	@blur: var(--bf-theme-popup-blur);
+	@saturate: var(--bf-theme-popup-saturate)
+) {
+	background: @bg;
+	border: 1px solid @borderColor;
+	box-shadow: @shadow;
+	backdrop-filter: blur(@blur) saturate(@saturate);
+	-webkit-backdrop-filter: blur(@blur) saturate(@saturate);
+}
+
+.popupSurfaceImportant(
+	@bg: var(--bf-theme-popup-bg);
+	@borderColor: var(--bf-theme-popup-border);
+	@shadow: var(--bf-theme-popup-shadow);
+	@blur: var(--bf-theme-popup-blur);
+	@saturate: var(--bf-theme-popup-saturate)
+) {
+	background: @bg !important;
+	border: 1px solid @borderColor !important;
+	box-shadow: @shadow !important;
+	backdrop-filter: blur(@blur) saturate(@saturate) !important;
+	-webkit-backdrop-filter: blur(@blur) saturate(@saturate) !important;
+}
+
+.popupPillSurfaceImportant(
+	@bg;
+	@borderColor;
+	@shadow: none;
+	@opacity: 1;
+	@blur: var(--bf-theme-popup-blur);
+	@saturate: var(--bf-theme-popup-saturate)
+) {
+	background: @bg !important;
+	border: 1px solid @borderColor !important;
+	border-radius: 999px !important;
+	box-shadow: @shadow !important;
+	opacity: @opacity !important;
+	backdrop-filter: blur(@blur) saturate(@saturate) !important;
+	-webkit-backdrop-filter: blur(@blur) saturate(@saturate) !important;
+}
+
+.popupNoBlurSurfaceImportant(
+	@bg: var(--bf-theme-popup-ultra-bg);
+	@borderColor: var(--bf-theme-popup-border);
+	@shadow: var(--bf-theme-popup-shadow)
+) {
+	background: @bg !important;
+	border: 1px solid @borderColor !important;
+	box-shadow: @shadow !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}

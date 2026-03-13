@@ -16,7 +16,6 @@ export const useMediaDetailsInteractionHandlers = ({
 	focusBelowSeasons,
 	handleToggleFavoriteById,
 	handleToggleWatched,
-	focusTopHeaderAction,
 	episodesById,
 	handleEpisodeClick,
 	isSidewaysEpisodeLayout,
@@ -30,7 +29,9 @@ export const useMediaDetailsInteractionHandlers = ({
 	focusNonSeriesSubtitleSelector,
 	focusNonSeriesPrimaryPlay,
 	focusNonSeriesAudioSelector,
+	focusNodeWithoutScroll,
 	focusIntroTopNavigation,
+	focusTopHeaderAction,
 	focusFirstSectionPrimary,
 	focusSecondSectionPrimary,
 	showEpisodeInfoButton,
@@ -40,40 +41,58 @@ export const useMediaDetailsInteractionHandlers = ({
 		scrollCastIntoView(event.currentTarget);
 	}, [scrollCastIntoView]);
 
+	const focusFirstSectionFromCast = useCallback(() => {
+		if (typeof focusFirstSectionPrimary === 'function' && focusFirstSectionPrimary()) return;
+		if (typeof focusIntroTopNavigation === 'function') {
+			focusIntroTopNavigation();
+		}
+	}, [focusFirstSectionPrimary, focusIntroTopNavigation]);
+
+	const focusCastCardWithoutScroll = useCallback((card) => {
+		if (!card?.focus) return false;
+		if (typeof focusNodeWithoutScroll === 'function') {
+			focusNodeWithoutScroll(card);
+			return true;
+		}
+		try {
+			card.focus({preventScroll: true});
+		} catch (_) {
+			card.focus();
+		}
+		return true;
+	}, [focusNodeWithoutScroll]);
+
 	const handleCastToggleKeyDown = useCallback((event) => {
 		if (event.keyCode === KeyCodes.UP) {
 			event.preventDefault();
 			event.stopPropagation();
-			if (typeof focusFirstSectionPrimary === 'function') {
-				focusFirstSectionPrimary();
-			}
+			focusFirstSectionFromCast();
 		} else if (event.keyCode === KeyCodes.DOWN) {
 			const firstCastCard = castRowRef.current?.querySelector(`.${css.castCard}`);
-			if (firstCastCard?.focus) {
+			if (firstCastCard?.focus && focusCastCardWithoutScroll(firstCastCard)) {
 				event.preventDefault();
 				event.stopPropagation();
-				firstCastCard.focus();
 			}
 		}
-	}, [castRowRef, css.castCard, focusFirstSectionPrimary]);
+	}, [castRowRef, css.castCard, focusCastCardWithoutScroll, focusFirstSectionFromCast]);
 
 	const handleCastCardKeyDown = useCallback((event) => {
 		const cards = Array.from(castRowRef.current?.querySelectorAll(`.${css.castCard}`) || []);
 		const index = cards.indexOf(event.currentTarget);
 		if (event.keyCode === KeyCodes.LEFT && index > 0) {
 			event.preventDefault();
-			cards[index - 1].focus();
+			event.stopPropagation();
+			focusCastCardWithoutScroll(cards[index - 1]);
 		} else if (event.keyCode === KeyCodes.RIGHT && index < cards.length - 1) {
 			event.preventDefault();
-			cards[index + 1].focus();
+			event.stopPropagation();
+			focusCastCardWithoutScroll(cards[index + 1]);
 		} else if (event.keyCode === KeyCodes.UP) {
 			event.preventDefault();
 			event.stopPropagation();
-			if (typeof focusFirstSectionPrimary === 'function') {
-				focusFirstSectionPrimary();
-			}
+			focusFirstSectionFromCast();
 		}
-	}, [castRowRef, css.castCard, focusFirstSectionPrimary]);
+	}, [castRowRef, css.castCard, focusCastCardWithoutScroll, focusFirstSectionFromCast]);
 
 	const handleSeasonCardClick = useCallback((event) => {
 		const seasonId = event.currentTarget.dataset.seasonId;
@@ -143,12 +162,12 @@ export const useMediaDetailsInteractionHandlers = ({
 		} else if (event.keyCode === KeyCodes.UP) {
 			event.preventDefault();
 			event.stopPropagation();
-			if (!focusTopHeaderAction()) {
-				const card = event.currentTarget.closest(`.${css.seasonCard}`);
-				if (card?.focus) card.focus();
-			}
+			if (typeof focusFirstSectionPrimary === 'function' && focusFirstSectionPrimary()) return;
+			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
+			const card = event.currentTarget.closest(`.${css.seasonCard}`);
+			if (card?.focus) card.focus();
 		}
-	}, [css.seasonCard, focusTopHeaderAction]);
+	}, [css.seasonCard, focusFirstSectionPrimary, focusIntroTopNavigation]);
 
 	const handleEpisodeSelectorKeyDown = useCallback((event) => {
 		if (event.keyCode === KeyCodes.DOWN) {
@@ -420,15 +439,15 @@ export const useMediaDetailsInteractionHandlers = ({
 		} else if (event.keyCode === KeyCodes.UP) {
 			event.preventDefault();
 			event.stopPropagation();
-			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
-			focusTopHeaderAction();
+			if (typeof focusIntroTopNavigation === 'function') {
+				focusIntroTopNavigation();
+			}
 		}
 	}, [
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesSubtitleSelector,
 		focusIntroTopNavigation,
-		focusSecondSectionPrimary,
-		focusTopHeaderAction
+		focusSecondSectionPrimary
 	]);
 
 	const handleSubtitleSelectorKeyDown = useCallback((event) => {
@@ -445,14 +464,13 @@ export const useMediaDetailsInteractionHandlers = ({
 			event.preventDefault();
 			event.stopPropagation();
 			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
-			if (!focusNonSeriesAudioSelector()) focusTopHeaderAction();
+			focusNonSeriesAudioSelector();
 		}
 	}, [
 		focusIntroTopNavigation,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
-		focusSecondSectionPrimary,
-		focusTopHeaderAction
+		focusSecondSectionPrimary
 	]);
 
 	const handleNonSeriesPlayKeyDown = useCallback((event) => {
@@ -466,12 +484,18 @@ export const useMediaDetailsInteractionHandlers = ({
 			event.stopPropagation();
 			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
 			if (!focusNonSeriesSubtitleSelector()) focusNonSeriesAudioSelector();
+		} else if (event.keyCode === KeyCodes.RIGHT) {
+			if (typeof focusTopHeaderAction !== 'function') return;
+			if (!focusTopHeaderAction()) return;
+			event.preventDefault();
+			event.stopPropagation();
 		}
 	}, [
 		focusIntroTopNavigation,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesSubtitleSelector,
+		focusTopHeaderAction,
 		focusSecondSectionPrimary
 	]);
 

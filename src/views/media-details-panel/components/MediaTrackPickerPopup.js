@@ -1,10 +1,6 @@
-import Popup from '@enact/sandstone/Popup';
-import Heading from '@enact/sandstone/Heading';
 import Button from '../../../components/BreezyButton';
-import Scroller from '../../../components/AppScroller';
 import css from '../../MediaDetailsPanel.module.less';
-import popupStyles from '../../../styles/popupStyles.module.less';
-import {popupShellCss} from '../../../styles/popupStyles';
+import MediaOptionPickerPopup from './MediaOptionPickerPopup';
 
 const MediaTrackPickerPopup = ({
 	open,
@@ -30,21 +26,13 @@ const MediaTrackPickerPopup = ({
 	));
 
 	return (
-		<Popup
+		<MediaOptionPickerPopup
 			open={open}
 			onClose={onClose}
-			noAutoDismiss
-			css={popupShellCss}
+			title={`Select ${isAudio ? 'Audio' : 'Subtitle'} Track`}
 		>
-			<div className={`${popupStyles.popupSurface} ${css.popupSurface}`}>
-				<Heading size="medium" spacing="none" className={css.popupHeading}>
-					Select {isAudio ? 'Audio' : 'Subtitle'} Track
-				</Heading>
-				<Scroller className={css.popupScroller}>
-					<div className={css.popupList}>{trackOptions}</div>
-				</Scroller>
-			</div>
-		</Popup>
+			{trackOptions}
+		</MediaOptionPickerPopup>
 	);
 };
 

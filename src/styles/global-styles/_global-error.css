@@ -1,0 +1,35 @@
+.bf-error-surface {
+	width: min(var(--bf-theme-error-surface-max-width), 94vw);
+	max-width: 94vw;
+	padding: var(--bf-theme-error-surface-padding);
+	border-radius: var(--bf-theme-popup-radius);
+	background: var(--bf-theme-error-surface-bg) !important;
+	border: 1px solid var(--bf-theme-error-border) !important;
+	box-shadow: var(--bf-theme-error-surface-shadow) !important;
+	backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+}
+
+.bf-error-title {
+	display: block;
+	width: 100%;
+	text-align: center;
+	line-height: 1.25;
+	margin: 0 0 0.9rem;
+}
+
+.bf-error-message {
+	display: block;
+	width: 100%;
+	text-align: center;
+	line-height: 1.45;
+	margin: 0 0 1rem;
+	color: var(--bf-theme-error-color);
+}
+
+.bf-error-actions {
+	display: flex;
+	justify-content: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}

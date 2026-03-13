@@ -1,0 +1,67 @@
+.playerContainer {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	background: var(--bf-theme-player-bg);
+	overflow: hidden;
+}
+
+.video {
+	position: relative;
+	z-index: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	background: var(--bf-theme-player-bg);
+}
+
+.videoHidden {
+	display: none;
+}
+
+.playerButtonShell(@radius: 999px) {
+	border-radius: @radius !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+}
+
+.playerButtonSurface(@bg; @border: none; @radius: 999px) {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: @bg !important;
+		border: @border !important;
+		border-radius: @radius !important;
+		box-shadow: none !important;
+	}
+}
+
+.playerButtonHover(@bg) {
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: @bg !important;
+	}
+}
+
+.playerButtonHover(@bg; @borderColor) {
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: @bg !important;
+		border-color: @borderColor !important;
+	}
+}
+
+.playerButtonActive(@bg) {
+	&:active :global(.bf-button-bg),
+	&:active :global(.bg) {
+		background: @bg !important;
+	}
+}

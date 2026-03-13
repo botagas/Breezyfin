@@ -1,4 +1,5 @@
 import {useCallback} from 'react';
+import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 
 export const usePlayerSkipOverlayState = ({
@@ -38,7 +39,7 @@ export const usePlayerSkipOverlayState = ({
 			// ignore parse issues
 		}
 
-		const positionTicks = positionSeconds * 10000000;
+		const positionTicks = positionSeconds * JELLYFIN_TICKS_PER_SECOND;
 		const activeSegment = mediaSegments.find(
 			(segment) => positionTicks >= segment.StartTicks && positionTicks < segment.EndTicks
 		);
@@ -67,7 +68,7 @@ export const usePlayerSkipOverlayState = ({
 				setShowNextEpisodePrompt(false);
 				nextEpisodePromptStartTicksRef.current = null;
 			}
-			const remainingSeconds = Math.max(0, (activeSegment.EndTicks / 10000000) - positionSeconds);
+			const remainingSeconds = Math.max(0, (activeSegment.EndTicks / JELLYFIN_TICKS_PER_SECOND) - positionSeconds);
 			setSkipCountdown(Math.ceil(remainingSeconds));
 		} else if (
 			playNextPromptEnabled &&
@@ -143,7 +144,7 @@ export const usePlayerSkipOverlayState = ({
 			handlePlayNextEpisode();
 			return;
 		}
-		const skipTo = currentSkipSegment.EndTicks / 10000000;
+		const skipTo = currentSkipSegment.EndTicks / JELLYFIN_TICKS_PER_SECOND;
 		if (videoRef.current) {
 			videoRef.current.currentTime = skipTo;
 			setCurrentTime(skipTo);

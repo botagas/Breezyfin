@@ -1,0 +1,38 @@
+.primaryButton,
+.trackSelectorPrimary {
+	--bf-button-fg: var(--bf-md-text-solid);
+	--bf-button-fg-hover: var(--bf-md-text-on-light);
+	--bf-button-fg-active: var(--bf-md-text-on-light);
+
+	:global(.bf-button) {
+		min-height: 2rem !important;
+		padding: 0 1rem !important;
+	}
+
+	:global(.client) {
+		font-size: 0.84em;
+		font-weight: 700;
+	}
+
+	.mdControlSurface(transparent; 1px solid var(--bf-md-control-border-strong); 999px);
+	.mdControlHoverSurface(var(--bf-md-text-solid));
+}
+
+.primaryButton {
+	:global(.bf-button .icon) {
+		font-size: 0.68rem;
+		width: 0.68rem;
+		height: 0.68rem;
+	}
+}
+
+.trackSelectorPrimary {
+	:global(.client) {
+		display: block !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		white-space: nowrap !important;
+		font-size: 0.84em !important;
+		font-weight: 700 !important;
+	}
+}

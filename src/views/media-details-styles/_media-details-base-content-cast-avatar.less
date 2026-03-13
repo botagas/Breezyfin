@@ -1,0 +1,65 @@
+.castAvatar {
+	position: relative;
+	width: 10rem;
+	height: 10rem;
+	border-radius: 50%;
+	overflow: hidden;
+	margin: 0 auto 8px;
+	background: var(--bf-theme-card-filter-chip-bg);
+	border: 1px solid var(--bf-theme-card-border-rest);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.castAvatarImage {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	opacity: 0;
+	filter: blur(0.75rem);
+	transition: opacity 180ms ease, filter 220ms ease;
+}
+
+.castAvatarImageLoaded {
+	opacity: 1;
+	filter: none;
+}
+
+.castAvatarLoadingHint {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background:
+		radial-gradient(circle at 34% 30%, rgba(214, 234, 255, 0.34), rgba(113, 156, 206, 0.18) 40%, rgba(20, 34, 51, 0.12) 78%),
+		linear-gradient(155deg, rgba(65, 84, 113, 0.38), rgba(34, 48, 71, 0.26));
+	filter: blur(0.7rem);
+	opacity: 0.75;
+	transition: opacity 220ms ease;
+	pointer-events: none;
+}
+
+.castAvatarLoadingHintHidden {
+	opacity: 0;
+}
+
+.castInitialFallback {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.6em;
+	font-weight: 700;
+	color: var(--bf-theme-text-primary);
+}
+
+.castInitial {
+	font-size: 1.6em;
+	font-weight: 700;
+	color: var(--bf-md-text-solid);
+}

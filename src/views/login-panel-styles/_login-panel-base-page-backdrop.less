@@ -1,0 +1,55 @@
+.backdropLayer {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.backdropImage {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transform: scale(1.04);
+	transition: opacity 500ms ease;
+}
+
+.backdropImageHidden {
+	opacity: 0 !important;
+}
+
+.backdropLoadingHint {
+	z-index: 0;
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.14) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.13) 0%, rgba(0, 216, 195, 0) 60%),
+		linear-gradient(160deg, rgba(19, 23, 34, 0.5) 0%, rgba(15, 18, 26, 0.5) 45%, rgba(16, 16, 16, 0.5) 100%);
+}
+
+.backdropImageCurrent {
+	opacity: 0.5;
+}
+
+.backdropImageIncoming {
+	opacity: 0.5;
+	animation: login-backdrop-fade-in 500ms ease both;
+}
+
+.backdropImageOutgoing {
+	opacity: 0.5;
+	animation: login-backdrop-fade-out 500ms ease both;
+}
+
+.backdropGradient {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(
+			to bottom,
+			var(--bf-login-backdrop-grad-top),
+			var(--bf-login-backdrop-grad-mid) 72%,
+			var(--bf-login-backdrop-grad-bottom)
+		),
+		radial-gradient(130% 120% at 50% 0%, var(--bf-login-backdrop-radial), rgba(17, 47, 74, 0) 65%);
+}

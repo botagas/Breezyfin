@@ -6,6 +6,7 @@ import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {KeyCodes} from '../utils/keyCodes';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
@@ -47,6 +48,8 @@ const LibraryPanel = ({
 	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const activeLibraryId = library?.Id || null;
+	const activeLibraryCollectionType = library?.CollectionType || null;
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -67,15 +70,15 @@ const LibraryPanel = ({
 		requireCacheKey: true
 	});
 
-	const getItemTypesForLibrary = useCallback((libraryValue) => {
-		if (!libraryValue) return undefined;
-		if (libraryValue.CollectionType === 'movies') return ['Movie'];
-		if (libraryValue.CollectionType === 'tvshows') return ['Series'];
+	const getItemTypesForLibrary = useCallback((collectionType) => {
+		if (!collectionType) return undefined;
+		if (collectionType === 'movies') return ['Movie'];
+		if (collectionType === 'tvshows') return ['Series'];
 		return undefined;
 	}, []);
 
 	const loadNextPage = useCallback(async () => {
-		if (!library || loading || !hasMore || loadingMoreRef.current) return;
+		if (!activeLibraryId || loading || !hasMore || loadingMoreRef.current) return;
 
 		loadingMoreRef.current = true;
 		setLoadingMore(true);
@@ -84,7 +87,7 @@ const LibraryPanel = ({
 
 		try {
 			const nextBatch = await jellyfinService.getLibraryItems(
-				library.Id,
+				activeLibraryId,
 				itemTypes,
 				LIBRARY_PAGE_SIZE,
 				nextStartIndex
@@ -114,13 +117,13 @@ const LibraryPanel = ({
 			}
 			loadingMoreRef.current = false;
 		}
-	}, [hasMore, library, loading]);
+	}, [activeLibraryId, hasMore, loading]);
 
 	const loadLibraryItems = useCallback(async () => {
-		if (!library) return;
+		if (!activeLibraryId) return;
 		const requestId = requestIdRef.current + 1;
 		requestIdRef.current = requestId;
-		const itemTypes = getItemTypesForLibrary(library);
+		const itemTypes = getItemTypesForLibrary(activeLibraryCollectionType);
 		paginationRef.current = { nextStartIndex: 0, itemTypes };
 		loadingMoreRef.current = false;
 		setLoading(true);
@@ -129,7 +132,7 @@ const LibraryPanel = ({
 		setHasMore(false);
 		try {
 			const firstBatch = await jellyfinService.getLibraryItems(
-				library.Id,
+				activeLibraryId,
 				itemTypes,
 				LIBRARY_PAGE_SIZE,
 				0
@@ -147,13 +150,13 @@ const LibraryPanel = ({
 				setLoading(false);
 			}
 		}
-	}, [getItemTypesForLibrary, library]);
+	}, [activeLibraryCollectionType, activeLibraryId, getItemTypesForLibrary]);
 
 	useEffect(() => {
-		if (library) {
+		if (activeLibraryId) {
 			loadLibraryItems();
 		}
-	}, [library, loadLibraryItems]);
+	}, [activeLibraryId, loadLibraryItems]);
 
 	const handleGridCardClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
@@ -223,7 +226,7 @@ const LibraryPanel = ({
 				<Header title={library?.Name || 'Library'} />
 				{topToolbar}
 				<div className={css.loading}>
-					<Spinner />
+					<BreezyLoadingOverlay />
 				</div>
 			</Panel>
 		);
@@ -241,35 +244,40 @@ const LibraryPanel = ({
 				>
 					<div ref={gridRef}>
 						<LibraryGridSpotlightContainer className={css.gridContainer} spotlightId="library-grid">
-							{items.map((item, index) => (
-								<PosterMediaCard
-									key={item.Id}
-									itemId={item.Id}
-									data-item-index={index}
-									className={css.gridCard}
-									imageClassName={css.cardImage}
-									placeholderClassName={css.placeholder}
-									usePlaceholderClassWhenNoImage
-									imageUrl={getPosterCardImageUrl(item, {includeBackdrop: true, includeSeriesFallback: false}) || ''}
-									title={item.Name}
-									subtitle={item.ProductionYear ? String(item.ProductionYear) : ''}
-									titleClassName={css.cardTitle}
-									subtitleClassName={css.cardSubtitle}
-									onClick={handleGridCardClick}
-									onKeyDown={handleGridCardKeyDown}
-									onFocus={handleGridCardFocus}
-									overlayContent={(
-										<MediaCardStatusOverlay
-											showWatched={getUnwatchedCount(item) !== null && hasStartedWatching(item)}
-											watchedContent={getUnwatchedCount(item) === 0 ? '\u2713' : getUnwatchedCount(item)}
-											watchedClassName={css.progressBadge}
-											progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
-											progressBarClassName={css.progressBar}
-											progressClassName={css.progress}
-										/>
-									)}
-								/>
-						))}
+							{items.map((item, index) => {
+								const unwatchedCount = getUnwatchedCount(item);
+								const showWatchStatus = unwatchedCount !== null && hasStartedWatching(item);
+								const isWatchComplete = showWatchStatus && unwatchedCount === 0;
+								return (
+									<PosterMediaCard
+										key={item.Id}
+										itemId={item.Id}
+										data-item-index={index}
+										className={css.gridCard}
+										imageClassName={css.cardImage}
+										placeholderClassName={css.placeholder}
+										usePlaceholderClassWhenNoImage
+										imageUrl={getPosterCardImageUrl(item, {includeBackdrop: true, includeSeriesFallback: false}) || ''}
+										title={item.Name}
+										subtitle={item.ProductionYear ? String(item.ProductionYear) : ''}
+										titleClassName={css.cardTitle}
+										subtitleClassName={css.cardSubtitle}
+										onClick={handleGridCardClick}
+										onKeyDown={handleGridCardKeyDown}
+										onFocus={handleGridCardFocus}
+										overlayContent={(
+											<MediaCardStatusOverlay
+												showWatched={showWatchStatus}
+												watchedContent={isWatchComplete ? '\u2713' : unwatchedCount}
+												watchedClassName={isWatchComplete ? css.watchedBadge : css.progressBadge}
+												progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
+												progressBarClassName={css.progressBar}
+												progressClassName={css.progress}
+											/>
+										)}
+									/>
+								);
+							})}
 						{loadingMore && (
 							<div className={css.loadingMore}>
 								<Spinner size="small" />

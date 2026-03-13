@@ -1,0 +1,56 @@
+.buttons {
+	display: flex;
+	gap: 1rem;
+}
+
+.heroBannerButton {
+	--bf-button-fg: var(--bf-hero-text-solid);
+	--bf-button-fg-hover: var(--bf-hero-text-on-light);
+	--bf-button-fg-active: var(--bf-hero-text-on-light);
+
+	color: var(--bf-hero-text-solid) !important;
+	font-size: 0.84em !important;
+	font-weight: 700 !important;
+	min-height: 2rem !important;
+	padding: 0 1rem !important;
+	margin: 0 !important;
+
+	:global(.icon) {
+		font-size: 0.68rem !important;
+		width: 0.68rem !important;
+		height: 0.68rem !important;
+		margin-right: 0 !important;
+	}
+
+	:global(.bf-button-bg) {
+		background: transparent !important;
+		border: 1px solid var(--bf-hero-button-border) !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg) {
+		background: var(--bf-hero-text-solid) !important;
+		border-color: var(--bf-hero-text-solid) !important;
+	}
+
+	&:hover,
+	&:hover *,
+	&:focus,
+	&:focus * {
+		color: var(--bf-hero-text-on-light) !important;
+	}
+
+	:global(.client) {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		gap: 0.45rem !important;
+		padding: 0 !important;
+	}
+
+	:global(.marquee) {
+		text-align: center !important;
+	}
+}

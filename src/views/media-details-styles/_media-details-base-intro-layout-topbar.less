@@ -1,0 +1,60 @@
+.detailsTopBar {
+	--bf-details-topbar-height: 2.35rem;
+	--bf-details-topbar-gap: 0.65rem;
+	position: relative;
+	top: auto;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: var(--bf-details-topbar-gap);
+	min-height: var(--bf-details-topbar-height);
+	padding: 0.22rem 0;
+	margin-bottom: 0;
+}
+
+.detailsBackButton {
+	--bf-button-fg: var(--bf-md-text-solid);
+	--bf-button-fg-hover: var(--bf-md-text-solid);
+	--bf-button-fg-active: var(--bf-md-text-solid);
+	min-width: 2.35rem !important;
+	width: 2.35rem !important;
+	height: 2.35rem !important;
+	padding: 0 !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	border: none !important;
+
+	.mdControlSurface(transparent; 1px solid transparent; 999px);
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-md-control-bg-hover) !important;
+		border-color: var(--bf-md-control-border-hover) !important;
+	}
+
+	&:active :global(.bf-button-bg),
+	&:active :global(.bg) {
+		background: var(--bf-md-control-bg-active) !important;
+		border-color: var(--bf-md-control-border-active) !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		transition: background 180ms ease, border-color 180ms ease, transform 180ms ease !important;
+	}
+}
+
+.detailsTopTitle {
+	font-size: 0.98em;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--bf-md-text-title);
+	margin: 0 !important;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

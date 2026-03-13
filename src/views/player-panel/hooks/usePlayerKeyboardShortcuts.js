@@ -4,8 +4,15 @@ import {KeyCodes} from '../../../utils/keyCodes';
 const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
 const SEEK_STEP_SECONDS = 15;
 const PLAY_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE, KeyCodes.MEDIA_PLAY_PAUSE];
+const PLAY_TOGGLE_POPUP_EXCLUDED_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE];
 const PLAY_ONLY_KEYS = [KeyCodes.PLAY];
 const PAUSE_KEYS = [KeyCodes.PAUSE];
+const POPUP_FOCUS_SCOPE_SELECTOR = '[data-popup-focus-scope="true"]';
+
+const isNodeInsidePopupFocusScope = (node) => {
+	if (!node || typeof node.closest !== 'function') return false;
+	return Boolean(node.closest(POPUP_FOCUS_SCOPE_SELECTOR));
+};
 
 export const usePlayerKeyboardShortcuts = ({
 	isActive,
@@ -95,6 +102,18 @@ export const usePlayerKeyboardShortcuts = ({
 			}
 
 			if (PLAY_KEYS.includes(code)) {
+				if ((showAudioPopup || showSubtitlePopup) && PLAY_TOGGLE_POPUP_EXCLUDED_KEYS.includes(code)) {
+					const eventTarget = event?.target;
+					const focusedElementInDocument = document.activeElement;
+					const popupScopeFocused =
+						isNodeInsidePopupFocusScope(eventTarget) ||
+						isNodeInsidePopupFocusScope(focusedElementInDocument);
+					// Keep ENTER/OK/SPACE bound to popup choices only while a popup is open.
+					if (!popupScopeFocused) {
+						consumeEvent();
+					}
+					return;
+				}
 				// Avoid double-trigger when an actual button is focused
 				const activeElement = document.activeElement;
 				const isControlFocused = controlsRef.current && activeElement && controlsRef.current.contains(activeElement);

@@ -1,0 +1,81 @@
+.episodeActions {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	flex-shrink: 0;
+}
+
+.episodeActionsRow {
+	flex-direction: row;
+	align-items: center;
+}
+
+.episodeInfoButton,
+.episodeFavoriteButton,
+.episodeWatchedButton {
+	.icon-circle-button-dimensions(3rem);
+	padding: 0 !important;
+
+	:global(.Icon),
+	:global(.icon) {
+		font-size: 1rem !important;
+		width: 1rem !important;
+		height: 1rem !important;
+		color: var(--bf-md-overlay-control-fg) !important;
+	}
+
+	.mdControlSurface(var(--bf-md-overlay-control-bg); 1px solid var(--bf-md-overlay-control-border); 999px);
+	.mdControlHoverSurface(var(--bf-md-overlay-control-hover-bg));
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		border-color: var(--bf-md-overlay-control-hover-border) !important;
+	}
+
+	&:hover :global(.Icon),
+	&:hover :global(.icon),
+	&:focus :global(.Icon),
+	&:focus :global(.icon),
+	&:global(.spottable):focus :global(.Icon),
+	&:global(.spottable):focus :global(.icon) {
+		color: rgba(var(--bf-theme-accent-rgb), 0.98) !important;
+	}
+}
+
+.episodeFavoriteButtonActive :global(.bf-button-bg),
+.episodeFavoriteButtonActive :global(.bg) {
+	background: rgba(var(--bf-theme-favorite-rgb), 0.14) !important;
+	border-color: rgba(var(--bf-theme-favorite-rgb), 0.5) !important;
+}
+
+.episodeFavoriteButtonActive:hover :global(.bf-button-bg),
+.episodeFavoriteButtonActive:focus :global(.bf-button-bg),
+.episodeFavoriteButtonActive:global(.spottable):focus :global(.bf-button-bg),
+.episodeFavoriteButtonActive:hover :global(.bg),
+.episodeFavoriteButtonActive:focus :global(.bg),
+.episodeFavoriteButtonActive:global(.spottable):focus :global(.bg) {
+	background: rgba(var(--bf-theme-favorite-rgb), 0.28) !important;
+	border-color: rgba(var(--bf-theme-favorite-rgb), 0.58) !important;
+}
+
+.episodeWatchedButtonActive :global(.bf-button-bg),
+.episodeWatchedButtonActive :global(.bg) {
+	background: rgba(var(--bf-theme-success-rgb), 0.14) !important;
+	border-color: rgba(var(--bf-theme-success-rgb), 0.5) !important;
+}
+
+.episodeWatchedButtonActive:hover :global(.bf-button-bg),
+.episodeWatchedButtonActive:focus :global(.bf-button-bg),
+.episodeWatchedButtonActive:global(.spottable):focus :global(.bf-button-bg),
+.episodeWatchedButtonActive:hover :global(.bg),
+.episodeWatchedButtonActive:focus :global(.bg),
+.episodeWatchedButtonActive:global(.spottable):focus :global(.bg) {
+	background: rgba(var(--bf-theme-success-rgb), 0.28) !important;
+	border-color: rgba(var(--bf-theme-success-rgb), 0.58) !important;
+}

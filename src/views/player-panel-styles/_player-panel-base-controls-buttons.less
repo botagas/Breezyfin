@@ -1,0 +1,54 @@
+.playerControlButtonTone() {
+	--bf-button-fg: var(--bf-theme-text-primary);
+	--bf-button-fg-hover: var(--bf-theme-accent);
+	--bf-button-fg-active: var(--bf-theme-accent);
+	.playerButtonShell();
+	.playerButtonSurface(transparent; none);
+	.playerButtonHover(var(--bf-theme-tab-hover-bg));
+	.playerButtonActive(var(--bf-theme-player-control-active-bg));
+}
+
+.playerBackButton {
+	.playerControlButtonTone();
+}
+
+.playerDebugToggleButton {
+	.playerControlButtonTone();
+	min-width: auto !important;
+	height: 2.5rem !important;
+	padding: 0 0.9rem !important;
+	font-size: 0.78rem !important;
+	letter-spacing: 0.02em;
+}
+
+.playerControlButton {
+	--bf-player-control-size: 3.2rem;
+	.playerControlButtonTone();
+	min-width: var(--bf-player-control-size) !important;
+	width: var(--bf-player-control-size) !important;
+	height: var(--bf-player-control-size) !important;
+	flex: 0 0 var(--bf-player-control-size);
+	padding: 0 !important;
+
+	:global(.bf-button-bg),
+	:global(.bg),
+	:global(.client) {
+		width: var(--bf-player-control-size) !important;
+		height: var(--bf-player-control-size) !important;
+		min-width: var(--bf-player-control-size) !important;
+		min-height: var(--bf-player-control-size) !important;
+	}
+
+	:global(.client) {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 !important;
+	}
+
+	:global(.Icon),
+	:global(.icon) {
+		font-size: 1.3rem !important;
+		line-height: 1 !important;
+	}
+}

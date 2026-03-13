@@ -1,0 +1,96 @@
+.seasonCard {
+	--seasonCardBorderColor: var(--bf-theme-card-border-rest);
+	flex-shrink: 0;
+	width: 15rem;
+	cursor: pointer;
+	transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+	border-radius: 1rem;
+	overflow: hidden;
+	background: linear-gradient(160deg, rgba(32, 41, 57, 0.82) 0%, rgba(17, 24, 36, 0.78) 100%);
+	border: none;
+	position: relative;
+	outline: none;
+
+	&::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		border: 1px solid var(--seasonCardBorderColor);
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	&:hover {
+		--seasonCardBorderColor: rgba(188, 213, 247, 0.7);
+		transform: translateY(-2px);
+		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
+		background: linear-gradient(160deg, rgba(44, 58, 79, 0.86) 0%, rgba(25, 35, 51, 0.83) 100%);
+	}
+
+	&:global(.spottable):focus,
+	&:focus {
+		transform: translateY(-2px);
+		box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
+		--seasonCardBorderColor: rgba(212, 226, 255, 0.9);
+		background: linear-gradient(160deg, rgba(48, 64, 88, 0.88) 0%, rgba(28, 40, 60, 0.84) 100%);
+	}
+
+	&:hover .seasonPosterWrap::before,
+	&:global(.spottable):focus .seasonPosterWrap::before,
+	&:focus .seasonPosterWrap::before {
+		opacity: 1;
+	}
+
+	&:hover .seasonPoster,
+	&:global(.spottable):focus .seasonPoster,
+	&:focus .seasonPoster {
+		transform: none;
+		filter: none;
+	}
+
+	&.selected {
+		--seasonCardBorderColor: rgba(169, 206, 255, 0.95);
+		box-shadow: 0 6px 14px rgba(57, 120, 203, 0.25);
+	}
+}
+
+.seasonCardNoImage {
+	min-height: 4.8rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	padding: 0.2rem 0 0.12rem;
+
+	.seasonName {
+		padding: 0.38rem 0.92rem 0.2rem;
+		min-height: 0;
+	}
+
+	.episodeCount {
+		padding: 0 0.92rem 0.28rem;
+	}
+}
+
+.seasonName {
+	margin: 0;
+	padding: 12px 10px 6px 10px;
+	font-weight: 600;
+	font-size: 0.95em;
+	color: var(--bf-md-text-primary);
+	word-wrap: break-word;
+	line-height: 1.25;
+	text-align: center;
+	min-height: 2.6em;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.episodeCount {
+	margin: 0;
+	padding: 0 10px 12px 10px;
+	font-size: 0.85em;
+	color: var(--bf-md-text-dim);
+	text-align: center;
+}

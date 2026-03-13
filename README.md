@@ -18,18 +18,17 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 ## Current capabilities
 
 > [!NOTE]
-> The app has undergone major refactoring efforts, so please do report any issues if you encounter any.
->
-> [Read more in the v0.1.5 announcement](https://github.com/botagas/Breezyfin/discussions/6)
+> The app has undergone major refactoring efforts. If you upgrade from an older build, run **Wipe Cache and Reload (Keep Login)** once, and report issues you encounter.
 
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
 - TV-first navigation tuned for LG Magic Remote (5-way and pointer flows)
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
-- Player with dynamic-range-aware direct play/direct stream/transcode fallback paths (DV -> HDR -> SDR)
-- Subtitle/audio compatibility fallbacks for webOS playback paths, with optional subtitle burn-in policy
-- Built-in runtime diagnostics for playback validation and troubleshooting
+- Playback that adapts to TV/media compatibility (Direct Play / Direct Stream / Transcode, DV -> HDR -> SDR)
+- Subtitle and audio handling that prioritizes quality while applying compatibility fallbacks when needed
+- Adaptive image loading (WebP when supported, with automatic fallback on load failure)
+- Built-in diagnostics, logs, and cache tools for easier troubleshooting
 
 ## Install on TV (IPK)
 
@@ -38,16 +37,19 @@ Watch repository releases for prebuilt IPK artifacts.
 1. Download the latest IPK from Releases.
 2. Install it with webOS Dev Manager (or your preferred webOS install tool).
 
-## Install on TV (Homebrew dev repo)
+## Install on TV via Homebrew Channel
 
-Breezyfin is not yet listed in the main Homebrew catalog, but you can add the dev feed now.
+Breezyfin is listed in the main Homebrew catalog. You can install it from the official catalog.
 
+You may also install the app using the `develop` branch:
 1. Open Homebrew Channel on your TV.
 2. Go to Repositories / Manage Repositories.
 3. Add this repo URL:
 `https://raw.githubusercontent.com/botagas/Breezyfin/develop/homebrew-dev.json`
 4. Refresh repositories.
 5. Install `Breezyfin` from the newly added source.
+
+Beware, `develop` may include breaking changes.
 
 ## Local development
 
@@ -66,78 +68,29 @@ npm run serve
 ```
 Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
-## Developer guidelines
+## Developer docs
 
-Start with these principles:
-- Reuse existing hooks/components before adding new abstractions.
-- Keep panel logic modular by using panel-local `components/`, `hooks/`, and `utils/`.
-- Keep large behavior flows in dedicated panel hooks (e.g. player load/skip/seek/commands, media details focus/actions).
-- Keep `jellyfinService` as a thin facade; place domain logic in `src/services/jellyfin/*`.
-- Keep styling token-driven and consistent across themes.
-- Reuse shared status badge primitives for watched/favorite/count states instead of panel-specific badge variants.
-- For webOS 6 / legacy compat, prefer concrete dimensions in compat files when implicit sizing causes unstable layout.
-- Keep comments minimal; document only non-obvious constraints/tradeoffs.
+For implementation and workflow details, use:
 
-For the full development guide (shared building blocks, panel patterns, style references, and conventions), see:
-- [`DEVELOPING.md`](./DEVELOPING.md)
-- [`HELPERS.md`](./HELPERS.md)
-- [`THEMES.md`](./THEMES.md)
-- [`COMPONENTS.md`](./COMPONENTS.md)
-- [`VIEWS.md`](./VIEWS.md)
-- [`TODOS.md`](./TODOS.md)
+- [`DEVELOPING.md`](./DEVELOPING.md) for architecture conventions, decomposition rules, shared hooks/utilities, and style patterns
+- [`HELPERS.md`](./HELPERS.md), [`THEMES.md`](./THEMES.md), [`COMPONENTS.md`](./COMPONENTS.md), [`VIEWS.md`](./VIEWS.md) for focused references
+- [`CHECKS.md`](./CHECKS.md) for recurring validation and pre-release verification
+- [`TODOS.md`](./TODOS.md) for prioritized planned work
 
-## Debug flags
+## Diagnostics and debug
 
-The app supports build-time/runtime debug behavior through environment flags:
+Primary diagnostics are runtime toggles under **Settings > Diagnostics** (including the **Device Playback Capabilities** section).
+This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics (for example Force DV and fMP4-HLS preference toggles), logs, and cache wipe actions.
 
-Defaults:
+Build-time log capture flags:
 
-- In non-production builds, Style Debug features are enabled by default.
-- Persistent app logging follows the same default as Style Debug.
-- In production builds, both are off unless explicitly enabled by flags.
-
-Flags:
-
-- `REACT_APP_ENABLE_STYLE_DEBUG=1`
-  - Forces Styling Debug panel/features on.
-- `REACT_APP_DISABLE_STYLE_DEBUG=1`
-  - Forces Styling Debug panel/features off.
-- `REACT_APP_ENABLE_PERSISTENT_LOGS=1`
-  - Forces persistent app log capture on (stored in `localStorage`).
-- `REACT_APP_DISABLE_PERSISTENT_LOGS=1`
-  - Forces persistent app log capture off.
-
-Examples:
+- `REACT_APP_ENABLE_PERSISTENT_LOGS=1` to force persistent app logs on
+- `REACT_APP_DISABLE_PERSISTENT_LOGS=1` to force persistent app logs off
 
 ```sh
 # Development server with persistent logs enabled
 REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run serve
-
-# Production build with Style Debug enabled and persistent logs on
-REACT_APP_ENABLE_STYLE_DEBUG=1 REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run pack-p
 ```
-
-Media Details focus tracing (runtime toggle):
-
-- Query param: `?bfFocusDebug=1`
-- Or from browser console:
-
-```js
-localStorage.setItem('breezyfinFocusDebug', '1');
-```
-
-## Runtime diagnostics (Settings panel)
-
-Diagnostics currently include:
-
-- Performance Overlay (`FPS`, `Input`, `Mode`)
-- Playback toast with active dynamic range / play method (for quick validation)
-- Device playback capability summary in Settings (DV/HDR/codec/audio support snapshot + probe source/timestamp)
-- Configurable capability probe refresh period (default 30 days) plus manual "Refresh now" action
-- Relaxed Playback Profile toggle (debug-only visibility)
-- Styling Debug Panel shortcut (debug-only visibility)
-- Logs viewer and clear action
-- Wipe App Cache (clears local/session storage, cache storage, IndexedDB, unregisters service workers, then reloads)
 
 ## Production build
 
@@ -146,23 +99,10 @@ npm run pack-p
 ```
 Output will be in the `dist/` folder.
 
-## Code quality audits
+## Roadmap and validation
 
-- Dead CSS module audit: `npm run audit:styles`
-- Mixed JS/LESS duplicate snippet audit: `npm run audit:duplicates`
-
-## Possible improvements
-
-- Stabilize playback across edge-case media by improving server capability checks and fallback messaging.
-- Expand hardware / software compatibility by testing across multiple webOS versions and TV chipsets.
-- Continue reducing remote-input latency and focus jitter in dense UI views.
-- Improve consistency of themed components and shared style tokens across all panels.
-- Expand diagnostics with actionable playback telemetry export for issue reports.
-- Add automated test coverage for panel navigation, playback recovery paths, and settings persistence.
-- Add CI quality gates for lint/test/build plus release artifact checks.
-- Improve accessibility/readability options (larger text mode, stronger contrast presets, clearer focus indicators).
-
-See [`TODOS.md`](./TODOS.md) for the prioritized implementation backlog.
+Planned work is tracked in [`TODOS.md`](./TODOS.md).
+Recurring validation and release checks are tracked in [`CHECKS.md`](./CHECKS.md).
 
 ## Release automation
 
@@ -181,4 +121,6 @@ Pull requests and issues are welcome! Please follow the code style and add tests
 
 - Built with [Enact Sandstone](https://github.com/enactjs/sandstone)
 - Uses [Jellyfin SDK](https://github.com/jellyfin/sdk)
-- AI-assisted development was used; please review changes carefully and report regressions/issues.
+
+## Disclaimer
+- A large set of the latest code is written with AI-assistance. That includes the web interface and underlying systems. While I have learnt and had experience with Python, and have some basic knowledge in HTML/CSS, I am far from being highly proficient. As my time is very limited, I'm often finding myself guiding the AI to do various tasks, verifying and testing the changes, and trying to prevent it from conquering the world. As such, please be aware of the state of the code and feel free to point out areas of improvement.

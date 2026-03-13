@@ -1,0 +1,39 @@
+.castToggleRow {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	width: fit-content;
+	cursor: pointer;
+	user-select: none;
+	outline: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.castToggleLabel {
+	color: var(--bf-theme-text-primary) !important;
+	transition: color 140ms ease, opacity 140ms ease;
+}
+
+.castToggleIcon {
+	font-size: 1.25rem !important;
+	width: 0.95rem !important;
+	height: 0.95rem !important;
+	line-height: 0.95rem !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	overflow: visible !important;
+	color: var(--bf-theme-text-primary) !important;
+	opacity: 0.9;
+	transition: color 140ms ease, opacity 140ms ease;
+}
+
+.castToggleRow:hover .castToggleLabel,
+.castToggleRow:focus .castToggleLabel,
+.castToggleRow:global(.spottable):focus .castToggleLabel,
+.castToggleRow:hover .castToggleIcon,
+.castToggleRow:focus .castToggleIcon,
+.castToggleRow:global(.spottable):focus .castToggleIcon {
+	color: var(--bf-theme-text-primary) !important;
+	opacity: 1;
+}

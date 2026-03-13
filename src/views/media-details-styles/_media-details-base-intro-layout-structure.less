@@ -1,0 +1,92 @@
+.content {
+	--bf-md-content-top-padding: 1rem;
+	--bf-md-intro-top-gap: clamp(
+		0rem,
+		calc(var(--bf-md-hero-top-padding) - (var(--bf-md-intro-control-size) - 2rem)),
+		var(--bf-md-hero-top-padding)
+	);
+	padding: var(--bf-md-content-top-padding) 48px calc(120px + var(--bf-panel-content-bottom-padding)) 48px;
+	position: relative;
+	z-index: 2;
+}
+
+.firstSection {
+	--bf-md-intro-control-size: 4rem;
+	min-height: calc(100vh - var(--bf-md-content-top-padding));
+	max-height: calc(100vh - var(--bf-md-content-top-padding));
+	height: calc(100vh - var(--bf-md-content-top-padding));
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.firstSection .detailsHeadingStack {
+	flex: 0 0 auto;
+}
+
+.firstSection .introSection {
+	flex: 1 1 auto;
+	min-height: 0 !important;
+	max-height: none !important;
+	height: auto !important;
+}
+
+.detailsHeadingStack {
+	display: flex;
+	flex-direction: column;
+	gap: 0.62rem;
+	padding-top: 0.5rem;
+	margin-bottom: 1.15rem;
+	position: static;
+	top: auto;
+	z-index: 4;
+}
+
+.header {
+	margin-bottom: 1.25rem;
+}
+
+.introSection {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.introContent {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+}
+
+.introTopSpacer {
+	flex: 1 1 var(--bf-md-intro-top-gap);
+	min-height: 0;
+}
+
+.contentSection {
+	padding-top: 0.45rem;
+	min-height: calc(100vh - var(--bf-md-content-top-padding));
+}
+
+.pageHeader {
+	flex: 1 1 auto;
+	min-width: 0;
+	max-width: 60vw;
+	padding: 0 0 1rem;
+	margin-bottom: 0.75rem;
+}
+
+.episodeDetailsMode .introSection {
+	min-height: 0;
+}
+
+.pageHeaderTitle {
+	color: var(--bf-md-text-solid);
+	font-size: 1.875rem;
+	font-weight: 700;
+	line-height: 1.2;
+	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
+}

@@ -1,0 +1,41 @@
+.progressBar {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: var(--bf-theme-card-progress-track);
+	z-index: 3;
+}
+
+.progress {
+	height: 100%;
+	background: var(--bf-theme-card-progress-fill);
+	transition: width 0.3s ease;
+}
+
+.episodeBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-pill();
+	font-weight: 700;
+	font-size: 0.85em;
+	text-align: center;
+	padding: 0.35rem 0.5rem;
+}
+
+.progressBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-pill();
+	padding: 0.35rem 0.5rem;
+}
+
+.watchedBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-success();
+}

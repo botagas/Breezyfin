@@ -1,0 +1,69 @@
+.resultsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+	gap: 1.5rem;
+	padding: 0.75rem 4rem clamp(2rem, var(--bf-panel-content-bottom-padding), 4rem);
+	.panel-grid-performance();
+}
+
+.resultCard {
+	cursor: pointer;
+	.card-shell();
+	.card-focus-expand-reset();
+	position: relative;
+
+	&:hover,
+	&:global(.spottable):focus {
+		.card-focus-lift();
+
+		.cardImage {
+			.card-image-focus();
+		}
+	}
+}
+
+.cardImage {
+	.card-image-shell(2/3);
+	.card-image-overlays();
+
+	&.placeholder {
+		.card-placeholder-surface();
+
+		&::after {
+			.card-placeholder-no-image-label();
+		}
+	}
+}
+
+.placeholderInner {
+	.card-placeholder-inner-content();
+}
+
+.watchedBadge {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	.status-badge-success();
+}
+
+.progressBar {
+	.card-progress-bar-surface();
+}
+
+.progress {
+	.card-progress-bar-fill();
+}
+
+.cardInfo {
+	padding: 0.5rem 0.2rem 0;
+}
+
+.cardTitle {
+	margin: 0.58rem 0 0 0;
+	.card-title-text();
+}
+
+.cardSubtitle {
+	margin-top: 0.28rem;
+	.card-subtitle-text();
+}

@@ -49,7 +49,9 @@ export const usePlayerLifecycleEffects = ({
 			setNextEpisodePromptDismissed(false);
 			nextEpisodePromptStartTicksRef.current = null;
 			loadVideo();
-			getMediaSegmentsForItem(item.Id).then(setMediaSegments).catch(() => setMediaSegments([]));
+			getMediaSegmentsForItem(item.Id, {
+				itemRunTimeTicks: item.RunTimeTicks
+			}).then(setMediaSegments).catch(() => setMediaSegments([]));
 		}
 		return () => {
 			handleStop();

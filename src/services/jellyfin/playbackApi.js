@@ -1,168 +1,355 @@
 import { getPlaystateApi } from '@jellyfin/sdk/lib/utils/api/playstate-api';
 import {
 	determinePlayMethod,
-	findBestCompatibleAudioStreamIndex,
-	getAudioStreams,
-	getDefaultAudioStreamIndex,
 	getMediaSourceDynamicRangeInfo,
 	getSubtitleStreamByIndex,
-	isSupportedAudioCodec,
 	reorderMediaSources,
 	selectMediaSource,
 	shouldTranscodeForSubtitleSelection,
 	toInteger
 } from './playbackSelection';
 import {buildPlaybackRequestContext} from './playbackProfileBuilder';
+import {fetchPlaybackInfo, buildPlaystatePayload} from './playback-api/network';
+import {buildPlaybackRequestDebug} from './playback-api/requestDebug';
+import {
+	buildForceDolbyVisionPayload,
+	buildPayloadWithoutMkvDirectPlay,
+	hasDolbyVisionMediaSource,
+	isForceDolbyVisionAudioOnlyTranscode,
+	summarizeMediaSourceRanges,
+	usesMkvContainer
+} from './playback-api/dolbyVision';
+import {attachPlaybackInfoMetadata} from './playback-api/metadata';
+import {
+	attemptDefaultAudioFallback,
+	attemptDirectAudioCompatibilityProbe,
+	attemptDolbyVisionMkvCompatibilityRetry
+} from './playback-api/sourceNegotiation';
 import {getDynamicRangeDisplayLabel} from '../../utils/playbackDynamicRange';
+import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
 
-const fetchPlaybackInfo = async (service, itemId, payload) => {
-	const response = await fetch(`${service.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${service.userId}`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Emby-Token': service.accessToken
-		},
-		body: JSON.stringify(payload)
-	});
-	if (!response.ok) {
-		service._handleAuthFailureStatus(response.status);
-		const errorText = await response.text();
-		console.error('PlaybackInfo error response:', errorText);
-		const compactError = String(errorText || '').replace(/\s+/g, ' ').trim().slice(0, 280);
-		throw new Error(`HTTP ${response.status}: ${response.statusText}${compactError ? ` - ${compactError}` : ''}`);
-	}
-	return response.json();
+const DYNAMIC_RANGE_PRIORITY = {
+	DV: 4,
+	HDR10_PLUS: 3,
+	HDR10: 2,
+	HLG: 2,
+	SDR: 1
+};
+const HDR_DYNAMIC_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
+
+const getDynamicRangePriority = (mediaSource) => {
+	const rangeId = getMediaSourceDynamicRangeInfo(mediaSource)?.id || 'SDR';
+	return DYNAMIC_RANGE_PRIORITY[rangeId] || 0;
 };
 
-const buildPlaystatePayload = (basePayload, session = {}) => {
-	const payload = {
-		...basePayload,
-		PlayMethod: session.playMethod || basePayload.PlayMethod || 'DirectStream'
-	};
-	if (session.playSessionId) payload.PlaySessionId = session.playSessionId;
-	if (session.mediaSourceId) payload.MediaSourceId = session.mediaSourceId;
-	if (Number.isInteger(session.audioStreamIndex)) payload.AudioStreamIndex = session.audioStreamIndex;
-	if (session.subtitleStreamIndex === -1 || Number.isInteger(session.subtitleStreamIndex)) {
-		payload.SubtitleStreamIndex = session.subtitleStreamIndex;
+const selectPreferredSourceFromPlaybackInfo = (data, createSourceSelectionOptions) => {
+	if (!data?.MediaSources?.length) {
+		return {data, selectedSource: null, selection: {index: -1, reason: 'none'}};
 	}
-	return payload;
-};
-
-const attachPlaybackInfoMetadata = (data, {
-	playMethod,
-	selectedSource,
-	selectedAudioStreamIndex,
-	adjustments,
-	dynamicRange,
-	dynamicRangeCap,
-	subtitlePolicy
-}) => {
-	data.__breezyfin = {
-		playMethod,
-		selectedMediaSourceId: selectedSource?.Id || null,
-		selectedAudioStreamIndex,
-		adjustments,
-		dynamicRange,
-		dynamicRangeCap,
-		subtitlePolicy
+	const selection = selectMediaSource(data.MediaSources, createSourceSelectionOptions());
+	if (selection.index > 0) {
+		data.MediaSources = reorderMediaSources(data.MediaSources, selection.index);
+	}
+	return {
+		data,
+		selectedSource: data.MediaSources[0] || null,
+		selection
 	};
-	return data;
 };
 
 export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 	try {
-			const {
-				payload,
-				forceTranscoding,
-				enableTranscoding,
-				requestedAudioStreamIndex: initialRequestedAudioStreamIndex,
-				forceSubtitleBurnIn,
-				dynamicRangeCap
-			} = buildPlaybackRequestContext(options);
-			let requestedAudioStreamIndex = initialRequestedAudioStreamIndex;
-
-		let data = await fetchPlaybackInfo(service, itemId, payload);
+		const {
+			payload,
+			forceTranscoding,
+			enableTranscoding,
+			requestedAudioStreamIndex: initialRequestedAudioStreamIndex,
+			forceSubtitleBurnIn,
+			enableSubtitleBurnIn,
+			allowSubtitleBurnInOnHdr,
+			subtitleBurnInTextCodecs,
+			dynamicRangeCap
+		} = buildPlaybackRequestContext(options);
+		let requestedAudioStreamIndex = initialRequestedAudioStreamIndex;
+		let activePayload = payload;
+		const runtimePlaybackCapabilities = getRuntimePlatformCapabilities()?.playback || {};
+		const forceDolbyVision = options.forceDolbyVision === true;
+		if (forceDolbyVision && runtimePlaybackCapabilities.supportsDolbyVision !== true) {
+			throw new Error('Force DV is enabled, but this TV does not report Dolby Vision support.');
+		}
+		const avoidDolbyVision = !forceDolbyVision && options.avoidDolbyVision === true;
+			const legacyPreferFmp4Preference = typeof options.preferDolbyVisionMp4 === 'boolean'
+				? options.preferDolbyVisionMp4
+				: undefined;
+			const hasEnableFmp4Preference = typeof options.enableFmp4HlsContainerPreference === 'boolean';
+			const enableFmp4HlsContainerPreference = hasEnableFmp4Preference
+				? options.enableFmp4HlsContainerPreference === true
+				: (legacyPreferFmp4Preference ?? false);
+		const forceFmp4HlsContainerPreference =
+			options.forceFmp4HlsContainerPreference === true &&
+			enableFmp4HlsContainerPreference === true;
+		const canUseFmp4HlsContainerPreference =
+			!forceTranscoding &&
+			runtimePlaybackCapabilities.supportsDolbyVision === true &&
+			!forceDolbyVision &&
+			(enableFmp4HlsContainerPreference || forceFmp4HlsContainerPreference);
+		const preferDolbyVision =
+			runtimePlaybackCapabilities.supportsDolbyVision === true &&
+			(
+				forceDolbyVision ||
+				(!avoidDolbyVision && !forceTranscoding && dynamicRangeCap === 'auto')
+			);
+		const createSourceSelectionOptions = ({
+			preferredMediaSourceId = options.mediaSourceId,
+			sourceForceTranscoding = forceTranscoding
+		} = {}) => ({
+			preferredMediaSourceId,
+			forceTranscoding: sourceForceTranscoding,
+			dynamicRangeCap,
+			preferDolbyVision,
+			avoidDolbyVision
+		});
 		const adjustments = [];
 
+		let data = await fetchPlaybackInfo(service, itemId, activePayload);
+
 		if (!data?.MediaSources?.length) {
+			if (forceDolbyVision) {
+				throw new Error('Force DV is enabled, but no Dolby Vision media source was returned.');
+			}
 			return data;
 		}
+		if (forceDolbyVision && !hasDolbyVisionMediaSource(data.MediaSources)) {
+			const forcedDolbyVisionPayload = buildForceDolbyVisionPayload(activePayload);
+			if (forcedDolbyVisionPayload) {
+				const forcedDolbyVisionData = await fetchPlaybackInfo(service, itemId, forcedDolbyVisionPayload);
+				if (forcedDolbyVisionData?.MediaSources?.length) {
+					data = forcedDolbyVisionData;
+					activePayload = forcedDolbyVisionPayload;
+					adjustments.push({
+						type: 'forceDolbyVisionProbe',
+						toast: 'Force DV: requesting Dolby Vision-only sources.'
+					});
+				}
+			}
+		}
+		if (forceDolbyVision && !hasDolbyVisionMediaSource(data.MediaSources)) {
+			const availableRanges = summarizeMediaSourceRanges(data.MediaSources);
+			throw new Error(`Force DV is enabled, but Jellyfin returned no Dolby Vision source. Available: ${availableRanges}`);
+		}
 
-			const sourceSelection = selectMediaSource(data.MediaSources, {
-				preferredMediaSourceId: options.mediaSourceId,
-				forceTranscoding,
-				dynamicRangeCap
-			});
+		let {selection: sourceSelection, selectedSource} = selectPreferredSourceFromPlaybackInfo(
+			data,
+			createSourceSelectionOptions
+		);
 		if (sourceSelection.index > 0) {
-			data.MediaSources = reorderMediaSources(data.MediaSources, sourceSelection.index);
 			adjustments.push({
 				type: 'sourceSelection',
 				toast: 'Playback source optimized for this TV.'
 			});
 		}
+			if (sourceSelection.reason === 'avoidDolbyVision') {
+				adjustments.push({
+					type: 'dolbyVisionFallbackSource',
+					toast: 'Dolby Vision fallback: using a non-DV source.'
+				});
+			}
 
-		let selectedSource = data.MediaSources[0];
+			const directAudioProbeResult = await attemptDirectAudioCompatibilityProbe({
+				service,
+				itemId,
+				activePayload,
+				selectedSource,
+				options,
+				forceTranscoding,
+				forceDolbyVision,
+				requestedAudioStreamIndex,
+				createSourceSelectionOptions
+			});
+			if (directAudioProbeResult) {
+				data = directAudioProbeResult.data;
+				selectedSource = directAudioProbeResult.selectedSource;
+				activePayload = directAudioProbeResult.activePayload;
+				requestedAudioStreamIndex = directAudioProbeResult.requestedAudioStreamIndex;
+				adjustments.push(directAudioProbeResult.adjustment);
+			}
 
-		if (!Number.isInteger(options.audioStreamIndex) && !forceTranscoding && selectedSource) {
-			const defaultAudioIndex = getDefaultAudioStreamIndex(selectedSource);
-			const fallbackAudioIndex = findBestCompatibleAudioStreamIndex(selectedSource);
-			if (defaultAudioIndex !== null && fallbackAudioIndex !== null && defaultAudioIndex !== fallbackAudioIndex) {
-				const defaultAudioStream = getAudioStreams(selectedSource).find((stream) => toInteger(stream.Index) === defaultAudioIndex);
-				const defaultCodecSupported = isSupportedAudioCodec(defaultAudioStream?.Codec);
-				if (!defaultCodecSupported) {
-					const retryPayload = {
-						...payload,
-						MediaSourceId: selectedSource.Id,
-						AudioStreamIndex: fallbackAudioIndex
-					};
-					const retryData = await fetchPlaybackInfo(service, itemId, retryPayload);
-					if (retryData?.MediaSources?.length) {
-						data = retryData;
-							const retrySelection = selectMediaSource(data.MediaSources, {
-								preferredMediaSourceId: selectedSource.Id,
-								forceTranscoding,
-								dynamicRangeCap
+			if (canUseFmp4HlsContainerPreference && selectedSource) {
+				const baseSource = selectedSource;
+				const baseRangeId = getMediaSourceDynamicRangeInfo(baseSource)?.id || 'SDR';
+				const basePriority = getDynamicRangePriority(baseSource);
+			const shouldSkipHdrSourcePreference =
+				forceFmp4HlsContainerPreference !== true &&
+				HDR_DYNAMIC_RANGE_IDS.has(baseRangeId);
+			if (shouldSkipHdrSourcePreference) {
+				adjustments.push({
+					type: 'fmp4HlsPreferenceSkippedHdr',
+					toast: 'Enable fMP4-HLS container preference: skipped for HDR/DV source.'
+				});
+			} else {
+				const mp4PreferredPayload = buildPayloadWithoutMkvDirectPlay(payload, options.mediaSourceId || null);
+				if (mp4PreferredPayload) {
+					adjustments.push({
+						type: 'dolbyVisionMp4Preference',
+						toast:
+							forceFmp4HlsContainerPreference === true
+								? 'Force fMP4-HLS container preference: probing non-MKV direct play sources.'
+								: 'Enable fMP4-HLS container preference: probing non-MKV direct play sources.'
+					});
+					try {
+						const mp4PreferredData = await fetchPlaybackInfo(service, itemId, mp4PreferredPayload);
+						if (mp4PreferredData?.MediaSources?.length) {
+							const {
+								data: selectedMp4Data,
+								selectedSource: selectedMp4Source
+							} = selectPreferredSourceFromPlaybackInfo(mp4PreferredData, createSourceSelectionOptions);
+							if (selectedMp4Source) {
+								const mp4RangeId = getMediaSourceDynamicRangeInfo(selectedMp4Source)?.id || 'SDR';
+								const mp4Priority = getDynamicRangePriority(selectedMp4Source);
+								const isNonMkvMp4Source = !usesMkvContainer(selectedMp4Source);
+								const doesNotRegressDynamicRange = mp4Priority >= basePriority;
+								if (isNonMkvMp4Source && doesNotRegressDynamicRange) {
+									data = selectedMp4Data;
+									selectedSource = selectedMp4Source;
+									activePayload = mp4PreferredPayload;
+									sourceSelection = selectMediaSource(data.MediaSources, createSourceSelectionOptions());
+										adjustments.push({
+											type: 'dolbyVisionMp4Applied',
+											toast: mp4RangeId === 'DV'
+												? (
+													forceFmp4HlsContainerPreference === true
+														? 'Force fMP4-HLS container preference: selected Dolby Vision non-MKV source.'
+														: 'Enable fMP4-HLS container preference: selected Dolby Vision non-MKV source.'
+												)
+												: (
+													forceFmp4HlsContainerPreference === true
+														? 'Force fMP4-HLS container preference: selected non-MKV source.'
+														: 'Enable fMP4-HLS container preference: selected non-MKV source.'
+												)
+										});
+									} else if (usesMkvContainer(selectedMp4Source)) {
+										adjustments.push({
+											type: 'dolbyVisionMp4Unavailable',
+											toast:
+												forceFmp4HlsContainerPreference === true
+													? 'Force fMP4-HLS container preference: server still selected an MKV source.'
+													: 'Enable fMP4-HLS container preference: server still selected an MKV source.'
+										});
+									} else {
+										adjustments.push({
+											type: 'dolbyVisionMp4PreserveRange',
+											toast:
+												forceFmp4HlsContainerPreference === true
+													? 'Force fMP4-HLS container preference: kept default source to preserve dynamic range.'
+													: 'Enable fMP4-HLS container preference: kept default source to preserve dynamic range.'
+										});
+									}
+								}
+							} else {
+								adjustments.push({
+									type: 'dolbyVisionMp4PreferenceFallback',
+									toast:
+										forceFmp4HlsContainerPreference === true
+											? 'Force fMP4-HLS container preference: default profile fallback.'
+											: 'Enable fMP4-HLS container preference: default profile fallback.'
+								});
+							}
+						} catch (mp4ProbeError) {
+							console.warn('fMP4-HLS container preference probe failed:', mp4ProbeError);
+							adjustments.push({
+								type: 'dolbyVisionMp4PreferenceFallback',
+								toast:
+									forceFmp4HlsContainerPreference === true
+										? 'Force fMP4-HLS container preference: default profile fallback.'
+										: 'Enable fMP4-HLS container preference: default profile fallback.'
 							});
-						if (retrySelection.index > 0) {
-							data.MediaSources = reorderMediaSources(data.MediaSources, retrySelection.index);
+							}
 						}
-						selectedSource = data.MediaSources[0];
-						requestedAudioStreamIndex = fallbackAudioIndex;
-						adjustments.push({
-							type: 'audioFallback',
-							toast: 'Switched audio track for compatibility.'
-						});
 					}
 				}
-			}
+
+			const dvMkvRetryResult = await attemptDolbyVisionMkvCompatibilityRetry({
+				service,
+				itemId,
+			activePayload,
+			selectedSource,
+			forceTranscoding,
+			enableTranscoding,
+			runtimeSupportsDolbyVision: runtimePlaybackCapabilities.supportsDolbyVision,
+			createSourceSelectionOptions,
+			buildPayloadWithoutMkvDirectPlay
+		});
+		if (dvMkvRetryResult) {
+			data = dvMkvRetryResult.data;
+			selectedSource = dvMkvRetryResult.selectedSource;
+			activePayload = dvMkvRetryResult.activePayload;
+			adjustments.push(dvMkvRetryResult.adjustment);
+		}
+
+		const defaultAudioFallbackResult = await attemptDefaultAudioFallback({
+			service,
+			itemId,
+			activePayload,
+			selectedSource,
+			options,
+			forceTranscoding,
+			createSourceSelectionOptions
+		});
+		if (defaultAudioFallbackResult) {
+			data = defaultAudioFallbackResult.data;
+			selectedSource = defaultAudioFallbackResult.selectedSource;
+			activePayload = defaultAudioFallbackResult.activePayload;
+			requestedAudioStreamIndex = defaultAudioFallbackResult.requestedAudioStreamIndex;
+			adjustments.push(defaultAudioFallbackResult.adjustment);
+		}
+		if (forceDolbyVision && getMediaSourceDynamicRangeInfo(selectedSource)?.id !== 'DV') {
+			const availableRanges = summarizeMediaSourceRanges(data.MediaSources);
+			throw new Error(`Force DV is enabled, but selected source is not Dolby Vision. Available: ${availableRanges}`);
 		}
 
 		const selectedSubtitleStreamIndex = toInteger(payload.SubtitleStreamIndex);
-			const subtitleNeedsTranscoding =
-				selectedSubtitleStreamIndex !== null &&
-				selectedSubtitleStreamIndex >= 0 &&
-				shouldTranscodeForSubtitleSelection(selectedSource, selectedSubtitleStreamIndex);
-			const effectiveForceSubtitleBurnIn = forceSubtitleBurnIn || subtitleNeedsTranscoding;
-			if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
-				if (effectiveForceSubtitleBurnIn) {
-					payload.SubtitleMethod = 'Encode';
-				} else {
-					delete payload.SubtitleMethod;
-				}
-			}
-			let playMethod = determinePlayMethod(selectedSource, {
-				forceTranscoding: forceTranscoding || subtitleNeedsTranscoding,
-				dynamicRangeCap
+		const subtitleNeedsTranscoding =
+			selectedSubtitleStreamIndex !== null &&
+			selectedSubtitleStreamIndex >= 0 &&
+			shouldTranscodeForSubtitleSelection(selectedSource, selectedSubtitleStreamIndex, {
+				enableSubtitleBurnIn,
+				allowSubtitleBurnInOnHdr,
+				subtitleBurnInTextCodecs
 			});
-			if (subtitleNeedsTranscoding) {
-				adjustments.push({
-					type: 'subtitleTranscodeGuard',
-					toast: 'Using transcoding for subtitle compatibility.'
-				});
+		const effectiveForceSubtitleBurnIn = forceSubtitleBurnIn || subtitleNeedsTranscoding;
+		if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
+			if (effectiveForceSubtitleBurnIn) {
+				payload.SubtitleMethod = 'Encode';
+			} else {
+				delete payload.SubtitleMethod;
 			}
+		}
+		let playMethod = determinePlayMethod(selectedSource, {
+			forceTranscoding: forceTranscoding || subtitleNeedsTranscoding,
+			dynamicRangeCap
+		});
+		if (forceDolbyVision && playMethod === 'Transcode') {
+			if (isForceDolbyVisionAudioOnlyTranscode(selectedSource)) {
+				adjustments.push({
+					type: 'forceDolbyVisionAudioOnlyTranscode',
+					toast: 'Force DV: allowing audio-only transcoding path.'
+				});
+			} else {
+				const availableRanges = summarizeMediaSourceRanges(data.MediaSources);
+				throw new Error(
+					`Force DV requires direct playback or audio-only transcode, but Jellyfin selected incompatible transcoding. Available: ${availableRanges}`
+				);
+			}
+		}
+		if (subtitleNeedsTranscoding) {
+			adjustments.push({
+				type: 'subtitleTranscodeGuard',
+				toast: 'Using transcoding for subtitle compatibility.'
+			});
+		}
 		if (playMethod === 'Transcode' && !selectedSource?.TranscodingUrl && enableTranscoding) {
 			const transcodePayload = {
-				...payload,
+				...activePayload,
 				EnableDirectPlay: false,
 				EnableDirectStream: false,
 				EnableTranscoding: true
@@ -170,24 +357,26 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			if (selectedSource?.Id) {
 				transcodePayload.MediaSourceId = selectedSource.Id;
 			}
-				if (Number.isInteger(requestedAudioStreamIndex)) {
-					transcodePayload.AudioStreamIndex = requestedAudioStreamIndex;
+			if (Number.isInteger(requestedAudioStreamIndex)) {
+				transcodePayload.AudioStreamIndex = requestedAudioStreamIndex;
+			}
+			if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
+				if (effectiveForceSubtitleBurnIn) {
+					transcodePayload.SubtitleMethod = 'Encode';
+				} else {
+					delete transcodePayload.SubtitleMethod;
 				}
-				if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
-					if (effectiveForceSubtitleBurnIn) {
-						transcodePayload.SubtitleMethod = 'Encode';
-					} else {
-						delete transcodePayload.SubtitleMethod;
-					}
-				}
-				const transcodedData = await fetchPlaybackInfo(service, itemId, transcodePayload);
-				if (transcodedData?.MediaSources?.length) {
-					data = transcodedData;
-					const transcodeSelection = selectMediaSource(data.MediaSources, {
+			}
+			const transcodedData = await fetchPlaybackInfo(service, itemId, transcodePayload);
+			if (transcodedData?.MediaSources?.length) {
+				data = transcodedData;
+				const transcodeSelection = selectMediaSource(
+					data.MediaSources,
+					createSourceSelectionOptions({
 						preferredMediaSourceId: selectedSource?.Id,
-						forceTranscoding: true,
-						dynamicRangeCap
-					});
+						sourceForceTranscoding: true
+					})
+				);
 				if (transcodeSelection.index > 0) {
 					data.MediaSources = reorderMediaSources(data.MediaSources, transcodeSelection.index);
 				}
@@ -197,31 +386,33 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 					type: 'forcedTranscode',
 					toast: 'Using transcoding for compatibility.'
 				});
-				}
 			}
+		}
 
-			const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(selectedSource);
-			const dynamicRange = {
-				...dynamicRangeInfo,
-				displayLabel: getDynamicRangeDisplayLabel(dynamicRangeInfo, dynamicRangeCap)
-			};
-			const subtitleStream = getSubtitleStreamByIndex(selectedSource, selectedSubtitleStreamIndex);
-			const subtitlePolicy = {
-				streamIndex: selectedSubtitleStreamIndex,
-				codec: subtitleStream?.Codec || null,
-				requiresBurnIn: subtitleNeedsTranscoding,
-				forceBurnIn: effectiveForceSubtitleBurnIn
-			};
+		const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(selectedSource);
+		const dynamicRange = {
+			...dynamicRangeInfo,
+			displayLabel: getDynamicRangeDisplayLabel(dynamicRangeInfo, dynamicRangeCap)
+		};
+		const subtitleStream = getSubtitleStreamByIndex(selectedSource, selectedSubtitleStreamIndex);
+		const subtitlePolicy = {
+			streamIndex: selectedSubtitleStreamIndex,
+			codec: subtitleStream?.Codec || null,
+			requiresBurnIn: subtitleNeedsTranscoding,
+			forceBurnIn: effectiveForceSubtitleBurnIn
+		};
+		const requestDebug = buildPlaybackRequestDebug(activePayload, data);
 
-			return attachPlaybackInfoMetadata(data, {
-				playMethod,
-				selectedSource,
-				selectedAudioStreamIndex: requestedAudioStreamIndex,
-				adjustments,
-				dynamicRange,
-				dynamicRangeCap,
-				subtitlePolicy
-			});
+		return attachPlaybackInfoMetadata(data, {
+			playMethod,
+			selectedSource,
+			selectedAudioStreamIndex: requestedAudioStreamIndex,
+			adjustments,
+			dynamicRange,
+			dynamicRangeCap,
+			subtitlePolicy,
+			requestDebug
+		});
 	} catch (error) {
 		console.error('Failed to get playback info:', error);
 		throw error;
@@ -229,23 +420,32 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 };
 
 export const getPlaybackStreamUrl = (service, itemId, mediaSourceId, playSessionId, tag, container, liveStreamId) => {
-	let url = `${service.serverUrl}/Videos/${itemId}/stream?static=true&api_key=${service.accessToken}`;
+	const params = new URLSearchParams({
+		static: 'true',
+		api_key: service.accessToken
+	});
+	if (container) {
+		params.set('container', container);
+	}
 	if (mediaSourceId) {
-		url += `&mediaSourceId=${mediaSourceId}`;
+		params.set('mediaSourceId', mediaSourceId);
 	}
 	if (playSessionId) {
-		url += `&playSessionId=${playSessionId}`;
+		params.set('playSessionId', playSessionId);
 	}
 	if (tag) {
-		url += `&tag=${tag}`;
-	}
-	if (container) {
-		url += `&container=${container}`;
+		params.set('tag', tag);
 	}
 	if (liveStreamId) {
-		url += `&liveStreamId=${liveStreamId}`;
+		params.set('liveStreamId', liveStreamId);
 	}
-	return url;
+	const deviceId = typeof service?.getDeviceId === 'function'
+		? service.getDeviceId()
+		: service?.deviceId;
+	if (deviceId) {
+		params.set('deviceId', deviceId);
+	}
+	return `${service.serverUrl}/Videos/${itemId}/stream?${params.toString()}`;
 };
 
 export const getTranscodePlaybackUrl = (service, playSessionId, mediaSource) => {

@@ -1,0 +1,76 @@
+.elegantTabs {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	justify-self: center;
+	padding: 0.24rem 0.28rem;
+	border-radius: 999px;
+	background: transparent;
+	min-width: min(42rem, 100%);
+}
+
+.tabButton {
+	--bf-button-fg: var(--bf-elegant-text-regular);
+	--bf-button-fg-hover: var(--bf-elegant-accent);
+	--bf-button-fg-active: var(--bf-elegant-accent);
+	font-family: 'Noto Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
+	font-weight: 300 !important;
+	line-height: 1 !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	min-width: auto !important;
+	height: 2.35rem !important;
+	min-height: 2.35rem !important;
+	padding: 0 1.5rem !important;
+	border-radius: 999px !important;
+	overflow: visible !important;
+
+	:global(.bf-button-bg) {
+		background: var(--bf-elegant-tab-bg) !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	:global(.client) {
+		font-size: 0.8em !important;
+		font-family: inherit !important;
+		font-weight: 300 !important;
+		line-height: 1 !important;
+		letter-spacing: 0.03em;
+		padding: 0 !important;
+		height: 100% !important;
+		min-height: 100% !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		transform: none !important;
+	}
+
+	:global(.marquee) {
+		font-family: inherit !important;
+		font-weight: 300 !important;
+		line-height: 1 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg) {
+		background: var(--bf-elegant-tab-active-bg) !important;
+		border: none !important;
+	}
+}
+
+.tabSelected {
+	--bf-button-fg: var(--bf-elegant-text-bright);
+	--bf-button-fg-hover: var(--bf-elegant-accent);
+	--bf-button-fg-active: var(--bf-elegant-accent);
+
+	:global(.bf-button-bg) {
+		background: var(--bf-elegant-tab-active-bg) !important;
+		border: none !important;
+	}
+}

@@ -1,0 +1,105 @@
+.scroller {
+	min-height: 100%;
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: contain;
+	background: transparent;
+	margin-top: 0;
+}
+
+.detailsContainer {
+	--bf-media-details-base-rgb: 18, 18, 18;
+	--bf-md-intro-accent-rgb: var(--bf-theme-accent-rgb);
+	--bf-md-text-solid: #ffffff;
+	--bf-md-text-on-light: #111111;
+	--bf-md-text-primary: var(--bf-theme-text-primary);
+	--bf-md-text-secondary: rgba(255, 255, 255, 0.75);
+	--bf-md-text-dim: rgba(255, 255, 255, 0.6);
+	--bf-md-text-title: rgba(245, 250, 255, 0.94);
+	--bf-md-text-credit: rgba(231, 241, 251, 0.9);
+	--bf-md-text-credit-label: rgba(243, 249, 255, 0.96);
+	--bf-md-text-credit-names: rgba(219, 230, 245, 0.88);
+	--bf-md-text-section-hint: rgba(210, 222, 238, 0.78);
+	--bf-md-text-breadcrumb: rgba(214, 224, 237, 0.62);
+	--bf-md-text-soft: rgba(215, 226, 240, 0.86);
+	--bf-md-text-overview: rgba(255, 255, 255, 0.9);
+	--bf-md-text-muted: rgba(223, 234, 247, 0.72);
+	--bf-md-text-date: rgba(199, 216, 236, 0.7);
+	--bf-md-text-episode-overview: rgba(243, 249, 255, 0.88);
+	--bf-md-text-stat: rgba(224, 236, 250, 0.84);
+	--bf-md-star-color: #ffd166;
+	--bf-md-control-bg-soft: rgba(255, 255, 255, 0.06);
+	--bf-md-control-bg-hover: rgba(255, 255, 255, 0.14);
+	--bf-md-control-bg-hover-strong: rgba(255, 255, 255, 0.17);
+	--bf-md-control-bg-active: rgba(255, 255, 255, 0.2);
+	--bf-md-control-border-soft: rgba(255, 255, 255, 0.24);
+	--bf-md-control-border-hover: rgba(255, 255, 255, 0.3);
+	--bf-md-control-border-active: rgba(255, 255, 255, 0.38);
+	--bf-md-control-border-strong: rgba(255, 255, 255, 0.4);
+	--bf-md-chip-bg: rgba(255, 255, 255, 0.03);
+	--bf-md-chip-border: rgba(255, 255, 255, 0.42);
+	--bf-md-overlay-control-bg: rgba(6, 12, 20, 0.42);
+	--bf-md-overlay-control-border: rgba(255, 255, 255, 0.28);
+	--bf-md-overlay-control-fg: rgba(232, 242, 255, 0.84);
+	--bf-md-overlay-control-hover-bg: rgba(12, 20, 32, 0.58);
+	--bf-md-overlay-control-hover-border: rgba(191, 224, 255, 0.58);
+	--bf-md-episode-bg: rgba(18, 24, 36, 0.45);
+	--bf-md-episode-border: rgba(255, 255, 255, 0.08);
+	--bf-md-episode-hover-bg: rgba(24, 34, 50, 0.62);
+	--bf-md-episode-bg-reduced: rgba(18, 24, 36, 0.34);
+	--bf-md-episode-hover-bg-reduced: rgba(24, 34, 50, 0.5);
+	--bf-md-episode-border-reduced: rgba(255, 255, 255, 0.14);
+	--bf-md-divider-soft: rgba(255, 255, 255, 0.14);
+	--bf-md-badge-border-soft: rgba(174, 221, 255, 0.38);
+	--bf-md-badge-border: rgba(190, 221, 252, 0.34);
+	--bf-media-details-control-radius: 0.9rem;
+	--bf-media-details-episode-radius: 1.75rem;
+	--bf-md-hero-top-padding: 0rem;
+	--bf-md-hero-top-padding-elegant: 22vh;
+	--bf-md-intro-control-size: 2rem;
+	min-height: 100vh;
+	background-color: rgb(var(--bf-media-details-base-rgb));
+	background: linear-gradient(
+		to bottom,
+		rgba(var(--bf-media-details-base-rgb), 0.98) 0%,
+		rgb(var(--bf-media-details-base-rgb)) 120px
+	);
+	position: relative;
+}
+
+.sectionSwitchLocked {
+	pointer-events: none;
+}
+
+.episodeDetailsMode {
+	--bf-md-hero-top-padding: 0rem;
+	--bf-md-hero-top-padding-elegant: 14vh;
+}
+
+.mdControlSurface(@bg; @border; @radius: 999px) {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: @bg !important;
+		border: @border !important;
+		border-radius: @radius !important;
+	}
+}
+
+.mdControlHoverSurface(@bg) {
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: @bg !important;
+	}
+}
+
+.mdControlFocusExpandReset() {
+	&:global(.focusExpand),
+	:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+}

@@ -1,0 +1,76 @@
+.backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
+.backdropLayer {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	opacity: 0;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		animation: kenBurns 20s ease-in-out infinite alternate !important;
+	}
+}
+
+.backdropImage {
+	position: relative;
+	z-index: 1;
+}
+
+.backdropLoadingHint {
+	z-index: 2;
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.16) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.14) 0%, rgba(0, 216, 195, 0) 60%),
+		linear-gradient(160deg, rgba(19, 23, 34, 0.52) 0%, rgba(15, 18, 26, 0.52) 45%, rgba(16, 16, 16, 0.52) 100%);
+}
+
+.backdropLayerCurrent {
+	opacity: 1;
+}
+
+.backdropLayerIncoming {
+	animation: heroBackdropIn 420ms ease-out forwards !important;
+}
+
+.backdropLayerOutgoing {
+	opacity: 1;
+	animation: heroBackdropOut 420ms ease-out forwards !important;
+}
+
+.backdropFallback {
+	width: 100%;
+	height: 100%;
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
+		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+}
+
+.gradient {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.2) 0%,
+		rgba(0, 0, 0, 0.45) 34%,
+		rgba(0, 0, 0, 0.62) 56%,
+		rgba(18, 18, 18, 0.76) 72%,
+		rgba(18, 18, 18, 0.9) 86%,
+		var(--bf-theme-panel-bg) 100%
+	);
+}

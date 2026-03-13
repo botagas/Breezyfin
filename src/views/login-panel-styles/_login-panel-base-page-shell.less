@@ -1,0 +1,34 @@
+.page {
+	--bf-login-page-bg: var(--bf-theme-login-page-bg);
+	--bf-login-grid-line: var(--bf-theme-login-grid-line);
+	--bf-login-grid-accent: var(--bf-theme-login-grid-accent);
+	--bf-login-backdrop-grad-top: var(--bf-theme-login-backdrop-grad-top);
+	--bf-login-backdrop-grad-mid: var(--bf-theme-login-backdrop-grad-mid);
+	--bf-login-backdrop-grad-bottom: var(--bf-theme-login-backdrop-grad-bottom);
+	--bf-login-backdrop-radial: var(--bf-theme-login-backdrop-radial);
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	padding: 48px;
+	background-color: var(--bf-login-page-bg);
+	background-image:
+		repeating-linear-gradient(
+			135deg,
+			var(--bf-login-grid-line),
+			var(--bf-login-grid-line) 2px,
+			transparent 2px,
+			transparent 88px
+		),
+		repeating-linear-gradient(
+			135deg,
+			var(--bf-login-grid-accent),
+			var(--bf-login-grid-accent) 2px,
+			transparent 2px,
+			transparent 108px
+		);
+	background-size: 240px 240px, 360px 360px;
+}

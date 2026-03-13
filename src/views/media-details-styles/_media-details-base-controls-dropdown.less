@@ -1,0 +1,40 @@
+.dropdown {
+	text-align: left !important;
+	margin: 0 !important;
+	font-size: 1em !important;
+	width: 100% !important;
+	max-width: 100% !important;
+	min-width: 0 !important;
+	border-radius: 0.9rem !important;
+	background: transparent !important;
+	border: none !important;
+
+	.mdControlFocusExpandReset();
+
+	:global(.bf-button),
+	:global(.client) {
+		width: 100% !important;
+		max-width: 100% !important;
+		min-width: 0 !important;
+		transform: none !important;
+	}
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: transparent !important;
+		border: none !important;
+		border-radius: 0.9rem !important;
+		box-shadow: none !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		min-width: 0 !important;
+		transform: none !important;
+		transition:
+			background 180ms ease,
+			border-color 180ms ease,
+			transform 180ms ease,
+			margin 180ms ease !important;
+	}
+
+	.mdControlHoverSurface(var(--bf-md-control-bg-hover-strong));
+}

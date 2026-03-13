@@ -1,0 +1,73 @@
+:global([data-bf-animations='off']) .backdropLayer img,
+:global([data-bf-all-animations='off']) .backdropLayer img {
+	animation: none !important;
+	transform: none !important;
+}
+
+:global([data-bf-animations='off']) .backdropLayerIncoming,
+:global([data-bf-all-animations='off']) .backdropLayerIncoming,
+:global([data-bf-animations='off']) .backdropLayerOutgoing,
+:global([data-bf-all-animations='off']) .backdropLayerOutgoing,
+:global([data-bf-animations='off']) .infoTransition,
+:global([data-bf-all-animations='off']) .infoTransition,
+:global([data-bf-animations='off']) .logoTransition,
+:global([data-bf-all-animations='off']) .logoTransition,
+:global([data-bf-animations='off']) .textTransition,
+:global([data-bf-all-animations='off']) .textTransition {
+	animation: none !important;
+}
+
+:global([data-bf-animations='off']) .logo,
+:global([data-bf-all-animations='off']) .logo {
+	filter: none;
+}
+
+:global([data-bf-animations='off']) .indicator,
+:global([data-bf-all-animations='off']) .indicator,
+:global([data-bf-animations='off']) .heroBannerButton,
+:global([data-bf-all-animations='off']) .heroBannerButton {
+	transition: none !important;
+}
+
+:global([data-bf-animations='off']) .indicator:hover,
+:global([data-bf-all-animations='off']) .indicator:hover {
+	transform: none !important;
+}
+
+@keyframes heroBackdropIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes heroBackdropOut {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes heroTextIn {
+	from {
+		opacity: 0;
+		transform: translateY(18px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes kenBurns {
+	from {
+		transform: scale(1.02);
+	}
+	to {
+		transform: scale(1.08);
+	}
+}

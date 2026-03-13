@@ -1,0 +1,82 @@
+.elegantActions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-shrink: 0;
+	justify-self: end;
+}
+
+.elegantLibraryMenuScope {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+}
+
+.elegantLibraryPopup {
+	position: absolute;
+	top: calc(100% + 0.58rem);
+	right: 0;
+	z-index: 180;
+}
+
+.toolbarElegant .iconButton {
+	min-width: 2.8rem;
+	min-height: 2.8rem;
+	border-radius: 999px;
+	background: transparent !important;
+	transform: none !important;
+}
+
+.toolbarElegant .iconButton.selected,
+.toolbarElegant .iconButton:focus,
+.toolbarElegant .iconButton:hover {
+	background: var(--bf-elegant-tab-active-bg) !important;
+	transform: none !important;
+}
+
+.toolbarElegant .iconButton :global(.Icon),
+.toolbarElegant .iconButton :global(.icon) {
+	font-size: 21px !important;
+	font-weight: 400 !important;
+	opacity: 0.84;
+	color: var(--bf-elegant-text-mid) !important;
+}
+
+.toolbarElegant .elegantBackButton {
+	min-width: 2.35rem;
+	min-height: 2.35rem;
+}
+
+.toolbarElegant .iconButton.selected :global(.Icon),
+.toolbarElegant .iconButton.selected :global(.icon),
+.toolbarElegant .iconButton:focus :global(.Icon),
+.toolbarElegant .iconButton:focus :global(.icon),
+.toolbarElegant .iconButton:hover :global(.Icon),
+.toolbarElegant .iconButton:hover :global(.icon) {
+	color: var(--bf-elegant-text-bright) !important;
+	opacity: 1;
+}
+
+.userIconButton {
+	min-width: 48px;
+	min-height: 48px;
+	position: relative;
+	overflow: hidden;
+}
+
+.userAvatar {
+	width: 2rem;
+	height: 2rem;
+	border-radius: 50%;
+	object-fit: cover;
+	display: block;
+	pointer-events: none;
+	position: relative;
+	z-index: 1;
+}
+
+.userAvatarLoadingHint {
+	border-radius: 50%;
+	background: linear-gradient(155deg, rgba(65, 84, 113, 0.4), rgba(34, 48, 71, 0.28));
+	z-index: 2;
+}

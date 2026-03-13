@@ -1,11 +1,8 @@
 @import (reference) '../../styles/compatMixins.less';
+@import (reference) '../../styles/surfaceMixins.less';
 
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassNav {
-	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
-	background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
-	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
-	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.55rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
-	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45));
+	.popupSurface();
 	overflow: visible;
 	isolation: auto;
 }
@@ -29,18 +26,14 @@
 }
 
 :global([data-bf-all-animations='off'][data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .glassNav {
-	background: var(--bf-theme-overlay-ultra-bg, rgba(9, 13, 19, 0.84)) !important;
+	background: var(--bf-theme-overlay-ultra-bg) !important;
 	backdrop-filter: none !important;
 	-webkit-backdrop-filter: none !important;
 	box-shadow: none !important;
 }
 
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .libraryNativeContentGlass {
-	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
-	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
-	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+	.popupNoBlurSurfaceImportant();
 }
 
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar-legacy='on']) .elegantLibraryPopup .liquidLayerFilter,
@@ -60,11 +53,7 @@
 
 :global([data-bf-webos-v6-compat='on']) .userMenu,
 :global([data-bf-webos-v6-compat='on']) .userMenuElegant {
-	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
-	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
-	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
+	.popupNoBlurSurfaceImportant();
 	isolation: auto !important;
 	contain: none !important;
 	transform: translateZ(0);
@@ -78,11 +67,7 @@
 }
 
 :global([data-bf-webos-v6-compat='on'] [data-bf-navbar='true']) .elegantLibraryPopup .libraryNativeContentGlass {
-	background: var(--bf-theme-popup-ultra-bg, rgba(9, 13, 19, 0.9)) !important;
-	border: 1px solid var(--bf-theme-popup-border, rgba(255, 255, 255, 0.12)) !important;
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
-	box-shadow: var(--bf-theme-popup-shadow, 0 10px 24px rgba(0, 0, 0, 0.45)) !important;
+	.popupNoBlurSurfaceImportant();
 	isolation: auto !important;
 	transform: translateZ(0);
 }

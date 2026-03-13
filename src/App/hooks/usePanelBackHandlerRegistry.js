@@ -8,7 +8,6 @@ export const usePanelBackHandlerRegistry = () => {
 	const searchBackHandlerRef = useRef(null);
 	const favoritesBackHandlerRef = useRef(null);
 	const settingsBackHandlerRef = useRef(null);
-	const styleDebugBackHandlerRef = useRef(null);
 
 	const runPanelBackHandler = useCallback((handlerRef) => {
 		if (typeof handlerRef?.current !== 'function') return false;
@@ -43,10 +42,6 @@ export const usePanelBackHandlerRegistry = () => {
 		settingsBackHandlerRef.current = handler;
 	}, []);
 
-	const registerStyleDebugBackHandler = useCallback((handler) => {
-		styleDebugBackHandlerRef.current = handler;
-	}, []);
-
 	return {
 		refs: {
 			playerBackHandlerRef,
@@ -55,8 +50,7 @@ export const usePanelBackHandlerRegistry = () => {
 			libraryBackHandlerRef,
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
-			settingsBackHandlerRef,
-			styleDebugBackHandlerRef
+			settingsBackHandlerRef
 		},
 		runPanelBackHandler,
 		registerDetailsBackHandler,
@@ -65,8 +59,7 @@ export const usePanelBackHandlerRegistry = () => {
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
-		registerSettingsBackHandler,
-		registerStyleDebugBackHandler
+		registerSettingsBackHandler
 	};
 };
 

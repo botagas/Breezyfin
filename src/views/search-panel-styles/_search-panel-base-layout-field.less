@@ -1,0 +1,75 @@
+.searchFieldShell {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 2.35rem;
+	padding: 0 0.22rem;
+	display: flex;
+	align-items: center;
+	border-radius: 999px;
+	background: var(--bf-theme-input-surface-bg);
+	border: 1px solid var(--bf-theme-input-surface-border);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	box-shadow: none;
+	box-sizing: border-box;
+	overflow: hidden;
+	transition: background 140ms ease, border-color 140ms ease;
+
+	&:focus-within {
+		background: var(--bf-theme-input-focus-bg);
+		border-color: var(--bf-theme-input-focus-border);
+	}
+
+	&:hover,
+	&:hover:focus-within {
+		background: var(--bf-theme-tab-hover-bg);
+		border-color: var(--bf-theme-input-hover-border);
+	}
+
+	/* Keep the search field shape stable; disable Sandstone focusExpand growth here. */
+	:global(.bf-input-trigger),
+	:global(.bf-input-trigger.focusExpand),
+	:global(.bf-input-trigger:hover),
+	:global(.bf-input-trigger:focus),
+	:global(.bf-input-trigger:active),
+	:global(.bf-input-trigger.spottable:focus) {
+		height: 2.05rem !important;
+		min-height: 2.05rem !important;
+		margin: 0 !important;
+		transform: none !important;
+		border-radius: 999px !important;
+	}
+
+	:global(.bf-input-trigger > div:first-of-type) {
+		background: transparent !important;
+		border: none !important;
+		transform: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+
+	:global(.bf-input-trigger) {
+		background: transparent !important;
+	}
+
+	/* Override global input-trigger hover styling that creates a smaller inner shape. */
+	:global(.bf-input-trigger:hover > div:first-of-type),
+	:global(.bf-input-trigger:focus > div:first-of-type),
+	:global(.bf-input-trigger:active > div:first-of-type),
+	:global(.bf-input-trigger.spottable:focus > div:first-of-type) {
+		background: transparent !important;
+		border: none !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.searchInput {
+	flex: 1 1 auto;
+	width: 100% !important;
+	max-width: none !important;
+	min-width: 0 !important;
+	margin: 0 !important;
+	display: block !important;
+	font-size: 1.2em;
+}

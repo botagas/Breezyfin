@@ -1,0 +1,40 @@
+.row {
+	margin-bottom: 64px;
+	margin-top: 24px;
+	contain: layout style;
+	content-visibility: auto;
+	contain-intrinsic-size: 0 28rem;
+}
+
+.rowTitle {
+	font-size: 1.05em;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	margin-bottom: 18px;
+	padding: 0 60px;
+	color: var(--bf-theme-card-title-color);
+}
+
+.rowContent {
+	overflow: visible;
+}
+
+.cardContainer {
+	display: flex;
+	gap: 1.15rem;
+	padding: 1rem 60px 1.25rem;
+	overflow-x: auto;
+	overflow-y: visible;
+	scroll-behavior: smooth;
+	transform: translateZ(0);
+	will-change: scroll-position;
+	contain: layout style;
+
+	/* Hide scrollbar */
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}

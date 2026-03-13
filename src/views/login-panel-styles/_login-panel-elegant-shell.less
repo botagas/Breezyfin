@@ -1,0 +1,40 @@
+.loginBox {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+	.popupSurface(
+		var(--bf-theme-popup-bg);
+		var(--bf-theme-popup-border);
+		var(--bf-theme-popup-shadow)
+	);
+}
+
+.loginBox::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	box-shadow: inset 1px 1px 1px var(--bf-login-elegant-box-sheen-strong);
+	opacity: 0.75;
+}
+
+.loginBox::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	background:
+		radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 56%),
+		radial-gradient(circle at 82% 78%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 52%);
+	mix-blend-mode: screen;
+	opacity: 0.72;
+}
+
+.loginBox > * {
+	position: relative;
+	z-index: 1;
+}

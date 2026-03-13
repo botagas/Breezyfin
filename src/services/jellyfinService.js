@@ -1,5 +1,7 @@
 import { Jellyfin } from '@jellyfin/sdk';
-import {APP_VERSION} from '../utils/appInfo';
+import {getAppVersion, loadAppVersion} from '../utils/appInfo';
+import {getDeviceId} from '../utils/deviceIdentity';
+import {applyPreferredImageFormatToParams} from '../utils/imageFormat';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {
 	applySessionFromStore,
@@ -49,16 +51,10 @@ import {
 
 class JellyfinService {
 	constructor() {
-		this.jellyfin = new Jellyfin({
-			clientInfo: {
-				name: 'Breezyfin',
-				version: APP_VERSION
-			},
-			deviceInfo: {
-				name: 'webOS TV',
-				id: 'webos-tv-' + Date.now()
-			}
-		});
+		this.deviceId = getDeviceId();
+		this.clientVersion = getAppVersion();
+		this.clientVersionPromise = null;
+		this.jellyfin = this._createJellyfinClient(this.clientVersion);
 		this.api = null;
 		this.userId = null;
 		this.serverUrl = null;
@@ -66,6 +62,52 @@ class JellyfinService {
 		this.serverName = null;
 		this.username = null;
 		this.sessionExpiredNotified = false;
+		void this.resolveClientVersion();
+	}
+
+	_createJellyfinClient(version) {
+		return new Jellyfin({
+			clientInfo: {
+				name: 'Breezyfin',
+				version
+			},
+			deviceInfo: {
+				name: 'webOS TV',
+				id: this.deviceId
+			}
+		});
+	}
+
+	_applyClientVersion(version) {
+		if (!version || version === this.clientVersion) return;
+		this.clientVersion = version;
+		this.jellyfin = this._createJellyfinClient(version);
+		if (this.serverUrl) {
+			this.api = this.jellyfin.createApi(this.serverUrl, this.accessToken || undefined);
+		}
+	}
+
+	getClientVersion() {
+		return this.clientVersion || getAppVersion();
+	}
+
+	getDeviceId() {
+		return this.deviceId || getDeviceId();
+	}
+
+	async resolveClientVersion() {
+		if (this.clientVersionPromise) return this.clientVersionPromise;
+		this.clientVersionPromise = (async () => {
+			const resolvedVersion = await loadAppVersion().catch(() => null);
+			const nextVersion = resolvedVersion || getAppVersion();
+			this._applyClientVersion(nextVersion);
+			return this.getClientVersion();
+		})();
+		try {
+			return await this.clientVersionPromise;
+		} finally {
+			this.clientVersionPromise = null;
+		}
 	}
 
 	_isAuthFailureStatus(status) {
@@ -103,6 +145,18 @@ class JellyfinService {
 			'X-Emby-Token': this.accessToken,
 			...extraHeaders
 		};
+	}
+
+	_buildImageAssetUrl(path, params = {}, options = {}) {
+		if (!this.serverUrl || !this.accessToken || !path) return null;
+		const search = new URLSearchParams();
+		Object.entries(params).forEach(([key, value]) => {
+			if (value === undefined || value === null || value === '') return;
+			search.set(key, String(value));
+		});
+		search.set('api_key', this.accessToken);
+		applyPreferredImageFormatToParams(search, options);
+		return `${this.serverUrl}${path}?${search.toString()}`;
 	}
 
 	async _request(pathOrUrl, options = {}) {
@@ -179,14 +233,40 @@ class JellyfinService {
 		forgetServiceServer(this, serverId, userId);
 	}
 
-	getImageUrl(itemId, imageType = 'Primary', width = 400) {
-		if (!this.serverUrl) return null;
-		return `${this.serverUrl}/Items/${itemId}/Images/${imageType}?width=${width}&api_key=${this.accessToken}`;
+	getImageUrl(itemId, imageType = 'Primary', width = 400, options = {}) {
+		if (!itemId || !imageType) return null;
+		return this._buildImageAssetUrl(
+			`/Items/${itemId}/Images/${imageType}`,
+			{
+				width,
+				tag: options?.tag
+			},
+			options
+		);
 	}
 
-	getBackdropUrl(itemId, index = 0, width = 1920) {
-		if (!this.serverUrl) return null;
-		return `${this.serverUrl}/Items/${itemId}/Images/Backdrop/${index}?width=${width}&api_key=${this.accessToken}`;
+	getBackdropUrl(itemId, index = 0, width = 1920, options = {}) {
+		if (!itemId) return null;
+		return this._buildImageAssetUrl(
+			`/Items/${itemId}/Images/Backdrop/${index}`,
+			{
+				width,
+				tag: options?.tag
+			},
+			options
+		);
+	}
+
+	getUserImageUrl(userId, width = 96, options = {}) {
+		if (!userId) return null;
+		return this._buildImageAssetUrl(
+			`/Users/${userId}/Images/Primary`,
+			{
+				width,
+				tag: options?.tag
+			},
+			options
+		);
 	}
 
 	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16) {
@@ -297,8 +377,8 @@ class JellyfinService {
 		return getPublicSystemInfo(this);
 	}
 
-	async getMediaSegments(itemId) {
-		return getItemMediaSegments(this, itemId);
+	async getMediaSegments(itemId, options = {}) {
+		return getItemMediaSegments(this, itemId, options);
 	}
 }
 

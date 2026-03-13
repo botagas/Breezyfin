@@ -1,0 +1,59 @@
+.episodeSelectorButton,
+.compactSelectorButton,
+.episodeNavButton,
+.dropdown,
+.trackSelectorPrimary,
+.primaryButton {
+	.elegantControlButtonCore();
+	--bf-button-fg: var(--bf-md-elegant-text-primary);
+	--bf-button-fg-hover: var(--bf-md-elegant-accent);
+	--bf-button-fg-active: var(--bf-md-elegant-accent);
+}
+
+.actionButton,
+.episodeInfoButton,
+.episodeFavoriteButton,
+.episodeWatchedButton {
+	--bf-button-fg: var(--bf-md-elegant-text-primary);
+	--bf-button-fg-hover: var(--bf-md-elegant-accent);
+	--bf-button-fg-active: var(--bf-md-elegant-accent);
+}
+
+.trackSelectorPrimary :global(.bf-button-bg),
+.trackSelectorPrimary :global(.bg),
+.primaryButton :global(.bf-button-bg),
+.primaryButton :global(.bg),
+.episodeNavButton :global(.bf-button-bg),
+.episodeNavButton :global(.bg) {
+	.popupPillSurfaceImportant(var(--bf-md-elegant-accent-pill-bg); var(--bf-md-elegant-accent-pill-border));
+}
+
+.trackSelectorPrimary:hover :global(.bf-button-bg),
+.trackSelectorPrimary:focus :global(.bf-button-bg),
+.trackSelectorPrimary:global(.spottable):focus :global(.bf-button-bg),
+.trackSelectorPrimary:hover :global(.bg),
+.trackSelectorPrimary:focus :global(.bg),
+.trackSelectorPrimary:global(.spottable):focus :global(.bg),
+.primaryButton:hover :global(.bf-button-bg),
+.primaryButton:focus :global(.bf-button-bg),
+.primaryButton:global(.spottable):focus :global(.bf-button-bg),
+.primaryButton:hover :global(.bg),
+.primaryButton:focus :global(.bg),
+.primaryButton:global(.spottable):focus :global(.bg),
+.episodeNavButton:hover :global(.bf-button-bg),
+.episodeNavButton:focus :global(.bf-button-bg),
+.episodeNavButton:global(.spottable):focus :global(.bf-button-bg),
+.episodeNavButton:hover :global(.bg),
+.episodeNavButton:focus :global(.bg),
+.episodeNavButton:global(.spottable):focus :global(.bg) {
+	background: var(--bf-md-elegant-accent-hover-bg) !important;
+}
+
+.trackSelectorPrimary:active :global(.bf-button-bg),
+.trackSelectorPrimary:active :global(.bg),
+.primaryButton:active :global(.bf-button-bg),
+.primaryButton:active :global(.bg),
+.episodeNavButton:active :global(.bf-button-bg),
+.episodeNavButton:active :global(.bg) {
+	background: var(--bf-md-elegant-accent-active-bg) !important;
+}

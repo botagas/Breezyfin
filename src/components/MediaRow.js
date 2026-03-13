@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
@@ -6,13 +6,24 @@ import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 
 import css from './MediaRow.module.less';
+import imageLoadCss from './ImageLoadReveal.module.less';
 
 const SpottableDiv = Spottable('div');
 
 const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown, ...rest }) => {
 	const [imageError, setImageError] = useState(false);
+	const [imageLoaded, setImageLoaded] = useState(false);
+	const [useEpisodeSeriesFallback, setUseEpisodeSeriesFallback] = useState(false);
+
+	const episodeSeriesFallbackUrl = useMemo(() => {
+		if (item.Type !== 'Episode' || !item.SeriesId || !imageUrl) return '';
+		return String(imageUrl).replace(String(item.Id), String(item.SeriesId));
+	}, [imageUrl, item.Id, item.SeriesId, item.Type]);
+	const canUseEpisodeSeriesFallback = Boolean(episodeSeriesFallbackUrl && episodeSeriesFallbackUrl !== imageUrl);
+	const resolvedImageUrl = useEpisodeSeriesFallback ? episodeSeriesFallbackUrl : imageUrl;
 
 	const handleCardClick = useCallback(() => {
 		onClick(item);
@@ -33,9 +44,25 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		}
 	}, [item, onCardKeyDown]);
 
-	const handleImageError = useCallback(() => {
+	const handleImageError = useCallback((event) => {
+		if (applyImageFormatFallbackFromEvent(event)) return;
+		if (canUseEpisodeSeriesFallback && !useEpisodeSeriesFallback) {
+			setUseEpisodeSeriesFallback(true);
+			setImageLoaded(false);
+			return;
+		}
 		setImageError(true);
+	}, [canUseEpisodeSeriesFallback, useEpisodeSeriesFallback]);
+
+	const handleImageLoad = useCallback(() => {
+		setImageLoaded(true);
 	}, []);
+
+	useEffect(() => {
+		setImageError(false);
+		setImageLoaded(false);
+		setUseEpisodeSeriesFallback(false);
+	}, [imageUrl, item.Id, item.SeriesId, item.Type]);
 
 	const getDisplayTitle = () => {
 		if (item.Type === 'Episode') {
@@ -56,15 +83,15 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	const getRemainingCount = () => {
 		if (item.Type === 'Series' && item.UserData) {
 			const hasWatched = item.UserData.PlayedPercentage > 0 || item.UserData.PlaybackPositionTicks > 0 || item.UserData.Played;
-			const unwatchedCount = item.UserData.UnplayedItemCount;
-			if (hasWatched && unwatchedCount > 0) {
-				return unwatchedCount;
+			const remainingUnwatchedCount = item.UserData.UnplayedItemCount;
+			if (hasWatched && remainingUnwatchedCount > 0) {
+				return remainingUnwatchedCount;
 			}
 		}
 		if (item.Type === 'Episode') {
-			const unwatchedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
-			if (unwatchedCount > 0) {
-				return unwatchedCount;
+			const remainingUnwatchedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
+			if (remainingUnwatchedCount > 0) {
+				return remainingUnwatchedCount;
 			}
 		}
 		return null;
@@ -73,53 +100,60 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	const getUnwatchedCount = () => {
 		if (!showEpisodeProgress) return null;
 		if (item.Type === 'Series') {
-			const unplayedCount = item.UserData?.UnplayedItemCount;
-			return Number.isInteger(unplayedCount) ? unplayedCount : null;
+			const seriesUnplayedCount = item.UserData?.UnplayedItemCount;
+			return Number.isInteger(seriesUnplayedCount) ? seriesUnplayedCount : null;
 		}
 		if (item.Type === 'Episode') {
-			const unplayedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
-			return Number.isInteger(unplayedCount) ? unplayedCount : null;
+			const episodeUnplayedCount = item.SeriesUserData?.UnplayedItemCount || item.UnplayedItemCount;
+			return Number.isInteger(episodeUnplayedCount) ? episodeUnplayedCount : null;
 		}
 		return null;
 	};
 
-	const getImageUrl = () => {
-		if (item.Type === 'Episode' && item.SeriesId && imageError) {
-			return imageUrl.replace(item.Id, item.SeriesId);
-		}
-		return imageUrl;
-	};
+	const cardUnwatchedCount = getUnwatchedCount();
+	const showWatchedStatusBadge = showEpisodeProgress && cardUnwatchedCount !== null;
+	const isCompletedWatchBadge = showWatchedStatusBadge && cardUnwatchedCount === 0;
+	const remainingCount = getRemainingCount();
+	const showImage = Boolean(resolvedImageUrl) && !imageError;
 
-		return (
-			<SpottableDiv
-				className={css.card}
-				onClick={handleCardClick}
-				onKeyDown={handleCardKeyDown}
-				{...rest}
-			>
+	return (
+		<SpottableDiv
+			className={css.card}
+			onClick={handleCardClick}
+			onKeyDown={handleCardKeyDown}
+			{...rest}
+		>
 			<div className={css.cardImage}>
-					{!imageError ? (
-						<img
-							src={getImageUrl()}
-							alt={item.Name}
-							onError={handleImageError}
-							loading="lazy"
-							decoding="async"
-							draggable={false}
-						/>
+				{showImage ? (
+					<img
+						src={resolvedImageUrl}
+						alt={item.Name}
+						className={`${imageLoadCss.imageReveal} ${imageLoaded ? imageLoadCss.imageRevealLoaded : ''}`}
+						onLoad={handleImageLoad}
+						onError={handleImageError}
+						loading="lazy"
+						decoding="async"
+						draggable={false}
+					/>
 				) : (
 					<div className={css.placeholder}>
 						<BodyText>{getDisplayTitle()}</BodyText>
 					</div>
 				)}
-				{showEpisodeProgress && getUnwatchedCount() !== null ? (
-					<div className={css.progressBadge}>
-						{getUnwatchedCount() === 0 ? '✓' : getUnwatchedCount()}
+				{showImage ? (
+					<div
+						className={`${imageLoadCss.imageLoadingHint} ${imageLoaded ? imageLoadCss.imageLoadingHintHidden : ''}`}
+						aria-hidden="true"
+					/>
+				) : null}
+				{showWatchedStatusBadge ? (
+					<div className={isCompletedWatchBadge ? css.watchedBadge : css.progressBadge}>
+						{isCompletedWatchBadge ? '✓' : cardUnwatchedCount}
 					</div>
 				) : (
-					getRemainingCount() && (
+					remainingCount && (
 						<div className={css.episodeBadge}>
-							{getRemainingCount()}
+							{remainingCount}
 						</div>
 					)
 				)}

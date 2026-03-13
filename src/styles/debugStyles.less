@@ -1,0 +1,55 @@
+.debug-overlay-surface(@radius: var(--bf-theme-debug-radius)) {
+	border-radius: @radius;
+	border: var(--bf-theme-debug-border-width) solid var(--bf-theme-debug-surface-border);
+	background: var(--bf-theme-debug-surface-bg);
+	backdrop-filter: blur(var(--bf-theme-debug-surface-blur));
+	-webkit-backdrop-filter: blur(var(--bf-theme-debug-surface-blur));
+	box-shadow: var(--bf-theme-debug-surface-shadow);
+}
+
+.debug-overlay-shell(
+	@radius: var(--bf-theme-debug-radius);
+	@paddingBlock: var(--bf-theme-debug-padding-block);
+	@paddingInline: var(--bf-theme-debug-padding-inline)
+) {
+	padding: @paddingBlock @paddingInline;
+	.debug-overlay-surface(@radius);
+	font-size: var(--bf-theme-debug-font-size);
+	letter-spacing: var(--bf-theme-debug-letter-spacing);
+	line-height: var(--bf-theme-debug-line-height);
+	color: var(--bf-theme-debug-value-color);
+}
+
+.debug-overlay-fixed-top(
+	@left: auto;
+	@right: auto;
+	@zIndex: var(--bf-theme-debug-overlay-z-index)
+) {
+	position: fixed;
+	top: var(--bf-theme-debug-overlay-inset);
+	left: @left;
+	right: @right;
+	z-index: @zIndex;
+}
+
+.debug-overlay-label() {
+	color: var(--bf-theme-debug-label-color);
+	text-transform: uppercase;
+	font-size: var(--bf-theme-debug-label-size);
+}
+
+.debug-overlay-value() {
+	color: var(--bf-theme-debug-value-color);
+	font-weight: 600;
+}
+
+.debug-overlay-inline-metric() {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--bf-theme-debug-metric-gap);
+}
+
+.debug-overlay-scrollbar() {
+	scrollbar-width: thin;
+	scrollbar-color: var(--bf-theme-debug-scrollbar-thumb) var(--bf-theme-debug-scrollbar-track);
+}

@@ -1,0 +1,63 @@
+.status-badge-pill() {
+	background: @status-badge-bg;
+	color: var(--bf-theme-input-trigger-fg);
+	padding: 4px 8px;
+	border-radius: 999px;
+	font-weight: 700;
+	font-size: 0.78em;
+	backdrop-filter: blur(8px);
+	box-shadow: @status-badge-shadow;
+	border: 1px solid @status-badge-border;
+	text-align: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+	line-height: 1.2;
+	min-height: 22px;
+
+	:global([data-bf-animations='off']) &,
+	:global([data-bf-all-animations='off']) & {
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+		box-shadow: none;
+	}
+}
+
+.status-badge-success() {
+	background: @status-success-badge-bg;
+	color: @status-success-badge-color;
+	border: 1px solid @status-success-badge-border;
+	box-shadow: @status-success-badge-shadow;
+	padding: 0 0.25rem;
+	border-radius: 999px;
+	font-weight: 800;
+	font-size: 0.75em;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+	line-height: 1.2;
+	min-width: 1.4rem;
+	height: 1.4rem;
+	min-height: 1.4rem;
+}
+
+.status-badge-favorite() {
+	background: @status-favorite-badge-bg;
+	color: @status-favorite-badge-color;
+	border: 1px solid @status-favorite-badge-border;
+	box-shadow: @status-favorite-badge-shadow;
+	padding: 0 0.32rem;
+	border-radius: 999px;
+	font-weight: 800;
+	font-size: 0.75em;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+	line-height: 1.2;
+	min-width: 1.4rem;
+	height: 1.4rem;
+	min-height: 1.4rem;
+}

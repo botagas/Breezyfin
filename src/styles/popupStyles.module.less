@@ -27,12 +27,12 @@
 	max-width: 92vw;
 	max-height: 82vh;
 	padding: 1rem 1.1rem;
-	border-radius: var(--bf-theme-popup-radius, 1rem);
-	background: var(--bf-theme-popup-bg, var(--bf-theme-surface-bg, rgba(18, 18, 18, 0.95)));
-	border: 1px solid var(--bf-theme-popup-border, var(--bf-theme-surface-border, rgba(255, 255, 255, 0.2)));
-	box-shadow: var(--bf-theme-popup-shadow, var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(0, 0, 0, 0.35)));
-	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.65rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
-	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.65rem)) saturate(var(--bf-theme-popup-saturate, 1.06));
+	border-radius: var(--bf-theme-popup-radius);
+	background: var(--bf-theme-popup-bg);
+	border: 1px solid var(--bf-theme-popup-border);
+	box-shadow: var(--bf-theme-popup-shadow);
+	backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
 	overflow: hidden;
 	position: relative;
 	isolation: isolate;
@@ -44,11 +44,11 @@
 }
 
 :global([data-bf-nav-theme='elegant']) .popupSurface {
-	background: var(--bf-theme-popup-bg, rgba(8, 13, 20, 0.26));
-	border-color: var(--bf-theme-popup-border, rgba(255, 255, 255, 0.1));
-	box-shadow: var(--bf-theme-popup-shadow, 0 0.95rem 2.3rem rgba(4, 10, 17, 0.42));
-	backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2));
-	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur, 0.85rem)) saturate(var(--bf-theme-popup-saturate, 1.2));
+	background: var(--bf-theme-popup-bg);
+	border-color: var(--bf-theme-popup-border);
+	box-shadow: var(--bf-theme-popup-shadow);
+	backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
 }
 
 :global([data-bf-nav-theme='elegant']) .popupSurface::before,
@@ -62,7 +62,7 @@
 
 :global([data-bf-nav-theme='elegant']) .popupSurface::before {
 	z-index: 1;
-	background: var(--bf-theme-liquid-overlay-bg, rgba(168, 188, 213, 0.08));
+	background: var(--bf-theme-liquid-overlay-bg);
 }
 
 :global([data-bf-nav-theme='elegant']) .popupSurface::after {
@@ -79,7 +79,7 @@
 :global([data-bf-all-animations='off']) .popupSurface {
 	--bf-theme-popup-blur: 0.5rem;
 	--bf-theme-popup-saturate: 1.04;
-	background: var(--bf-theme-popup-ultra-bg, var(--bf-theme-ultra-surface-bg, rgba(9, 13, 19, 0.62)));
+	background: var(--bf-theme-popup-ultra-bg);
 	backdrop-filter: blur(0.5rem) !important;
 	-webkit-backdrop-filter: blur(0.5rem) !important;
 	box-shadow: none !important;

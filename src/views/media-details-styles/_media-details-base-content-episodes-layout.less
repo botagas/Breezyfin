@@ -1,0 +1,139 @@
+.episodesSection {
+	margin-bottom: 32px;
+	content-visibility: auto;
+	contain: layout style paint;
+	contain-intrinsic-size: 0 56rem;
+}
+
+.episodeCards {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	contain: layout style;
+}
+
+.episodeCardsSideways {
+	flex-direction: row;
+	gap: 1.2rem;
+	overflow-x: auto;
+	overflow-y: visible;
+	padding: 0.35rem 0 1.1rem;
+	scroll-behavior: smooth;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+.episodeCardSideways {
+	width: min(30rem, 82vw);
+	min-width: min(30rem, 82vw);
+	max-width: min(30rem, 82vw);
+	height: auto;
+	min-height: 0;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.95rem;
+	padding: 1rem;
+}
+
+.episodeCardSideways:hover,
+.episodeCardSideways:focus,
+.episodeCardSideways:global(.spottable):focus {
+	transform: translateY(-2px);
+}
+
+.episodeCardSideways .episodeImageContainer {
+	aspect-ratio: 16 / 9;
+	min-height: clamp(12.8rem, 24vw, 16rem);
+	height: auto;
+	border-radius: var(--bf-media-details-episode-radius);
+	background: rgba(10, 16, 24, 0.55);
+}
+
+.episodeCardSideways .episodeImage {
+	width: 100%;
+	height: 100%;
+	aspect-ratio: auto;
+	object-fit: cover;
+}
+
+.episodeCardSideways .episodeInfo {
+	flex: 0 0 auto;
+	overflow: visible;
+	gap: 0.58rem;
+}
+
+.episodeCardSideways .episodeOverview {
+	min-height: 4.45em;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+}
+
+.episodeCardSideways .episodeActions {
+	align-items: center;
+	justify-content: flex-start;
+}
+
+.episodeCard {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+	padding: 16px;
+	background: var(--bf-md-episode-bg);
+	border: 1px solid var(--bf-md-episode-border);
+	border-radius: var(--bf-media-details-episode-radius);
+	transition: background 140ms ease, transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+	height: 15rem;
+	overflow: hidden;
+
+	&:hover,
+	&:focus,
+	&:global(.spottable):focus {
+		background: var(--bf-md-episode-hover-bg);
+		transform: translateX(3px);
+		border-color: var(--bf-md-chip-border);
+		box-shadow: 0 8px 14px rgba(0, 0, 0, 0.28);
+
+		.episodeImageContainer {
+			box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(22, 39, 68, 0.45);
+		}
+
+		.episodeImageContainer::before {
+			opacity: 1;
+		}
+
+		.episodeImage {
+			transform: none;
+			filter: none;
+		}
+	}
+
+	&.selected {
+		background: rgba(var(--bf-theme-accent-rgb), 0.16);
+		border-color: rgba(var(--bf-theme-accent-rgb), 0.6);
+	}
+}
+
+.episodeCard.episodeCardSideways {
+	height: auto !important;
+	min-height: 0;
+	overflow: visible;
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.episodeCard.episodeCardSideways .episodeInfo {
+	flex: 0 0 auto;
+}
+
+.episodeCard.episodeCardSideways .episodeActions {
+	margin-top: 0.45rem;
+	align-self: flex-start;
+}
+
+.episodePlayed {
+	border-color: rgba(var(--bf-theme-success-rgb), 0.45);
+}

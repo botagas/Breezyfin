@@ -1,0 +1,64 @@
+.seasonWatchedButton {
+	position: absolute;
+	top: 0.55rem;
+	right: 0.55rem;
+	z-index: 3;
+	.icon-circle-button-dimensions(2.35rem);
+	padding: 0 !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	border: none !important;
+
+	.mdControlSurface(var(--bf-md-overlay-control-bg); 1px solid var(--bf-md-overlay-control-border); 999px);
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		box-shadow: none !important;
+		backdrop-filter: blur(8px) !important;
+		-webkit-backdrop-filter: blur(8px) !important;
+	}
+
+	:global(.Icon),
+	:global(.icon) {
+		font-size: 0.9rem !important;
+		width: 0.9rem !important;
+		height: 0.9rem !important;
+		color: var(--bf-md-overlay-control-fg) !important;
+	}
+
+	.mdControlHoverSurface(var(--bf-md-overlay-control-hover-bg));
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		border-color: var(--bf-md-overlay-control-hover-border) !important;
+	}
+
+	&:hover :global(.Icon),
+	&:hover :global(.icon),
+	&:focus :global(.Icon),
+	&:focus :global(.icon),
+	&:global(.spottable):focus :global(.Icon),
+	&:global(.spottable):focus :global(.icon) {
+		color: rgba(var(--bf-theme-accent-rgb), 0.98) !important;
+	}
+
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
+		background: rgba(var(--bf-theme-success-rgb), 0.22) !important;
+		border-color: rgba(var(--bf-theme-success-rgb), 0.58) !important;
+	}
+
+	&:global(.selected):hover :global(.bf-button-bg),
+	&:global(.selected):focus :global(.bf-button-bg),
+	&:global(.selected):global(.spottable):focus :global(.bf-button-bg),
+	&:global(.selected):hover :global(.bg),
+	&:global(.selected):focus :global(.bg),
+	&:global(.selected):global(.spottable):focus :global(.bg) {
+		background: rgba(var(--bf-theme-success-rgb), 0.3) !important;
+		border-color: rgba(var(--bf-theme-success-rgb), 0.65) !important;
+	}
+}

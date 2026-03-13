@@ -1,0 +1,81 @@
+.overview {
+	margin-top: 32px;
+	margin-bottom: 24px;
+	line-height: 1.7;
+	max-width: 100%;
+	color: var(--bf-md-text-overview);
+	font-size: 1.1em;
+}
+
+.overviewBlock {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.7rem;
+}
+
+.introControlsRow {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.58rem;
+	width: 100%;
+}
+
+.overviewMissing {
+	margin-top: 0.4rem;
+	margin-bottom: 0.4rem;
+	font-size: 0.98em;
+	font-style: italic;
+	color: var(--bf-md-text-muted);
+}
+
+.overviewCollapsed {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	overflow: hidden;
+}
+
+.overviewInteractive {
+	cursor: pointer;
+	user-select: none;
+	outline: none;
+}
+
+.overviewInteractive:hover,
+.overviewInteractive:focus,
+.overviewInteractive:focus-visible {
+	border-color: var(--bf-theme-surface-border);
+	background: var(--bf-theme-tab-hover-bg);
+}
+
+.overviewPlayButton {
+	min-width: 0 !important;
+	width: auto !important;
+	align-self: flex-start;
+
+	:global(.bf-button) {
+		min-width: 0 !important;
+		width: auto !important;
+		padding: 0 1rem !important;
+	}
+
+	:global(.client) {
+		display: inline-flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		width: auto !important;
+		text-align: center !important;
+		white-space: nowrap !important;
+	}
+}
+
+.introPlayButton {
+	align-self: auto;
+}
+
+.overviewText {
+	display: block;
+}

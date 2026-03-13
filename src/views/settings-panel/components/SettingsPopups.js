@@ -1,7 +1,9 @@
+import {useRef} from 'react';
 import Popup from '@enact/sandstone/Popup';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../../../components/AppScroller';
 import Button from '../../../components/BreezyButton';
+import {usePopupInitialFocus} from '../../../hooks/usePopupInitialFocus';
 import css from '../../SettingsPanel.module.less';
 import popupStyles from '../../../styles/popupStyles.module.less';
 
@@ -23,6 +25,10 @@ const SettingsPopups = ({
 	subtitleLangPopupOpen,
 	closeSubtitleLangPopup,
 	handleSubtitleLanguageSelect,
+	subtitleBurnInTextCodecsPopupOpen,
+	closeSubtitleBurnInTextCodecsPopup,
+	subtitleBurnInTextCodecOptions,
+	handleSubtitleBurnInTextCodecToggle,
 	navbarThemePopupOpen,
 	closeNavbarThemePopup,
 	navbarThemeOptions,
@@ -41,10 +47,38 @@ const SettingsPopups = ({
 	appLogs,
 	wipeCacheConfirmOpen,
 	closeWipeCacheConfirm,
+	wipeCacheKeepLogin,
 	cacheWipeInProgress,
 	cacheWipeError,
 	handleWipeCacheConfirm
 }) => {
+	const wipeCacheTitle = wipeCacheKeepLogin ? 'Wipe Cache (Keep Login)' : 'Wipe App Cache';
+	const wipeCacheMessage = wipeCacheKeepLogin
+		? 'This clears cache/storage data and reloads the app, while preserving saved login session data.'
+		: 'This clears local storage, session storage, cache storage, and IndexedDB, then reloads the app.';
+	const wipeCacheActionLabel = wipeCacheKeepLogin ? 'Wipe (Keep Login) & Reload' : 'Wipe & Reload';
+	const bitratePopupContentRef = useRef(null);
+	const audioLangPopupContentRef = useRef(null);
+	const capabilityProbeRefreshPopupContentRef = useRef(null);
+	const subtitleLangPopupContentRef = useRef(null);
+	const subtitleBurnInTextCodecsPopupContentRef = useRef(null);
+	const navbarThemePopupContentRef = useRef(null);
+	const playNextPromptModePopupContentRef = useRef(null);
+	const logoutConfirmPopupContentRef = useRef(null);
+	const logsPopupContentRef = useRef(null);
+	const wipeCacheConfirmPopupContentRef = useRef(null);
+
+	usePopupInitialFocus(bitratePopupOpen, bitratePopupContentRef);
+	usePopupInitialFocus(audioLangPopupOpen, audioLangPopupContentRef);
+	usePopupInitialFocus(capabilityProbeRefreshPopupOpen, capabilityProbeRefreshPopupContentRef);
+	usePopupInitialFocus(subtitleLangPopupOpen, subtitleLangPopupContentRef);
+	usePopupInitialFocus(subtitleBurnInTextCodecsPopupOpen, subtitleBurnInTextCodecsPopupContentRef);
+	usePopupInitialFocus(navbarThemePopupOpen, navbarThemePopupContentRef);
+	usePopupInitialFocus(playNextPromptModePopupOpen, playNextPromptModePopupContentRef);
+	usePopupInitialFocus(logoutConfirmOpen, logoutConfirmPopupContentRef);
+	usePopupInitialFocus(logsPopupOpen, logsPopupContentRef);
+	usePopupInitialFocus(wipeCacheConfirmOpen, wipeCacheConfirmPopupContentRef);
+
 	return (
 		<>
 			<Popup
@@ -52,7 +86,7 @@ const SettingsPopups = ({
 				onClose={closeBitratePopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<div ref={bitratePopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Select Maximum Bitrate</BodyText>
 					{bitrateOptions.map((option) => (
 						<Button
@@ -73,7 +107,7 @@ const SettingsPopups = ({
 				onClose={closeAudioLangPopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<div ref={audioLangPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Audio Language</BodyText>
 					<div className={css.popupOptions}>
 						{languageOptions.map((option) => (
@@ -96,7 +130,7 @@ const SettingsPopups = ({
 				onClose={closeCapabilityProbeRefreshPopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<div ref={capabilityProbeRefreshPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Capability Probe Refresh Period</BodyText>
 					{capabilityProbeRefreshOptions.map((option) => (
 						<Button
@@ -117,7 +151,7 @@ const SettingsPopups = ({
 				onClose={closeSubtitleLangPopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<div ref={subtitleLangPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Subtitle Language</BodyText>
 					<div className={css.popupOptions}>
 						{languageOptions.map((option) => (
@@ -136,11 +170,40 @@ const SettingsPopups = ({
 			</Popup>
 
 			<Popup
+				open={subtitleBurnInTextCodecsPopupOpen}
+				onClose={closeSubtitleBurnInTextCodecsPopup}
+				css={popupShellCss}
+			>
+				<div ref={subtitleBurnInTextCodecsPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Subtitle Burn-in Formats</BodyText>
+					<BodyText className={css.popupMessage}>
+						Selected formats will prefer burn-in/transcoding. Leave empty to keep quality-first playback.
+					</BodyText>
+					<div className={css.popupOptions}>
+						{subtitleBurnInTextCodecOptions.map((option) => (
+							<Button
+								key={option.value}
+								data-codec={option.value}
+								className={css.popupOption}
+								selected={(settings.subtitleBurnInTextCodecs || []).includes(option.value)}
+								onClick={handleSubtitleBurnInTextCodecToggle}
+							>
+								{option.label}
+							</Button>
+						))}
+					</div>
+					<div className={css.popupActions}>
+						<Button onClick={closeSubtitleBurnInTextCodecsPopup} className={css.popupOption}>Done</Button>
+					</div>
+				</div>
+			</Popup>
+
+			<Popup
 				open={navbarThemePopupOpen}
 				onClose={closeNavbarThemePopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.nativeThemePopupContent}`}>
+				<div ref={navbarThemePopupContentRef} className={`${popupStyles.popupSurface} ${css.nativeThemePopupContent}`}>
 					<BodyText className={css.popupTitle}>Navigation Theme</BodyText>
 					<div className={css.nativeThemePopupOptions}>
 						{navbarThemeOptions.map((option) => (
@@ -164,7 +227,7 @@ const SettingsPopups = ({
 				onClose={closePlayNextPromptModePopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<div ref={playNextPromptModePopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Play Next Prompt Mode</BodyText>
 					<Button
 						className={css.popupOption}
@@ -188,7 +251,7 @@ const SettingsPopups = ({
 				onClose={closeLogoutConfirm}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<div ref={logoutConfirmPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Sign Out</BodyText>
 					<BodyText className={css.popupMessage}>
 						Are you sure you want to sign out from {serverInfo?.ServerName || 'this server'}?
@@ -205,7 +268,7 @@ const SettingsPopups = ({
 				onClose={closeLogsPopup}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.logPopupContent}`}>
+				<div ref={logsPopupContentRef} className={`${popupStyles.popupSurface} ${css.logPopupContent}`}>
 					<BodyText className={css.popupTitle}>Recent Logs</BodyText>
 					<div className={css.logActions}>
 						<Button size="small" onClick={handleClearLogs} className={css.popupOption}>Clear Logs</Button>
@@ -231,23 +294,23 @@ const SettingsPopups = ({
 				noAutoDismiss={cacheWipeInProgress}
 				css={popupShellCss}
 			>
-				<div className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Wipe App Cache</BodyText>
+				<div ref={wipeCacheConfirmPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>{wipeCacheTitle}</BodyText>
 					<BodyText className={css.popupMessage}>
-						This clears local storage, session storage, cache storage, and IndexedDB, then reloads the app.
+						{wipeCacheMessage}
 					</BodyText>
 					{cacheWipeError ? (
 						<BodyText className={css.popupMessage}>{cacheWipeError}</BodyText>
 					) : null}
 					<div className={css.popupActions}>
-						<Button onClick={closeWipeCacheConfirm} disabled={cacheWipeInProgress}>Cancel</Button>
+						<Button onClick={closeWipeCacheConfirm} disabled={cacheWipeInProgress} className={css.popupOption}>Cancel</Button>
 						<Button
 							onClick={handleWipeCacheConfirm}
-							className={css.dangerButton}
+							className={`${css.popupOption} ${css.dangerButton}`}
 							disabled={cacheWipeInProgress}
 							selected={cacheWipeInProgress}
 						>
-							{cacheWipeInProgress ? 'Wiping...' : 'Wipe & Reload'}
+							{cacheWipeInProgress ? 'Wiping...' : wipeCacheActionLabel}
 						</Button>
 					</div>
 				</div>

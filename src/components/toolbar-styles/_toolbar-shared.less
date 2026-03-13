@@ -1,0 +1,11 @@
+.toolbarBackdropSurface() {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--bf-theme-popup-bg);
+	backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	pointer-events: none;
+	z-index: 0;
+}

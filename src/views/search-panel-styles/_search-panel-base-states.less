@@ -1,0 +1,42 @@
+.loadingState {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	min-height: 0;
+}
+
+.loadingMore {
+	display: flex;
+	justify-content: center;
+	padding: 1rem 0 1.75rem;
+}
+
+.emptyState {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	min-height: 0;
+	opacity: 0.6;
+	text-align: center;
+	padding: 2rem 4rem;
+	width: 100%;
+	max-width: none;
+	box-sizing: border-box;
+	align-self: center;
+}
+
+.emptyState :global(.BodyText) {
+	display: block;
+	width: 100%;
+	text-align: center;
+	margin: 0 auto;
+}
+
+.resultsScroller {
+	flex: 1;
+	min-height: 0;
+	background: var(--bf-theme-panel-bg);
+	overscroll-behavior: contain;
+}

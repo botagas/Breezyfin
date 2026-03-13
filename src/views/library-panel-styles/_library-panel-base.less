@@ -2,13 +2,13 @@
 @import (reference) '../../styles/panelLayoutMixins.less';
 
 .libraryContainer {
-	.panel-fill-container(var(--bf-theme-panel-bg, #121212));
+	.panel-fill-container(var(--bf-theme-panel-bg));
 }
 
 .scroller {
 	flex: 1;
 	min-height: 0;
-	background: var(--bf-theme-panel-bg, #121212);
+	background: var(--bf-theme-panel-bg);
 	overscroll-behavior: contain;
 }
 
@@ -24,8 +24,8 @@
 	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
 	gap: 2rem;
 	/* Panel body already sits below native header; offset content by toolbar chrome only. */
-	padding: calc(var(--bf-panel-top-offset, 4.5rem) - 0.75rem) 4rem clamp(2rem, var(--bf-panel-content-bottom-padding, 4rem), 4rem);
-	background: var(--bf-theme-panel-bg, #121212);
+	padding: calc(var(--bf-panel-top-offset) - 0.75rem) 4rem clamp(2rem, var(--bf-panel-content-bottom-padding), 4rem);
+	background: var(--bf-theme-panel-bg);
 	.panel-grid-performance();
 }
 
@@ -74,14 +74,19 @@
 	.status-badge-pill();
 }
 
+.watchedBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	.status-badge-success();
+}
+
 .progressBar {
 	.card-progress-bar-surface();
-	background: rgba(255, 255, 255, 0.3);
 }
 
 .progress {
 	.card-progress-bar-fill();
-	background: #00a4dc;
 	transition: width 0.3s ease;
 }
 

@@ -1,0 +1,48 @@
+.episodeImageContainer {
+	position: relative;
+	cursor: pointer;
+	transition: box-shadow 180ms ease, border-color 180ms ease;
+	border-radius: var(--bf-media-details-episode-radius);
+	overflow: hidden;
+	height: calc(100% - 32px);
+	border: 1px solid var(--bf-theme-card-border-rest);
+	box-shadow: var(--bf-theme-card-shadow-rest);
+
+	&::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: var(--bf-theme-card-hover-overlay-gradient);
+		opacity: 0;
+		transition: opacity 220ms ease;
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 45%;
+		background: var(--bf-theme-card-bottom-fade-gradient);
+		pointer-events: none;
+		z-index: 1;
+	}
+}
+
+.episodeImageLoadingHint {
+	z-index: 2;
+	background: linear-gradient(155deg, rgba(65, 84, 113, 0.34), rgba(34, 48, 71, 0.24));
+}
+
+.episodeImage {
+	height: 100%;
+	width: auto;
+	aspect-ratio: 21/9;
+	object-fit: cover;
+	flex-shrink: 0;
+	display: block;
+	transition: opacity 180ms ease;
+}

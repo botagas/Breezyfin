@@ -1,0 +1,17 @@
+.userMenuElegant {
+	margin-top: 0.55rem;
+	padding: 0.38rem;
+	border-radius: 0.95rem;
+	background: transparent;
+	border: 1px solid var(--bf-elegant-surface-border-soft);
+	box-shadow: var(--bf-theme-surface-shadow);
+	backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	-webkit-backdrop-filter: blur(var(--bf-theme-popup-blur)) saturate(var(--bf-theme-popup-saturate));
+	overflow: hidden;
+	isolation: isolate;
+	contain: paint;
+}
+
+.userMenuElegant::before {
+	background: var(--bf-elegant-popup-bg);
+}

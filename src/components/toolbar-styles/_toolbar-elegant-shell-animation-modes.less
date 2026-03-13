@@ -1,0 +1,39 @@
+:global([data-bf-all-animations='off']) .liquidLayerFilter {
+	backdrop-filter: blur(0.5rem) !important;
+	-webkit-backdrop-filter: blur(0.5rem) !important;
+	filter: none !important;
+}
+
+:global([data-bf-animations='off']) .liquidLayerFilter {
+	backdrop-filter: blur(0.56rem) !important;
+	-webkit-backdrop-filter: blur(0.56rem) !important;
+	filter: var(--bf-glass-distortion-filter) saturate(1.12) brightness(1.04) !important;
+}
+
+:global([data-bf-animations='off']) .glassFilter {
+	backdrop-filter: blur(0.56rem) !important;
+	-webkit-backdrop-filter: blur(0.56rem) !important;
+	filter: var(--bf-glass-distortion-filter) saturate(1.14) brightness(1.05) !important;
+}
+
+:global([data-bf-animations='off']) .userMenuElegant,
+:global([data-bf-animations='off']) .libraryNativeContentGlass {
+	box-shadow: none !important;
+}
+
+:global([data-bf-all-animations='off']) .liquidLayerOverlay {
+	background: var(--bf-theme-overlay-ultra-soft-bg) !important;
+}
+
+:global([data-bf-all-animations='off']) .liquidLayerSpecular {
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+:global([data-bf-all-animations='off']) .userMenuElegant,
+:global([data-bf-all-animations='off']) .libraryNativeContentGlass {
+	background: var(--bf-theme-ultra-surface-bg) !important;
+	backdrop-filter: blur(0.5rem) !important;
+	-webkit-backdrop-filter: blur(0.5rem) !important;
+	box-shadow: none !important;
+}

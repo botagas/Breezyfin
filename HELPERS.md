@@ -14,15 +14,33 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Open/close multiple popups/menus | `useDisclosureMap` |
 | Build stable per-popup open/close handlers | `useDisclosureHandlers` |
 | Close popup when focus/pointer leaves scope | `useDismissOnOutsideInteraction` |
+| Auto-focus first actionable popup option on open | `usePopupInitialFocus` |
 | Centralize PlayerPanel remote/media-key handling | `usePlayerKeyboardShortcuts` |
+| Centralize PlayerPanel external/internal controls-visibility synchronization | `usePlayerVisibilitySync` |
 | Centralize PlayerPanel video loading/session selection flow | `usePlayerVideoLoader` |
+| Centralize PlayerPanel playback option/session-context builders | `usePlayerPlaybackContext` |
 | Centralize PlayerPanel skip overlay + next-episode prompt state machine | `usePlayerSkipOverlayState` |
 | Centralize PlayerPanel seek + track-switching flow | `usePlayerSeekAndTrackSwitching` |
+| Centralize PlayerPanel track-popup `data-track-index` click handlers | `usePlayerTrackPopupHandlers` |
 | Centralize PlayerPanel play/pause/retry/end command handlers | `usePlayerPlaybackCommands` |
+| Centralize PlayerPanel stop/focus control handlers | `usePlayerCoreControls` |
+| Centralize PlayerPanel layered back handling decisions | `usePlayerBackNavigation` |
+| Centralize PlayerPanel audio/subtitle popup disclosure wiring | `usePlayerDisclosures` |
+| Centralize PlayerPanel adjacent-episode checks + progress reporting ticker | `usePlayerEpisodeProgress` |
+| Centralize PlayerPanel media event callbacks (load/canplay/time/error) | `usePlayerMediaEventHandlers` |
+| Centralize PlayerPanel episode-navigation + surface/volume interaction handlers | `usePlayerEpisodeAndSurfaceHandlers` |
 | Centralize Media Details focus debug tracing | `useMediaDetailsFocusDebug` |
 | Centralize Media Details focus orchestration (pointer + 5-way seed/focus) | `useMediaDetailsFocusOrchestrator` |
+| Centralize Media Details section snap + section-switch focus behavior | `useMediaDetailsSectionNavigation` |
 | Centralize Media Details watched/favorite mutations | `useMediaDetailsItemActions` |
 | Centralize Media Details popup picker handlers | `useMediaDetailsPickerHandlers` |
+| Centralize Media Details primary action handlers | `useMediaDetailsPrimaryActions` |
+| Centralize Media Details popup disclosure wiring | `useMediaDetailsDisclosures` |
+| Centralize Media Details image state/url/fallback handlers | `useMediaDetailsImages` |
+| Centralize Media Details DOM scroll/focus helper callbacks | `useMediaDetailsDomHelpers` |
+| Centralize Media Details overview overflow measurement + play label derivation | `useMediaDetailsOverviewState` |
+| Centralize Media Details panel sync effects (item reset, timeout cleanup, settings sync) | `useMediaDetailsPanelSync` |
+| Centralize Media Details per-item bootstrap effect (data load + selection reset) | `useMediaDetailsItemBootstrap` |
 | Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
 | Keep component state synced to settings changes | `useBreezyfinSettingsSync` |
 | Fast lookup of items by id/key | `useMapById` |
@@ -30,7 +48,15 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Reusable toast lifecycle | `useToastMessage` |
 | Reusable image fallback behavior | `useImageErrorFallback` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
-| Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` |
+| Derive Settings runtime capability labels from capability snapshot | `useRuntimeCapabilityLabels` |
+| Centralize Settings bootstrap data loading/effects | `useSettingsBootstrap` |
+| Centralize Settings panel disclosure/open-close wiring | `useSettingsDisclosures` |
+| Centralize Settings panel home-row toggle/reorder handlers | `useSettingsHomeRows` |
+| Centralize Settings panel option-selection handlers | `useSettingsOptionHandlers` |
+| Centralize Settings panel server/session/log/cache orchestration | `useSettingsSystemHandlers` |
+| Centralize Settings panel boolean-setting toggle handlers + persistence writes | `useSettingsToggleHandlers` |
+| Centralize Settings panel display/label/diagnostic + panel-back handlers | `useSettingsDisplayHandlers` |
+| Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` / `refreshRuntimePlatformCapabilitiesWithLuna` |
 
 ---
 
@@ -172,6 +198,21 @@ useDismissOnOutsideInteraction({
 })
 ```
 
+### `usePopupInitialFocus`
+- File: `src/hooks/usePopupInitialFocus.js`
+- Purpose: focus the first actionable item inside a popup once it opens (with mount-timing retries for Sandstone popup lifecycle timing).
+- Signature:
+```js
+usePopupInitialFocus(open, popupContentRef, {
+  selector,
+  retryDelayMs,
+  maxAttempts
+})
+```
+- Use when:
+  - opening a popup should always land focus on the first option/action.
+  - you want to avoid focus staying on the trigger button/body after popup open.
+
 ### `usePlayerKeyboardShortcuts`
 - File: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
 - Purpose: isolate global PlayerPanel key handling (seek, back layering, play/pause media keys).
@@ -199,10 +240,25 @@ usePlayerKeyboardShortcuts({
 })
 ```
 
+### `usePlayerVisibilitySync`
+- File: `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
+- Purpose: keep PlayerPanel controls-visibility state synchronized with:
+  - optional external `requestedControlsVisible` prop
+  - optional `onControlsVisibilityChange` callback
+- Signature:
+```js
+usePlayerVisibilitySync({
+  requestedControlsVisible,
+  onControlsVisibilityChange,
+  showControls,
+  setShowControls
+})
+```
+
 ### `usePlayerVideoLoader`
 - File: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
 - Purpose: encapsulate the PlayerPanel playback load pipeline:
-  - settings + playback profile resolution
+  - settings + playback profile resolution (including subtitle burn-in format policy)
   - media source/session selection
   - audio/subtitle initialization
   - stream URL construction (direct/hls/transcode)
@@ -248,6 +304,16 @@ const loadVideo = usePlayerVideoLoader({
 });
 ```
 
+### `usePlayerPlaybackContext`
+- File: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
+- Purpose: centralize playback option/session context derivation and current track ref sync:
+  - `buildPlaybackOptions()` using selected audio/subtitle track state
+  - `getPlaybackSessionContext()` for reporting calls
+  - keep `currentAudioTrackRef` / `currentSubtitleTrackRef` in sync
+- Returns:
+  - `buildPlaybackOptions()`
+  - `getPlaybackSessionContext()`
+
 ### `usePlayerSkipOverlayState`
 - File: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
 - Purpose: encapsulate Player skip-intro/credits + next-episode prompt state transitions and dismiss/skip handlers.
@@ -268,6 +334,13 @@ const loadVideo = usePlayerVideoLoader({
   - `handleAudioTrackChange(trackIndex)`
   - `handleSubtitleTrackChange(trackIndex)`
 
+### `usePlayerTrackPopupHandlers`
+- File: `src/views/player-panel/hooks/usePlayerTrackPopupHandlers.js`
+- Purpose: centralize `PlayerTrackPopup` click handlers parsing `data-track-index` and dispatching to track-change handlers.
+- Returns:
+  - `handleAudioTrackItemClick(event)`
+  - `handleSubtitleTrackItemClick(event)`
+
 ### `usePlayerPlaybackCommands`
 - File: `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
 - Purpose: centralize playback command callbacks that sit above low-level stop/recovery wiring:
@@ -284,6 +357,24 @@ const loadVideo = usePlayerVideoLoader({
   - `handleBackButton()`
   - `tryPlaybackFallbackOnCanPlayError(errorMessage)`
 
+### `usePlayerEpisodeAndSurfaceHandlers`
+- File: `src/views/player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers.js`
+- Purpose: centralize remaining PlayerPanel inline UI interaction handlers:
+  - next/previous episode navigation handlers
+  - video surface click play/pause toggle
+  - volume/mute handlers
+  - video playing/pause state callbacks
+  - error clear action
+- Returns:
+  - `handlePlayNextEpisode()`
+  - `handlePlayPreviousEpisode()`
+  - `handleVideoSurfaceClick()`
+  - `handleVolumeChange(event)`
+  - `toggleMute()`
+  - `handleVideoPlaying()`
+  - `handleVideoPause()`
+  - `clearError()`
+
 ### `useMediaDetailsFocusDebug`
 - File: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
 - Purpose: encapsulate opt-in focus/scroll debug tracing (`bfFocusDebug`) and attach focus/scroll debug listeners.
@@ -296,7 +387,7 @@ const loadVideo = usePlayerVideoLoader({
 - File: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
 - Purpose: centralize Media Details focus routing/orchestration:
   - pointer-to-focus sync and guard behavior
-  - initial focus seeding for series/non-series
+  - initial focus seeding for series/non-series with playback-first order (`Audio -> Subtitle -> Play`)
   - focus target helper methods used by interaction handlers
   - cast/season focus scrolling behavior
 - Returns key methods:
@@ -306,6 +397,28 @@ const loadVideo = usePlayerVideoLoader({
   - `focusSeasonCardByIndex()`, `focusSeasonWatchedButton()`, `focusBelowSeasons()`
   - `focusNonSeriesAudioSelector()`, `focusNonSeriesSubtitleSelector()`, `focusNonSeriesPrimaryPlay()`
   - `handleDetailsPointerDownCapture()`, `handleDetailsPointerClickCapture()`
+- Focus policy note:
+  - prefer playback controls for first-section targeting (`Audio -> Subtitle -> Play`), then fall back as needed.
+  - do not use header favorite/watched actions as automatic first-focus targets.
+
+### `useMediaDetailsSectionNavigation`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
+- Purpose: centralize intro/content section navigation behavior for Media Details:
+  - section snap thresholds and wheel capture
+  - focus-driven section switching
+  - smooth-scroll-preserving focus handoff when returning from section two to section one
+  - intro top-nav `DOWN` routing and section primary focus targets
+  - scroller stop snap behavior
+- Returns key methods:
+  - `hasSecondarySection`
+  - `focusSectionOnePrimary()`
+  - `focusAndShowFirstSection()`
+  - `focusAndShowSecondSection()`
+  - `focusIntroTopNavigation()`
+  - `handleIntroActionKeyDown(event)`
+  - `handleIntroTopNavKeyDown(event)`
+  - `handleSectionWheelCapture(event)`
+  - `handleDetailsScrollerScrollStop(event)`
 
 ### `useMediaDetailsItemActions`
 - File: `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
@@ -321,6 +434,42 @@ const loadVideo = usePlayerVideoLoader({
 - Returns:
   - `handleTrackSelect(event)`
   - `handleEpisodePopupSelect(event)`
+
+### `useMediaDetailsDomHelpers`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsDomHelpers.js`
+- Purpose: centralize Media Details DOM-level helper callbacks used by focus/debug/navigation orchestration:
+  - scroll element resolution
+  - scroll snapshot generation
+  - safe focus without scroll jumps
+- Returns:
+  - `getDetailsScrollElement()`
+  - `getScrollSnapshot()`
+  - `focusNodeWithoutScroll(node)`
+
+### `useMediaDetailsOverviewState`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
+- Purpose: centralize Media Details overview/presentation derivation:
+  - overview overflow measurement effect
+  - series/non-series primary play label derivation (`Play`/`Continue`/`Next Up`)
+- Returns:
+  - `hasOverviewOverflow`
+  - `seriesPlayLabel`
+  - `overviewPlayLabel`
+
+### `useMediaDetailsPanelSync`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
+- Purpose: centralize Media Details panel-level synchronization effects:
+  - reset cast/overview expansion when item changes
+  - cleanup pending cast/season/episode focus-scroll timers on unmount
+  - subscribe/apply settings (`navbarTheme`, `showSeasonImages`, `useSidewaysEpisodeList`)
+
+### `useMediaDetailsItemBootstrap`
+- File: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
+- Purpose: centralize per-item bootstrap effect for Media Details:
+  - bump request guards on item change
+  - reload playback/season data
+  - reset non-series/series selection state
+  - initialize favorite/watched state from `item.UserData`
 
 ### `useInputMode`
 - File: `src/hooks/useInputMode.js`
@@ -363,6 +512,7 @@ useItemMetadata(itemId, { enabled = true, errorContext = 'item metadata' })
 ### `useImageErrorFallback`
 - File: `src/hooks/useImageErrorFallback.js`
 - Purpose: shared `onError` behavior for images:
+  - retry once with downgraded non-WebP URL when preferred WebP path fails
   - hide broken image
   - mark container with placeholder class
   - optional callback
@@ -410,6 +560,14 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - File: `src/utils/spotlightContainerUtils.js`
 - Purpose: create `SpotlightContainerDecorator` with `enterTo: 'last-focused'`.
 
+### `toInteger`
+- File: `src/utils/numberParsing.js`
+- Purpose: normalize integer-like values (`number` or numeric string) to a strict integer-or-null shape.
+
+### `describeDomNode`
+- File: `src/utils/domNodeDescription.js`
+- Purpose: build concise debug labels for DOM focus targets (`tag#id.class [spotlight=...] [role=...]`).
+
 ### `scrollElementIntoHorizontalView`
 - File: `src/utils/horizontalScroll.js`
 - Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer.
@@ -435,7 +593,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/player-panel/components/PlayerTrackPopup.js`
   - shared audio/subtitle popup list shell.
 - `src/views/player-panel/components/PlayerLoadingOverlay.js`
-  - loading glass spinner shell.
+  - player wrapper around shared `src/components/BreezyLoadingOverlay.js`.
 - `src/views/player-panel/components/PlayerSeekFeedback.js`
   - transient seek feedback label overlay.
 - `src/views/player-panel/components/PlayerSkipOverlay.js`
@@ -448,14 +606,32 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 ### Player panel local hooks
 - `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
   - centralizes player keyboard/media key handling with seek/context guards.
+- `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
+  - centralizes external/internal controls-visibility synchronization effects.
 - `src/views/player-panel/hooks/usePlayerVideoLoader.js`
   - centralizes playback source/session selection and video load orchestration.
+- `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
+  - centralizes playback option/session-context derivation and selected-track ref synchronization.
 - `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
   - centralizes skip-intro/next-episode prompt transitions and skip/dismiss handlers.
 - `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
   - centralizes seek logic and audio/subtitle switching behavior across HLS/direct/transcode paths.
+- `src/views/player-panel/hooks/usePlayerTrackPopupHandlers.js`
+  - centralizes Player track-popup click handlers that parse `data-track-index`.
 - `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
   - centralizes player command handlers (`play/pause/retry/end/back`) above low-level stop/recovery.
+- `src/views/player-panel/hooks/usePlayerCoreControls.js`
+  - centralizes stop lifecycle, startup-watch timer cleanup, and skip-overlay focus targeting.
+- `src/views/player-panel/hooks/usePlayerBackNavigation.js`
+  - centralizes layered PlayerPanel back handling (track popups -> skip overlay -> controls).
+- `src/views/player-panel/hooks/usePlayerDisclosures.js`
+  - centralizes PlayerPanel audio/subtitle popup disclosure state + handlers.
+- `src/views/player-panel/hooks/usePlayerEpisodeProgress.js`
+  - centralizes adjacent-episode availability checks and playback-progress reporting interval orchestration.
+- `src/views/player-panel/hooks/usePlayerMediaEventHandlers.js`
+  - centralizes video element load/canplay/timeupdate/error callback behavior and fallback decisions.
+- `src/views/player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers.js`
+  - centralizes episode navigation plus video surface/volume/mute/error UI handlers.
 - `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
   - centralizes playback recovery/session rebuild + fallback/transcode/HLS fatal recovery logic.
 - `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
@@ -466,6 +642,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes optional focus/scroll debug tracing lifecycle.
 - `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
   - centralizes pointer/5-way focus routing and initial focus seeding.
+- `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
+  - centralizes section snap + first/second section focus switch behavior (including deferred first-section focus after smooth scroll).
 - `src/views/media-details-panel/hooks/useMediaDetailsKeyboardShortcuts.js`
   - centralizes details panel BACK/PLAY key handling and pointer-mode guard behavior.
 - `src/views/media-details-panel/hooks/useMediaDetailsTrackOptions.js`
@@ -478,8 +656,22 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes favorite/watched mutation flows and related refresh behavior.
 - `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
   - centralizes audio/subtitle and episode picker selection handlers.
+- `src/views/media-details-panel/hooks/useMediaDetailsPrimaryActions.js`
+  - centralizes primary play/back and overview/cast/episode-series action handlers.
+- `src/views/media-details-panel/hooks/useMediaDetailsDisclosures.js`
+  - centralizes Media Details popup disclosure state and open/close handlers.
+- `src/views/media-details-panel/hooks/useMediaDetailsImages.js`
+  - centralizes Media Details image state, image URL builders, and fallback/error handlers.
 - `src/views/media-details-panel/hooks/useMediaDetailsInteractionHandlers.js`
   - centralizes cast/season/episode focus-navigation + key interaction handlers.
+- `src/views/media-details-panel/hooks/useMediaDetailsDomHelpers.js`
+  - centralizes DOM scroll-element/snapshot helpers and focus-without-scroll helper callbacks.
+- `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
+  - centralizes overview overflow state and primary play-label derivation.
+- `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
+  - centralizes panel sync effects (item reset, timeout cleanup, settings sync).
+- `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
+  - centralizes per-item bootstrap effect for request guards + reload + initial favorite/watched state.
 
 ### Media details panel local components
 - `src/views/media-details-panel/components/MediaDetailsToast.js`
@@ -512,6 +704,43 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - `writeTrackPreferences(preferences)`
   - `createAudioPreference(index, stream)`
   - `createSubtitlePreference(index, stream)`
+- `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
+  - derives UI-ready settings labels from runtime playback capabilities.
+- `src/views/settings-panel/hooks/useSettingsBootstrap.js`
+  - centralizes bootstrap loading/effects for settings, server/user info, saved servers, logs count, and app version.
+- `src/views/settings-panel/hooks/useSettingsDisclosures.js`
+  - centralizes popup disclosure state booleans and open/close handlers for `SettingsPanel`.
+- `src/views/settings-panel/hooks/useSettingsHomeRows.js`
+  - centralizes Settings home-row toggle/reorder handlers and move-button event callbacks.
+- `src/views/settings-panel/hooks/useSettingsOptionHandlers.js`
+  - centralizes Settings option-selection handlers (bitrate/theme/language/capability refresh/subtitle burn-in formats/play-next prompt mode).
+- `src/views/settings-panel/hooks/useSettingsSystemHandlers.js`
+  - centralizes Settings server/session actions plus diagnostics log and cache-wipe orchestration handlers.
+- `src/views/settings-panel/hooks/useSettingsToggleHandlers.js`
+  - centralizes boolean-setting toggles and persisted setting mutation handler.
+- `src/views/settings-panel/hooks/useSettingsDisplayHandlers.js`
+  - centralizes display/label helpers plus diagnostics refresh and panel back handling.
+- `src/views/settings-panel/capabilityFormatting.js`
+  - formatting/normalization helpers for runtime capability values and refresh period settings.
+
+### Shared constants
+- `src/constants/time.js`
+  - `JELLYFIN_TICKS_PER_SECOND` for consistent Jellyfin tick/second conversion across services and player hooks.
+- `src/constants/toast.js`
+  - `PANEL_TOAST_CONFIG` shared toast timing preset for panel toasts.
+
+### Runtime capability helpers
+- `src/utils/platformCapabilities.js`
+  - public runtime capability facade (probe cache, refresh TTL, and Luna refresh entrypoint).
+- `src/utils/platform-capabilities/*`
+  - decomposed internals (`runtimeComputation`, `runtimeCache`, `lunaProbe`, `lunaOverrides`, `runtimeSignature`, and related helpers).
+
+### Runtime image format helpers
+- `src/utils/imageFormat.js`
+  - `getPreferredImageFormat()`
+  - `applyPreferredImageFormatToParams(searchParams, options?)`
+  - `stripPreferredImageFormatFromUrl(url)`
+  - `applyImageFormatFallbackFromEvent(event)`
 
 ---
 
@@ -522,6 +751,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - [`THEMES.md`](./THEMES.md)
 - [`COMPONENTS.md`](./COMPONENTS.md)
 - [`VIEWS.md`](./VIEWS.md)
+- [`CHECKS.md`](./CHECKS.md)
 - [`TODOS.md`](./TODOS.md)
 
 ---

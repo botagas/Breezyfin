@@ -1,0 +1,67 @@
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton {
+	--bf-button-fg: var(--bf-theme-text-primary);
+	--bf-button-fg-hover: var(--bf-theme-accent);
+	--bf-button-fg-active: var(--bf-theme-accent);
+	border-radius: 0.72rem !important;
+	border: 1px solid rgba(255, 255, 255, 0.16) !important;
+	background: transparent !important;
+	overflow: hidden !important;
+	box-shadow: none !important;
+	outline: none !important;
+	transition: background 0.16s ease, border-color 0.16s ease !important;
+}
+
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton :global(.bf-button-bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton :global(.bg) {
+	background: transparent !important;
+	border: none !important;
+	border-radius: inherit !important;
+	box-shadow: none !important;
+}
+
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton :global(.client),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton :global(.marquee) {
+	color: inherit !important;
+}
+
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:hover,
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:focus,
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.spottable):focus,
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.spotlight),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global([data-webos-voice-focused='true']) {
+	background: var(--bf-theme-tab-hover-bg) !important;
+	border-color: rgba(255, 255, 255, 0.26) !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:hover :global(.bf-button-bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:focus :global(.bf-button-bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.spottable):focus :global(.bf-button-bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.spotlight) :global(.bf-button-bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global([data-webos-voice-focused='true']) :global(.bf-button-bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:hover :global(.bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:focus :global(.bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.spottable):focus :global(.bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.spotlight) :global(.bg),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global([data-webos-voice-focused='true']) :global(.bg) {
+	background: transparent !important;
+	border: none !important;
+}
+
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected) {
+	--bf-button-fg: var(--bf-theme-accent);
+	--bf-button-fg-hover: var(--bf-theme-accent);
+	--bf-button-fg-active: var(--bf-theme-accent);
+	border-color: rgba(var(--bf-theme-accent-rgb), 0.55) !important;
+	background: rgba(var(--bf-theme-accent-rgb), 0.14) !important;
+}
+
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected):hover,
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected):focus,
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected):global(.spottable):focus,
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected):global(.spotlight),
+:global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected):global([data-webos-voice-focused='true']) {
+	background: rgba(var(--bf-theme-accent-rgb), 0.22) !important;
+	border-color: rgba(var(--bf-theme-accent-rgb), 0.68) !important;
+}

@@ -1,0 +1,65 @@
+.settingsContainer {
+	--bf-panel-overlap-lift: calc(var(--bf-top-chrome-height) - var(--bf-panel-scroller-offset-nudge));
+	--bf-settings-content-bottom-pad: 4rem;
+	--bf-settings-bottom-spacer: 0rem;
+	--settings-accent: var(--bf-theme-accent);
+	--settings-bg-base: var(--bf-theme-settings-bg-base);
+	--settings-bg-glow-a: var(--bf-theme-settings-bg-glow-a);
+	--settings-bg-glow-b: var(--bf-theme-settings-bg-glow-b);
+	--settings-surface: var(--bf-theme-settings-surface);
+	--settings-surface-strong: var(--bf-theme-settings-surface-strong);
+	--settings-border: var(--bf-theme-settings-border);
+	--settings-focus: var(--bf-theme-settings-focus);
+	--settings-title-color: var(--bf-theme-settings-title-color);
+	--settings-text-strong: var(--bf-theme-settings-text-strong);
+	--settings-row-divider: var(--bf-theme-settings-row-divider);
+	--settings-row-divider-strong: var(--bf-theme-settings-row-divider-strong);
+	--settings-log-surface: var(--bf-theme-settings-log-surface);
+	--settings-server-card-bg: var(--bf-theme-settings-server-card-bg);
+	--settings-server-card-active-bg: var(--bf-theme-settings-server-card-active-bg);
+	--settings-danger-bg: var(--bf-theme-settings-danger-bg);
+	--settings-danger-border: var(--bf-theme-settings-danger-border);
+	--settings-danger-bg-hover: var(--bf-theme-settings-danger-bg-hover);
+	--settings-tab-bg: var(--bf-theme-tab-bg);
+	--settings-tab-active-bg: var(--bf-theme-tab-hover-bg);
+	--settings-tab-surface: var(--bf-theme-popup-bg);
+	--settings-tab-border: var(--bf-theme-surface-border);
+	--settings-tab-shadow: var(--bf-theme-surface-shadow);
+	--settings-popup-option-fg-hover: var(--settings-accent);
+	--settings-text-solid: var(--bf-theme-input-trigger-fg);
+	--settings-focus-border: var(--bf-theme-settings-focus-border);
+	--settings-danger-fg: var(--bf-theme-settings-danger-fg);
+	--settings-danger-fg-hover: var(--bf-theme-settings-danger-fg-hover);
+	--settings-danger-overlay-bg: var(--bf-theme-settings-danger-overlay-bg);
+	--settings-log-border: var(--bf-theme-settings-log-border);
+	--settings-server-card-border: var(--bf-theme-settings-server-card-border);
+	--settings-server-card-border-active: var(--bf-theme-settings-server-card-border-active);
+	background:
+		radial-gradient(120rem 50rem at 20% -10%, var(--settings-bg-glow-a), transparent 60%),
+		radial-gradient(100rem 60rem at 100% -20%, var(--settings-bg-glow-b), transparent 58%),
+		var(--settings-bg-base);
+	height: calc(100vh + var(--bf-panel-overlap-lift));
+	min-height: 0;
+	padding-top: 0;
+	margin-top: calc(-1 * var(--bf-panel-overlap-lift));
+	overflow: hidden;
+	overscroll-behavior: contain;
+}
+
+.content {
+	padding: calc(var(--bf-top-chrome-height) + 1.9rem) 4rem var(--bf-settings-content-bottom-pad);
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1.25rem;
+	max-width: 100%;
+	margin: 0 auto;
+	position: relative;
+
+	&::after {
+		content: '';
+		display: block;
+		grid-column: 1 / -1;
+		height: var(--bf-settings-bottom-spacer);
+		pointer-events: none;
+	}
+}

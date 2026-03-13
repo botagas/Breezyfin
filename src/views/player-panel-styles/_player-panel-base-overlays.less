@@ -1,0 +1,66 @@
+.errorBackdrop {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	z-index: 1;
+	pointer-events: none;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0.6;
+		filter: blur(18px);
+		transform: scale(1.05);
+	}
+}
+
+.errorBackdropGradient {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to bottom,
+		var(--bf-theme-player-error-grad-start) 0%,
+		var(--bf-theme-player-error-grad-mid) 35%,
+		var(--bf-theme-player-error-grad-end) 75%,
+		var(--bf-theme-player-error-grad-solid) 100%
+	);
+	z-index: 1;
+}
+
+.errorBackdropFallback {
+	background: var(--bf-theme-backdrop-fallback);
+}
+
+.loading {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 100;
+}
+
+.seekFeedback {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 126px;
+	height: 126px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 145;
+	pointer-events: none;
+	background: transparent;
+	border: 4px solid var(--bf-theme-player-seek-ring);
+	box-shadow: var(--bf-theme-player-seek-shadow);
+}
+
+.seekFeedbackText {
+	font-size: 0.7em;
+	font-weight: 700;
+	text-shadow: var(--bf-theme-player-seek-text-shadow);
+	margin: 0;
+}

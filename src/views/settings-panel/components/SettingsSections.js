@@ -28,7 +28,6 @@ const TAB_SECTION_KEYS = {
 const DEFAULT_TAB_KEY = SETTINGS_TABS[0].key;
 
 const SettingsSections = ({
-	styleDebugEnabled,
 	loading,
 	serverInfo,
 	serverUrl,
@@ -49,6 +48,8 @@ const SettingsSections = ({
 	getLanguageLabel,
 	openAudioLangPopup,
 	openSubtitleLangPopup,
+	subtitleBurnInTextCodecsLabel,
+	openSubtitleBurnInTextCodecsPopup,
 	getBitrateLabel,
 	openBitratePopup,
 	getNavbarThemeLabel,
@@ -61,17 +62,18 @@ const SettingsSections = ({
 	handleRefreshCapabilitiesNow,
 	dynamicRangeLabel,
 	dolbyVisionMkvLabel,
+	webpImageDecodeLabel,
 	videoCodecsLabel,
 	audioCodecsLabel,
 	atmosLabel,
 	hdAudioLabel,
 	maxAudioChannelsLabel,
 	maxStreamingBitrateLabel,
-	openStylingDebugPanel,
 	appLogCount,
 	cacheWipeInProgress,
 	openLogsPopup,
-	openWipeCacheConfirm
+	openWipeCacheConfirm,
+	openWipeCacheKeepLoginConfirm
 }) => {
 	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_TAB_KEY);
 	const [expandedCapabilityRows, setExpandedCapabilityRows] = useState({
@@ -314,38 +316,65 @@ const SettingsSections = ({
 				</section>
 			) : null}
 
-			{shouldRenderSection('transcoding') ? (
-				<section className={css.section}>
-					<BodyText className={css.sectionTitle}>Transcoding</BodyText>
-					<Item
-						className={css.settingItem}
-						label="Maximum Bitrate"
-						slotAfter={getBitrateLabel(settings.maxBitrate)}
-						onClick={openBitratePopup}
-					/>
-					<SwitchItem
-						className={css.switchItem}
-						onToggle={settingToggleHandlers.enableTranscoding}
-						selected={settings.enableTranscoding}
-					>
-						Enable Transcoding
-					</SwitchItem>
-					<SwitchItem
-						className={css.switchItem}
-						onToggle={settingToggleHandlers.forceTranscoding}
-						selected={settings.forceTranscoding}
-					>
-						Force Transcoding (always)
-					</SwitchItem>
-					<SwitchItem
-						className={css.switchItem}
-						onToggle={settingToggleHandlers.forceTranscodingWithSubtitles}
-						selected={settings.forceTranscodingWithSubtitles}
-					>
-						Force Transcoding with Subtitles (burn-in subs)
-					</SwitchItem>
-				</section>
-			) : null}
+				{shouldRenderSection('transcoding') ? (
+					<section className={css.section}>
+						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
+						<Item
+							className={css.settingItem}
+							label="Maximum Bitrate"
+							slotAfter={getBitrateLabel(settings.maxBitrate)}
+							onClick={openBitratePopup}
+						/>
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.enableTranscoding}
+							selected={settings.enableTranscoding}
+						>
+							Enable Transcoding
+						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.forceTranscoding}
+							selected={settings.forceTranscoding}
+						>
+							Force Transcoding (always)
+						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.enableFmp4HlsContainerPreference}
+							selected={settings.enableFmp4HlsContainerPreference !== false}
+						>
+							Enable fMP4-HLS container preference
+						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.forceFmp4HlsContainerPreference}
+							selected={settings.forceFmp4HlsContainerPreference === true}
+						>
+							Force fMP4-HLS container preference
+						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.enableSubtitleBurnIn}
+							selected={settings.enableSubtitleBurnIn !== false}
+						>
+							Enable Subtitle Burn-in
+						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.forceTranscodingWithSubtitles}
+							selected={settings.forceTranscodingWithSubtitles}
+						>
+							Force Subtitle Burn-in on HDR/DV
+						</SwitchItem>
+						<Item
+							className={css.settingItem}
+							label="Subtitle Burn-in Formats"
+							slotAfter={settings.enableSubtitleBurnIn === false ? 'Disabled' : subtitleBurnInTextCodecsLabel}
+							onClick={openSubtitleBurnInTextCodecsPopup}
+						/>
+					</section>
+				) : null}
 
 			{shouldRenderSection('display') ? (
 				<section className={css.section}>
@@ -438,28 +467,45 @@ const SettingsSections = ({
 					>
 						Performance Overlay (FPS/Input)
 					</SwitchItem>
-					{styleDebugEnabled ? (
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.relaxedPlaybackProfile}
-							selected={settings.relaxedPlaybackProfile === true}
-						>
-							Relaxed Playback Profile (Debug)
-						</SwitchItem>
-					) : null}
-					{styleDebugEnabled ? (
-						<Item
-							className={css.settingItem}
-							label="Styling Debug Panel"
-							slotAfter="Open"
-							onClick={openStylingDebugPanel}
-						/>
-					) : null}
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.showExtendedPlayerDebugOverlay}
+						selected={settings.showExtendedPlayerDebugOverlay === true}
+					>
+						Extended Player Debug Metrics
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.showFocusDebugOverlay}
+						selected={settings.showFocusDebugOverlay === true}
+					>
+						Focus Debug Overlay (All Panels)
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.forceDolbyVision}
+						selected={settings.forceDolbyVision === true}
+					>
+						Force DV (Debug)
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.relaxedPlaybackProfile}
+						selected={settings.relaxedPlaybackProfile === true}
+					>
+						Relaxed Playback Profile (Debug)
+					</SwitchItem>
 					<Item
 						className={css.settingItem}
 						label="Logs"
 						slotAfter={`${appLogCount} entries`}
 						onClick={openLogsPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Wipe Cache (Keep Login)"
+						slotAfter={cacheWipeInProgress ? 'Wiping...' : 'Run'}
+						onClick={openWipeCacheKeepLoginConfirm}
 					/>
 					<Item
 						className={css.settingItem}
@@ -492,6 +538,7 @@ const SettingsSections = ({
 					/>
 					<Item className={css.infoItem} label="Dynamic Range" slotAfter={dynamicRangeLabel} />
 					<Item className={css.infoItem} label="Dolby Vision in MKV" slotAfter={dolbyVisionMkvLabel} />
+					<Item className={css.infoItem} label="WebP Image Decode" slotAfter={webpImageDecodeLabel} />
 					<Item
 						className={`${css.infoItem} ${css.collapsibleInfoItem} ${expandedCapabilityRows.videoCodecs ? css.collapsibleInfoItemExpanded : ''}`}
 						label="Video Codecs"
