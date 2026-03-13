@@ -119,16 +119,18 @@ Standard gate for functional changes (recommended default):
 1. `npm run lint`
 2. `npm run test -- --watch=false --runInBand`
 3. `npm run audit:styles`
-4. `npm run audit:duplicates`
-5. `npm run pack`
+4. `npm run audit:style-tokens`
+5. `npm run audit:duplicates`
+6. `npm run pack`
 
 Release-oriented gate:
 
 1. `npm run lint`
 2. `npm run test -- --watch=false --runInBand`
 3. `npm run audit:styles`
-4. `npm run audit:duplicates`
-5. `npm run pack-p`
+4. `npm run audit:style-tokens`
+5. `npm run audit:duplicates`
+6. `npm run pack-p`
 
 If any gate is skipped, state exactly what was skipped and why.
 

@@ -1,10 +1,11 @@
-import {useCallback, useEffect, useMemo, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {KeyCodes} from '../../../utils/keyCodes';
 
 const SECTION_SNAP_TOLERANCE_PX = 8;
 const SECTION_WHEEL_DELTA_THRESHOLD = 18;
 const SECTION_SNAP_THRESHOLD_RATIO = 0.45;
 const SECTION_FOCUS_SETTLE_TIMEOUT_MS = 420;
+const SECTION_SWITCH_LOCK_TIMEOUT_MS = 760;
 
 export const useMediaDetailsSectionNavigation = ({
 	itemType,
@@ -32,6 +33,12 @@ export const useMediaDetailsSectionNavigation = ({
 }) => {
 	const introFocusRafRef = useRef(null);
 	const introFocusTimeoutRef = useRef(null);
+	const sectionSwitchWatchRafRef = useRef(null);
+	const sectionSwitchUnlockTimeoutRef = useRef(null);
+	const sectionSwitchTargetTopRef = useRef(null);
+	const sectionSwitchStartedAtRef = useRef(0);
+	const sectionSwitchInProgressRef = useRef(false);
+	const [sectionSwitchInProgress, setSectionSwitchInProgress] = useState(false);
 
 	const cancelPendingIntroFocus = useCallback(() => {
 		if (introFocusRafRef.current !== null) {
@@ -43,6 +50,58 @@ export const useMediaDetailsSectionNavigation = ({
 			introFocusTimeoutRef.current = null;
 		}
 	}, []);
+
+	const cancelSectionSwitchWatch = useCallback(() => {
+		if (sectionSwitchWatchRafRef.current !== null) {
+			window.cancelAnimationFrame(sectionSwitchWatchRafRef.current);
+			sectionSwitchWatchRafRef.current = null;
+		}
+		if (sectionSwitchUnlockTimeoutRef.current !== null) {
+			window.clearTimeout(sectionSwitchUnlockTimeoutRef.current);
+			sectionSwitchUnlockTimeoutRef.current = null;
+		}
+	}, []);
+
+	const finishSectionSwitch = useCallback(() => {
+		cancelSectionSwitchWatch();
+		sectionSwitchTargetTopRef.current = null;
+		sectionSwitchStartedAtRef.current = 0;
+		sectionSwitchInProgressRef.current = false;
+		setSectionSwitchInProgress(false);
+	}, [cancelSectionSwitchWatch]);
+
+	const isSectionSwitchInProgress = useCallback(() => {
+		return sectionSwitchInProgressRef.current === true;
+	}, []);
+
+	const beginSectionSwitch = useCallback((targetTop) => {
+		const scrollEl = getDetailsScrollElement();
+		if (!scrollEl || !Number.isFinite(targetTop)) {
+			finishSectionSwitch();
+			return;
+		}
+		cancelSectionSwitchWatch();
+		sectionSwitchTargetTopRef.current = targetTop;
+		sectionSwitchStartedAtRef.current = Date.now();
+		sectionSwitchInProgressRef.current = true;
+		setSectionSwitchInProgress(true);
+
+		const watchScrollSettle = () => {
+			const currentTop = scrollEl.scrollTop;
+			const nearTarget = Math.abs(currentTop - targetTop) <= SECTION_SNAP_TOLERANCE_PX;
+			const timedOut = (Date.now() - sectionSwitchStartedAtRef.current) >= SECTION_SWITCH_LOCK_TIMEOUT_MS;
+			if (nearTarget || timedOut) {
+				finishSectionSwitch();
+				return;
+			}
+			sectionSwitchWatchRafRef.current = window.requestAnimationFrame(watchScrollSettle);
+		};
+
+		sectionSwitchWatchRafRef.current = window.requestAnimationFrame(watchScrollSettle);
+		sectionSwitchUnlockTimeoutRef.current = window.setTimeout(() => {
+			finishSectionSwitch();
+		}, SECTION_SWITCH_LOCK_TIMEOUT_MS + 120);
+	}, [cancelSectionSwitchWatch, finishSectionSwitch, getDetailsScrollElement]);
 
 	const hasSecondarySection = useMemo(() => {
 		if (Array.isArray(cast) && cast.length > 0) return true;
@@ -180,6 +239,9 @@ export const useMediaDetailsSectionNavigation = ({
 		if (sectionTwoTop === null) return false;
 		const nextTop = sectionKey === 'content' ? sectionTwoTop : 0;
 		if (Math.abs(scrollEl.scrollTop - nextTop) > 1) {
+			if (animate) {
+				beginSectionSwitch(nextTop);
+			}
 			scrollEl.scrollTo({top: nextTop, behavior: animate ? 'smooth' : 'auto'});
 		}
 		if (focusTarget) {
@@ -193,6 +255,7 @@ export const useMediaDetailsSectionNavigation = ({
 		}
 		return true;
 	}, [
+		beginSectionSwitch,
 		focusSectionOnePrimary,
 		focusSectionTwoPrimary,
 		getContentSectionTop,
@@ -201,10 +264,11 @@ export const useMediaDetailsSectionNavigation = ({
 	]);
 
 	const focusAndShowSecondSection = useCallback(() => {
+		if (isSectionSwitchInProgress()) return true;
 		if (!focusSectionTwoPrimary()) return false;
 		scrollToDetailsSection('content', {animate: true, focusTarget: false});
 		return true;
-	}, [focusSectionTwoPrimary, scrollToDetailsSection]);
+	}, [focusSectionTwoPrimary, isSectionSwitchInProgress, scrollToDetailsSection]);
 
 	const focusFirstSectionAfterScrollSettles = useCallback((scrollEl) => {
 		if (!scrollEl) return focusSectionOnePrimary();
@@ -243,6 +307,7 @@ export const useMediaDetailsSectionNavigation = ({
 	}, [cancelPendingIntroFocus, focusSectionOnePrimary]);
 
 	const focusAndShowFirstSection = useCallback(() => {
+		if (isSectionSwitchInProgress()) return true;
 		const scrollEl = getDetailsScrollElement();
 		if (!scrollEl) return focusSectionOnePrimary();
 		if (scrollEl.scrollTop <= SECTION_SNAP_TOLERANCE_PX) {
@@ -256,18 +321,31 @@ export const useMediaDetailsSectionNavigation = ({
 		focusFirstSectionAfterScrollSettles,
 		focusSectionOnePrimary,
 		getDetailsScrollElement,
+		isSectionSwitchInProgress,
 		scrollToDetailsSection
 	]);
 
 	const handleIntroActionKeyDown = useCallback((event) => {
+		if (isSectionSwitchInProgress()) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			return;
+		}
 		const code = event.keyCode || event.which;
 		if (code !== KeyCodes.DOWN) return;
 		if (!focusSectionOnePrimaryFromIntroAction()) return;
 		event.preventDefault();
 		event.stopPropagation();
-	}, [focusSectionOnePrimaryFromIntroAction]);
+	}, [focusSectionOnePrimaryFromIntroAction, isSectionSwitchInProgress]);
 
 	const handleIntroTopNavKeyDown = useCallback((event) => {
+		if (isSectionSwitchInProgress()) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			return;
+		}
 		if (event.defaultPrevented) return;
 		const code = event.keyCode || event.which;
 		if (code !== KeyCodes.DOWN) return;
@@ -277,11 +355,17 @@ export const useMediaDetailsSectionNavigation = ({
 		window.requestAnimationFrame(() => {
 			focusSectionOnePrimaryFromTopNav();
 		});
-	}, [focusSectionOnePrimaryFromTopNav]);
+	}, [focusSectionOnePrimaryFromTopNav, isSectionSwitchInProgress]);
 
 	const handleSectionWheelCapture = useCallback((event) => {
 		if (!isActive || !hasSecondarySection) return;
 		if (showAudioPicker || showSubtitlePicker || showEpisodePicker) return;
+		if (isSectionSwitchInProgress()) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			return;
+		}
 		const scrollEl = getDetailsScrollElement();
 		const sectionTwoTop = getContentSectionTop();
 		if (!scrollEl || sectionTwoTop === null) return;
@@ -302,6 +386,7 @@ export const useMediaDetailsSectionNavigation = ({
 		getDetailsScrollElement,
 		hasSecondarySection,
 		isActive,
+		isSectionSwitchInProgress,
 		scrollToDetailsSection,
 		showAudioPicker,
 		showEpisodePicker,
@@ -319,6 +404,7 @@ export const useMediaDetailsSectionNavigation = ({
 			const scrollEl = getDetailsScrollElement();
 			const sectionTwoTop = getContentSectionTop();
 			if (!scrollEl || sectionTwoTop === null) return;
+			if (isSectionSwitchInProgress()) return;
 
 			if (firstSectionRef.current?.contains(targetNode)) {
 				if (scrollEl.scrollTop > SECTION_SNAP_TOLERANCE_PX) {
@@ -341,6 +427,7 @@ export const useMediaDetailsSectionNavigation = ({
 		getDetailsScrollElement,
 		hasSecondarySection,
 		isActive,
+		isSectionSwitchInProgress,
 		loading,
 		scrollToDetailsSection,
 		showAudioPicker,
@@ -355,26 +442,51 @@ export const useMediaDetailsSectionNavigation = ({
 		const sectionTwoTop = getContentSectionTop();
 		if (!scrollEl || sectionTwoTop === null) return;
 		const currentTop = scrollEl.scrollTop;
+		if (isSectionSwitchInProgress()) {
+			const targetTop = sectionSwitchTargetTopRef.current;
+			if (Number.isFinite(targetTop) && Math.abs(currentTop - targetTop) <= SECTION_SNAP_TOLERANCE_PX) {
+				finishSectionSwitch();
+			}
+			return;
+		}
 		if (currentTop <= SECTION_SNAP_TOLERANCE_PX || currentTop >= sectionTwoTop) return;
 		const snapThreshold = sectionTwoTop * SECTION_SNAP_THRESHOLD_RATIO;
 		scrollEl.scrollTo({
 			top: currentTop <= snapThreshold ? 0 : sectionTwoTop,
 			behavior: 'smooth'
 		});
-	}, [getContentSectionTop, getDetailsScrollElement, handleDetailsScrollMemoryStop, hasSecondarySection]);
+	}, [
+		finishSectionSwitch,
+		getContentSectionTop,
+		getDetailsScrollElement,
+		handleDetailsScrollMemoryStop,
+		hasSecondarySection,
+		isSectionSwitchInProgress
+	]);
+
+	const handleSectionSwitchKeyDownCapture = useCallback((event) => {
+		if (!isSectionSwitchInProgress()) return;
+		event.preventDefault();
+		event.stopPropagation();
+		event.stopImmediatePropagation?.();
+	}, [isSectionSwitchInProgress]);
 
 	useEffect(() => () => {
 		cancelPendingIntroFocus();
-	}, [cancelPendingIntroFocus]);
+		cancelSectionSwitchWatch();
+	}, [cancelPendingIntroFocus, cancelSectionSwitchWatch]);
 
 	return {
 		hasSecondarySection,
+		sectionSwitchInProgress,
+		isSectionSwitchInProgress,
 		focusSectionOnePrimary,
 		focusAndShowFirstSection,
 		focusAndShowSecondSection,
 		focusIntroTopNavigation,
 		handleIntroActionKeyDown,
 		handleIntroTopNavKeyDown,
+		handleSectionSwitchKeyDownCapture,
 		handleSectionWheelCapture,
 		handleDetailsScrollerScrollStop
 	};

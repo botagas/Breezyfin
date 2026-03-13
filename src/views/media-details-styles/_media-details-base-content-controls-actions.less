@@ -15,33 +15,67 @@
 .episodeInfoButton,
 .episodeFavoriteButton,
 .episodeWatchedButton {
-	min-width: 3rem !important;
-	width: 3rem !important;
-	height: 3rem !important;
+	.icon-circle-button-dimensions(3rem);
 	padding: 0 !important;
 
-	:global(.Icon) {
+	:global(.Icon),
+	:global(.icon) {
 		font-size: 1rem !important;
 		width: 1rem !important;
 		height: 1rem !important;
+		color: var(--bf-md-overlay-control-fg) !important;
 	}
 
-	.mdControlSurface(
-		var(--bf-theme-card-filter-chip-bg);
-		1px solid var(--bf-theme-card-filter-chip-border);
-		999px
-	);
-	.mdControlHoverSurface(rgba(var(--bf-theme-accent-rgb), 0.22));
+	.mdControlSurface(var(--bf-md-overlay-control-bg); 1px solid var(--bf-md-overlay-control-border); 999px);
+	.mdControlHoverSurface(var(--bf-md-overlay-control-hover-bg));
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		border-color: var(--bf-md-overlay-control-hover-border) !important;
+	}
+
+	&:hover :global(.Icon),
+	&:hover :global(.icon),
+	&:focus :global(.Icon),
+	&:focus :global(.icon),
+	&:global(.spottable):focus :global(.Icon),
+	&:global(.spottable):focus :global(.icon) {
+		color: rgba(var(--bf-theme-accent-rgb), 0.98) !important;
+	}
 }
 
 .episodeFavoriteButtonActive :global(.bf-button-bg),
 .episodeFavoriteButtonActive :global(.bg) {
-	background: rgba(var(--bf-theme-favorite-rgb), 0.2) !important;
-	border-color: rgba(var(--bf-theme-favorite-rgb), 0.54) !important;
+	background: rgba(var(--bf-theme-favorite-rgb), 0.14) !important;
+	border-color: rgba(var(--bf-theme-favorite-rgb), 0.5) !important;
+}
+
+.episodeFavoriteButtonActive:hover :global(.bf-button-bg),
+.episodeFavoriteButtonActive:focus :global(.bf-button-bg),
+.episodeFavoriteButtonActive:global(.spottable):focus :global(.bf-button-bg),
+.episodeFavoriteButtonActive:hover :global(.bg),
+.episodeFavoriteButtonActive:focus :global(.bg),
+.episodeFavoriteButtonActive:global(.spottable):focus :global(.bg) {
+	background: rgba(var(--bf-theme-favorite-rgb), 0.28) !important;
+	border-color: rgba(var(--bf-theme-favorite-rgb), 0.58) !important;
 }
 
 .episodeWatchedButtonActive :global(.bf-button-bg),
 .episodeWatchedButtonActive :global(.bg) {
-	background: rgba(var(--bf-theme-success-rgb), 0.2) !important;
-	border-color: rgba(var(--bf-theme-success-rgb), 0.56) !important;
+	background: rgba(var(--bf-theme-success-rgb), 0.14) !important;
+	border-color: rgba(var(--bf-theme-success-rgb), 0.5) !important;
+}
+
+.episodeWatchedButtonActive:hover :global(.bf-button-bg),
+.episodeWatchedButtonActive:focus :global(.bf-button-bg),
+.episodeWatchedButtonActive:global(.spottable):focus :global(.bf-button-bg),
+.episodeWatchedButtonActive:hover :global(.bg),
+.episodeWatchedButtonActive:focus :global(.bg),
+.episodeWatchedButtonActive:global(.spottable):focus :global(.bg) {
+	background: rgba(var(--bf-theme-success-rgb), 0.28) !important;
+	border-color: rgba(var(--bf-theme-success-rgb), 0.58) !important;
 }

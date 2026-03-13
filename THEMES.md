@@ -166,7 +166,7 @@ Default theme is Elegant unless settings explicitly switch to Classic.
 
 ## 8) Adding new theme features
 
-Use this sequence to keep maintainability high:
+Use this sequence to keep it clean and maintainable:
 
 1. Add/extend a token first in theme token files (Classic + Elegant as needed).
 2. Consume the token with `var(--token, fallback)` in panel/component styles.
@@ -185,11 +185,11 @@ Before merging theme changes, test:
 3. Elegant + Performance Mode
 4. Elegant + Performance+ Mode
 5. webOS 6 compat path (gap/layout/nav fallback)
-6. webOS 22 compat path (grid scroll metrics)
+6. webOS 22-24 compat path (grid scroll metrics)
 
 Also verify:
 
-- Focus/hover states are readable in both pointer and 5-way input.
+- Focus/hover states are operational in both pointer and 5-way input.
 - Popup surfaces and toasts still use tokenized colors.
 - No panel uses fixed offsets that bypass shared layout tokens.
 

@@ -25,10 +25,10 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - TV-first navigation tuned for LG Magic Remote (5-way and pointer flows)
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
-- Player with dynamic-range-aware direct play/direct stream/transcode fallback paths (DV -> HDR -> SDR)
-- Subtitle/audio compatibility fallbacks for webOS playback paths, with quality-first default subtitle behavior and UX-oriented per-format burn-in policy
-- Adaptive image delivery path: request WebP when supported, with automatic non-WebP retry fallback on image load failure
-- Built-in runtime diagnostics for playback validation and troubleshooting
+- Playback that adapts to TV/media compatibility (Direct Play / Direct Stream / Transcode, DV -> HDR -> SDR)
+- Subtitle and audio handling that prioritizes quality while applying compatibility fallbacks when needed
+- Adaptive image loading (WebP when supported, with automatic fallback on load failure)
+- Built-in diagnostics, logs, and cache tools for easier troubleshooting
 
 ## Install on TV (IPK)
 
@@ -79,8 +79,8 @@ For implementation and workflow details, use:
 
 ## Diagnostics and debug
 
-Primary diagnostics are runtime toggles under **Settings > Diagnostics** and **Settings > Device Playback Capabilities**.
-This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics, logs, and cache wipe actions.
+Primary diagnostics are runtime toggles under **Settings > Diagnostics** (including the **Device Playback Capabilities** section).
+This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics (for example Force DV and fMP4-HLS preference toggles), logs, and cache wipe actions.
 
 Build-time log capture flags:
 
@@ -98,13 +98,6 @@ REACT_APP_ENABLE_PERSISTENT_LOGS=1 npm run serve
 npm run pack-p
 ```
 Output will be in the `dist/` folder.
-
-## Code quality audits
-
-- Dead CSS module audit: `npm run audit:styles`
-- Mixed JS/LESS duplicate snippet audit: `npm run audit:duplicates`
-
-For the full recurring validation checklist, use [`CHECKS.md`](./CHECKS.md).
 
 ## Roadmap and validation
 

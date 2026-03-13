@@ -12,6 +12,7 @@
 		"clean": "enact clean",
 		"lint": "enact lint .",
 		"audit:styles": "node scripts/style-audit/find-dead-css-modules.cjs",
+		"audit:style-tokens": "node scripts/style-audit/find-raw-color-usage.cjs",
 		"license": "enact license",
 		"test": "enact test",
 		"test-watch": "enact test --watch",

@@ -397,11 +397,14 @@ const MediaDetailsPanel = ({
 	}, [captureDetailsScrollRestore]);
 	const {
 		hasSecondarySection,
+		sectionSwitchInProgress,
+		isSectionSwitchInProgress,
 		focusAndShowFirstSection,
 		focusAndShowSecondSection,
 		focusIntroTopNavigation,
 		handleIntroActionKeyDown,
 		handleIntroTopNavKeyDown,
+		handleSectionSwitchKeyDownCapture,
 		handleSectionWheelCapture,
 		handleDetailsScrollerScrollStop
 	} = useMediaDetailsSectionNavigation({
@@ -428,6 +431,23 @@ const MediaDetailsPanel = ({
 		focusNonSeriesSubtitleSelector,
 		focusEpisodeSelector
 	});
+	const handleSectionSwitchPointerCapture = useCallback((event) => {
+		if (!isSectionSwitchInProgress()) return false;
+		if (event.cancelable) {
+			event.preventDefault();
+		}
+		event.stopPropagation();
+		event.stopImmediatePropagation?.();
+		return true;
+	}, [isSectionSwitchInProgress]);
+	const handleDetailsMouseDownCapture = useCallback((event) => {
+		if (handleSectionSwitchPointerCapture(event)) return;
+		handleDetailsPointerDownCapture(event);
+	}, [handleDetailsPointerDownCapture, handleSectionSwitchPointerCapture]);
+	const handleDetailsClickCapture = useCallback((event) => {
+		if (handleSectionSwitchPointerCapture(event)) return;
+		handleDetailsPointerClickCapture(event);
+	}, [handleDetailsPointerClickCapture, handleSectionSwitchPointerCapture]);
 
 	const {
 		handleTrackSelect,
@@ -569,11 +589,12 @@ const MediaDetailsPanel = ({
 					onScrollStop={handleDetailsScrollerScrollStop}
 				>
 					<div
-						className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''} ${item.Type === 'Episode' ? css.episodeDetailsMode : ''}`}
+						className={`${css.detailsContainer} ${isElegantTheme ? css.elegantMode : ''} ${item.Type === 'Episode' ? css.episodeDetailsMode : ''} ${sectionSwitchInProgress ? css.sectionSwitchLocked : ''}`}
 						ref={detailsContainerRef}
 						tabIndex={-1}
-						onMouseDownCapture={handleDetailsPointerDownCapture}
-						onClickCapture={handleDetailsPointerClickCapture}
+						onKeyDownCapture={handleSectionSwitchKeyDownCapture}
+						onMouseDownCapture={handleDetailsMouseDownCapture}
+						onClickCapture={handleDetailsClickCapture}
 						onWheelCapture={handleSectionWheelCapture}
 				>
 					{!loading && (

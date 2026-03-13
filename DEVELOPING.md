@@ -20,6 +20,16 @@ This document is the detailed developer guide for architecture patterns, shared 
 - [`CHECKS.md`](./CHECKS.md)
 - [`TODOS.md`](./TODOS.md)
 
+## Verification and audits
+
+Use [`CHECKS.md`](./CHECKS.md) as the single source of truth for recurring validation and release gates.
+
+Quick quality audit commands:
+
+- `npm run audit:styles` (dead CSS module candidates)
+- `npm run audit:style-tokens` (raw color usage outside token declarations)
+- `npm run audit:duplicates` (cross-file duplicate snippet candidates)
+
 ## Shared building blocks (prefer these first)
 
 - Back handling: `src/hooks/usePanelBackHandler.js`
@@ -168,4 +178,4 @@ Status badge convention:
 ## Comments convention
 
 - Keep comments minimal; prefer clear naming/structure so code explains itself.
-- Add comments only where behavior, constraints, or tradeoffs are non-obvious.
+- Add comments only where behavior, constraints, or tradeoffs need to be addressed.

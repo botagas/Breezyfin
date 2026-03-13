@@ -3,32 +3,16 @@
 	top: 0.55rem;
 	right: 0.55rem;
 	z-index: 3;
-	min-width: 2.35rem !important;
-	width: 2.35rem !important;
-	height: 2.35rem !important;
+	.icon-circle-button-dimensions(2.35rem);
 	padding: 0 !important;
 	border-radius: 999px !important;
 	background: transparent !important;
 	border: none !important;
 
-	:global(.bf-button),
-	:global(.client) {
-		width: 100% !important;
-		height: 100% !important;
-		min-width: 0 !important;
-		min-height: 0 !important;
-		padding: 0 !important;
-		margin: 0 !important;
-		display: inline-flex !important;
-		align-items: center !important;
-		justify-content: center !important;
-	}
+	.mdControlSurface(var(--bf-md-overlay-control-bg); 1px solid var(--bf-md-overlay-control-border); 999px);
 
 	:global(.bf-button-bg),
 	:global(.bg) {
-		background: var(--bf-md-overlay-control-bg) !important;
-		border: 1px solid var(--bf-md-overlay-control-border) !important;
-		border-radius: 999px !important;
 		box-shadow: none !important;
 		backdrop-filter: blur(8px) !important;
 		-webkit-backdrop-filter: blur(8px) !important;
@@ -42,13 +26,14 @@
 		color: var(--bf-md-overlay-control-fg) !important;
 	}
 
+	.mdControlHoverSurface(var(--bf-md-overlay-control-hover-bg));
+
 	&:hover :global(.bf-button-bg),
 	&:focus :global(.bf-button-bg),
 	&:global(.spottable):focus :global(.bf-button-bg),
 	&:hover :global(.bg),
 	&:focus :global(.bg),
 	&:global(.spottable):focus :global(.bg) {
-		background: var(--bf-md-overlay-control-hover-bg) !important;
 		border-color: var(--bf-md-overlay-control-hover-border) !important;
 	}
 
