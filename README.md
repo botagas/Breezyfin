@@ -117,6 +117,16 @@ See `docs/homebrew-release-flow.md` for the full branch/release/version workflow
 
 Pull requests and issues are welcome! Please follow the code style and add tests for new features. See [`COMPONENTS.md`](./COMPONENTS.md) and [`VIEWS.md`](./VIEWS.md) for architecture and UI conventions.
 
+## Project statistics
+
+<a href="https://www.star-history.com/?repos=botagas%2FBreezyfin&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=botagas/Breezyfin&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=botagas/Breezyfin&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=botagas/Breezyfin&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## Credits
 
 - Built with [Enact Sandstone](https://github.com/enactjs/sandstone)
