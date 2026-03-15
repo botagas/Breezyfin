@@ -15,6 +15,7 @@ Rule:
 - Run a post-decomposition style analysis pass to identify remaining hotspots/overlap and prioritize practical style cleanup improvements.
 - Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
 - Implement manual-login server selection UX (URL input + selectable saved server list in the same flow).
+- Implement server discovery for manual login so compatible local servers can be detected and selected without manually entering full server details (SSDP discovery).
 - Inspect style token usage for potential over-tokenization and simplify cases where indirection adds noise without practical reuse.
 
 ## Long-term goals
