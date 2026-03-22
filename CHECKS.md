@@ -43,3 +43,10 @@ Run these before packaging a release candidate:
 8. With `Enable fMP4-HLS container preference` enabled and `Force fMP4-HLS container preference` disabled, verify HDR/DV playback paths remain quality-first (no forced container override).
 9. With `Force fMP4-HLS container preference` enabled, verify non-MKV source probing occurs and fallback diagnostics are shown when Jellyfin cannot satisfy the request.
 10. With `Force DV (Debug)` enabled, verify playback fails fast when no compatible DV path exists and succeeds only on direct path or audio-only transcode compatible DV sources.
+
+### Library panel scroll/focus regression
+
+1. In Library, scroll deep using pointer, open an item, then go back; verify return position restores to the same depth.
+2. In Library, with cached deep position beyond first page, go back into panel and verify progressive restore reaches deep target (not clamped to first-page max).
+3. In Library, switch between pointer and 5-way after scrolling; verify no snap-to-top occurs.
+4. In Library 5-way mode, navigate cards with directional keys and verify focused card remains in viewport (focus-driven scroll works).

@@ -17,6 +17,7 @@ Rule:
 - Implement manual-login server selection UX (URL input + selectable saved server list in the same flow).
 - Implement server discovery for manual login so compatible local servers can be detected and selected without manually entering full server details (SSDP discovery).
 - Inspect style token usage for potential over-tokenization and simplify cases where indirection adds noise without practical reuse.
+- Add a screensaver (think DVD-like) that would trigger after a minute of inactivity (configurable). Need to create a separate screensaver logo.
 
 ## Long-term goals
 

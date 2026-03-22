@@ -44,7 +44,8 @@ export const createPanelChildren = ({
 	registerFavoritesBackHandler,
 	registerSettingsBackHandler,
 	registerDetailsBackHandler,
-	registerPlayerBackHandler
+	registerPlayerBackHandler,
+	inputMode
 }) => {
 	const panelChildren = [
 		<LoginPanel
@@ -70,6 +71,7 @@ export const createPanelChildren = ({
 		<LibraryPanel
 			key="library"
 			isActive={currentView === 'library'}
+			inputMode={inputMode}
 			library={selectedLibrary}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}

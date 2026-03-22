@@ -23,6 +23,23 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
+const emitAppDebugEvent = (name, detail) => {
+	if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') {
+		return;
+	}
+	try {
+		window.dispatchEvent(new CustomEvent(name, {detail}));
+	} catch (_) {
+		// Debug telemetry must never alter runtime behavior.
+	}
+};
+const isEditableTarget = (target) => {
+	if (!target || target.nodeType !== 1) return false;
+	if (target.isContentEditable) return true;
+	const tagName = target.tagName?.toLowerCase();
+	if (tagName === 'input' || tagName === 'textarea') return true;
+	return Boolean(target.closest?.('input, textarea, [contenteditable="true"], [role="textbox"]'));
+};
 
 const resolveInitialVisualSettings = () => {
 	const settings = readBreezyfinSettings();
@@ -56,6 +73,7 @@ const App = (props) => {
 	const [navbarTheme, setNavbarTheme] = useState(initialVisualSettingsRef.current.navbarTheme);
 	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
 	const [focusDebugOverlayEnabled, setFocusDebugOverlayEnabled] = useState(initialVisualSettingsRef.current.focusDebugOverlayEnabled);
+	const [lastNavigateDebug, setLastNavigateDebug] = useState(null);
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
@@ -317,6 +335,10 @@ const App = (props) => {
 	useEffect(() => {
 		const handleGlobalKeyDown = (e) => {
 			const code = e.keyCode || e.which;
+			const isBackspaceDelete = code === 8 || e.key === 'Backspace';
+			if (isBackspaceDelete && isEditableTarget(e.target)) {
+				return;
+			}
 			if (isBackKey(code)) {
 				const handled = handleBack();
 				if (handled) {
@@ -374,6 +396,13 @@ const App = (props) => {
 	}, [resetSessionState]);
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
+		emitAppDebugEvent('breezyfin:item-select-debug', {
+			at: Date.now(),
+			itemId: item?.Id ? String(item.Id) : '-',
+			itemType: item?.Type || '-',
+			fromView: currentView || '-',
+			fromItemId: fromItem?.Id ? String(fromItem.Id) : '-'
+		});
 		if (DETAIL_RETURN_VIEWS.has(currentView) && currentView !== 'details') {
 			setDetailsReturnView(currentView);
 			pushPanelHistory();
@@ -396,6 +425,32 @@ const App = (props) => {
 		const targetView = section;
 		const nextLibraryId = targetView === 'library' ? data?.Id : null;
 		const currentLibraryId = selectedLibrary?.Id || null;
+		const navigateDebugBase = {
+			at: Date.now(),
+			fromView: currentView || '-',
+			targetView: targetView || '-',
+			nextLibraryId: nextLibraryId ? String(nextLibraryId) : '-',
+			currentLibraryId: currentLibraryId ? String(currentLibraryId) : '-'
+		};
+		const isSameLibraryNavigation =
+			targetView === 'library' &&
+			currentView === 'library' &&
+			nextLibraryId !== null &&
+			currentLibraryId !== null &&
+			String(nextLibraryId) === String(currentLibraryId);
+		if (isSameLibraryNavigation) {
+			setLastNavigateDebug({
+				...navigateDebugBase,
+				ignored: true,
+				reason: 'same-library'
+			});
+			return;
+		}
+		setLastNavigateDebug({
+			...navigateDebugBase,
+			ignored: false,
+			reason: 'dispatch'
+		});
 		const shouldTrackHistory =
 			targetView === 'home' ||
 			targetView === 'library' ||
@@ -545,7 +600,8 @@ const App = (props) => {
 		registerFavoritesBackHandler,
 		registerSettingsBackHandler,
 		registerDetailsBackHandler,
-		registerPlayerBackHandler
+		registerPlayerBackHandler,
+		inputMode
 	});
 
 	return (
@@ -565,6 +621,7 @@ const App = (props) => {
 						enabled={focusDebugOverlayEnabled}
 						currentView={currentView}
 						inputMode={inputMode}
+						lastNavigateDebug={lastNavigateDebug}
 					/>
 					<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />
 				</div>

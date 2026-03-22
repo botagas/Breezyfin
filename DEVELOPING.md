@@ -116,6 +116,9 @@ Other shared utilities:
 
 ## Panel decomposition conventions
 
+Library panel decomposition paths:
+- `src/views/library-panel/hooks/` (`useLibraryPagination`, `useLibraryScrollPersistence`)
+
 Player panel decomposition paths:
 - `src/views/player-panel/components/`
 - `src/views/player-panel/hooks/`

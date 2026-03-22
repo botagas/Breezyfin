@@ -1,18 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
-import Scroller from '../components/AppScroller';
 import Spinner from '@enact/sandstone/Spinner';
-import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
 import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
-import {KeyCodes} from '../utils/keyCodes';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
-import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import { useLibraryPagination } from './library-panel/hooks/useLibraryPagination';
+import { useLibraryScrollPersistence } from './library-panel/hooks/useLibraryScrollPersistence';
 import {
 	getPlaybackProgressPercent,
 	getPosterCardImageUrl,
@@ -22,9 +20,8 @@ import {
 
 import css from './LibraryPanel.module.less';
 
-const LIBRARY_PAGE_SIZE = 60;
 const FOCUS_PREFETCH_THRESHOLD = 12;
-const LibraryGridSpotlightContainer = createLastFocusedSpotlightContainer();
+const LibraryGridSpotlightContainer = createLastFocusedSpotlightContainer('div');
 
 const LibraryPanel = ({
 	library,
@@ -37,19 +34,23 @@ const LibraryPanel = ({
 	isActive = false,
 	cachedState = null,
 	onCacheState = null,
+	inputMode = '5way',
 	...rest
 }) => {
-	const [loading, setLoading] = useState(true);
-	const [loadingMore, setLoadingMore] = useState(false);
-	const [hasMore, setHasMore] = useState(false);
-	const [items, setItems] = useState([]);
-	const libraryScrollToRef = useRef(null);
-	const gridRef = useRef(null);
-	const paginationRef = useRef({ nextStartIndex: 0, itemTypes: undefined });
-	const requestIdRef = useRef(0);
-	const loadingMoreRef = useRef(false);
+	const scrollerRef = useRef(null);
 	const activeLibraryId = library?.Id || null;
 	const activeLibraryCollectionType = library?.CollectionType || null;
+	const isPointerInputMode = inputMode === 'pointer';
+	const {
+		scrollTop,
+		setScrollTop
+	} = usePanelScrollState({
+		cachedState,
+		isActive,
+		onCacheState,
+		cacheKey: activeLibraryId,
+		requireCacheKey: true
+	});
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -58,17 +59,6 @@ const LibraryPanel = ({
 		registerBackHandler,
 		isActive
 	});
-	const itemsById = useMapById(items);
-	const {
-		captureScrollTo: captureLibraryScrollRestore,
-		handleScrollStop: handleLibraryScrollMemoryStop
-	} = usePanelScrollState({
-		cachedState,
-		isActive,
-		onCacheState,
-		cacheKey: library?.Id || null,
-		requireCacheKey: true
-	});
 
 	const getItemTypesForLibrary = useCallback((collectionType) => {
 		if (!collectionType) return undefined;
@@ -76,127 +66,47 @@ const LibraryPanel = ({
 		if (collectionType === 'tvshows') return ['Series'];
 		return undefined;
 	}, []);
-
-	const loadNextPage = useCallback(async () => {
-		if (!activeLibraryId || loading || !hasMore || loadingMoreRef.current) return;
-
-		loadingMoreRef.current = true;
-		setLoadingMore(true);
-		const requestId = requestIdRef.current;
-		const { nextStartIndex, itemTypes } = paginationRef.current;
-
-		try {
-			const nextBatch = await jellyfinService.getLibraryItems(
-				activeLibraryId,
-				itemTypes,
-				LIBRARY_PAGE_SIZE,
-				nextStartIndex
-			);
-			if (requestId !== requestIdRef.current) return;
-
-			const safeBatch = Array.isArray(nextBatch) ? nextBatch : [];
-			if (safeBatch.length === 0) {
-				setHasMore(false);
-				return;
-			}
-
-			paginationRef.current.nextStartIndex = nextStartIndex + safeBatch.length;
-			setItems((prevItems) => {
-				const existingIds = new Set(prevItems.map((item) => String(item.Id)));
-				const dedupedBatch = safeBatch.filter((item) => !existingIds.has(String(item.Id)));
-				return dedupedBatch.length ? [...prevItems, ...dedupedBatch] : prevItems;
-			});
-			if (safeBatch.length < LIBRARY_PAGE_SIZE) {
-				setHasMore(false);
-			}
-		} catch (error) {
-			console.error('Failed to load additional library items:', error);
-		} finally {
-			if (requestId === requestIdRef.current) {
-				setLoadingMore(false);
-			}
-			loadingMoreRef.current = false;
-		}
-	}, [activeLibraryId, hasMore, loading]);
-
-	const loadLibraryItems = useCallback(async () => {
-		if (!activeLibraryId) return;
-		const requestId = requestIdRef.current + 1;
-		requestIdRef.current = requestId;
-		const itemTypes = getItemTypesForLibrary(activeLibraryCollectionType);
-		paginationRef.current = { nextStartIndex: 0, itemTypes };
-		loadingMoreRef.current = false;
-		setLoading(true);
-		setLoadingMore(false);
-		setItems([]);
-		setHasMore(false);
-		try {
-			const firstBatch = await jellyfinService.getLibraryItems(
-				activeLibraryId,
-				itemTypes,
-				LIBRARY_PAGE_SIZE,
-				0
-			);
-			if (requestId !== requestIdRef.current) return;
-
-			const safeFirstBatch = Array.isArray(firstBatch) ? firstBatch : [];
-			setItems(safeFirstBatch);
-			paginationRef.current.nextStartIndex = safeFirstBatch.length;
-			setHasMore(safeFirstBatch.length === LIBRARY_PAGE_SIZE);
-		} catch (error) {
-			console.error('Failed to load library items:', error);
-		} finally {
-			if (requestId === requestIdRef.current) {
-				setLoading(false);
-			}
-		}
-	}, [activeLibraryCollectionType, activeLibraryId, getItemTypesForLibrary]);
-
-	useEffect(() => {
-		if (activeLibraryId) {
-			loadLibraryItems();
-		}
-	}, [activeLibraryId, loadLibraryItems]);
+	const {
+		loading,
+		loadingMore,
+		hasMore,
+		items,
+		loadNextPage,
+		loadingMoreRef
+	} = useLibraryPagination({
+		activeLibraryId,
+		activeLibraryCollectionType,
+		getItemTypesForLibrary,
+		pageSize: 60
+	});
+	const itemsById = useMapById(items);
+	const {handleScrollerScroll, commitCurrentScrollNow} = useLibraryScrollPersistence({
+		scrollerRef,
+		isActive,
+		activeLibraryId,
+		loading,
+		hasMore,
+		loadNextPage,
+		scrollTop,
+		setScrollTop
+	});
 
 	const handleGridCardClick = useCallback((event) => {
+		commitCurrentScrollNow();
 		const itemId = event.currentTarget.dataset.itemId;
 		const selectedItem = itemsById.get(itemId);
 		if (!selectedItem) return;
 		onItemSelect(selectedItem);
-	}, [itemsById, onItemSelect]);
+	}, [commitCurrentScrollNow, itemsById, onItemSelect]);
 
-	const getUnwatchedCount = (item) => {
-		return getSeriesUnplayedCount(item);
-	};
-
-	const captureLibraryScrollTo = useCallback((fn) => {
-		libraryScrollToRef.current = fn;
-		captureLibraryScrollRestore(fn);
-	}, [captureLibraryScrollRestore]);
-
-	const focusTopToolbarAction = useCallback(() => {
-		const preferredLibraryId = library?.Id ? `toolbar-library-${library.Id}` : null;
-		return focusToolbarSpotlightTargets([preferredLibraryId, 'toolbar-home', 'toolbar-user']);
-	}, [library?.Id]);
-
-	const handleGridCardKeyDown = useCallback((event) => {
-		const code = event.keyCode || event.which;
-		if (code !== KeyCodes.UP) return;
-		const cards = Array.from(gridRef.current?.querySelectorAll(`.${css.gridCard}`) || []);
-		if (cards.length === 0) return;
-		const firstRowTop = Math.min(...cards.map((card) => card.offsetTop));
-		const currentTop = event.currentTarget.offsetTop;
-		if (currentTop > firstRowTop + 1) return;
-
-		event.preventDefault();
+	const handleGridCardPointerDown = useCallback((event) => {
+		if (!isPointerInputMode) return;
 		event.stopPropagation();
-		if (typeof libraryScrollToRef.current === 'function') {
-			libraryScrollToRef.current({align: 'top', animate: true});
-		}
-		focusTopToolbarAction();
-	}, [focusTopToolbarAction]);
+	}, [isPointerInputMode]);
 
 	const handleGridCardFocus = useCallback((event) => {
+		if (isPointerInputMode) return;
+		event.currentTarget?.scrollIntoView?.({block: 'nearest', inline: 'nearest'});
 		if (!hasMore || loadingMoreRef.current) return;
 		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
 		if (!Number.isInteger(itemIndex)) return;
@@ -204,14 +114,8 @@ const LibraryPanel = ({
 		if (remainingItems <= FOCUS_PREFETCH_THRESHOLD) {
 			loadNextPage();
 		}
-	}, [hasMore, items.length, loadNextPage]);
+	}, [hasMore, isPointerInputMode, items.length, loadNextPage, loadingMoreRef]);
 
-	const handleScrollerScrollStop = useCallback((event) => {
-		handleLibraryScrollMemoryStop(event);
-		if (event?.reachedEdgeInfo?.bottom) {
-			loadNextPage();
-		}
-	}, [handleLibraryScrollMemoryStop, loadNextPage]);
 	const topToolbar = (
 		<Toolbar
 			activeSection="library"
@@ -237,15 +141,15 @@ const LibraryPanel = ({
 			<Header title={library?.Name || 'Library'} />
 			{topToolbar}
 			<div className={css.libraryContainer}>
-				<Scroller
-					className={css.scroller}
-					cbScrollTo={captureLibraryScrollTo}
-					onScrollStop={handleScrollerScrollStop}
+				<div
+					ref={scrollerRef}
+					className={css.nativeScroller}
+					onScroll={handleScrollerScroll}
 				>
-					<div ref={gridRef}>
-						<LibraryGridSpotlightContainer className={css.gridContainer} spotlightId="library-grid">
+					<div>
+						<LibraryGridSpotlightContainer className={css.gridContainer}>
 							{items.map((item, index) => {
-								const unwatchedCount = getUnwatchedCount(item);
+								const unwatchedCount = getSeriesUnplayedCount(item);
 								const showWatchStatus = unwatchedCount !== null && hasStartedWatching(item);
 								const isWatchComplete = showWatchStatus && unwatchedCount === 0;
 								return (
@@ -263,8 +167,10 @@ const LibraryPanel = ({
 										titleClassName={css.cardTitle}
 										subtitleClassName={css.cardSubtitle}
 										onClick={handleGridCardClick}
-										onKeyDown={handleGridCardKeyDown}
+										onPointerDown={handleGridCardPointerDown}
+										onMouseDown={handleGridCardPointerDown}
 										onFocus={handleGridCardFocus}
+										spotlightDisabled={isPointerInputMode}
 										overlayContent={(
 											<MediaCardStatusOverlay
 												showWatched={showWatchStatus}
@@ -278,14 +184,14 @@ const LibraryPanel = ({
 									/>
 								);
 							})}
-						{loadingMore && (
-							<div className={css.loadingMore}>
-								<Spinner size="small" />
-							</div>
-						)}
+							{loadingMore && (
+								<div className={css.loadingMore}>
+									<Spinner size="small" />
+								</div>
+							)}
 						</LibraryGridSpotlightContainer>
 					</div>
-				</Scroller>
+				</div>
 			</div>
 		</Panel>
 	);

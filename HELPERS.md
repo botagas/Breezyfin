@@ -7,6 +7,8 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Need | Preferred Helper |
 |---|---|
 | Save/restore panel scroll + cache scrollTop | `usePanelScrollState` |
+| Library panel paged data loading (first page + incremental load-more) | `useLibraryPagination` |
+| Library panel native-scroll persistence + progressive deep restore | `useLibraryScrollPersistence` |
 | Wire panel back handling | `usePanelBackHandler` |
 | Wire toolbar callbacks + layered panel back flow | `usePanelToolbarActions` |
 | Wire toolbar callbacks consistently | `useToolbarActions` |
@@ -96,6 +98,25 @@ const {
   requireCacheKey: true
 });
 ```
+
+### `useLibraryPagination`
+- File: `src/views/library-panel/hooks/useLibraryPagination.js`
+- Purpose: panel-local pagination flow for Library:
+  - first-page fetch
+  - load-more fetch
+  - dedupe by id
+  - request-id race guards
+- Use when:
+  - Library panel needs deterministic paged loading behavior without regrowing panel orchestrator logic.
+
+### `useLibraryScrollPersistence`
+- File: `src/views/library-panel/hooks/useLibraryScrollPersistence.js`
+- Purpose: panel-local native scroller persistence for Library:
+  - debounced `scrollTop` cache commits
+  - flush on deactivation/unmount/item selection
+  - progressive restore for deep positions (load more until target position is reachable)
+- Use when:
+  - Library panel uses native scrolling and needs deterministic restore across panel transitions.
 
 ### `useScrollerScrollMemory` and `useCachedScrollTopState`
 - File: `src/hooks/useScrollerScrollMemory.js`
