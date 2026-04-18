@@ -50,3 +50,4 @@ Run these before packaging a release candidate:
 2. In Library, with cached deep position beyond first page, go back into panel and verify progressive restore reaches deep target (not clamped to first-page max).
 3. In Library, switch between pointer and 5-way after scrolling; verify no snap-to-top occurs.
 4. In Library 5-way mode, navigate cards with directional keys and verify focused card remains in viewport (focus-driven scroll works).
+5. In Library, scroll down and interact with the page using 5-way or pointer. Verify that snap back to top of the page does not occur.
