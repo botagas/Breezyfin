@@ -51,6 +51,18 @@ You may also install the app using the `develop` branch:
 
 Beware, `develop` may include breaking changes.
 
+## Screenshots
+> [!NOTE]
+> Provided images use a sample library.
+
+<img alt="Home Screen View" src="/images/HomeView.png" />
+<img alt="Library Screen View" src="/images/LibraryView.png" />
+<img alt="Media Details Overview" src="/images/MediaDetails_1.png" />
+<img alt="Media Details Overview 2" src="/images/MediaDetails_2.png" />
+<img alt="Media Details Overview 3" src="/images/MediaDetails_3.png" />
+<img alt="Player Screen View" src="/images/PlayerView.png" />
+<img alt="Switch User View" src="/images/SwitchUserView.png" />
+
 ## Local development
 
 Clone the repository and install dependencies:
