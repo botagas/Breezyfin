@@ -39,6 +39,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize Media Details primary action handlers | `useMediaDetailsPrimaryActions` |
 | Centralize Media Details popup disclosure wiring | `useMediaDetailsDisclosures` |
 | Centralize Media Details image state/url/fallback handlers | `useMediaDetailsImages` |
+| Centralize Media Details staged loading reveal flow (backdrop -> branding -> content) | `useMediaDetailsStagedReveal` |
 | Centralize Media Details DOM scroll/focus helper callbacks | `useMediaDetailsDomHelpers` |
 | Centralize Media Details overview overflow measurement + play label derivation | `useMediaDetailsOverviewState` |
 | Centralize Media Details panel sync effects (item reset, timeout cleanup, settings sync) | `useMediaDetailsPanelSync` |

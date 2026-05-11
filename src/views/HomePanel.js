@@ -10,6 +10,7 @@ import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
+import {filterItemsByUserRequestTags} from '../utils/myRequests';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
@@ -151,21 +152,21 @@ const HomePanel = ({
 			]);
 
 			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-			const userNeedle = userName.trim();
-			const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			const userTagPattern = userNeedle
-				? new RegExp(`^\\s*.+?\\s*-\\s*${escapeRegex(userNeedle)}\\s*$`, 'i')
-				: null;
-			const tagMatchesUser = (item) => {
-				if (!userTagPattern) return false;
-				const tags = [
-					...(item?.Tags || []),
-					...(item?.TagItems?.map(tag => tag.Name) || [])
-				].filter(Boolean);
-				return tags.some(tag => userTagPattern.test(tag));
-			};
-
-			const requestItems = (taggedLatest || []).filter(tagMatchesUser);
+			let requestItems = filterItemsByUserRequestTags(taggedLatest || [], userName);
+			try {
+				const myRequestsResult = await jellyfinService.getMyRequests(
+					null,
+					['Movie', 'Series'],
+					MY_REQUESTS_TAG_SCAN_LIMIT,
+					0,
+					userName
+				);
+				if (Array.isArray(myRequestsResult?.items)) {
+					requestItems = myRequestsResult.items;
+				}
+			} catch (_) {
+				// Keep tag fallback items.
+			}
 			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 			const heroContent = recently.filter(item =>

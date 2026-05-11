@@ -2,6 +2,31 @@ import {useCallback} from 'react';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 
+const isOutroSegmentType = (type) => type === 'Outro' || type === 'Credits';
+
+const pickActiveSkipSegment = (mediaSegments, positionTicks) => {
+	if (!Array.isArray(mediaSegments) || mediaSegments.length === 0) return null;
+	const matchingSegments = mediaSegments.filter(
+		(segment) => positionTicks >= segment.StartTicks && positionTicks < segment.EndTicks
+	);
+	if (matchingSegments.length === 0) return null;
+	if (matchingSegments.length === 1) return matchingSegments[0];
+
+	const ranked = [...matchingSegments].sort((left, right) => {
+		const leftIsOutro = isOutroSegmentType(left?.Type);
+		const rightIsOutro = isOutroSegmentType(right?.Type);
+		if (leftIsOutro !== rightIsOutro) return leftIsOutro ? -1 : 1;
+
+		const leftDuration = (left?.EndTicks || 0) - (left?.StartTicks || 0);
+		const rightDuration = (right?.EndTicks || 0) - (right?.StartTicks || 0);
+		if (leftDuration !== rightDuration) return leftDuration - rightDuration;
+
+		return (right?.StartTicks || 0) - (left?.StartTicks || 0);
+	});
+
+	return ranked[0] || null;
+};
+
 export const usePlayerSkipOverlayState = ({
 	mediaSegments,
 	duration,
@@ -22,6 +47,31 @@ export const usePlayerSkipOverlayState = ({
 	setNextEpisodePromptDismissed,
 	handlePlayNextEpisode
 }) => {
+	const resetSkipOverlayState = useCallback(({
+		clearDismissedId = false,
+		clearNextEpisodeDismissed = false
+	} = {}) => {
+		setSkipOverlayVisible(false);
+		setCurrentSkipSegment(null);
+		setSkipCountdown(null);
+		setShowNextEpisodePrompt(false);
+		nextEpisodePromptStartTicksRef.current = null;
+		if (clearDismissedId) {
+			setDismissedSkipSegmentId(null);
+		}
+		if (clearNextEpisodeDismissed) {
+			setNextEpisodePromptDismissed(false);
+		}
+	}, [
+		nextEpisodePromptStartTicksRef,
+		setCurrentSkipSegment,
+		setDismissedSkipSegmentId,
+		setNextEpisodePromptDismissed,
+		setShowNextEpisodePrompt,
+		setSkipCountdown,
+		setSkipOverlayVisible
+	]);
+
 	const checkSkipSegments = useCallback((positionSeconds) => {
 		if (!Number.isFinite(positionSeconds)) return;
 		let skipSegmentPromptsEnabled = true;
@@ -40,21 +90,18 @@ export const usePlayerSkipOverlayState = ({
 		}
 
 		const positionTicks = positionSeconds * JELLYFIN_TICKS_PER_SECOND;
-		const activeSegment = mediaSegments.find(
-			(segment) => positionTicks >= segment.StartTicks && positionTicks < segment.EndTicks
-		);
+		const activeSegment = pickActiveSkipSegment(mediaSegments, positionTicks);
 
 		if (activeSegment) {
-			const isOutro = activeSegment.Type === 'Outro' || activeSegment.Type === 'Credits';
+			const isOutro = isOutroSegmentType(activeSegment.Type);
 			if (!isOutro && dismissedSkipSegmentId === activeSegment.Id) {
-				setSkipOverlayVisible(false);
 				setCurrentSkipSegment(activeSegment);
+				setShowNextEpisodePrompt(false);
+				setSkipCountdown(null);
 				return;
 			}
 			if (!isOutro && !skipSegmentPromptsEnabled) {
-				setSkipOverlayVisible(false);
-				setCurrentSkipSegment(null);
-				setSkipCountdown(null);
+				resetSkipOverlayState();
 				return;
 			}
 			if (!currentSkipSegment || currentSkipSegment.Id !== activeSegment.Id) {
@@ -85,36 +132,22 @@ export const usePlayerSkipOverlayState = ({
 				setCurrentSkipSegment(null);
 				setSkipCountdown(Math.ceil(remainingSeconds));
 			} else if (showNextEpisodePrompt) {
-				setShowNextEpisodePrompt(false);
-				setSkipOverlayVisible(false);
-				setCurrentSkipSegment(null);
-				setSkipCountdown(null);
+				resetSkipOverlayState();
 			}
 		} else if (showNextEpisodePrompt) {
 			const promptStartTicks = nextEpisodePromptStartTicksRef.current || 0;
 			if (positionTicks < promptStartTicks) {
-				setShowNextEpisodePrompt(false);
-				setSkipOverlayVisible(false);
-				setCurrentSkipSegment(null);
-				setSkipCountdown(null);
-				nextEpisodePromptStartTicksRef.current = null;
+				resetSkipOverlayState();
 			} else {
 				if (!playNextPromptEnabled || (playNextPromptMode === 'segmentsOnly' && !currentSkipSegment)) {
-					setShowNextEpisodePrompt(false);
-					setSkipOverlayVisible(false);
-					setCurrentSkipSegment(null);
-					setSkipCountdown(null);
-					nextEpisodePromptStartTicksRef.current = null;
+					resetSkipOverlayState();
 					return;
 				}
 				setSkipOverlayVisible(true);
 				setSkipCountdown(null);
 			}
 		} else if (skipOverlayVisible) {
-			setSkipOverlayVisible(false);
-			setCurrentSkipSegment(null);
-			setSkipCountdown(null);
-			setDismissedSkipSegmentId(null);
+			resetSkipOverlayState({clearDismissedId: true});
 		}
 	}, [
 		currentSkipSegment,
@@ -125,12 +158,12 @@ export const usePlayerSkipOverlayState = ({
 		nextEpisodePromptDismissed,
 		nextEpisodePromptStartTicksRef,
 		setCurrentSkipSegment,
-		setDismissedSkipSegmentId,
 		setShowNextEpisodePrompt,
 		setSkipCountdown,
 		setSkipOverlayVisible,
 		showNextEpisodePrompt,
-		skipOverlayVisible
+		skipOverlayVisible,
+		resetSkipOverlayState
 	]);
 
 	const handleSkipSegment = useCallback(() => {
@@ -139,7 +172,7 @@ export const usePlayerSkipOverlayState = ({
 			return;
 		}
 		if (!currentSkipSegment) return;
-		const isOutro = currentSkipSegment.Type === 'Outro' || currentSkipSegment.Type === 'Credits';
+		const isOutro = isOutroSegmentType(currentSkipSegment.Type);
 		if (isOutro && nextEpisodeData) {
 			handlePlayNextEpisode();
 			return;
@@ -150,42 +183,24 @@ export const usePlayerSkipOverlayState = ({
 			setCurrentTime(skipTo);
 		}
 		setDismissedSkipSegmentId(currentSkipSegment.Id || null);
-		setSkipOverlayVisible(false);
-		setCurrentSkipSegment(null);
-		setSkipCountdown(null);
-		setShowNextEpisodePrompt(false);
-		setNextEpisodePromptDismissed(false);
-		nextEpisodePromptStartTicksRef.current = null;
+		resetSkipOverlayState({clearNextEpisodeDismissed: true});
 	}, [
 		currentSkipSegment,
 		handlePlayNextEpisode,
 		nextEpisodeData,
-		nextEpisodePromptStartTicksRef,
-		setCurrentSkipSegment,
 		setCurrentTime,
 		setDismissedSkipSegmentId,
-		setNextEpisodePromptDismissed,
-		setShowNextEpisodePrompt,
-		setSkipCountdown,
-		setSkipOverlayVisible,
+		resetSkipOverlayState,
 		showNextEpisodePrompt,
 		videoRef
 	]);
 
 	const handleDismissNextEpisodePrompt = useCallback(() => {
-		setShowNextEpisodePrompt(false);
-		setSkipOverlayVisible(false);
-		setCurrentSkipSegment(null);
-		setSkipCountdown(null);
+		resetSkipOverlayState();
 		setNextEpisodePromptDismissed(true);
-		nextEpisodePromptStartTicksRef.current = null;
 	}, [
-		nextEpisodePromptStartTicksRef,
-		setCurrentSkipSegment,
+		resetSkipOverlayState,
 		setNextEpisodePromptDismissed,
-		setShowNextEpisodePrompt,
-		setSkipCountdown,
-		setSkipOverlayVisible
 	]);
 
 	const handleDismissSkipOverlay = useCallback(() => {

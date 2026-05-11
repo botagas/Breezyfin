@@ -66,13 +66,23 @@ export const getLibraryViewItems = async (service) => {
 	}
 };
 
-export const getLibraryChildItems = async (service, parentId, itemTypes, limit = 100, startIndex = 0) => {
+export const getLibraryChildItems = async (
+	service,
+	parentId,
+	itemTypes,
+	limit = 100,
+	startIndex = 0,
+	options = {}
+) => {
 	try {
-		let url = `${service.serverUrl}/Users/${service.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount`;
+		let url = `${service.serverUrl}/Users/${service.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount,Tags,TagItems`;
 
 		if (itemTypes) {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
 			url += `&includeItemTypes=${types}`;
+		}
+		if (typeof options?.filters === 'string' && options.filters.trim()) {
+			url += `&filters=${encodeURIComponent(options.filters.trim())}`;
 		}
 
 		return await service._fetchItems(url, {}, 'getLibraryItems');

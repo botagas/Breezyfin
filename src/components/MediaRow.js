@@ -7,6 +7,7 @@ import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainer
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
 
 import css from './MediaRow.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
@@ -211,6 +212,11 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 				}
 				focusDebounceTimeoutRef.current = window.setTimeout(() => {
 					scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
+					ensureFocusTargetVisibleWithTopChrome(element, {
+						topPadding: 12,
+						bottomPadding: 16,
+						behavior: 'auto'
+					});
 					focusDebounceTimeoutRef.current = null;
 				}, 45);
 			}

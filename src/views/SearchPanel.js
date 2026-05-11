@@ -14,6 +14,7 @@ import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {KeyCodes} from '../utils/keyCodes';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
+import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
@@ -404,6 +405,11 @@ const SearchPanel = ({
 	}, []);
 
 	const handleResultCardFocus = useCallback((event) => {
+		ensureFocusTargetVisibleWithTopChrome(event.currentTarget, {
+			topPadding: 12,
+			bottomPadding: 14,
+			behavior: 'auto'
+		});
 		if (!hasMore || loadingMoreRef.current) return;
 		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
 		if (!Number.isInteger(itemIndex)) return;
@@ -543,7 +549,7 @@ const SearchPanel = ({
 									selected={selectedFilterIds.includes(filter.id)}
 									onClick={handleFilterToggleClick}
 									size="small"
-									className={css.filterPopupOptionButton}
+									className={`${css.filterPopupOptionButton} ${selectedFilterIds.includes(filter.id) ? css.filterPopupOptionButtonSelected : ''}`}
 								>
 									{filter.label}
 								</Button>

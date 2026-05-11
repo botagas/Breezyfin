@@ -42,7 +42,10 @@ export const useMediaDetailsInteractionHandlers = ({
 	}, [scrollCastIntoView]);
 
 	const focusFirstSectionFromCast = useCallback(() => {
-		if (typeof focusFirstSectionPrimary === 'function' && focusFirstSectionPrimary()) return;
+		if (typeof focusFirstSectionPrimary === 'function' && focusFirstSectionPrimary({
+			forceScroll: true,
+			focusTarget: 'topNav'
+		})) return;
 		if (typeof focusIntroTopNavigation === 'function') {
 			focusIntroTopNavigation();
 		}
@@ -162,12 +165,33 @@ export const useMediaDetailsInteractionHandlers = ({
 		} else if (event.keyCode === KeyCodes.UP) {
 			event.preventDefault();
 			event.stopPropagation();
-			if (typeof focusFirstSectionPrimary === 'function' && focusFirstSectionPrimary()) return;
+			if (typeof focusSecondSectionPrimary === 'function' && focusSecondSectionPrimary()) return;
+			if (typeof focusFirstSectionPrimary === 'function' && focusFirstSectionPrimary({forceScroll: true})) return;
 			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
 			const card = event.currentTarget.closest(`.${css.seasonCard}`);
 			if (card?.focus) card.focus();
 		}
-	}, [css.seasonCard, focusFirstSectionPrimary, focusIntroTopNavigation]);
+	}, [css.seasonCard, focusFirstSectionPrimary, focusIntroTopNavigation, focusSecondSectionPrimary]);
+
+	const focusSeasonFromEpisodeSelector = useCallback(() => {
+		const seasonRoot = seasonScrollerRef.current;
+		if (seasonRoot) {
+			const selectedSeasonCard = seasonRoot.querySelector(`.${css.seasonCard}.${css.selected}`);
+			const firstSeasonCard = selectedSeasonCard || seasonRoot.querySelector(`.${css.seasonCard}`);
+			if (firstSeasonCard?.focus) {
+				if (typeof focusNodeWithoutScroll === 'function') {
+					focusNodeWithoutScroll(firstSeasonCard);
+				} else {
+					firstSeasonCard.focus();
+				}
+				return true;
+			}
+		}
+		if (typeof focusSeasonCardByIndex === 'function') {
+			return focusSeasonCardByIndex(0);
+		}
+		return false;
+	}, [css.seasonCard, css.selected, focusNodeWithoutScroll, focusSeasonCardByIndex, seasonScrollerRef]);
 
 	const handleEpisodeSelectorKeyDown = useCallback((event) => {
 		if (event.keyCode === KeyCodes.DOWN) {
@@ -177,11 +201,12 @@ export const useMediaDetailsInteractionHandlers = ({
 		} else if (event.keyCode === KeyCodes.UP) {
 			event.preventDefault();
 			event.stopPropagation();
+			if (focusSeasonFromEpisodeSelector()) return;
 			if (typeof focusFirstSectionPrimary === 'function') {
-				focusFirstSectionPrimary();
+				focusFirstSectionPrimary({forceScroll: true});
 			}
 		}
-	}, [focusEpisodeCardByIndex, focusFirstSectionPrimary]);
+	}, [focusEpisodeCardByIndex, focusFirstSectionPrimary, focusSeasonFromEpisodeSelector]);
 
 	const handleEpisodeCardClick = useCallback((event) => {
 		const episodeId = event.currentTarget.dataset.episodeId;

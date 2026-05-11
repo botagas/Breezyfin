@@ -15,14 +15,17 @@ Rule:
 - Run a post-decomposition style analysis pass to identify remaining hotspots/overlap and prioritize practical style cleanup improvements.
 - Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
 - Implement manual-login server selection UX (URL input + selectable saved server list in the same flow).
-- Implement server discovery for manual login so compatible local servers can be detected and selected without manually entering full server details (SSDP discovery).
 - Inspect style token usage for potential over-tokenization and simplify cases where indirection adds noise without practical reuse.
-- Add a screensaver (think DVD-like) that would trigger after a minute of inactivity (configurable). Need to create a separate screensaver logo.
-- Implement filtering and search in library view.
+- Expand staged panel loading reveal beyond Media Details (background -> branding -> full UI) with data-ready gating so reveal only starts after panel content is loaded.
+- Add a screensaver (think DVD-like) that would trigger after a minute of inactivity (configurable). The screensaver logo could be the transparent logo in white + text BF (short for Breezyfin).
+- Next to a section in Home Panel, there should be a button to enter that section for more (icon would be enough). This would allow you to view more entries for that section in a separate panel, like library panel.
 
 ## Long-term goals
 
+- Implement server discovery for manual login so compatible local servers can be detected and selected without manually entering full server details (SSDP discovery).
+- Some text titles seem to be glitching position (for example, Culinary Class Wars), where it jumps up and down. Some images pair poorly with the next, which creates visibility issues and poor contrast. That decreases readability. 
 - Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
+- Consider adding dedicated Library search UX in future.
 - Identify and fix panel loading delay and unintended panel reload behavior when switching between panels. Needs inspection as it might not be caused by the app.
 - Implement Discovery media rows via Seerr integration (likely requires Jellyfin plugin support).
 - Implement Watchlist support (evaluate Jellyfin Enhanced/KefinTweaks Watchlist compatibility and integration path).

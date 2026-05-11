@@ -67,6 +67,7 @@ Quick quality audit commands:
 - Media details overview overflow + play-label derivation: `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
 - Media details panel sync effects: `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
 - Media details per-item bootstrap effect: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
+- Media details staged loading reveal orchestration: `src/views/media-details-panel/hooks/useMediaDetailsStagedReveal.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
 - Settings runtime capability label derivation: `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
 - Settings bootstrap loader/effects: `src/views/settings-panel/hooks/useSettingsBootstrap.js`

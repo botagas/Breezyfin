@@ -14,6 +14,14 @@ const matchesLanguage = (stream, language) =>
 	Boolean(language) &&
 	String(stream.Language).toLowerCase() === String(language).toLowerCase();
 
+const findStreamByIndex = (streams = [], index) =>
+	Array.isArray(streams) ? streams.find((stream) => stream?.Index === index) : null;
+
+const streamMatchesPreferredLanguage = (stream, language) => {
+	if (!language) return true;
+	return matchesLanguage(stream, language);
+};
+
 const isCompatibleAudioStream = (stream) => isSupportedAudioCodec(stream?.Codec);
 
 const pickBestCompatibleAudioTrack = (audioStreams = []) => {
@@ -82,14 +90,23 @@ export const useTrackPreferences = () => {
 
 	const pickPreferredSubtitle = useCallback((subtitleStreams = [], providedSubtitle = null, defaultSubtitle = null) => {
 		if (providedSubtitle === -1) return -1;
-		if (isInteger(providedSubtitle) && subtitleStreams.some((stream) => stream.Index === providedSubtitle)) {
+
+		const preference = preferencesRef.current?.subtitle;
+		const providedStream = isInteger(providedSubtitle) ? findStreamByIndex(subtitleStreams, providedSubtitle) : null;
+		const providedSubtitleMatchesPreference = providedStream
+			? streamMatchesPreferredLanguage(providedStream, preference?.language)
+			: false;
+
+		if (providedStream && (providedSubtitleMatchesPreference || !preference?.language)) {
 			return providedSubtitle;
 		}
 
-		const preference = preferencesRef.current?.subtitle;
 		if (preference?.off) return -1;
-		if (isInteger(preference?.index) && subtitleStreams.some((stream) => stream.Index === preference.index)) {
-			return preference.index;
+		if (isInteger(preference?.index)) {
+			const preferredStream = findStreamByIndex(subtitleStreams, preference.index);
+			if (preferredStream && streamMatchesPreferredLanguage(preferredStream, preference?.language)) {
+				return preference.index;
+			}
 		}
 
 		if (preference?.language) {

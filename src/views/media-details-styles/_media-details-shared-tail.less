@@ -19,6 +19,14 @@
 :global([data-bf-animations='off']),
 :global([data-bf-all-animations='off']) {
 	.detailsContainer {
+		.contentRevealHidden,
+		.contentRevealVisible,
+		.backdropRevealHidden,
+		.backdropRevealVisible {
+			transition: none !important;
+			transform: none !important;
+		}
+
 		.detailsBackButton,
 		.episodeSelectorButton,
 		.compactSelectorButton,

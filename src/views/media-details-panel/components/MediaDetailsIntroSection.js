@@ -1,4 +1,3 @@
-import {useCallback, useEffect, useState} from 'react';
 import Heading from '@enact/sandstone/Heading';
 import BodyText from '@enact/sandstone/BodyText';
 import Icon from '@enact/sandstone/Icon';
@@ -19,6 +18,7 @@ const MediaDetailsIntroSection = ({
 		isElegantTheme,
 		useHeaderLogo,
 		headerLogoUrl,
+		isHeaderLogoLoaded,
 		headerTitle,
 		hasCreatorCredits,
 		directorNames,
@@ -40,6 +40,7 @@ const MediaDetailsIntroSection = ({
 		onBack,
 		onOpenEpisodeSeries,
 		onOpenEpisodePicker,
+		onHeaderLogoLoad,
 		onHeaderLogoError,
 		renderCreditNames,
 		onToggleFavorite,
@@ -52,6 +53,8 @@ const MediaDetailsIntroSection = ({
 		onPlay,
 		onNonSeriesPlayKeyDown,
 		showSectionHints,
+		showLogoStage,
+		showContentStage,
 		onIntroActionKeyDown,
 		onIntroTopNavKeyDown
 	} = actions;
@@ -64,28 +67,11 @@ const MediaDetailsIntroSection = ({
 		subtitleSelectorButtonRef,
 		playPrimaryButtonRef
 	} = refs;
-	const [headerLogoLoaded, setHeaderLogoLoaded] = useState(false);
-
-	useEffect(() => {
-		setHeaderLogoLoaded(false);
-	}, [headerLogoUrl, useHeaderLogo]);
-
-	const handleHeaderLogoLoad = useCallback(() => {
-		setHeaderLogoLoaded(true);
-	}, []);
-
-	const handleHeaderLogoError = useCallback((event) => {
-		setHeaderLogoLoaded(false);
-		if (typeof onHeaderLogoError === 'function') {
-			onHeaderLogoError(event);
-		}
-	}, [onHeaderLogoError]);
-
 	if (!item) return null;
 
 	return (
 		<div className={css.firstSection} ref={firstSectionRef}>
-			<div className={css.detailsHeadingStack}>
+			<div className={`${css.detailsHeadingStack} ${showLogoStage ? css.contentRevealVisible : css.contentRevealHidden}`}>
 				<div className={css.detailsTopBar}>
 					<Button
 						size="small"
@@ -145,23 +131,20 @@ const MediaDetailsIntroSection = ({
 			<div className={`${css.introSection} ${isElegantTheme ? css.introSectionElegant : ''}`}>
 				<div className={css.introContent}>
 					<div className={css.introTopSpacer} />
-					<div className={css.introHeaderRow}>
+					<div className={`${css.introHeaderRow} ${showLogoStage ? css.contentRevealVisible : css.contentRevealHidden}`}>
 						<div className={css.pageHeader}>
 								{useHeaderLogo ? (
 									<div className={css.headerLogoWrap}>
 										<img
 											src={headerLogoUrl}
 											alt={item?.Name || 'Details'}
-											className={`${css.headerLogo} ${imageLoadCss.imageReveal} ${headerLogoLoaded ? imageLoadCss.imageRevealLoaded : ''}`}
-											onLoad={handleHeaderLogoLoad}
-											onError={handleHeaderLogoError}
+											className={`${css.headerLogo} ${imageLoadCss.imageReveal} ${isHeaderLogoLoaded ? imageLoadCss.imageRevealLoaded : ''}`}
+											onLoad={onHeaderLogoLoad}
+											onError={onHeaderLogoError}
 											loading="lazy"
 											decoding="async"
 											draggable={false}
 										/>
-										{!headerLogoLoaded ? (
-											<div className={`${imageLoadCss.imageLoadingHint} ${css.headerLogoLoadingHint}`} aria-hidden="true" />
-										) : null}
 									</div>
 								) : (
 								<Heading size="large" className={css.pageHeaderTitle}>
@@ -190,7 +173,7 @@ const MediaDetailsIntroSection = ({
 							</div>
 						)}
 					</div>
-					<div className={css.header}>
+					<div className={`${css.header} ${showContentStage ? css.contentRevealVisible : css.contentRevealHidden}`}>
 						<div className={css.metadataRow}>
 							<div className={css.metadata}>
 								{item.ProductionYear && (

@@ -48,6 +48,7 @@ import {
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
+import {getMyRequestItems} from './jellyfin/requestsApi';
 
 class JellyfinService {
 	constructor() {
@@ -293,8 +294,8 @@ class JellyfinService {
 		return getLibraryViewItems(this);
 	}
 
-	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0) {
-		return getLibraryChildItems(this, parentId, itemTypes, limit, startIndex);
+	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0, options = {}) {
+		return getLibraryChildItems(this, parentId, itemTypes, limit, startIndex, options);
 	}
 
 	async getItem(itemId) {
@@ -339,6 +340,16 @@ class JellyfinService {
 
 	async search(searchTerm, itemTypes = null, limit = 25, startIndex = 0) {
 		return searchLibraryItems(this, searchTerm, itemTypes, limit, startIndex);
+	}
+
+	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '') {
+		return getMyRequestItems(this, {
+			parentId,
+			itemTypes,
+			limit,
+			startIndex,
+			username
+		});
 	}
 
 	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100) {
