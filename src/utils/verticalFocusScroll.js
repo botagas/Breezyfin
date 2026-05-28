@@ -37,8 +37,8 @@ const getTopChromeBottom = () => {
 export const ensureFocusTargetVisibleWithTopChrome = (
 	target,
 	{
-		topPadding = 10,
-		bottomPadding = 10,
+		topPadding = 12,
+		bottomPadding = 14,
 		behavior = 'auto'
 	} = {}
 ) => {

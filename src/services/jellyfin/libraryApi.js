@@ -1,4 +1,5 @@
 import {JELLYFIN_TICKS_PER_SECOND} from '../../constants/time';
+import {normalizeOptionalQueryValue} from './queryParams';
 
 export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16) => {
 	try {
@@ -75,15 +76,28 @@ export const getLibraryChildItems = async (
 	options = {}
 ) => {
 	try {
-		let url = `${service.serverUrl}/Users/${service.userId}/Items?parentId=${parentId}&limit=${limit}&startIndex=${startIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount,Tags,TagItems`;
+		const params = new URLSearchParams();
+		const safeParentId = normalizeOptionalQueryValue(parentId);
+		const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.trunc(Number(limit))) : 100;
+		const safeStartIndex = Number.isFinite(Number(startIndex)) ? Math.max(0, Math.trunc(Number(startIndex))) : 0;
+		if (safeParentId) params.set('parentId', safeParentId);
+		params.set('limit', String(safeLimit));
+		params.set('startIndex', String(safeStartIndex));
+		params.set('recursive', 'true');
+		params.set('sortBy', 'SortName');
+		params.set('sortOrder', 'Ascending');
+		params.set('fields', 'Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount,Tags,TagItems');
 
 		if (itemTypes) {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
-			url += `&includeItemTypes=${types}`;
+			if (typeof types === 'string' && types.trim()) {
+				params.set('includeItemTypes', types.trim());
+			}
 		}
 		if (typeof options?.filters === 'string' && options.filters.trim()) {
-			url += `&filters=${encodeURIComponent(options.filters.trim())}`;
+			params.set('filters', options.filters.trim());
 		}
+		const url = `${service.serverUrl}/Users/${service.userId}/Items?${params.toString()}`;
 
 		return await service._fetchItems(url, {}, 'getLibraryItems');
 	} catch (error) {

@@ -111,6 +111,7 @@ Other shared utilities:
 - Shared poster card class helper: `src/utils/posterCardClassProps.js`
 - Shared integer parser helper: `src/utils/numberParsing.js`
 - Shared DOM node debug descriptor helper: `src/utils/domNodeDescription.js`
+- Crash-boundary recovery context/action helper: `src/utils/crashRecovery.js`
 - Shared player view helpers: `src/views/player-panel/utils/playerPanelHelpers.js`
 - Shared episode next/previous helpers: `src/views/player-panel/utils/episodeNavigation.js`
 - Shared media details formatting/image helpers: `src/views/media-details-panel/utils/mediaDetailsHelpers.js`

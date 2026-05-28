@@ -90,6 +90,7 @@ jobs:
       - name: Build production bundle
         env:
           REACT_APP_DISABLE_PERSISTENT_LOGS: "1"
+          REACT_APP_RELEASE_CHANNEL: "stable"
         run: |
           npm run clean
           npm run pack-p

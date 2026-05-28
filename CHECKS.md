@@ -47,6 +47,7 @@ Run these before packaging a release candidate:
 12. Validate `Skip Credits` always resolves to the active credits/outro boundary when intro and credits markers overlap or are malformed.
 13. Validate play-next subtitle continuity prefers prior language semantics over raw stream index when next-episode subtitle ordering/naming differs.
 14. In Media Details, validate staged reveal order (`backdrop -> header logo/title -> full controls/content`) starts only after data load completion and does not expose half-loaded title surfaces.
+15. Validate audio track switching works when multiple audio streams share the same language code (for example many `ru` tracks plus one `en`) and that selecting non-first same-language tracks applies correctly.
 
 ### Library panel scroll/focus regression
 

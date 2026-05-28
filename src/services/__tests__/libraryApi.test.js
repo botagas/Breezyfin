@@ -39,12 +39,29 @@ describe('libraryApi', () => {
 
 		expect(service._fetchItems).toHaveBeenCalledTimes(1);
 		const requestedUrl = service._fetchItems.mock.calls[0][0];
+		const requestedParams = new URL(requestedUrl).searchParams;
 		expect(requestedUrl).toContain('http://media.local/Users/user-1/Items?');
 		expect(requestedUrl).toContain('parentId=parent-1');
 		expect(requestedUrl).toContain('limit=50');
 		expect(requestedUrl).toContain('startIndex=10');
-		expect(requestedUrl).toContain('includeItemTypes=Movie,Series');
+		expect(requestedParams.get('includeItemTypes')).toBe('Movie,Series');
 		expect(service._fetchItems).toHaveBeenCalledWith(requestedUrl, {}, 'getLibraryItems');
+	});
+
+	it('omits invalid parentId values when building library item requests', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await getLibraryChildItems(service, null, ['Movie'], 30, 0);
+		await getLibraryChildItems(service, 'null', ['Movie'], 30, 0);
+		await getLibraryChildItems(service, 'undefined', ['Movie'], 30, 0);
+
+		expect(service._fetchItems).toHaveBeenCalledTimes(3);
+		service._fetchItems.mock.calls.forEach(([requestedUrl]) => {
+			const requestedParams = new URL(requestedUrl).searchParams;
+			expect(requestedParams.has('parentId')).toBe(false);
+			expect(requestedParams.get('includeItemTypes')).toBe('Movie');
+		});
 	});
 
 	it('normalizes search inputs for encoded term and non-negative start index', async () => {

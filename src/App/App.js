@@ -5,6 +5,7 @@ import { Panels } from '../components/BreezyPanels';
 
 import PerformanceOverlay from '../components/PerformanceOverlay';
 import FocusDebugOverlay from '../components/FocusDebugOverlay';
+import DebugErrorMenu from '../components/DebugErrorMenu';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
@@ -12,6 +13,14 @@ import { useInputMode } from '../hooks/useInputMode';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {isNonStableBuild} from '../utils/featureFlags';
+import {
+	CRASH_RECOVERY_ACTIONS,
+	consumeCrashRecoveryAction,
+	readCrashNavigationSnapshot,
+	saveCrashNavigationSnapshot,
+	clearCrashPlaybackContext
+} from '../utils/crashRecovery';
 import AppCrashBoundary from './AppCrashBoundary';
 import {normalizePanelStatePayload, upsertKeyedPanelState, clearKeyedPanelState} from './utils/panelStateCache';
 import {getPanelIndexForView} from './utils/panelIndex';
@@ -23,6 +32,8 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
+const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
+
 const emitAppDebugEvent = (name, detail) => {
 	if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') {
 		return;
@@ -48,7 +59,8 @@ const resolveInitialVisualSettings = () => {
 		allAnimationsDisabled: settings.disableAllAnimations === true,
 		navbarTheme: settings.navbarTheme === 'classic' ? 'classic' : 'elegant',
 		performanceOverlayEnabled: settings.showPerformanceOverlay === true,
-		focusDebugOverlayEnabled: settings.showFocusDebugOverlay === true
+		focusDebugOverlayEnabled: settings.showFocusDebugOverlay === true,
+		debugErrorMenuEnabled: SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true
 	};
 };
 
@@ -73,6 +85,8 @@ const App = (props) => {
 	const [navbarTheme, setNavbarTheme] = useState(initialVisualSettingsRef.current.navbarTheme);
 	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
 	const [focusDebugOverlayEnabled, setFocusDebugOverlayEnabled] = useState(initialVisualSettingsRef.current.focusDebugOverlayEnabled);
+	const [debugErrorMenuEnabled, setDebugErrorMenuEnabled] = useState(initialVisualSettingsRef.current.debugErrorMenuEnabled);
+	const [debugErrorMenuOpen, setDebugErrorMenuOpen] = useState(false);
 	const [lastNavigateDebug, setLastNavigateDebug] = useState(null);
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
@@ -134,6 +148,7 @@ const App = (props) => {
 		setDetailsReturnView('home');
 		setPlayerControlsVisible(true);
 		clearPanelHistory();
+		clearCrashPlaybackContext();
 	}, [clearPanelHistory]);
 
 	const clearPanelSelection = useCallback((options = {}) => {
@@ -204,9 +219,36 @@ const App = (props) => {
 		setNavbarTheme(settings.navbarTheme === 'classic' ? 'classic' : 'elegant');
 		setPerformanceOverlayEnabled(settings.showPerformanceOverlay === true);
 		setFocusDebugOverlayEnabled(settings.showFocusDebugOverlay === true);
+		setDebugErrorMenuEnabled(SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true);
 	}, []);
 
 	useBreezyfinSettingsSync(applyVisualSettings);
+
+	useEffect(() => {
+		if (!debugErrorMenuEnabled && debugErrorMenuOpen) {
+			setDebugErrorMenuOpen(false);
+		}
+	}, [debugErrorMenuEnabled, debugErrorMenuOpen]);
+
+	useEffect(() => {
+		saveCrashNavigationSnapshot({
+			currentView,
+			selectedItem,
+			selectedLibrary,
+			playbackOptions,
+			previousItem,
+			detailsReturnView,
+			playerControlsVisible
+		});
+	}, [
+		currentView,
+		selectedItem,
+		selectedLibrary,
+		playbackOptions,
+		previousItem,
+		detailsReturnView,
+		playerControlsVisible
+	]);
 
 	const handleSessionExpired = useCallback((message = SESSION_EXPIRED_MESSAGE) => {
 		jellyfinService.switchUser();
@@ -215,6 +257,50 @@ const App = (props) => {
 		setLoginNotice(message);
 		setLoginNoticeNonce((value) => value + 1);
 	}, [resetSessionState]);
+
+	const applyPendingCrashRecovery = useCallback(() => {
+		const pendingRecoveryAction = consumeCrashRecoveryAction();
+		if (!pendingRecoveryAction) return;
+
+		if (pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.HOME) {
+			setSelectedItem(null);
+			setSelectedLibrary(null);
+			setPlaybackOptions(null);
+			setPreviousItem(null);
+			setDetailsReturnView('home');
+			setPlayerControlsVisible(true);
+			setCurrentView('home');
+			return;
+		}
+
+		if (
+			pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.BACK ||
+			pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.DETAILS
+		) {
+			const crashSnapshot = readCrashNavigationSnapshot();
+			if (!crashSnapshot) {
+				setCurrentView('home');
+				return;
+			}
+			const recoverView = crashSnapshot.currentView === 'player' ? 'details' : crashSnapshot.currentView;
+			const recoverSelectedItem = crashSnapshot.selectedItem || null;
+			setSelectedItem(crashSnapshot.selectedItem || null);
+			setSelectedLibrary(crashSnapshot.selectedLibrary || null);
+			setPlaybackOptions(crashSnapshot.playbackOptions || null);
+			setPreviousItem(crashSnapshot.previousItem || null);
+			setDetailsReturnView(
+				DETAIL_RETURN_VIEWS.has(crashSnapshot.detailsReturnView)
+					? crashSnapshot.detailsReturnView
+					: 'home'
+			);
+			setPlayerControlsVisible(crashSnapshot.playerControlsVisible !== false);
+			if (recoverView === 'details' && !recoverSelectedItem?.Id) {
+				setCurrentView('home');
+				return;
+			}
+			setCurrentView(recoverView || 'home');
+		}
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -225,6 +311,7 @@ const App = (props) => {
 			if (cancelled) return;
 			if (user) {
 				setCurrentView('home');
+				applyPendingCrashRecovery();
 				return;
 			}
 			handleSessionExpired();
@@ -233,7 +320,7 @@ const App = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [handleSessionExpired]);
+	}, [applyPendingCrashRecovery, handleSessionExpired]);
 
 	useEffect(() => {
 		const onSessionExpired = (event) => {
@@ -282,6 +369,10 @@ const App = (props) => {
 	}, [runtimeDataAttributes]);
 
 	const handleBack = useCallback(() => {
+		if (debugErrorMenuOpen) {
+			setDebugErrorMenuOpen(false);
+			return true;
+		}
 		switch (currentView) {
 			case 'library':
 				return handleSectionBack(libraryBackHandlerRef, 'home');
@@ -312,6 +403,7 @@ const App = (props) => {
 		}
 		}, [
 			currentView,
+			debugErrorMenuOpen,
 			detailsBackHandlerRef,
 			fallbackToDetailsFromPlayer,
 			favoritesBackHandlerRef,
@@ -563,6 +655,58 @@ const App = (props) => {
 		));
 	}, []);
 
+	const debugErrorActions = useMemo(() => {
+		const actions = [
+			{id: 'runtime-crash', label: 'App Crash Boundary'},
+			{id: 'unhandled-rejection', label: 'Unhandled Rejection'}
+		];
+		if (currentView === 'player') {
+			actions.unshift(
+				{id: 'player-transcode-fallback', label: 'Player: Transcode Fallback'},
+				{id: 'player-session-rebuild', label: 'Player: Restart Stream'},
+				{id: 'player-playback-error', label: 'Player: Playback Error'}
+			);
+		}
+		return actions;
+	}, [currentView]);
+
+	const handleDebugErrorMenuOpenChange = useCallback((open) => {
+		if (!debugErrorMenuEnabled) return;
+		setDebugErrorMenuOpen(Boolean(open));
+	}, [debugErrorMenuEnabled]);
+
+	const dispatchPlayerDebugAction = useCallback((action) => {
+		emitAppDebugEvent('breezyfin:debug-error-action', {
+			action,
+			at: Date.now(),
+			source: 'app-debug-menu'
+		});
+	}, []);
+
+	const handleDebugErrorMenuAction = useCallback((actionId) => {
+		if (!debugErrorMenuEnabled) return;
+		switch (actionId) {
+			case 'runtime-crash':
+				window.setTimeout(() => {
+					throw new Error('Debug: simulated app runtime crash');
+				}, 0);
+				break;
+			case 'unhandled-rejection':
+				window.setTimeout(() => {
+					Promise.reject(new Error('Debug: simulated unhandled rejection'));
+				}, 0);
+				break;
+			case 'player-playback-error':
+			case 'player-session-rebuild':
+			case 'player-transcode-fallback':
+				dispatchPlayerDebugAction(actionId);
+				break;
+			default:
+				break;
+		}
+		setDebugErrorMenuOpen(false);
+	}, [debugErrorMenuEnabled, dispatchPlayerDebugAction]);
+
 	const panelChildren = createPanelChildren({
 		currentView,
 		selectedItem,
@@ -617,6 +761,14 @@ const App = (props) => {
 					>
 					{panelChildren}
 					</Panels>
+					<DebugErrorMenu
+						enabled={debugErrorMenuEnabled}
+						actions={debugErrorActions}
+						open={debugErrorMenuOpen}
+						onOpenChange={handleDebugErrorMenuOpenChange}
+						onAction={handleDebugErrorMenuAction}
+						ariaLabel="Debug error actions"
+					/>
 					<FocusDebugOverlay
 						enabled={focusDebugOverlayEnabled}
 						currentView={currentView}

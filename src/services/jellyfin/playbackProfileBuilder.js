@@ -365,11 +365,7 @@ export const buildPlaybackDeviceProfile = ({
 	};
 };
 
-export const buildPlaybackRequestContext = (options = {}) => {
-	const playbackCapabilities = getPlaybackCapabilities();
-	const relaxedPlaybackProfile = options.relaxedPlaybackProfile === true;
-	const forceTranscoding = options.forceTranscoding === true;
-	const enableTranscoding = options.enableTranscoding !== false;
+export const resolveFmp4HlsContainerPreference = (options = {}) => {
 	const legacyPreferFmp4Preference = typeof options.preferDolbyVisionMp4 === 'boolean'
 		? options.preferDolbyVisionMp4
 		: undefined;
@@ -380,6 +376,24 @@ export const buildPlaybackRequestContext = (options = {}) => {
 	const forceFmp4HlsContainerPreference =
 		options.forceFmp4HlsContainerPreference === true &&
 		enableFmp4HlsContainerPreference === true;
+	return {
+		legacyPreferFmp4Preference,
+		hasEnableFmp4Preference,
+		enableFmp4HlsContainerPreference,
+		forceFmp4HlsContainerPreference
+	};
+};
+
+export const buildPlaybackRequestContext = (options = {}) => {
+	const playbackCapabilities = getPlaybackCapabilities();
+	const relaxedPlaybackProfile = options.relaxedPlaybackProfile === true;
+	const forceTranscoding = options.forceTranscoding === true;
+	const enableTranscoding = options.enableTranscoding !== false;
+	const {
+		legacyPreferFmp4Preference,
+		hasEnableFmp4Preference,
+		forceFmp4HlsContainerPreference
+	} = resolveFmp4HlsContainerPreference(options);
 	// Keep base payload conservative for HDR/DV. Non-forced preference is applied later as a source probe.
 	const preferFmp4Mp4 = forceFmp4HlsContainerPreference || (!hasEnableFmp4Preference && legacyPreferFmp4Preference === true);
 	const forceSubtitleBurnIn = options.forceSubtitleBurnIn === true;

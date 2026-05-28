@@ -1,4 +1,5 @@
 import {filterItemsByUserRequestTags} from '../../utils/myRequests';
+import {normalizeOptionalQueryValue} from './queryParams';
 
 const REQUESTS_PLUGIN_ENDPOINT = '/Breezyfin/MyRequests';
 
@@ -12,7 +13,8 @@ const getMyRequestsFromPlugin = async (service, {
 		if (!service?.userId) return null;
 		const params = new URLSearchParams();
 		params.set('userId', service.userId);
-		if (parentId) params.set('parentId', parentId);
+		const safeParentId = normalizeOptionalQueryValue(parentId);
+		if (safeParentId) params.set('parentId', safeParentId);
 		if (Number.isFinite(limit)) params.set('limit', String(Math.max(1, Math.trunc(limit))));
 		if (Number.isFinite(startIndex)) params.set('startIndex', String(Math.max(0, Math.trunc(startIndex))));
 		if (Array.isArray(itemTypes) && itemTypes.length > 0) {
@@ -36,8 +38,9 @@ export const getMyRequestItems = async (service, {
 	startIndex = 0,
 	username = ''
 } = {}) => {
+	const safeParentId = normalizeOptionalQueryValue(parentId);
 	const pluginItems = await getMyRequestsFromPlugin(service, {
-		parentId,
+		parentId: safeParentId,
 		itemTypes,
 		limit,
 		startIndex
@@ -46,7 +49,7 @@ export const getMyRequestItems = async (service, {
 		return {items: pluginItems, source: 'plugin', scannedCount: pluginItems.length};
 	}
 
-	const libraryItems = await service.getLibraryItems(parentId, itemTypes, limit, startIndex);
+	const libraryItems = await service.getLibraryItems(safeParentId, itemTypes, limit, startIndex);
 	const safeLibraryItems = Array.isArray(libraryItems) ? libraryItems : [];
 	return {
 		items: filterItemsByUserRequestTags(safeLibraryItems, username),

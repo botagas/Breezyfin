@@ -11,6 +11,7 @@ This guide covers shared UI components in `src/components/`.
 - For larger shared components, prefer local decomposition folders (for example `src/components/toolbar/`) to keep root files focused on orchestration.
 - Reuse shared feedback primitives (for example `src/components/BreezyToast.js`) instead of panel-specific toast styling/markup.
 - Reuse shared loading primitives (for example `src/components/BreezyLoadingOverlay.js`) instead of panel-specific loading spinners.
+- Keep developer-only diagnostics UI shared (for example `src/components/DebugErrorMenu.js`) instead of per-panel debug menu clones.
 
 ## Styling
 

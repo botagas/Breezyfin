@@ -13,6 +13,7 @@ export const usePlayerRecoveryHandlers = ({
 	setError,
 	setShowControls,
 	setLoading,
+	setLoadingStatusMessage,
 	setPlaying,
 	handleStop,
 	currentAudioTrackRef,
@@ -104,11 +105,16 @@ export const usePlayerRecoveryHandlers = ({
 			hlsRef.current = null;
 		}
 		if (videoRef.current) {
+			try {
+				videoRef.current.pause();
+			} catch (_) {
+				// Ignore pause failures while recovering.
+			}
 			videoRef.current.removeAttribute('src');
 			videoRef.current.load();
 		}
 
-		playbackOverrideRef.current = {
+		const nextPlaybackOverride = {
 			...(playbackOptions || {}),
 			audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
 			subtitleStreamIndex:
@@ -118,9 +124,11 @@ export const usePlayerRecoveryHandlers = ({
 			seekSeconds,
 			forceNewSession: true
 		};
+		playbackOverrideRef.current = nextPlaybackOverride;
 
 		setError(null);
 		setLoading(true);
+		setLoadingStatusMessage('Restarting stream...');
 		setPlaying(false);
 		if (toast) {
 			setToastMessage(toast);
@@ -150,6 +158,7 @@ export const usePlayerRecoveryHandlers = ({
 		seekOffsetRef,
 		setError,
 		setLoading,
+		setLoadingStatusMessage,
 		setPlaying,
 		setToastMessage,
 		startupFallbackTimerRef,
@@ -164,12 +173,13 @@ export const usePlayerRecoveryHandlers = ({
 		setToastMessage('');
 		setShowControls(true);
 		setLoading(false);
+		setLoadingStatusMessage('Loading...');
 		clearStartWatch();
 		if (startupFallbackTimerRef.current) {
 			clearTimeout(startupFallbackTimerRef.current);
 			startupFallbackTimerRef.current = null;
 		}
-	}, [clearStartWatch, playbackFailureLockedRef, setError, setLoading, setShowControls, setToastMessage, startupFallbackTimerRef, stopHlsRecoveryLoop]);
+	}, [clearStartWatch, playbackFailureLockedRef, setError, setLoading, setLoadingStatusMessage, setShowControls, setToastMessage, startupFallbackTimerRef, stopHlsRecoveryLoop]);
 
 	const isSubtitleCompatibilityError = useCallback((errorData) => {
 		const fromMessage = typeof errorData === 'string' ? errorData : '';
@@ -225,6 +235,7 @@ export const usePlayerRecoveryHandlers = ({
 			}
 			setError(null);
 			setLoading(true);
+			setLoadingStatusMessage('Restarting stream...');
 			setPlaying(false);
 			if (typeof loadVideoRef.current === 'function') {
 				loadVideoRef.current();
@@ -243,6 +254,7 @@ export const usePlayerRecoveryHandlers = ({
 		await handleStop();
 		setError(null);
 		setLoading(true);
+		setLoadingStatusMessage('Restarting stream...');
 		if (loadVideoRef.current) {
 			loadVideoRef.current(true);
 		}
@@ -255,6 +267,7 @@ export const usePlayerRecoveryHandlers = ({
 		playbackSettingsRef,
 		setError,
 		setLoading,
+		setLoadingStatusMessage,
 		setPlaying,
 		setToastMessage,
 		playbackOptions,
@@ -293,6 +306,7 @@ export const usePlayerRecoveryHandlers = ({
 			console.warn('Failed while preparing subtitle compatibility fallback:', fallbackError);
 		}
 		if (typeof loadVideoRef.current === 'function') {
+			setLoadingStatusMessage('Restarting stream...');
 			loadVideoRef.current();
 		}
 		return true;
@@ -307,6 +321,7 @@ export const usePlayerRecoveryHandlers = ({
 		playbackOverrideRef,
 		playbackSettingsRef,
 		setCurrentSubtitleTrack,
+		setLoadingStatusMessage,
 		setToastMessage,
 		subtitleCompatibilityFallbackAttemptedRef,
 		videoRef

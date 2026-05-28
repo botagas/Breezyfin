@@ -22,10 +22,10 @@ const PlayerErrorPopup = ({
 				<BodyText className={`${css.popupTitle} bf-error-title`}>Playback Error</BodyText>
 				<BodyText className={`${css.errorMessage} bf-error-message`}>{error}</BodyText>
 				<div className={`${css.errorActions} bf-error-actions`}>
-					<Button onClick={onRetry} autoFocus className={css.errorActionButton}>
+					<Button onClick={onRetry} autoFocus className={`${css.errorActionButton} bf-error-action-button`}>
 						Retry
 					</Button>
-					<Button onClick={onBack} className={css.errorActionButton}>
+					<Button onClick={onBack} className={`${css.errorActionButton} bf-error-action-button`}>
 						Go Back
 					</Button>
 				</div>

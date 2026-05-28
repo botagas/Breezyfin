@@ -46,6 +46,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize Media Details per-item bootstrap effect (data load + selection reset) | `useMediaDetailsItemBootstrap` |
 | Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
 | Keep component state synced to settings changes | `useBreezyfinSettingsSync` |
+| Persist crash recovery action/context across ErrorBoundary remounts | `src/utils/crashRecovery.js` helpers |
 | Fast lookup of items by id/key | `useMapById` |
 | Fetch item metadata with cancel-safe effect | `useItemMetadata` |
 | Reusable toast lifecycle | `useToastMessage` |

@@ -20,6 +20,7 @@ const TOGGLE_SETTING_KEYS = [
 	'showPerformanceOverlay',
 	'showExtendedPlayerDebugOverlay',
 	'showFocusDebugOverlay',
+	'showDebugErrorMenu',
 	'forceDolbyVision',
 	'enableFmp4HlsContainerPreference',
 	'forceFmp4HlsContainerPreference'

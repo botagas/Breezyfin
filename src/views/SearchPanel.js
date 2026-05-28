@@ -405,11 +405,7 @@ const SearchPanel = ({
 	}, []);
 
 	const handleResultCardFocus = useCallback((event) => {
-		ensureFocusTargetVisibleWithTopChrome(event.currentTarget, {
-			topPadding: 12,
-			bottomPadding: 14,
-			behavior: 'auto'
-		});
+		ensureFocusTargetVisibleWithTopChrome(event.currentTarget);
 		if (!hasMore || loadingMoreRef.current) return;
 		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
 		if (!Number.isInteger(itemIndex)) return;

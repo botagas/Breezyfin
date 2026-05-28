@@ -92,7 +92,7 @@ For implementation and workflow details, use:
 ## Diagnostics and debug
 
 Primary diagnostics are runtime toggles under **Settings > Diagnostics** (including the **Device Playback Capabilities** section).
-This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics (for example Force DV and fMP4-HLS preference toggles), logs, and cache wipe actions.
+This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics (for example Force DV and fMP4-HLS preference toggles), logs, cache wipe actions, and a non-stable-build debug error menu toggle.
 
 Build-time log capture flags:
 

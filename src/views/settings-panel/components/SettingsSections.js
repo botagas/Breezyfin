@@ -73,7 +73,8 @@ const SettingsSections = ({
 	cacheWipeInProgress,
 	openLogsPopup,
 	openWipeCacheConfirm,
-	openWipeCacheKeepLoginConfirm
+	openWipeCacheKeepLoginConfirm,
+	isNonStableBuild = false
 }) => {
 	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_TAB_KEY);
 	const [expandedCapabilityRows, setExpandedCapabilityRows] = useState({
@@ -481,6 +482,15 @@ const SettingsSections = ({
 					>
 						Focus Debug Overlay (All Panels)
 					</SwitchItem>
+					{isNonStableBuild ? (
+						<SwitchItem
+							className={css.switchItem}
+							onToggle={settingToggleHandlers.showDebugErrorMenu}
+							selected={settings.showDebugErrorMenu === true}
+						>
+							Debug Error Menu (Non-stable builds only)
+						</SwitchItem>
+					) : null}
 					<SwitchItem
 						className={css.switchItem}
 						onToggle={settingToggleHandlers.forceDolbyVision}

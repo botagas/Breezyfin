@@ -12,6 +12,7 @@ import {
 	getRuntimePlatformCapabilities,
 	setRuntimeCapabilityProbeRefreshDays
 } from '../utils/platformCapabilities';
+import {isNonStableBuild} from '../utils/featureFlags';
 import BreezyToast from '../components/BreezyToast';
 import {
 	BITRATE_OPTIONS,
@@ -47,6 +48,7 @@ const normalizeCapabilityProbeRefreshDaysSetting = createCapabilityProbeRefreshN
 	CAPABILITY_PROBE_REFRESH_OPTIONS,
 	DEFAULT_SETTINGS.capabilityProbeRefreshDays
 );
+const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
 
 const SettingsPanel = ({
 	onNavigate,
@@ -298,6 +300,7 @@ const SettingsPanel = ({
 						openLogsPopup={openLogsPopup}
 						openWipeCacheConfirm={openWipeCacheConfirm}
 						openWipeCacheKeepLoginConfirm={openWipeCacheKeepLoginConfirm}
+						isNonStableBuild={SHOW_NON_STABLE_DEBUG_OPTIONS}
 					/>
 				</Scroller>
 				<SettingsPopups

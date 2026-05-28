@@ -172,11 +172,7 @@ const LibraryPanel = ({
 	const handleGridCardFocus = useCallback((event) => {
 		lastFocusedCardIdRef.current = event.currentTarget?.dataset?.itemId || null;
 		if (isPointerInputMode) return;
-		ensureFocusTargetVisibleWithTopChrome(event.currentTarget, {
-			topPadding: 12,
-			bottomPadding: 14,
-			behavior: 'auto'
-		});
+		ensureFocusTargetVisibleWithTopChrome(event.currentTarget);
 		if (!hasMore || loadingMoreRef.current) return;
 		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
 		if (!Number.isInteger(itemIndex)) return;
