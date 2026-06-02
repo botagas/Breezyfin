@@ -94,13 +94,18 @@ export const usePlayerSkipOverlayState = ({
 
 		if (activeSegment) {
 			const isOutro = isOutroSegmentType(activeSegment.Type);
-			if (!isOutro && dismissedSkipSegmentId === activeSegment.Id) {
+			const shouldShowNextEpisodeForOutro =
+				isOutro &&
+				nextEpisodeData &&
+				playNextPromptEnabled &&
+				!nextEpisodePromptDismissed;
+			if (dismissedSkipSegmentId === activeSegment.Id && !shouldShowNextEpisodeForOutro) {
 				setCurrentSkipSegment(activeSegment);
 				setShowNextEpisodePrompt(false);
 				setSkipCountdown(null);
 				return;
 			}
-			if (!isOutro && !skipSegmentPromptsEnabled) {
+			if (!skipSegmentPromptsEnabled && !shouldShowNextEpisodeForOutro) {
 				resetSkipOverlayState();
 				return;
 			}
@@ -108,7 +113,7 @@ export const usePlayerSkipOverlayState = ({
 				setCurrentSkipSegment(activeSegment);
 			}
 			setSkipOverlayVisible(true);
-			if (isOutro && nextEpisodeData && playNextPromptEnabled) {
+			if (shouldShowNextEpisodeForOutro) {
 				setShowNextEpisodePrompt(true);
 				nextEpisodePromptStartTicksRef.current = activeSegment.StartTicks;
 			} else {
@@ -172,11 +177,6 @@ export const usePlayerSkipOverlayState = ({
 			return;
 		}
 		if (!currentSkipSegment) return;
-		const isOutro = isOutroSegmentType(currentSkipSegment.Type);
-		if (isOutro && nextEpisodeData) {
-			handlePlayNextEpisode();
-			return;
-		}
 		const skipTo = currentSkipSegment.EndTicks / JELLYFIN_TICKS_PER_SECOND;
 		if (videoRef.current) {
 			videoRef.current.currentTime = skipTo;

@@ -696,7 +696,6 @@ const PlayerPanel = ({
 					visible={skipOverlayVisible}
 					currentSkipSegment={currentSkipSegment}
 					showNextEpisodePrompt={showNextEpisodePrompt}
-					nextEpisodeData={nextEpisodeData}
 					skipCountdown={skipCountdown}
 					onSkip={handleSkipSegment}
 					onDismiss={handleDismissSkipOverlay}

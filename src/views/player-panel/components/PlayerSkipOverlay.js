@@ -6,7 +6,6 @@ const PlayerSkipOverlay = ({
 	visible,
 	currentSkipSegment,
 	showNextEpisodePrompt,
-	nextEpisodeData,
 	skipCountdown,
 	onSkip,
 	onDismiss,
@@ -27,7 +26,7 @@ const PlayerSkipOverlay = ({
 					spotlightId="skip-overlay-action"
 					autoFocus
 				>
-					{showNextEpisodePrompt ? 'Play Next' : getSkipSegmentLabel(currentSkipSegment.Type, Boolean(nextEpisodeData))}
+					{showNextEpisodePrompt ? 'Play Next' : getSkipSegmentLabel(currentSkipSegment.Type, false)}
 				</Button>
 				{skipCountdown !== null && (
 					<BodyText className={css.skipCountdownCompact}>{skipCountdown}s</BodyText>
