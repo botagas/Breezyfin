@@ -110,11 +110,21 @@ jobs:
       - name: Build IPK
         id: package
         run: |
-          rm -rf build release
-          mkdir -p build release
+          package_ipk() {
+            rm -rf build
+            mkdir -p build
+            ares-config --profile tv
+            ares-package dist --outdir build
+          }
 
-          ares-config --profile tv
-          ares-package dist --outdir build
+          rm -rf build release
+          mkdir -p release
+
+          if ! package_ipk; then
+            echo "ares-package failed with latest @webos-tools/cli. Retrying with @webos-tools/cli@3.2.1."
+            npm install --global @webos-tools/cli@3.2.1
+            package_ipk
+          fi
 
           IPK_PATH="$(find build -maxdepth 1 -name '*.ipk' | head -n 1)"
           if [ -z "${IPK_PATH}" ]; then
