@@ -270,20 +270,20 @@ class JellyfinService {
 		);
 	}
 
-	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16) {
-		return getLatestMediaItems(this, includeItemTypes, limit);
+	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) {
+		return getLatestMediaItems(this, includeItemTypes, limit, startIndex);
 	}
 
-	async getRecentlyAdded(limit = 20) {
-		return getRecentlyAddedItems(this, limit);
+	async getRecentlyAdded(limit = 20, startIndex = 0) {
+		return getRecentlyAddedItems(this, limit, startIndex);
 	}
 
-	async getNextUp(limit = 24) {
-		return getNextUpItems(this, limit);
+	async getNextUp(limit = 24, startIndex = 0) {
+		return getNextUpItems(this, limit, startIndex);
 	}
 
-	async getResumeItems(limit = 10) {
-		return getResumeMediaItems(this, limit);
+	async getResumeItems(limit = 10, startIndex = 0) {
+		return getResumeMediaItems(this, limit, startIndex);
 	}
 
 	async getCurrentUser() {

@@ -17,6 +17,7 @@ import {isNonStableBuild} from '../utils/featureFlags';
 import {
 	CRASH_RECOVERY_ACTIONS,
 	consumeCrashRecoveryAction,
+	peekCrashRecoveryAction,
 	readCrashNavigationSnapshot,
 	saveCrashNavigationSnapshot,
 	clearCrashPlaybackContext
@@ -31,7 +32,7 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 
 import css from './App.module.less';
 
-const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
+const DETAIL_RETURN_VIEWS = new Set(['home', 'homeSection', 'library', 'search', 'favorites', 'settings']);
 const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
 
 const emitAppDebugEvent = (name, detail) => {
@@ -70,9 +71,11 @@ const App = (props) => {
 	const [currentView, setCurrentView] = useState('login');
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
+	const [selectedHomeSection, setSelectedHomeSection] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [previousItem, setPreviousItem] = useState(null);
 	const [homePanelState, setHomePanelState] = useState(null);
+	const [homeSectionPanelStateById, setHomeSectionPanelStateById] = useState({});
 	const [libraryPanelStateById, setLibraryPanelStateById] = useState({});
 	const [searchPanelState, setSearchPanelState] = useState(null);
 	const [favoritesPanelState, setFavoritesPanelState] = useState(null);
@@ -92,11 +95,13 @@ const App = (props) => {
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
 	const handleBackRef = useRef(null);
+	const crashRecoveryPendingRef = useRef(Boolean(peekCrashRecoveryAction()));
 	const {
 		refs: {
 			playerBackHandlerRef,
 			detailsBackHandlerRef,
 			homeBackHandlerRef,
+			homeSectionBackHandlerRef,
 			libraryBackHandlerRef,
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
@@ -106,6 +111,7 @@ const App = (props) => {
 		registerDetailsBackHandler,
 		registerPlayerBackHandler,
 		registerHomeBackHandler,
+		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
@@ -121,6 +127,7 @@ const App = (props) => {
 		currentView,
 		selectedItem,
 		selectedLibrary,
+		selectedHomeSection,
 		playbackOptions,
 		previousItem,
 		detailsReturnView,
@@ -128,6 +135,7 @@ const App = (props) => {
 		setCurrentView,
 		setSelectedItem,
 		setSelectedLibrary,
+		setSelectedHomeSection,
 		setPlaybackOptions,
 		setPreviousItem,
 		setDetailsReturnView,
@@ -137,9 +145,11 @@ const App = (props) => {
 	const resetSessionState = useCallback(() => {
 		setSelectedItem(null);
 		setSelectedLibrary(null);
+		setSelectedHomeSection(null);
 		setPlaybackOptions(null);
 		setPreviousItem(null);
 		setHomePanelState(null);
+		setHomeSectionPanelStateById({});
 		setLibraryPanelStateById({});
 		setSearchPanelState(null);
 		setFavoritesPanelState(null);
@@ -152,11 +162,14 @@ const App = (props) => {
 	}, [clearPanelHistory]);
 
 	const clearPanelSelection = useCallback((options = {}) => {
-		const {clearLibrary = true} = options;
+		const {clearLibrary = true, clearHomeSection = true} = options;
 		setSelectedItem(null);
 		setPlaybackOptions(null);
 		if (clearLibrary) {
 			setSelectedLibrary(null);
+		}
+		if (clearHomeSection) {
+			setSelectedHomeSection(null);
 		}
 	}, []);
 
@@ -176,8 +189,11 @@ const App = (props) => {
 		if (detailsReturnView === 'library') {
 			return selectedLibrary ? 'library' : 'home';
 		}
+		if (detailsReturnView === 'homeSection') {
+			return selectedHomeSection ? 'homeSection' : 'home';
+		}
 		return DETAIL_RETURN_VIEWS.has(detailsReturnView) ? detailsReturnView : 'home';
-	}, [detailsReturnView, selectedLibrary]);
+	}, [detailsReturnView, selectedHomeSection, selectedLibrary]);
 
 	const navigateBackFromDetails = useCallback(() => {
 		if (navigateBackInHistory()) {
@@ -185,7 +201,10 @@ const App = (props) => {
 		}
 
 		const targetView = resolveDetailsReturnView();
-		navigateToViewAndClearSelection(targetView, {clearLibrary: targetView === 'home'});
+		navigateToViewAndClearSelection(targetView, {
+			clearLibrary: targetView === 'home',
+			clearHomeSection: targetView !== 'homeSection'
+		});
 		return true;
 	}, [navigateBackInHistory, navigateToViewAndClearSelection, resolveDetailsReturnView]);
 	const fallbackToDetailsFromPlayer = useCallback(() => {
@@ -231,10 +250,12 @@ const App = (props) => {
 	}, [debugErrorMenuEnabled, debugErrorMenuOpen]);
 
 	useEffect(() => {
+		if (crashRecoveryPendingRef.current) return;
 		saveCrashNavigationSnapshot({
 			currentView,
 			selectedItem,
 			selectedLibrary,
+			selectedHomeSection,
 			playbackOptions,
 			previousItem,
 			detailsReturnView,
@@ -244,6 +265,7 @@ const App = (props) => {
 		currentView,
 		selectedItem,
 		selectedLibrary,
+		selectedHomeSection,
 		playbackOptions,
 		previousItem,
 		detailsReturnView,
@@ -260,11 +282,13 @@ const App = (props) => {
 
 	const applyPendingCrashRecovery = useCallback(() => {
 		const pendingRecoveryAction = consumeCrashRecoveryAction();
+		crashRecoveryPendingRef.current = false;
 		if (!pendingRecoveryAction) return;
 
 		if (pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.HOME) {
 			setSelectedItem(null);
 			setSelectedLibrary(null);
+			setSelectedHomeSection(null);
 			setPlaybackOptions(null);
 			setPreviousItem(null);
 			setDetailsReturnView('home');
@@ -284,8 +308,10 @@ const App = (props) => {
 			}
 			const recoverView = crashSnapshot.currentView === 'player' ? 'details' : crashSnapshot.currentView;
 			const recoverSelectedItem = crashSnapshot.selectedItem || null;
+			const recoverHomeSection = crashSnapshot.selectedHomeSection || null;
 			setSelectedItem(crashSnapshot.selectedItem || null);
 			setSelectedLibrary(crashSnapshot.selectedLibrary || null);
+			setSelectedHomeSection(recoverHomeSection);
 			setPlaybackOptions(crashSnapshot.playbackOptions || null);
 			setPreviousItem(crashSnapshot.previousItem || null);
 			setDetailsReturnView(
@@ -295,6 +321,10 @@ const App = (props) => {
 			);
 			setPlayerControlsVisible(crashSnapshot.playerControlsVisible !== false);
 			if (recoverView === 'details' && !recoverSelectedItem?.Id) {
+				setCurrentView('home');
+				return;
+			}
+			if (recoverView === 'homeSection' && !recoverHomeSection?.id) {
 				setCurrentView('home');
 				return;
 			}
@@ -374,6 +404,8 @@ const App = (props) => {
 			return true;
 		}
 		switch (currentView) {
+			case 'homeSection':
+				return handleSectionBack(homeSectionBackHandlerRef, 'home');
 			case 'library':
 				return handleSectionBack(libraryBackHandlerRef, 'home');
 			case 'search':
@@ -409,6 +441,7 @@ const App = (props) => {
 			favoritesBackHandlerRef,
 			handleSectionBack,
 			homeBackHandlerRef,
+			homeSectionBackHandlerRef,
 			libraryBackHandlerRef,
 			navigateBackFromDetails,
 			navigateBackInHistory,
@@ -515,15 +548,33 @@ const App = (props) => {
 
 	const handleNavigate = useCallback((section, data) => {
 		const targetView = section;
+		const nextHomeSectionId = targetView === 'homeSection' ? data?.id : null;
 		const nextLibraryId = targetView === 'library' ? data?.Id : null;
+		const currentHomeSectionId = selectedHomeSection?.id || null;
 		const currentLibraryId = selectedLibrary?.Id || null;
 		const navigateDebugBase = {
 			at: Date.now(),
 			fromView: currentView || '-',
 			targetView: targetView || '-',
+			nextHomeSectionId: nextHomeSectionId ? String(nextHomeSectionId) : '-',
+			currentHomeSectionId: currentHomeSectionId ? String(currentHomeSectionId) : '-',
 			nextLibraryId: nextLibraryId ? String(nextLibraryId) : '-',
 			currentLibraryId: currentLibraryId ? String(currentLibraryId) : '-'
 		};
+		const isSameHomeSectionNavigation =
+			targetView === 'homeSection' &&
+			currentView === 'homeSection' &&
+			nextHomeSectionId !== null &&
+			currentHomeSectionId !== null &&
+			String(nextHomeSectionId) === String(currentHomeSectionId);
+		if (isSameHomeSectionNavigation) {
+			setLastNavigateDebug({
+				...navigateDebugBase,
+				ignored: true,
+				reason: 'same-home-section'
+			});
+			return;
+		}
 		const isSameLibraryNavigation =
 			targetView === 'library' &&
 			currentView === 'library' &&
@@ -545,11 +596,12 @@ const App = (props) => {
 		});
 		const shouldTrackHistory =
 			targetView === 'home' ||
+			targetView === 'homeSection' ||
 			targetView === 'library' ||
 			targetView === 'search' ||
 			targetView === 'favorites' ||
 			targetView === 'settings'
-				? (targetView !== currentView || nextLibraryId !== currentLibraryId)
+				? (targetView !== currentView || nextLibraryId !== currentLibraryId || nextHomeSectionId !== currentHomeSectionId)
 				: false;
 		if (shouldTrackHistory) {
 			pushPanelHistory();
@@ -557,6 +609,13 @@ const App = (props) => {
 		switch (section) {
 			case 'home':
 				setHomePanelState(null);
+				break;
+			case 'homeSection':
+				if (nextHomeSectionId) {
+					setHomeSectionPanelStateById((previousState) => clearKeyedPanelState(previousState, nextHomeSectionId));
+				} else {
+					setHomeSectionPanelStateById({});
+				}
 				break;
 			case 'library':
 				if (nextLibraryId) {
@@ -580,11 +639,20 @@ const App = (props) => {
 		switch (section) {
 			case 'home':
 				setCurrentView('home');
+				setSelectedHomeSection(null);
 				setSelectedLibrary(null);
 				setSelectedItem(null);
 				setPlaybackOptions(null);
 				break;
+			case 'homeSection':
+				setSelectedHomeSection(data);
+				setSelectedLibrary(null);
+				setSelectedItem(null);
+				setPlaybackOptions(null);
+				setCurrentView('homeSection');
+				break;
 			case 'library':
+				setSelectedHomeSection(null);
 				setSelectedLibrary(data);
 				setSelectedItem(null);
 				setPlaybackOptions(null);
@@ -595,13 +663,14 @@ const App = (props) => {
 			case 'settings':
 				setCurrentView(section);
 				setSelectedItem(null);
+				setSelectedHomeSection(null);
 				setSelectedLibrary(null);
 				setPlaybackOptions(null);
 				break;
 			default:
 				break;
 		}
-	}, [currentView, pushPanelHistory, selectedLibrary?.Id]);
+	}, [currentView, pushPanelHistory, selectedHomeSection?.id, selectedLibrary?.Id]);
 
 	const handlePlay = useCallback((item, options = null) => {
 		if (currentView !== 'player') {
@@ -631,6 +700,13 @@ const App = (props) => {
 
 	const handleHomePanelStateChange = useCallback((nextState) => {
 		setHomePanelState(normalizePanelStatePayload(nextState));
+	}, []);
+
+	const handleHomeSectionPanelStateChange = useCallback((sectionId, nextState) => {
+		if (!sectionId) return;
+		setHomeSectionPanelStateById((previousState) => (
+			upsertKeyedPanelState(previousState, sectionId, nextState)
+		));
 	}, []);
 
 	const handleLibraryPanelStateChange = useCallback((libraryId, nextState) => {
@@ -711,10 +787,12 @@ const App = (props) => {
 		currentView,
 		selectedItem,
 		selectedLibrary,
+		selectedHomeSection,
 		playbackOptions,
 		loginNotice,
 		loginNoticeNonce,
 		homePanelState,
+		homeSectionPanelStateById,
 		libraryPanelStateById,
 		searchPanelState,
 		favoritesPanelState,
@@ -734,11 +812,13 @@ const App = (props) => {
 		playerControlsVisible,
 		handleSearchPanelStateChange,
 		handleHomePanelStateChange,
+		handleHomeSectionPanelStateChange,
 		handleLibraryPanelStateChange,
 		handleFavoritesPanelStateChange,
 		handleSettingsPanelStateChange,
 		handleDetailsPanelStateChange,
 		registerHomeBackHandler,
+		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,

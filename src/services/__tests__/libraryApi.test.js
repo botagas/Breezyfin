@@ -1,8 +1,12 @@
 import {
+	getLatestMediaItems,
 	getItemMediaSegments,
 	getLibraryChildItems,
+	getNextUpItems,
 	getNextUpEpisodeForSeries,
 	getPublicSystemInfo,
+	getRecentlyAddedItems,
+	getResumeMediaItems,
 	searchLibraryItems
 } from '../jellyfin/libraryApi';
 
@@ -76,6 +80,27 @@ describe('libraryApi', () => {
 		expect(requestedUrl).toContain('searchTerm=The%20Expanse');
 		expect(requestedUrl).toContain('startIndex=0');
 		expect(requestedUrl).toContain('includeItemTypes=Series');
+	});
+
+	it('builds paged Home section source requests with start indexes', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await getRecentlyAddedItems(service, 60, 120);
+		await getResumeMediaItems(service, 60, 180);
+		await getNextUpItems(service, 60, 240);
+		await getLatestMediaItems(service, ['Movie'], 60, 300);
+
+		const requestedUrls = service._fetchItems.mock.calls.map(([requestedUrl]) => requestedUrl);
+		expect(requestedUrls[0]).toContain('limit=60');
+		expect(requestedUrls[0]).toContain('startIndex=120');
+		expect(requestedUrls[1]).toContain('limit=60');
+		expect(requestedUrls[1]).toContain('startIndex=180');
+		expect(requestedUrls[2]).toContain('limit=60');
+		expect(requestedUrls[2]).toContain('startIndex=240');
+		expect(requestedUrls[3]).toContain('includeItemTypes=Movie');
+		expect(requestedUrls[3]).toContain('limit=60');
+		expect(requestedUrls[3]).toContain('startIndex=300');
 	});
 
 	it('returns next-up episode immediately when API has one', async () => {

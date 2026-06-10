@@ -6,13 +6,61 @@
 	contain-intrinsic-size: 0 28rem;
 }
 
+.rowHeader {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0 60px;
+	margin-bottom: 18px;
+}
+
 .rowTitle {
 	font-size: 1.05em;
 	font-weight: 700;
 	letter-spacing: 0.01em;
-	margin-bottom: 18px;
-	padding: 0 60px;
+	margin: 0;
 	color: var(--bf-theme-card-title-color);
+}
+
+.rowMoreButton {
+	--bf-media-row-more-size: 2.3rem;
+	min-width: var(--bf-media-row-more-size);
+	width: var(--bf-media-row-more-size);
+	height: var(--bf-media-row-more-size);
+	border-radius: 999px;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	cursor: pointer;
+	outline: none;
+	color: var(--bf-theme-card-title-color);
+	transition: color 140ms ease, background 140ms ease;
+}
+
+.rowMoreIcon {
+	font-size: 0.74rem !important;
+	width: 0.74rem !important;
+	height: 0.74rem !important;
+	line-height: 0.74rem !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	opacity: 0.9;
+	transition: color 140ms ease, opacity 140ms ease;
+}
+
+.rowMoreButton:hover,
+.rowMoreButton:focus,
+.rowMoreButton:global(.spottable):focus {
+	background: var(--bf-theme-tab-hover-bg);
+	color: var(--bf-theme-text-primary);
+}
+
+.rowMoreButton:hover .rowMoreIcon,
+.rowMoreButton:focus .rowMoreIcon,
+.rowMoreButton:global(.spottable):focus .rowMoreIcon {
+	color: var(--bf-theme-text-primary);
+	opacity: 1;
 }
 
 .rowContent {

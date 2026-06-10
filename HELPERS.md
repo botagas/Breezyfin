@@ -9,6 +9,8 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Save/restore panel scroll + cache scrollTop | `usePanelScrollState` |
 | Library panel paged data loading (first page + incremental load-more) | `useLibraryPagination` |
 | Library panel native-scroll persistence + progressive deep restore | `useLibraryScrollPersistence` |
+| Manage shared Library/Home Section media filter popup state | `useMediaFilterState` |
+| Apply shared media filter semantics | `MEDIA_FILTER_OPTIONS` / `buildMediaFilterState` / `mediaItemMatchesFilters` |
 | Wire panel back handling | `usePanelBackHandler` |
 | Wire toolbar callbacks + layered panel back flow | `usePanelToolbarActions` |
 | Wire toolbar callbacks consistently | `useToolbarActions` |
@@ -61,6 +63,11 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize Settings panel boolean-setting toggle handlers + persistence writes | `useSettingsToggleHandlers` |
 | Centralize Settings panel display/label/diagnostic + panel-back handlers | `useSettingsDisplayHandlers` |
 | Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` / `refreshRuntimePlatformCapabilitiesWithLuna` |
+| Render shared Library-like poster grid cards | `PanelPosterMediaCard` |
+| Map Library-like CSS module classes for shared poster grid cards | `getPanelPosterCardClassProps` |
+| Keep focused grid cards visible and trigger load-more prefetch | `shouldLoadMoreFromGridFocus` |
+| Route right-most grid-card focus to adjacent filter controls | `focusTargetFromRightMostGridItem` |
+| Resolve current Jellyfin username for request/tag matching | `getJellyfinUsername` |
 
 ---
 
@@ -119,6 +126,31 @@ const {
   - progressive restore for deep positions (load more until target position is reachable)
 - Use when:
   - Library panel uses native scrolling and needs deterministic restore across panel transitions.
+
+### `useMediaFilterState`
+- File: `src/hooks/useMediaFilterState.js`
+- Purpose: shared state controller for Library-like media filters:
+  - cached active filter ids
+  - popup draft filter ids
+  - popup first focus
+  - apply/reset/close behavior
+  - cached-state wrapping for panels that persist filters with scroll state
+- Use with:
+  - `MediaFilterControls` for the trigger/popup UI.
+  - `MEDIA_FILTER_OPTIONS` and `mediaItemMatchesFilters` for shared filter semantics.
+
+### Media Filter Utilities
+- File: `src/utils/mediaFilters.js`
+- Purpose: shared filter definitions and item matching for Library-like grids.
+- Exports:
+  - `MEDIA_FILTER_OPTIONS`
+  - `normalizeMediaFilterIds`
+  - `areMediaFilterSelectionsEqual`
+  - `buildMediaFilterState`
+  - `mediaItemMatchesFilters`
+- Use when:
+  - a panel needs consistent `All`, `Unplayed`, `Played`, `Favorites`, or `My Requests` filtering.
+  - filter state must be normalized before caching or comparison.
 
 ### `useScrollerScrollMemory` and `useCachedScrollTopState`
 - File: `src/hooks/useScrollerScrollMemory.js`

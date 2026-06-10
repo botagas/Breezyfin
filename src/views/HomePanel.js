@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
+import Spotlight from '@enact/spotlight';
 import jellyfinService from '../services/jellyfinService';
 import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {HOME_ROW_ORDER} from '../constants/homeRows';
+import {getHomeSectionDescriptor} from '../constants/homeSections';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
 import {filterItemsByUserRequestTags} from '../utils/myRequests';
@@ -19,6 +21,7 @@ import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import css from './HomePanel.module.less';
 
 const SERIES_UNPLAYED_CACHE_TTL_MS = 5 * 60 * 1000;
+const HOME_ROW_PREVIEW_LIMIT = 10;
 const MY_REQUESTS_TAG_SCAN_LIMIT = 240;
 
 const HomePanel = ({
@@ -125,23 +128,23 @@ const HomePanel = ({
 		setLoading(true);
 		try {
 			const [recently, resume, next, movies, shows, taggedLatest] = await Promise.all([
-				jellyfinService.getRecentlyAdded(20).catch(err => {
+				jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load recently added:', err);
 					return [];
 				}),
-				jellyfinService.getResumeItems(50).catch(err => {
+				jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load resume items:', err);
 					return [];
 				}),
-				jellyfinService.getNextUp(24).catch(err => {
+				jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load next up:', err);
 					return [];
 				}),
-				jellyfinService.getLatestMedia(['Movie'], 20).catch(err => {
+				jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load latest movies:', err);
 					return [];
 				}),
-				jellyfinService.getLatestMedia(['Series'], 20).catch(err => {
+				jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load latest shows:', err);
 					return [];
 				}),
@@ -157,7 +160,7 @@ const HomePanel = ({
 				const myRequestsResult = await jellyfinService.getMyRequests(
 					null,
 					['Movie', 'Series'],
-					MY_REQUESTS_TAG_SCAN_LIMIT,
+					HOME_ROW_PREVIEW_LIMIT,
 					0,
 					userName
 				);
@@ -180,7 +183,7 @@ const HomePanel = ({
 			setNextUp(enhancedNext || []);
 			setLatestMovies(movies || []);
 			setLatestShows(shows || []);
-			setMyRequests(requestItems || []);
+			setMyRequests((requestItems || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
 		} catch (error) {
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 			console.error('Failed to load content:', error);
@@ -227,6 +230,12 @@ const HomePanel = ({
 		onItemSelect(item);
 	}, [onItemSelect]);
 
+	const handleViewMoreSection = useCallback((sectionKey) => {
+		const descriptor = getHomeSectionDescriptor(sectionKey);
+		if (!descriptor) return;
+		handleNavigation('homeSection', descriptor);
+	}, [handleNavigation]);
+
 	const getCardImageUrl = useCallback((item) => {
 		return getLandscapeCardImageUrl(item, {width: 640});
 	}, []);
@@ -243,6 +252,10 @@ const HomePanel = ({
 	const focusTopToolbarAction = useCallback(() => (
 		focusToolbarSpotlightTargets(['toolbar-home', 'toolbar-user'])
 	), []);
+
+	const focusHeroPrimaryAction = useCallback(() => {
+		Spotlight.focus('home-hero-play');
+	}, []);
 
 	const handleHomeCardKeyDown = useCallback((e) => {
 		const code = e.keyCode || e.which;
@@ -293,6 +306,24 @@ const HomePanel = ({
 	const visibleRows = homeRowOrder
 		.map((key) => ({key, row: rowConfig[key]}))
 		.filter(({key, row}) => row && homeRowSettings[key] && row.items.length > 0);
+	const handleHomePanelKeyDownCapture = useCallback((event) => {
+		const code = event.keyCode || event.which;
+		if (code !== KeyCodes.DOWN) return;
+		const activeElement = document.activeElement;
+		const spotlightId = activeElement?.dataset?.spotlightId || '';
+		if (showMediaBar && heroItems.length > 0 && spotlightId.startsWith('toolbar-')) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			focusHeroPrimaryAction();
+			return;
+		}
+		if (!spotlightId.startsWith('home-hero-') || visibleRows.length === 0) return;
+		event.preventDefault();
+		event.stopPropagation();
+		event.stopImmediatePropagation?.();
+		Spotlight.focus(`home-row-more-${visibleRows[0].key}`);
+	}, [focusHeroPrimaryAction, heroItems.length, showMediaBar, visibleRows]);
 	const hasContent = visibleRows.length > 0;
 	const hasHero = showMediaBar && heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
@@ -315,7 +346,7 @@ const HomePanel = ({
 	}
 
 	return (
-		<Panel {...rest}>
+		<Panel {...rest} onKeyDownCapture={handleHomePanelKeyDownCapture}>
 			{topToolbar}
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>
@@ -347,6 +378,9 @@ const HomePanel = ({
 							showEpisodeProgress={row.showEpisodeProgress}
 							rowIndex={rowIndex}
 							onCardKeyDown={handleHomeCardKeyDown}
+							onMoreClick={handleViewMoreSection}
+							moreSpotlightId={`home-row-more-${key}`}
+							sectionKey={key}
 						/>
 					))}
 				</div>

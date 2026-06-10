@@ -4,6 +4,7 @@ const CRASH_RECOVERY_TTL_MS = 6 * 60 * 60 * 1000;
 const RECOVERABLE_VIEWS = new Set([
 	'login',
 	'home',
+	'homeSection',
 	'library',
 	'search',
 	'favorites',
@@ -71,6 +72,14 @@ export const queueCrashRecoveryAction = (action) => {
 	}
 };
 
+export const peekCrashRecoveryAction = () => {
+	const storage = getStorage();
+	if (!storage) return null;
+	const parsed = safeParseJson(storage.getItem(CRASH_RECOVERY_ACTION_KEY));
+	if (!parsed || isExpired(parsed.timestamp)) return null;
+	return normalizeCrashAction(parsed.action);
+};
+
 export const consumeCrashRecoveryAction = () => {
 	const storage = getStorage();
 	if (!storage) return null;
@@ -105,6 +114,7 @@ export const saveCrashNavigationSnapshot = ({
 	currentView = 'home',
 	selectedItem = null,
 	selectedLibrary = null,
+	selectedHomeSection = null,
 	playbackOptions = null,
 	previousItem = null,
 	detailsReturnView = 'home',
@@ -116,6 +126,7 @@ export const saveCrashNavigationSnapshot = ({
 		currentView: normalizeRecoverableView(currentView) || 'home',
 		selectedItem: normalizePlainObject(selectedItem),
 		selectedLibrary: normalizePlainObject(selectedLibrary),
+		selectedHomeSection: normalizePlainObject(selectedHomeSection),
 		playbackOptions: normalizePlainObject(playbackOptions),
 		previousItem: normalizePlainObject(previousItem),
 		detailsReturnView: normalizeDetailsReturnView(detailsReturnView),
@@ -139,6 +150,7 @@ export const readCrashNavigationSnapshot = () => {
 		currentView,
 		selectedItem: normalizePlainObject(parsed.selectedItem),
 		selectedLibrary: normalizePlainObject(parsed.selectedLibrary),
+		selectedHomeSection: normalizePlainObject(parsed.selectedHomeSection),
 		playbackOptions: normalizePlainObject(parsed.playbackOptions),
 		previousItem: normalizePlainObject(parsed.previousItem),
 		detailsReturnView: normalizeDetailsReturnView(parsed.detailsReturnView),

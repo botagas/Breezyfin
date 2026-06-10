@@ -1,47 +1,13 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
+import {
+	buildMediaFilterState,
+	mediaItemMatchesFilters
+} from '../../../utils/mediaFilters';
+import {getJellyfinUsername} from '../../../utils/jellyfinUser';
 
 const REQUESTS_FALLBACK_SCAN_MULTIPLIER = 4;
 const REQUESTS_FALLBACK_SCAN_LIMIT = 6;
-const ALLOWED_FILTER_IDS = new Set(['all', 'unplayed', 'played', 'favorites', 'myRequests']);
-
-const normalizeFilterIds = (filterIds = []) => {
-	const candidateIds = Array.isArray(filterIds) ? filterIds : [];
-	const unique = [];
-	candidateIds.forEach((id) => {
-		if (!ALLOWED_FILTER_IDS.has(id)) return;
-		if (unique.includes(id)) return;
-		unique.push(id);
-	});
-	if (unique.length === 0) return ['all'];
-	const nonAll = unique.filter((id) => id !== 'all');
-	return nonAll.length > 0 ? nonAll : ['all'];
-};
-
-const isFavoriteItem = (item) => item?.UserData?.IsFavorite === true;
-
-const getItemPlayedState = (item) => {
-	const userData = item?.UserData || {};
-	if (Number.isFinite(userData.UnplayedItemCount)) {
-		return Number(userData.UnplayedItemCount) <= 0;
-	}
-	if (userData.Played === true) return true;
-	if (Number.isFinite(userData.PlayedPercentage)) {
-		return Number(userData.PlayedPercentage) >= 100;
-	}
-	return false;
-};
-
-const matchesCombinedFilters = (item, {
-	includeFavorites = false,
-	requirePlayed = false,
-	requireUnplayed = false
-}) => {
-	if (includeFavorites && !isFavoriteItem(item)) return false;
-	if (requirePlayed && !getItemPlayedState(item)) return false;
-	if (requireUnplayed && getItemPlayedState(item)) return false;
-	return true;
-};
 
 export const useLibraryPagination = ({
 	activeLibraryId = null,
@@ -73,38 +39,7 @@ export const useLibraryPagination = ({
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
 
-	const buildFilterState = useCallback((filterIds) => {
-		const normalized = normalizeFilterIds(filterIds);
-		const selected = new Set(normalized);
-		const useMyRequestsSource = selected.has('myRequests');
-		const includeFavorites = selected.has('favorites');
-		const hasPlayed = selected.has('played');
-		const hasUnplayed = selected.has('unplayed');
-		const requirePlayed = hasPlayed && !hasUnplayed;
-		const requireUnplayed = hasUnplayed && !hasPlayed;
-		const serverFilters = [];
-		if (includeFavorites) serverFilters.push('IsFavorite');
-		if (requirePlayed) serverFilters.push('IsPlayed');
-		if (requireUnplayed) serverFilters.push('IsUnplayed');
-		return {
-			filterIds: normalized,
-			useMyRequestsSource,
-			includeFavorites,
-			requirePlayed,
-			requireUnplayed,
-			serverFilters: serverFilters.length > 0 ? serverFilters.join(',') : null
-		};
-	}, []);
-
-	const getRequestUsername = useCallback(async () => {
-		if (jellyfinService.username) return jellyfinService.username;
-		try {
-			const user = await jellyfinService.getCurrentUser();
-			return user?.Name || '';
-		} catch (_) {
-			return '';
-		}
-	}, []);
+	const buildFilterState = useCallback((filterIds) => buildMediaFilterState(filterIds), []);
 
 	const fetchRawPage = useCallback(async ({
 		itemTypes,
@@ -112,12 +47,12 @@ export const useLibraryPagination = ({
 		filterState
 	}) => {
 		if (filterState.useMyRequestsSource) {
-			const username = paginationRef.current.username || await getRequestUsername();
+			const username = paginationRef.current.username || await getJellyfinUsername(jellyfinService);
 			paginationRef.current.username = username;
 			const myRequestsResult = await jellyfinService.getMyRequests(
 				activeLibraryId,
 				itemTypes,
-				pageSize * REQUESTS_FALLBACK_SCAN_MULTIPLIER,
+				pageSize,
 				startIndex,
 				username
 			);
@@ -129,7 +64,7 @@ export const useLibraryPagination = ({
 			return {
 				items: myRequestItems,
 				scannedCount,
-				sourceHasMore: scannedCount >= (pageSize * REQUESTS_FALLBACK_SCAN_MULTIPLIER)
+				sourceHasMore: myRequestsResult?.hasMore === true
 			};
 		}
 
@@ -146,7 +81,7 @@ export const useLibraryPagination = ({
 			scannedCount: rawItems.length,
 			sourceHasMore: rawItems.length >= (pageSize * REQUESTS_FALLBACK_SCAN_MULTIPLIER)
 		};
-	}, [activeLibraryId, getRequestUsername, pageSize]);
+	}, [activeLibraryId, pageSize]);
 
 	const collectFilteredPage = useCallback(async ({
 		itemTypes,
@@ -176,7 +111,7 @@ export const useLibraryPagination = ({
 				break;
 			}
 			cursor += scannedCount;
-			const filteredItems = safeItems.filter((item) => matchesCombinedFilters(item, filterState));
+			const filteredItems = safeItems.filter((item) => mediaItemMatchesFilters(item, filterState));
 			if (filteredItems.length > 0) {
 				collected = [...collected, ...filteredItems];
 			}

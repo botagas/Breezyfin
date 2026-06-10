@@ -30,6 +30,8 @@ Quick quality audit commands:
 - `npm run audit:style-tokens` (raw color usage outside token declarations)
 - `npm run audit:duplicates` (cross-file duplicate snippet candidates)
 
+Audit results are decision inputs, not style targets. If an audit flags an intentional helper/component pattern, improve the shared API or audit rule instead of reshaping code only to make the report disappear.
+
 ## Shared building blocks (prefer these first)
 
 - Back handling: `src/hooks/usePanelBackHandler.js`

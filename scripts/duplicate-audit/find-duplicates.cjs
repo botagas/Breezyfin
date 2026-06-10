@@ -20,15 +20,30 @@ const normalizeLine = (line) => line.replace(/\s+/g, ' ').trim();
 
 const JS_LOW_SIGNAL_LINE_REGEX = /^(?:\.\.\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\s*:\s*[^,]+)?(?:\s*=\s*[^,]+)?,?$/;
 const JS_LOW_SIGNAL_SCAFFOLD_REGEX = /^(?:const\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*use[A-Za-z0-9_$]+\(\{|}\);|}\) => \{)$/;
+const JS_LOW_SIGNAL_OBJECT_ARG_REGEX = /^(?:if\s*\()?[$A-Za-z_][A-Za-z0-9_$]*\(\{$|^\}\)\)?\s*\{?$/;
+const JS_LOW_SIGNAL_SIMPLE_STATEMENT_REGEX = /^(?:[A-Za-z_$][A-Za-z0-9_$]*\(\);|\})$/;
+const JS_LOW_SIGNAL_ASSIGNMENT_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+ = [A-Za-z_$][A-Za-z0-9_$]*;$/;
+const JS_LOW_SIGNAL_HOOK_OBJECT_REGEX = /^(?:const \{|[A-Za-z_$][A-Za-z0-9_$]*:\s*\(\)\s*=>\s*\{|}\);?)$/;
+const JS_LOW_SIGNAL_HOOK_DESTRUCTURE_REGEX = /^(?:const \{[^}]+} = use[A-Za-z0-9_$]+\(\{|\} = use[A-Za-z0-9_$]+\(\{)$/;
+const JS_LOW_SIGNAL_GUARD_REGEX = /^(?:if \(![A-Za-z_$][A-Za-z0-9_$]*\) return false;|return true;)$/;
+const JS_LOW_SIGNAL_JSX_REGEX = /^(?:\{[A-Za-z_$][A-Za-z0-9_$]*\}|<\/?[A-Za-z][^>]*>?|[A-Za-z_$][A-Za-z0-9_$-]*=.+|\/?>)$/;
 
 const isLowSignalSnippet = (extension, snippetKey) => {
 	if (extension !== '.js') return false;
 	const lines = snippetKey.split('\n').map((line) => line.trim()).filter(Boolean);
 	if (lines.length === 0) return true;
 	const lowSignalLineCount = lines.filter((line) => (
-		JS_LOW_SIGNAL_LINE_REGEX.test(line) || JS_LOW_SIGNAL_SCAFFOLD_REGEX.test(line)
+		JS_LOW_SIGNAL_LINE_REGEX.test(line) ||
+		JS_LOW_SIGNAL_SCAFFOLD_REGEX.test(line) ||
+		JS_LOW_SIGNAL_OBJECT_ARG_REGEX.test(line) ||
+		JS_LOW_SIGNAL_SIMPLE_STATEMENT_REGEX.test(line) ||
+		JS_LOW_SIGNAL_ASSIGNMENT_REGEX.test(line) ||
+		JS_LOW_SIGNAL_HOOK_OBJECT_REGEX.test(line) ||
+		JS_LOW_SIGNAL_HOOK_DESTRUCTURE_REGEX.test(line) ||
+		JS_LOW_SIGNAL_GUARD_REGEX.test(line) ||
+		JS_LOW_SIGNAL_JSX_REGEX.test(line)
 	)).length;
-	// Ignore windows that are primarily prop lists / hook-scaffolding and carry little structural value.
+	// Ignore windows that are primarily prop lists / hook-helper object arguments / JSX scaffolding and carry little structural value.
 	return lowSignalLineCount / lines.length >= 0.85;
 };
 

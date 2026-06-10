@@ -1,11 +1,12 @@
 import {JELLYFIN_TICKS_PER_SECOND} from '../../constants/time';
 import {normalizeOptionalQueryValue} from './queryParams';
 
-export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16) => {
+export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) => {
 	try {
 		const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
+		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items?includeItemTypes=${types}&limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items?includeItemTypes=${types}&limit=${limit}&startIndex=${safeStartIndex}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
 			{},
 			'getLatestMedia'
 		);
@@ -15,10 +16,11 @@ export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 
 	}
 };
 
-export const getRecentlyAddedItems = async (service, limit = 20) => {
+export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0) => {
 	try {
+		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items?limit=${limit}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items?limit=${limit}&startIndex=${safeStartIndex}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
 			{},
 			'getRecentlyAdded'
 		);
@@ -28,10 +30,11 @@ export const getRecentlyAddedItems = async (service, limit = 20) => {
 	}
 };
 
-export const getNextUpItems = async (service, limit = 24) => {
+export const getNextUpItems = async (service, limit = 24, startIndex = 0) => {
 	try {
+		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Shows/NextUp?userId=${service.userId}&limit=${limit}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber&imageTypeLimit=1&enableTotalRecordCount=false`,
+			`/Shows/NextUp?userId=${service.userId}&limit=${limit}&startIndex=${safeStartIndex}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData&imageTypeLimit=1&enableTotalRecordCount=false`,
 			{},
 			'getNextUp'
 		);
@@ -41,10 +44,11 @@ export const getNextUpItems = async (service, limit = 24) => {
 	}
 };
 
-export const getResumeMediaItems = async (service, limit = 10) => {
+export const getResumeMediaItems = async (service, limit = 10, startIndex = 0) => {
 	try {
+		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items/Resume?limit=${limit}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items/Resume?limit=${limit}&startIndex=${safeStartIndex}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData&imageTypeLimit=1`,
 			{},
 			'getResumeItems'
 		);

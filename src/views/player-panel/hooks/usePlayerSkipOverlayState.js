@@ -122,37 +122,46 @@ export const usePlayerSkipOverlayState = ({
 			}
 			const remainingSeconds = Math.max(0, (activeSegment.EndTicks / JELLYFIN_TICKS_PER_SECOND) - positionSeconds);
 			setSkipCountdown(Math.ceil(remainingSeconds));
-		} else if (
-			playNextPromptEnabled &&
-			playNextPromptMode === 'segmentsOrLast60' &&
-			!nextEpisodePromptDismissed &&
-			nextEpisodeData &&
-			Number.isFinite(duration) &&
-			duration > 0
-		) {
-			const remainingSeconds = Math.max(0, duration - positionSeconds);
-			if (remainingSeconds > 0 && remainingSeconds <= 60) {
-				setSkipOverlayVisible(true);
-				setShowNextEpisodePrompt(true);
+		} else {
+			if (currentSkipSegment) {
 				setCurrentSkipSegment(null);
-				setSkipCountdown(Math.ceil(remainingSeconds));
-			} else if (showNextEpisodePrompt) {
-				resetSkipOverlayState();
 			}
-		} else if (showNextEpisodePrompt) {
-			const promptStartTicks = nextEpisodePromptStartTicksRef.current || 0;
-			if (positionTicks < promptStartTicks) {
-				resetSkipOverlayState();
-			} else {
-				if (!playNextPromptEnabled || (playNextPromptMode === 'segmentsOnly' && !currentSkipSegment)) {
+			if (dismissedSkipSegmentId) {
+				setDismissedSkipSegmentId(null);
+			}
+
+			if (
+				playNextPromptEnabled &&
+				playNextPromptMode === 'segmentsOrLast60' &&
+				!nextEpisodePromptDismissed &&
+				nextEpisodeData &&
+				Number.isFinite(duration) &&
+				duration > 0
+			) {
+				const remainingSeconds = Math.max(0, duration - positionSeconds);
+				if (remainingSeconds > 0 && remainingSeconds <= 60) {
+					setSkipOverlayVisible(true);
+					setShowNextEpisodePrompt(true);
+					setSkipCountdown(Math.ceil(remainingSeconds));
+				} else if (showNextEpisodePrompt) {
 					resetSkipOverlayState();
-					return;
 				}
-				setSkipOverlayVisible(true);
-				setSkipCountdown(null);
+			} else if (showNextEpisodePrompt) {
+				const promptStartTicks = nextEpisodePromptStartTicksRef.current || 0;
+				if (positionTicks < promptStartTicks) {
+					resetSkipOverlayState();
+				} else {
+					if (!playNextPromptEnabled || playNextPromptMode === 'segmentsOnly') {
+						resetSkipOverlayState();
+						return;
+					}
+					setSkipOverlayVisible(true);
+					setSkipCountdown(null);
+				}
+			} else {
+				if (!skipOverlayVisible) return;
+				resetSkipOverlayState({clearDismissedId: true});
 			}
-		} else if (skipOverlayVisible) {
-			resetSkipOverlayState({clearDismissedId: true});
 		}
 	}, [
 		currentSkipSegment,
@@ -163,6 +172,7 @@ export const usePlayerSkipOverlayState = ({
 		nextEpisodePromptDismissed,
 		nextEpisodePromptStartTicksRef,
 		setCurrentSkipSegment,
+		setDismissedSkipSegmentId,
 		setShowNextEpisodePrompt,
 		setSkipCountdown,
 		setSkipOverlayVisible,

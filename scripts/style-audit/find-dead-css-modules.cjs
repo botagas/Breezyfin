@@ -95,12 +95,28 @@ const POSTER_CARD_CLASS_PROP_KEYS = [
 	'cardSubtitle'
 ];
 
+const PANEL_POSTER_CARD_CLASS_PROP_KEYS = [
+	'gridCard',
+	'cardImage',
+	'placeholder',
+	'cardTitle',
+	'cardSubtitle',
+	'watchedBadge',
+	'progressBadge',
+	'progressBar',
+	'progress'
+];
+
 const parseHelperMappedClassesForAlias = (source, alias) => {
 	const used = new Set();
 	const safeAlias = escapeRegExp(alias);
 	const posterCardClassPropsRegex = new RegExp(`getPosterCardClassProps\\(\\s*${safeAlias}\\s*\\)`);
 	if (posterCardClassPropsRegex.test(source)) {
 		POSTER_CARD_CLASS_PROP_KEYS.forEach((className) => used.add(className));
+	}
+	const panelPosterCardClassPropsRegex = new RegExp(`getPanelPosterCardClassProps\\(\\s*${safeAlias}\\s*\\)`);
+	if (panelPosterCardClassPropsRegex.test(source)) {
+		PANEL_POSTER_CARD_CLASS_PROP_KEYS.forEach((className) => used.add(className));
 	}
 	return used;
 };

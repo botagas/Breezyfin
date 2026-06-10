@@ -14,6 +14,8 @@ const matchesLanguage = (stream, language) =>
 	Boolean(language) &&
 	String(stream.Language).toLowerCase() === String(language).toLowerCase();
 
+const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
 const findStreamByIndex = (streams = [], index) =>
 	Array.isArray(streams) ? streams.find((stream) => stream?.Index === index) : null;
 
@@ -23,6 +25,27 @@ const streamMatchesPreferredLanguage = (stream, language) => {
 };
 
 const isCompatibleAudioStream = (stream) => isSupportedAudioCodec(stream?.Codec);
+
+const getSubtitleTitle = (stream) => normalizeText(stream?.DisplayTitle || stream?.Title);
+
+const matchesSubtitleForcedState = (stream, preference) => {
+	if (typeof preference?.isForced !== 'boolean') return true;
+	return Boolean(stream?.IsForced) === preference.isForced;
+};
+
+const matchesSubtitleTitle = (stream, preference) => {
+	const preferredTitle = normalizeText(preference?.title);
+	if (!preferredTitle) return true;
+	return getSubtitleTitle(stream) === preferredTitle;
+};
+
+const matchesSubtitleSemantics = (stream, preference) => {
+	if (!stream || !preference || preference.off) return false;
+	if (preference.language && !matchesLanguage(stream, preference.language)) return false;
+	if (!matchesSubtitleForcedState(stream, preference)) return false;
+	if (!matchesSubtitleTitle(stream, preference)) return false;
+	return true;
+};
 
 const pickBestCompatibleAudioTrack = (audioStreams = []) => {
 	if (!Array.isArray(audioStreams) || audioStreams.length === 0) return null;
@@ -93,27 +116,36 @@ export const useTrackPreferences = () => {
 
 		const preference = preferencesRef.current?.subtitle;
 		const providedStream = isInteger(providedSubtitle) ? findStreamByIndex(subtitleStreams, providedSubtitle) : null;
-		const providedSubtitleMatchesPreference = providedStream
-			? streamMatchesPreferredLanguage(providedStream, preference?.language)
-			: false;
-
-		if (providedStream && (providedSubtitleMatchesPreference || !preference?.language)) {
+		if (providedStream && (!preference || matchesSubtitleSemantics(providedStream, preference))) {
 			return providedSubtitle;
 		}
 
 		if (preference?.off) return -1;
-		if (isInteger(preference?.index)) {
-			const preferredStream = findStreamByIndex(subtitleStreams, preference.index);
-			if (preferredStream && streamMatchesPreferredLanguage(preferredStream, preference?.language)) {
-				return preference.index;
-			}
-		}
 
 		if (preference?.language) {
-			const nonForced = subtitleStreams.find((stream) => matchesLanguage(stream, preference.language) && !stream.IsForced);
-			if (nonForced) return nonForced.Index;
+			const semanticMatch = subtitleStreams.find((stream) => matchesSubtitleSemantics(stream, preference));
+			if (semanticMatch) return semanticMatch.Index;
+			const forcedStateMatch = subtitleStreams.find(
+				(stream) => matchesLanguage(stream, preference.language) && matchesSubtitleForcedState(stream, preference)
+			);
+			if (forcedStateMatch) return forcedStateMatch.Index;
+			if (preference.isForced === false) {
+				const nonForced = subtitleStreams.find((stream) => matchesLanguage(stream, preference.language) && !stream.IsForced);
+				if (nonForced) return nonForced.Index;
+			}
 			const languageMatch = subtitleStreams.find((stream) => matchesLanguage(stream, preference.language));
 			if (languageMatch) return languageMatch.Index;
+		}
+
+		if (isInteger(preference?.index)) {
+			const preferredStream = findStreamByIndex(subtitleStreams, preference.index);
+			if (
+				preferredStream &&
+				streamMatchesPreferredLanguage(preferredStream, preference?.language) &&
+				matchesSubtitleForcedState(preferredStream, preference)
+			) {
+				return preference.index;
+			}
 		}
 
 		if (defaultSubtitle?.IsForced) {
