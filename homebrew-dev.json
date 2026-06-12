@@ -2,7 +2,7 @@
   "packages": [
     {
       "id": "com.breezyfin.app",
-      "title": "Breezyfin",
+      "title": "Breezyfin Development",
       "iconUri": "https://raw.githubusercontent.com/botagas/Breezyfin/develop/icon.png",
       "manifestUrl": "https://github.com/botagas/Breezyfin/releases/download/nightly/com.breezyfin.app.manifest.json"
     }
