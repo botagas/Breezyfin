@@ -196,11 +196,13 @@ export const searchLibraryItems = async (service, searchTerm, itemTypes = null, 
 	}
 };
 
-export const getFavoriteMediaItems = async (service, itemTypes = ['Movie', 'Series'], limit = 100) => {
+export const getFavoriteMediaItems = async (service, itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0) => {
 	try {
+		const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.trunc(Number(limit))) : 100;
+		const safeStartIndex = Number.isFinite(Number(startIndex)) ? Math.max(0, Math.trunc(Number(startIndex))) : 0;
 		const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${limit}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${safeLimit}&startIndex=${safeStartIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
 			{},
 			'getFavorites'
 		);

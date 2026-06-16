@@ -12,7 +12,6 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getHomeSectionDescriptor} from '../constants/homeSections';
 import {KeyCodes} from '../utils/keyCodes';
 import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
-import {filterItemsByUserRequestTags} from '../utils/myRequests';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
@@ -21,8 +20,23 @@ import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import css from './HomePanel.module.less';
 
 const SERIES_UNPLAYED_CACHE_TTL_MS = 5 * 60 * 1000;
+const SERIES_UNPLAYED_CACHE_MAX_ENTRIES = 40;
 const HOME_ROW_PREVIEW_LIMIT = 10;
-const MY_REQUESTS_TAG_SCAN_LIMIT = 240;
+
+const pruneSeriesUnplayedCache = (cache, now = Date.now()) => {
+	if (!cache || typeof cache.entries !== 'function') return;
+	for (const [seriesId, value] of cache.entries()) {
+		if (!value?.timestamp || now - value.timestamp >= SERIES_UNPLAYED_CACHE_TTL_MS) {
+			cache.delete(seriesId);
+		}
+	}
+	if (cache.size <= SERIES_UNPLAYED_CACHE_MAX_ENTRIES) return;
+	const oldestEntries = [...cache.entries()]
+		.sort(([, left], [, right]) => (left?.timestamp || 0) - (right?.timestamp || 0));
+	oldestEntries
+		.slice(0, Math.max(0, cache.size - SERIES_UNPLAYED_CACHE_MAX_ENTRIES))
+		.forEach(([seriesId]) => cache.delete(seriesId));
+};
 
 const HomePanel = ({
 	onItemSelect,
@@ -81,7 +95,7 @@ const HomePanel = ({
 
 	const hydrateEpisodeSeriesProgress = useCallback(async (episodeGroups = []) => {
 		const normalizedGroups = episodeGroups.map((group) => (Array.isArray(group) ? group : []));
-		const allEpisodes = normalizedGroups.flat();
+		const allEpisodes = normalizedGroups.reduce((episodes, group) => episodes.concat(group), []);
 		const seriesIds = [...new Set(
 			allEpisodes
 				.filter((episode) => episode?.Type === 'Episode' && episode?.SeriesId)
@@ -93,6 +107,7 @@ const HomePanel = ({
 
 		const cache = seriesUnplayedCacheRef.current;
 		const now = Date.now();
+		pruneSeriesUnplayedCache(cache, now);
 		const missingSeriesIds = seriesIds.filter((seriesId) => {
 			const cached = cache.get(seriesId);
 			return !(cached && now - cached.timestamp < SERIES_UNPLAYED_CACHE_TTL_MS);
@@ -106,6 +121,7 @@ const HomePanel = ({
 					count: Number.isFinite(count) ? count : 0,
 					timestamp: Date.now()
 				});
+				pruneSeriesUnplayedCache(cache);
 			} catch (error) {
 				console.error('Failed to fetch series data:', error);
 			}
@@ -127,7 +143,7 @@ const HomePanel = ({
 		const loadRequestId = contentLoadRequestIdRef.current;
 		setLoading(true);
 		try {
-			const [recently, resume, next, movies, shows, taggedLatest] = await Promise.all([
+			const [recently, resume, next, movies, shows] = await Promise.all([
 				jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load recently added:', err);
 					return [];
@@ -147,15 +163,11 @@ const HomePanel = ({
 				jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT).catch(err => {
 					console.error('Failed to load latest shows:', err);
 					return [];
-				}),
-				jellyfinService.getLatestMedia(['Movie', 'Series'], MY_REQUESTS_TAG_SCAN_LIMIT).catch(err => {
-					console.error('Failed to load tagged latest media:', err);
-					return [];
 				})
 			]);
 
 			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-			let requestItems = filterItemsByUserRequestTags(taggedLatest || [], userName);
+			let requestItems = [];
 			try {
 				const myRequestsResult = await jellyfinService.getMyRequests(
 					null,
@@ -168,7 +180,7 @@ const HomePanel = ({
 					requestItems = myRequestsResult.items;
 				}
 			} catch (_) {
-				// Keep tag fallback items.
+				requestItems = [];
 			}
 			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
@@ -217,14 +229,15 @@ const HomePanel = ({
 		setShowMediaBar(settings.showMediaBar !== false);
 	}, []);
 
-	useBreezyfinSettingsSync(applyHomeSettings);
+	useBreezyfinSettingsSync(applyHomeSettings, {enabled: isActive});
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		loadContent();
 		return () => {
 			contentLoadRequestIdRef.current += 1;
 		};
-	}, [loadContent]);
+	}, [isActive, loadContent]);
 
 	const handleItemClick = useCallback((item) => {
 		onItemSelect(item);
@@ -330,6 +343,7 @@ const HomePanel = ({
 	const topToolbar = (
 		<Toolbar
 			activeSection="home"
+			isActive={isActive}
 			{...toolbarActions}
 		/>
 	);
@@ -365,6 +379,7 @@ const HomePanel = ({
 						<HeroBanner
 							items={heroItems}
 							onPlayClick={handleItemClick}
+							isActive={isActive}
 						/>
 					)}
 

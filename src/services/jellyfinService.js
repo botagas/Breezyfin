@@ -49,6 +49,7 @@ import {
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
 import {getMyRequestItems} from './jellyfin/requestsApi';
+import {getSubtitleTrackEvents} from './jellyfin/subtitleApi';
 
 class JellyfinService {
 	constructor() {
@@ -352,8 +353,8 @@ class JellyfinService {
 		});
 	}
 
-	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100) {
-		return getFavoriteMediaItems(this, itemTypes, limit);
+	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0) {
+		return getFavoriteMediaItems(this, itemTypes, limit, startIndex);
 	}
 
 	async toggleFavorite(itemId, isFavorite) {
@@ -390,6 +391,10 @@ class JellyfinService {
 
 	async getMediaSegments(itemId, options = {}) {
 		return getItemMediaSegments(this, itemId, options);
+	}
+
+	async getSubtitleEvents(itemId, mediaSourceId, subtitleStreamIndex) {
+		return getSubtitleTrackEvents(this, itemId, mediaSourceId, subtitleStreamIndex);
 	}
 }
 

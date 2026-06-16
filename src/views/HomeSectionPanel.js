@@ -14,6 +14,7 @@ import {usePanelScrollState} from '../hooks/usePanelScrollState';
 import {useMediaFilterState} from '../hooks/useMediaFilterState';
 import {useLibraryScrollPersistence} from './library-panel/hooks/useLibraryScrollPersistence';
 import {HOME_SECTION_IDS, getHomeSectionDescriptor} from '../constants/homeSections';
+import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
 import {focusTargetFromRightMostGridItem, shouldLoadMoreFromGridFocus} from '../utils/gridFocus';
 import {getPanelPosterCardClassProps} from '../utils/posterCardClassProps';
 import {getJellyfinUsername} from '../utils/jellyfinUser';
@@ -21,10 +22,11 @@ import {
 	MEDIA_FILTER_OPTIONS,
 	mediaItemMatchesFilters
 } from '../utils/mediaFilters';
+import {buildMediaListItemKey} from '../utils/reactKeys';
 
 import css from './LibraryPanel.module.less';
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
 const FOCUS_PREFETCH_THRESHOLD = 12;
 const FILTERED_PAGE_SCAN_MULTIPLIER = 4;
 const FILTERED_PAGE_SCAN_LIMIT = 6;
@@ -140,18 +142,46 @@ const HomeSectionPanel = ({
 	}) => {
 		if (activeSectionId === HOME_SECTION_IDS.MY_REQUESTS) {
 			const requestUserName = await getJellyfinUsername(jellyfinService);
-			const result = await jellyfinService.getMyRequests(null, ['Movie', 'Series'], PAGE_SIZE, startIndex, requestUserName);
-			const safeItems = Array.isArray(result?.items) ? result.items : [];
+			let requestCursor = startIndex;
+			let requestCollected = [];
+			let requestScans = 0;
+			let requestSourceHasMore = true;
+			while (requestCollected.length < PAGE_SIZE && requestScans < FILTERED_PAGE_SCAN_LIMIT && requestSourceHasMore) {
+				const result = await jellyfinService.getMyRequests(
+					null,
+					['Movie', 'Series'],
+					PAGE_SIZE - requestCollected.length,
+					requestCursor,
+					requestUserName
+				);
+				if (requestId !== requestIdRef.current) {
+					return {items: [], nextStartIndex: requestCursor, hasMore: false};
+				}
+				const safeItems = Array.isArray(result?.items) ? result.items : [];
+				const nextStartIndex = Number(result?.nextStartIndex);
+				const resolvedNextStartIndex = Number.isFinite(nextStartIndex)
+					? Math.max(0, Math.trunc(nextStartIndex))
+					: requestCursor + safeItems.length;
+				if (resolvedNextStartIndex <= requestCursor && safeItems.length === 0) {
+					requestSourceHasMore = false;
+					break;
+				}
+				requestCollected = [
+					...requestCollected,
+					...safeItems.filter((item) => mediaItemMatchesFilters(item, {
+						...currentFilterState,
+						useMyRequestsSource: false,
+						username: requestUserName
+					}))
+				];
+				requestCursor = resolvedNextStartIndex;
+				requestSourceHasMore = result?.hasMore === true;
+				requestScans += 1;
+			}
 			return {
-				items: safeItems.filter((item) => mediaItemMatchesFilters(item, {
-					...currentFilterState,
-					useMyRequestsSource: false,
-					username: requestUserName
-				})),
-				nextStartIndex: Number.isFinite(Number(result?.nextStartIndex))
-					? Math.max(0, Math.trunc(Number(result.nextStartIndex)))
-					: startIndex + safeItems.length,
-				hasMore: result?.hasMore === true
+				items: requestCollected.slice(0, PAGE_SIZE),
+				nextStartIndex: requestCursor,
+				hasMore: requestSourceHasMore
 			};
 		}
 
@@ -333,6 +363,7 @@ const HomeSectionPanel = ({
 	const topToolbar = (
 		<Toolbar
 			activeSection="home"
+			isActive={isActive}
 			{...toolbarActions}
 		/>
 	);
@@ -358,7 +389,7 @@ const HomeSectionPanel = ({
 			<div className={css.libraryContainer} ref={panelRootRef} onKeyDownCapture={handlePanelKeyDownCapture}>
 				<div
 					ref={scrollerRef}
-					className={css.nativeScroller}
+					className={`${css.nativeScroller} ${css.homeSectionScroller}`}
 					onScroll={handleScrollerScroll}
 				>
 					<div className={css.contentFrame}>
@@ -393,7 +424,7 @@ const HomeSectionPanel = ({
 						<div className={css.gridContainer}>
 							{items.map((item, index) => (
 								<PanelPosterMediaCard
-									key={item.Id}
+									key={buildMediaListItemKey(`home-section-${activeSectionId || 'unknown'}`, item, index)}
 									item={item}
 									index={index}
 									classes={panelCardClasses}

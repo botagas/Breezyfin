@@ -36,7 +36,6 @@ const PanelPosterMediaCard = ({
 
 	return (
 		<PosterMediaCard
-			key={item.Id}
 			itemId={item.Id}
 			data-item-index={index}
 			className={classes.gridCard}

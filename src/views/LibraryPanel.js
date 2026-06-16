@@ -16,6 +16,8 @@ import { useLibraryScrollPersistence } from './library-panel/hooks/useLibraryScr
 import {focusTargetFromRightMostGridItem, shouldLoadMoreFromGridFocus} from '../utils/gridFocus';
 import {getPanelPosterCardClassProps} from '../utils/posterCardClassProps';
 import {MEDIA_FILTER_OPTIONS} from '../utils/mediaFilters';
+import {buildMediaListItemKey} from '../utils/reactKeys';
+import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
 
 import css from './LibraryPanel.module.less';
 
@@ -108,7 +110,7 @@ const LibraryPanel = ({
 		activeLibraryId,
 		activeLibraryCollectionType,
 		getItemTypesForLibrary,
-		pageSize: 60,
+		pageSize: MEDIA_GRID_PAGE_SIZE,
 		activeFilterIds
 	});
 	const filteredOptions = useMemo(() => {
@@ -204,6 +206,7 @@ const LibraryPanel = ({
 		<Toolbar
 			activeSection="library"
 			activeLibraryId={library?.Id}
+			isActive={isActive}
 			{...toolbarActions}
 		/>
 	);
@@ -252,7 +255,7 @@ const LibraryPanel = ({
 						<LibraryGridSpotlightContainer className={css.gridContainer} spotlightId="library-grid">
 							{items.map((item, index) => (
 								<PanelPosterMediaCard
-									key={item.Id}
+									key={buildMediaListItemKey(`library-${activeLibraryId || 'unknown'}`, item, index)}
 									item={item}
 									index={index}
 									classes={panelCardClasses}

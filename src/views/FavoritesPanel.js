@@ -3,6 +3,7 @@ import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Scroller from '../components/AppScroller';
 import BodyText from '@enact/sandstone/BodyText';
+import Spinner from '@enact/sandstone/Spinner';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
@@ -14,8 +15,14 @@ import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
 import {KeyCodes} from '../utils/keyCodes';
+import {buildMediaListItemKey} from '../utils/reactKeys';
+import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
+import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
 
 import css from './FavoritesPanel.module.less';
+
+const FAVORITES_PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
+const FAVORITES_FOCUS_PREFETCH_THRESHOLD = 12;
 
 const FILTERS = [
 	{ id: 'all', label: 'All', types: ['Movie', 'Series', 'Episode'] },
@@ -23,6 +30,22 @@ const FILTERS = [
 	{ id: 'series', label: 'Series', types: ['Series'] },
 	{ id: 'episodes', label: 'Episodes', types: ['Episode'] }
 ];
+
+const getFilterById = (filterId) => FILTERS.find((filter) => filter.id === filterId) || FILTERS[0];
+
+const normalizeCachedFavorites = (cachedState) => (
+	Array.isArray(cachedState?.favorites) ? cachedState.favorites : []
+);
+
+const normalizeCachedFilterId = (cachedState) => getFilterById(cachedState?.activeFilter)?.id || FILTERS[0].id;
+
+const normalizeCachedNextStartIndex = (cachedState, fallbackItems) => {
+	const nextStartIndex = Number(cachedState?.nextStartIndex);
+	if (Number.isFinite(nextStartIndex)) {
+		return Math.max(0, Math.trunc(nextStartIndex));
+	}
+	return Array.isArray(fallbackItems) ? fallbackItems.length : 0;
+};
 
 const FavoritesPanel = ({
 	onItemSelect,
@@ -36,10 +59,20 @@ const FavoritesPanel = ({
 	onCacheState = null,
 	...rest
 }) => {
-	const [favorites, setFavorites] = useState([]);
-	const [loading, setLoading] = useState(true);
-	const [activeFilter, setActiveFilter] = useState('all');
+	const cachedFavorites = normalizeCachedFavorites(cachedState);
+	const [favorites, setFavorites] = useState(() => cachedFavorites);
+	const [loading, setLoading] = useState(() => cachedState?.loaded !== true);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasMore, setHasMore] = useState(() => cachedState?.hasMore === true);
+	const [activeFilter, setActiveFilter] = useState(() => normalizeCachedFilterId(cachedState));
 	const loadRequestIdRef = useRef(0);
+	const loadingMoreRef = useRef(false);
+	const lastCachedStateRef = useRef(cachedState);
+	const skipInitialCachedLoadRef = useRef(cachedState?.loaded === true);
+	const paginationRef = useRef({
+		nextStartIndex: normalizeCachedNextStartIndex(cachedState, cachedFavorites),
+		filterTypes: getFilterById(normalizeCachedFilterId(cachedState)).types
+	});
 	const favoritesGridRef = useRef(null);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
@@ -51,41 +84,121 @@ const FavoritesPanel = ({
 	});
 	const favoritesById = useMapById(favorites);
 	const {
+		scrollTop,
 		setScrollTop,
 		captureScrollTo: captureFavoritesScrollRestore,
 		handleScrollStop: handleFavoritesScrollMemoryStop
 	} = usePanelScrollState({
 		cachedState,
-		isActive,
-		onCacheState
+		isActive
 	});
 
-	const loadFavorites = useCallback(async () => {
+	const loadFavorites = useCallback(async (filterId = FILTERS[0].id) => {
 		const requestId = loadRequestIdRef.current + 1;
 		loadRequestIdRef.current = requestId;
+		const filterTypes = getFilterById(filterId).types;
+		paginationRef.current = {
+			nextStartIndex: 0,
+			filterTypes
+		};
+		loadingMoreRef.current = false;
 		setLoading(true);
+		setLoadingMore(false);
+		setHasMore(false);
+		setFavorites([]);
 		try {
-			const filterTypes = FILTERS.find(f => f.id === activeFilter)?.types;
-			const items = await jellyfinService.getFavorites(filterTypes, 100);
+			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, 0);
 			if (requestId !== loadRequestIdRef.current) return;
-			setFavorites(items);
+			const safeItems = Array.isArray(items) ? items : [];
+			setFavorites(safeItems);
+			paginationRef.current.nextStartIndex = safeItems.length;
+			setHasMore(safeItems.length >= FAVORITES_PAGE_SIZE);
 		} catch (error) {
 			if (requestId !== loadRequestIdRef.current) return;
 			console.error('Failed to load favorites:', error);
 			setFavorites([]);
+			setHasMore(false);
 		} finally {
 			if (requestId === loadRequestIdRef.current) {
 				setLoading(false);
 			}
 		}
-	}, [activeFilter]);
+	}, []);
+
+	const loadNextPage = useCallback(async () => {
+		if (loading || loadingMoreRef.current || !hasMore) return;
+		const requestId = loadRequestIdRef.current;
+		const {nextStartIndex, filterTypes} = paginationRef.current;
+		loadingMoreRef.current = true;
+		setLoadingMore(true);
+		try {
+			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, nextStartIndex);
+			if (requestId !== loadRequestIdRef.current) return;
+			const safeBatch = Array.isArray(items) ? items : [];
+			paginationRef.current.nextStartIndex = nextStartIndex + safeBatch.length;
+			if (safeBatch.length === 0) {
+				setHasMore(false);
+				return;
+			}
+			setFavorites((previousFavorites) => {
+				const existingIds = new Set(previousFavorites.map((item) => String(item.Id)));
+				const dedupedBatch = safeBatch.filter((item) => !existingIds.has(String(item.Id)));
+				return dedupedBatch.length ? [...previousFavorites, ...dedupedBatch] : previousFavorites;
+			});
+			setHasMore(safeBatch.length >= FAVORITES_PAGE_SIZE);
+		} catch (error) {
+			console.error('Failed to load additional favorites:', error);
+		} finally {
+			if (requestId === loadRequestIdRef.current) {
+				setLoadingMore(false);
+			}
+			loadingMoreRef.current = false;
+		}
+	}, [hasMore, loading]);
 
 	useEffect(() => {
-		loadFavorites();
+		if (skipInitialCachedLoadRef.current) {
+			skipInitialCachedLoadRef.current = false;
+			return undefined;
+		}
+		loadFavorites(activeFilter);
 		return () => {
 			loadRequestIdRef.current += 1;
 		};
-	}, [loadFavorites]);
+	}, [activeFilter, loadFavorites]);
+
+	useEffect(() => {
+		const hadCachedState = lastCachedStateRef.current !== null;
+		lastCachedStateRef.current = cachedState;
+		if (!hadCachedState || cachedState !== null) return;
+		loadRequestIdRef.current += 1;
+		loadingMoreRef.current = false;
+		paginationRef.current = {
+			nextStartIndex: 0,
+			filterTypes: FILTERS[0].types
+		};
+		setFavorites([]);
+		setHasMore(false);
+		setLoadingMore(false);
+		setScrollTop(0);
+		if (activeFilter !== FILTERS[0].id) {
+			setActiveFilter(FILTERS[0].id);
+			return;
+		}
+		loadFavorites(FILTERS[0].id);
+	}, [activeFilter, cachedState, loadFavorites, setScrollTop]);
+
+	useEffect(() => {
+		if (typeof onCacheState !== 'function') return;
+		onCacheState({
+			favorites,
+			activeFilter,
+			hasMore,
+			nextStartIndex: paginationRef.current.nextStartIndex,
+			loaded: !loading,
+			scrollTop
+		});
+	}, [activeFilter, favorites, hasMore, loading, onCacheState, scrollTop]);
 
 	const handleRemoveFavorite = useCallback(async (event, item) => {
 		event.stopPropagation();
@@ -158,6 +271,24 @@ const FavoritesPanel = ({
 			console.error('Failed to toggle watched state:', error);
 		}
 	}, [favoritesById]);
+
+	const handleFavoriteCardFocus = useCallback((event) => {
+		ensureFocusTargetVisibleWithTopChrome(event.currentTarget);
+		if (!hasMore || loadingMoreRef.current) return;
+		const itemIndex = Number(event.currentTarget.dataset.cardIndex);
+		if (!Number.isInteger(itemIndex)) return;
+		const remainingItems = favorites.length - itemIndex - 1;
+		if (remainingItems <= FAVORITES_FOCUS_PREFETCH_THRESHOLD) {
+			loadNextPage();
+		}
+	}, [favorites.length, hasMore, loadNextPage]);
+
+	const handleFavoritesScrollerScrollStop = useCallback((event) => {
+		handleFavoritesScrollMemoryStop(event);
+		if (event?.reachedEdgeInfo?.bottom) {
+			loadNextPage();
+		}
+	}, [handleFavoritesScrollMemoryStop, loadNextPage]);
 
 	const getFavoriteCards = useCallback(() => {
 		return Array.from(favoritesGridRef.current?.querySelectorAll(`.${css.favoriteCard}`) || []);
@@ -256,13 +387,14 @@ const FavoritesPanel = ({
 			<Header title="Favorites" />
 				<Toolbar
 					activeSection="favorites"
+					isActive={isActive}
 					{...toolbarActions}
 				/>
 			<div className={css.favoritesContainer}>
 				<Scroller
 					className={css.favoritesScroller}
 					cbScrollTo={captureFavoritesScrollRestore}
-					onScrollStop={handleFavoritesScrollMemoryStop}
+					onScrollStop={handleFavoritesScrollerScrollStop}
 				>
 					<div className={css.favoritesContent}>
 						<div className={css.filters}>
@@ -298,7 +430,7 @@ const FavoritesPanel = ({
 										const imageUrl = getPosterCardImageUrl(item);
 										return (
 											<PosterMediaCard
-												key={item.Id}
+												key={buildMediaListItemKey(`favorites-${activeFilter}`, item, index)}
 												itemId={item.Id}
 												data-card-index={index}
 												className={css.favoriteCard}
@@ -309,6 +441,7 @@ const FavoritesPanel = ({
 												placeholderText={item.Name?.charAt(0) || '?'}
 												onClick={handleFavoriteCardClick}
 												onKeyDown={handleFavoriteCardKeyDown}
+												onFocus={handleFavoriteCardFocus}
 												overlayContent={(
 													<MediaCardStatusOverlay
 														progressPercent={item.UserData?.PlayedPercentage}
@@ -354,6 +487,11 @@ const FavoritesPanel = ({
 											/>
 										);
 									})}
+									{loadingMore && (
+										<div className={css.loadingMore}>
+											<Spinner size="small" />
+										</div>
+									)}
 								</div>
 							)}
 						</div>

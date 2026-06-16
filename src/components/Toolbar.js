@@ -12,6 +12,7 @@ import { useMapById } from '../hooks/useMapById';
 import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import {buildUserPrimaryImageUrl, normalizeImageTag} from '../utils/imageUrls';
 import ToolbarLibraryPicker from './toolbar/ToolbarLibraryPicker';
 import ToolbarElegantLayout from './toolbar/ToolbarElegantLayout';
 import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
@@ -91,8 +92,13 @@ const Toolbar = ({
 	}, []);
 
 	const buildUserAvatarUrl = useCallback((user) => {
-		if (!user?.Id || !jellyfinService?.serverUrl || !jellyfinService?.accessToken || !user?.PrimaryImageTag) return '';
-		return jellyfinService.getUserImageUrl(user.Id, 96, {tag: user.PrimaryImageTag}) || '';
+		return buildUserPrimaryImageUrl({
+			baseUrl: jellyfinService.serverUrl,
+			userId: user?.Id,
+			accessToken: jellyfinService.accessToken,
+			width: 96,
+			tag: normalizeImageTag(user?.PrimaryImageTag)
+		});
 	}, []);
 
 	const loadUserInfo = useCallback(async () => {
