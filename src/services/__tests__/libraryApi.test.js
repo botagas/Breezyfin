@@ -1,5 +1,6 @@
 import {
 	getLatestMediaItems,
+	getFavoriteMediaItems,
 	getItemMediaSegments,
 	getLibraryChildItems,
 	getNextUpItems,
@@ -80,6 +81,24 @@ describe('libraryApi', () => {
 		expect(requestedUrl).toContain('searchTerm=The%20Expanse');
 		expect(requestedUrl).toContain('startIndex=0');
 		expect(requestedUrl).toContain('includeItemTypes=Series');
+	});
+
+	it('builds favorites request with paging and type filters', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await expect(
+			getFavoriteMediaItems(service, ['Movie'], 30, 60)
+		).resolves.toEqual([]);
+
+		expect(service._fetchItems).toHaveBeenCalledTimes(1);
+		const requestedUrl = service._fetchItems.mock.calls[0][0];
+		const requestedParams = new URL(requestedUrl, service.serverUrl).searchParams;
+		expect(requestedParams.get('filters')).toBe('IsFavorite');
+		expect(requestedParams.get('includeItemTypes')).toBe('Movie');
+		expect(requestedParams.get('limit')).toBe('30');
+		expect(requestedParams.get('startIndex')).toBe('60');
+		expect(service._fetchItems).toHaveBeenCalledWith(requestedUrl, {}, 'getFavorites');
 	});
 
 	it('builds paged Home section source requests with start indexes', async () => {
