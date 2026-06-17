@@ -1,5 +1,16 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 
+const emitScrollerDebugEvent = (detail) => {
+	if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') {
+		return;
+	}
+	try {
+		window.dispatchEvent(new CustomEvent('breezyfin:scroller-debug', {detail}));
+	} catch (_) {
+		// Debug telemetry must never affect scroll behavior.
+	}
+};
+
 export const normalizeScrollTop = (value) => {
 	const numericValue = Number(value);
 	if (!Number.isFinite(numericValue) || numericValue <= 0) return 0;
@@ -52,8 +63,22 @@ export const useScrollerScrollMemory = ({
 
 		try {
 			if (targetTop <= 0) {
+				emitScrollerDebugEvent({
+					phase: 'restore',
+					type: 'align-top',
+					targetTop,
+					force,
+					isActive
+				});
 				scrollToRef.current({align: 'top', animate: false});
 			} else {
+				emitScrollerDebugEvent({
+					phase: 'restore',
+					type: 'position',
+					targetTop,
+					force,
+					isActive
+				});
 				scrollToRef.current({position: {y: targetTop}, animate: false});
 			}
 		} catch (error) {
@@ -91,7 +116,16 @@ export const useScrollerScrollMemory = ({
 	}, [applyScrollRestore, isActive]);
 
 	const handleScrollStop = useCallback((event) => {
-		const nextTop = normalizeScrollTop(event?.scrollTop);
+		const rawTop = event?.scrollTop;
+		emitScrollerDebugEvent({
+			phase: 'stop',
+			type: 'event',
+			rawTop,
+			reachedBottom: event?.reachedEdgeInfo?.bottom === true,
+			reachedTop: event?.reachedEdgeInfo?.top === true
+		});
+		if (!Number.isFinite(Number(rawTop))) return;
+		const nextTop = normalizeScrollTop(rawTop);
 		lastKnownScrollTopRef.current = nextTop;
 		if (typeof onScrollTopChange === 'function') {
 			onScrollTopChange(nextTop);

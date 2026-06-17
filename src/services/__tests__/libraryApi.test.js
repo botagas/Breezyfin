@@ -1,8 +1,13 @@
 import {
+	getLatestMediaItems,
+	getFavoriteMediaItems,
 	getItemMediaSegments,
 	getLibraryChildItems,
+	getNextUpItems,
 	getNextUpEpisodeForSeries,
 	getPublicSystemInfo,
+	getRecentlyAddedItems,
+	getResumeMediaItems,
 	searchLibraryItems
 } from '../jellyfin/libraryApi';
 
@@ -39,12 +44,29 @@ describe('libraryApi', () => {
 
 		expect(service._fetchItems).toHaveBeenCalledTimes(1);
 		const requestedUrl = service._fetchItems.mock.calls[0][0];
+		const requestedParams = new URL(requestedUrl).searchParams;
 		expect(requestedUrl).toContain('http://media.local/Users/user-1/Items?');
 		expect(requestedUrl).toContain('parentId=parent-1');
 		expect(requestedUrl).toContain('limit=50');
 		expect(requestedUrl).toContain('startIndex=10');
-		expect(requestedUrl).toContain('includeItemTypes=Movie,Series');
+		expect(requestedParams.get('includeItemTypes')).toBe('Movie,Series');
 		expect(service._fetchItems).toHaveBeenCalledWith(requestedUrl, {}, 'getLibraryItems');
+	});
+
+	it('omits invalid parentId values when building library item requests', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await getLibraryChildItems(service, null, ['Movie'], 30, 0);
+		await getLibraryChildItems(service, 'null', ['Movie'], 30, 0);
+		await getLibraryChildItems(service, 'undefined', ['Movie'], 30, 0);
+
+		expect(service._fetchItems).toHaveBeenCalledTimes(3);
+		service._fetchItems.mock.calls.forEach(([requestedUrl]) => {
+			const requestedParams = new URL(requestedUrl).searchParams;
+			expect(requestedParams.has('parentId')).toBe(false);
+			expect(requestedParams.get('includeItemTypes')).toBe('Movie');
+		});
 	});
 
 	it('normalizes search inputs for encoded term and non-negative start index', async () => {
@@ -59,6 +81,45 @@ describe('libraryApi', () => {
 		expect(requestedUrl).toContain('searchTerm=The%20Expanse');
 		expect(requestedUrl).toContain('startIndex=0');
 		expect(requestedUrl).toContain('includeItemTypes=Series');
+	});
+
+	it('builds favorites request with paging and type filters', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await expect(
+			getFavoriteMediaItems(service, ['Movie'], 30, 60)
+		).resolves.toEqual([]);
+
+		expect(service._fetchItems).toHaveBeenCalledTimes(1);
+		const requestedUrl = service._fetchItems.mock.calls[0][0];
+		const requestedParams = new URL(requestedUrl, service.serverUrl).searchParams;
+		expect(requestedParams.get('filters')).toBe('IsFavorite');
+		expect(requestedParams.get('includeItemTypes')).toBe('Movie');
+		expect(requestedParams.get('limit')).toBe('30');
+		expect(requestedParams.get('startIndex')).toBe('60');
+		expect(service._fetchItems).toHaveBeenCalledWith(requestedUrl, {}, 'getFavorites');
+	});
+
+	it('builds paged Home section source requests with start indexes', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await getRecentlyAddedItems(service, 60, 120);
+		await getResumeMediaItems(service, 60, 180);
+		await getNextUpItems(service, 60, 240);
+		await getLatestMediaItems(service, ['Movie'], 60, 300);
+
+		const requestedUrls = service._fetchItems.mock.calls.map(([requestedUrl]) => requestedUrl);
+		expect(requestedUrls[0]).toContain('limit=60');
+		expect(requestedUrls[0]).toContain('startIndex=120');
+		expect(requestedUrls[1]).toContain('limit=60');
+		expect(requestedUrls[1]).toContain('startIndex=180');
+		expect(requestedUrls[2]).toContain('limit=60');
+		expect(requestedUrls[2]).toContain('startIndex=240');
+		expect(requestedUrls[3]).toContain('includeItemTypes=Movie');
+		expect(requestedUrls[3]).toContain('limit=60');
+		expect(requestedUrls[3]).toContain('startIndex=300');
 	});
 
 	it('returns next-up episode immediately when API has one', async () => {

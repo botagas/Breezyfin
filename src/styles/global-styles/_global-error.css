@@ -33,3 +33,71 @@
 	gap: 12px;
 	flex-wrap: wrap;
 }
+
+.bf-error-actions .bf-button,
+.bf-error-actions .bf-error-action-button {
+	--bf-button-fg: var(--bf-theme-error-color);
+	--bf-button-fg-hover: var(--bf-theme-text-primary);
+	--bf-button-fg-active: var(--bf-theme-text-primary);
+	border-radius: 999px !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.bf-error-actions .bf-button-bg,
+.bf-error-actions .bg,
+.bf-error-action-button .bf-button-bg,
+.bf-error-action-button .bg {
+	background: var(--bf-theme-error-bg) !important;
+	border: 1px solid var(--bf-theme-error-border) !important;
+	border-radius: 999px !important;
+	box-shadow: none !important;
+	transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.bf-error-actions .bf-button:hover .bf-button-bg,
+.bf-error-actions .bf-button:focus .bf-button-bg,
+.bf-error-actions .bf-button.spottable:focus .bf-button-bg,
+.bf-error-actions .bf-button.spotlight .bf-button-bg,
+.bf-error-actions .bf-button.selected .bf-button-bg,
+.bf-error-actions .bf-button[data-webos-voice-focused='true'] .bf-button-bg,
+.bf-error-actions .bf-button:hover .bg,
+.bf-error-actions .bf-button:focus .bg,
+.bf-error-actions .bf-button.spottable:focus .bg,
+.bf-error-actions .bf-button.spotlight .bg,
+.bf-error-actions .bf-button.selected .bg,
+.bf-error-actions .bf-button[data-webos-voice-focused='true'] .bg,
+.bf-error-action-button:hover .bf-button-bg,
+.bf-error-action-button:focus .bf-button-bg,
+.bf-error-action-button.spottable:focus .bf-button-bg,
+.bf-error-action-button.spotlight .bf-button-bg,
+.bf-error-action-button.selected .bf-button-bg,
+.bf-error-action-button[data-webos-voice-focused='true'] .bf-button-bg,
+.bf-error-action-button:hover .bg,
+.bf-error-action-button:focus .bg,
+.bf-error-action-button.spottable:focus .bg,
+.bf-error-action-button.spotlight .bg,
+.bf-error-action-button.selected .bg,
+.bf-error-action-button[data-webos-voice-focused='true'] .bg {
+	background: var(--bf-theme-settings-danger-overlay-bg, rgba(244, 67, 54, 0.42)) !important;
+	border-color: var(--bf-theme-error-color) !important;
+}
+
+.bf-error-actions .bf-button:active .bf-button-bg,
+.bf-error-actions .bf-button:active .bg,
+.bf-error-action-button:active .bf-button-bg,
+.bf-error-action-button:active .bg {
+	background: var(--bf-theme-settings-danger-bg-hover, rgba(204, 94, 112, 0.28)) !important;
+	border-color: var(--bf-theme-error-color) !important;
+}
+
+.bf-error-action-button.spotlight,
+.bf-error-action-button.selected,
+.bf-error-action-button[data-webos-voice-focused='true'],
+.bf-error-actions .bf-button.spotlight,
+.bf-error-actions .bf-button.selected,
+.bf-error-actions .bf-button[data-webos-voice-focused='true'] {
+	--bf-button-fg: var(--bf-theme-text-primary);
+}

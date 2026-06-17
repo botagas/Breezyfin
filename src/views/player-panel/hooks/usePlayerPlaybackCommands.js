@@ -18,6 +18,7 @@ export const usePlayerPlaybackCommands = ({
 	setPlaying,
 	setShowControls,
 	setError,
+	setLoadingStatusMessage,
 	setToastMessage,
 	showPlaybackError,
 	resetRecoveryGuards,
@@ -90,6 +91,7 @@ export const usePlayerPlaybackCommands = ({
 
 	const handleRetryPlayback = useCallback(async () => {
 		setError(null);
+		setLoadingStatusMessage('Loading...');
 		setToastMessage('');
 		resetRecoveryGuards();
 		playSessionRebuildAttemptsRef.current = 0;
@@ -105,14 +107,32 @@ export const usePlayerPlaybackCommands = ({
 		reloadAttemptedRef,
 		resetRecoveryGuards,
 		setError,
+		setLoadingStatusMessage,
 		setToastMessage,
 		subtitleCompatibilityFallbackAttemptedRef,
 		transcodeFallbackAttemptedRef
 	]);
 
-	const handleBackButton = useCallback(async () => {
-		await handleStop();
-		onBack();
+	const handleBackButton = useCallback(() => {
+		let didNavigate = false;
+		const navigateBack = () => {
+			if (didNavigate) return;
+			didNavigate = true;
+			onBack();
+		};
+
+		const navigationTimeout = setTimeout(() => {
+			navigateBack();
+		}, 1400);
+
+		Promise.resolve(handleStop())
+			.catch((stopError) => {
+				console.warn('Failed to fully stop playback before navigating back:', stopError);
+			})
+			.finally(() => {
+				clearTimeout(navigationTimeout);
+				navigateBack();
+			});
 	}, [handleStop, onBack]);
 
 	const tryPlaybackFallbackOnCanPlayError = useCallback(async (errorMessage) => {

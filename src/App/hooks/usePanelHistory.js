@@ -4,6 +4,7 @@ export const usePanelHistory = ({
 	currentView,
 	selectedItem,
 	selectedLibrary,
+	selectedHomeSection,
 	playbackOptions,
 	previousItem,
 	detailsReturnView,
@@ -11,6 +12,7 @@ export const usePanelHistory = ({
 	setCurrentView,
 	setSelectedItem,
 	setSelectedLibrary,
+	setSelectedHomeSection,
 	setPlaybackOptions,
 	setPreviousItem,
 	setDetailsReturnView,
@@ -22,6 +24,7 @@ export const usePanelHistory = ({
 		view: currentView,
 		selectedItem,
 		selectedLibrary,
+		selectedHomeSection,
 		playbackOptions,
 		previousItem,
 		detailsReturnView,
@@ -33,7 +36,8 @@ export const usePanelHistory = ({
 		playerControlsVisible,
 		previousItem,
 		selectedItem,
-		selectedLibrary
+		selectedLibrary,
+		selectedHomeSection
 	]);
 
 	const pushPanelHistory = useCallback(() => {
@@ -49,6 +53,7 @@ export const usePanelHistory = ({
 		setCurrentView(snapshot.view || 'home');
 		setSelectedItem(snapshot.selectedItem || null);
 		setSelectedLibrary(snapshot.selectedLibrary || null);
+		setSelectedHomeSection(snapshot.selectedHomeSection || null);
 		setPlaybackOptions(snapshot.playbackOptions || null);
 		setPreviousItem(snapshot.previousItem || null);
 		setDetailsReturnView(snapshot.detailsReturnView || 'home');
@@ -61,7 +66,8 @@ export const usePanelHistory = ({
 		setPlayerControlsVisible,
 		setPreviousItem,
 		setSelectedItem,
-		setSelectedLibrary
+		setSelectedLibrary,
+		setSelectedHomeSection
 	]);
 
 	const navigateBackInHistory = useCallback(() => {

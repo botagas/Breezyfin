@@ -3,6 +3,69 @@ import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
 import {shouldTranscodeForSubtitleSelection} from '../../../services/jellyfin/playbackSelection';
 
+const normalizeTrackToken = (value) => String(value || '').trim().toLowerCase();
+
+const findUniqueTrackMatchIndex = (tracks, matcher) => {
+	if (!Array.isArray(tracks) || tracks.length === 0 || typeof matcher !== 'function') return -1;
+	const matches = [];
+	tracks.forEach((track, index) => {
+		if (matcher(track, index)) {
+			matches.push(index);
+		}
+	});
+	return matches.length === 1 ? matches[0] : -1;
+};
+
+const resolveHlsTrackIndex = ({
+	hlsTracks,
+	mediaTracks,
+	selectedTrackIndex,
+	allowPositionalFallback = false,
+	getLanguage = (track) => track?.lang,
+	getTitle = (track) => track?.name
+}) => {
+	if (!Array.isArray(hlsTracks) || hlsTracks.length === 0) return -1;
+	if (!Array.isArray(mediaTracks) || mediaTracks.length === 0) return -1;
+
+	const selectedMediaTrack = mediaTracks.find((track) => track?.Index === selectedTrackIndex);
+	if (!selectedMediaTrack) return -1;
+
+	const selectedLanguage = normalizeTrackToken(selectedMediaTrack?.Language);
+	const selectedTitle = normalizeTrackToken(selectedMediaTrack?.Title);
+
+	if (selectedLanguage && selectedTitle) {
+		const exactMatch = findUniqueTrackMatchIndex(hlsTracks, (track) => (
+			normalizeTrackToken(getLanguage(track)) === selectedLanguage &&
+			normalizeTrackToken(getTitle(track)) === selectedTitle
+		));
+		if (exactMatch >= 0) return exactMatch;
+	}
+
+	if (selectedTitle) {
+		const titleMatch = findUniqueTrackMatchIndex(hlsTracks, (track) => (
+			normalizeTrackToken(getTitle(track)) === selectedTitle
+		));
+		if (titleMatch >= 0) return titleMatch;
+	}
+
+	if (selectedLanguage) {
+		const languageMatch = findUniqueTrackMatchIndex(hlsTracks, (track) => (
+			normalizeTrackToken(getLanguage(track)) === selectedLanguage
+		));
+		if (languageMatch >= 0) return languageMatch;
+	}
+
+	if (allowPositionalFallback) {
+		// Last resort for manifests that omit language/title metadata.
+		const mediaTrackOrder = mediaTracks.findIndex((track) => track?.Index === selectedTrackIndex);
+		if (mediaTrackOrder >= 0 && mediaTrackOrder < hlsTracks.length) {
+			return mediaTrackOrder;
+		}
+	}
+
+	return -1;
+};
+
 export const usePlayerSeekAndTrackSwitching = ({
 	item,
 	videoRef,
@@ -163,9 +226,10 @@ export const usePlayerSeekAndTrackSwitching = ({
 		saveAudioSelection(trackIndex, audioTracks);
 
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
-			const hlsTrackIndex = hlsRef.current.audioTracks.findIndex((track) => {
-				const mediaTrack = audioTracks.find((audioTrack) => audioTrack.Index === trackIndex);
-				return track.lang === mediaTrack?.Language || track.name === mediaTrack?.Title;
+			const hlsTrackIndex = resolveHlsTrackIndex({
+				hlsTracks: hlsRef.current.audioTracks,
+				mediaTracks: audioTracks,
+				selectedTrackIndex: trackIndex
 			});
 			if (hlsTrackIndex >= 0) {
 				hlsRef.current.audioTrack = hlsTrackIndex;
@@ -196,9 +260,10 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (hlsRef.current) {
 			if (typeof hlsRef.current.subtitleTrack === 'number' && hlsRef.current.subtitleTracks) {
-				const hlsTrackIndex = hlsRef.current.subtitleTracks.findIndex((track) => {
-					const mediaTrack = subtitleTracks.find((subtitleTrack) => subtitleTrack.Index === trackIndex);
-					return mediaTrack && (track.lang === mediaTrack.Language || track.name === mediaTrack.Title);
+				const hlsTrackIndex = resolveHlsTrackIndex({
+					hlsTracks: hlsRef.current.subtitleTracks,
+					mediaTracks: subtitleTracks,
+					selectedTrackIndex: trackIndex
 				});
 				if (hlsTrackIndex >= 0) {
 					hlsRef.current.subtitleTrack = hlsTrackIndex;

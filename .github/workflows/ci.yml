@@ -37,6 +37,8 @@ jobs:
         run: CI=true npm run test -- --watch=false --passWithNoTests
 
       - name: Build production bundle
+        env:
+          REACT_APP_RELEASE_CHANNEL: ${{ github.ref_name }}
         run: |
           npm run clean
           npm run pack-p

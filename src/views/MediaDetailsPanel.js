@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import Scroller from '../components/AppScroller';
 import Icon from '@enact/sandstone/Icon';
@@ -32,6 +32,7 @@ import { useMediaDetailsDomHelpers } from './media-details-panel/hooks/useMediaD
 import { useMediaDetailsOverviewState } from './media-details-panel/hooks/useMediaDetailsOverviewState';
 import { useMediaDetailsPanelSync } from './media-details-panel/hooks/useMediaDetailsPanelSync';
 import { useMediaDetailsItemBootstrap } from './media-details-panel/hooks/useMediaDetailsItemBootstrap';
+import { useMediaDetailsStagedReveal } from './media-details-panel/hooks/useMediaDetailsStagedReveal';
 import MediaDetailsToast from './media-details-panel/components/MediaDetailsToast';
 import MediaTrackPickerPopup from './media-details-panel/components/MediaTrackPickerPopup';
 import MediaEpisodePickerPopup from './media-details-panel/components/MediaEpisodePickerPopup';
@@ -315,6 +316,30 @@ const MediaDetailsPanel = ({
 		handleSeasonImageError,
 		handleEpisodeImageError
 	} = useMediaDetailsImages({item});
+	const [isHeaderLogoLoaded, setIsHeaderLogoLoaded] = useState(false);
+	useEffect(() => {
+		setIsHeaderLogoLoaded(false);
+	}, [headerLogoUrl, item?.Id, useHeaderLogo]);
+	const handleHeaderLogoLoad = useCallback(() => {
+		setIsHeaderLogoLoaded(true);
+	}, []);
+	const handleHeaderLogoRevealError = useCallback((event) => {
+		setIsHeaderLogoLoaded(true);
+		handleHeaderLogoError(event);
+	}, [handleHeaderLogoError]);
+	const {
+		showBackdropStage,
+		showLogoStage,
+		showContentStage
+	} = useMediaDetailsStagedReveal({
+		itemId: item?.Id,
+		loading,
+		hasBackdropImage,
+		isBackdropImageLoaded,
+		useHeaderLogo,
+		isHeaderLogoLoaded
+	});
+	const isInteractionLoading = loading || !showContentStage;
 	const shouldShowSeasonPosters = !isElegantTheme || showSeasonImages;
 	const isSidewaysEpisodeLayout = isElegantTheme && useSidewaysEpisodeList;
 	const pageTitle = item?.Name || item?.SeriesName || 'Details';
@@ -366,12 +391,11 @@ const MediaDetailsPanel = ({
 	} = useMediaDetailsFocusOrchestrator({
 		item,
 		isActive,
-		loading,
+		loading: isInteractionLoading,
 		showEpisodePicker,
 		showAudioPicker,
 		showSubtitlePicker,
 		css,
-		getDetailsScrollElement,
 		getScrollSnapshot,
 		describeNode,
 		logDetailsDebug,
@@ -413,7 +437,7 @@ const MediaDetailsPanel = ({
 		seasons,
 		episodes,
 		isActive,
-		loading,
+		loading: isInteractionLoading,
 		showAudioPicker,
 		showSubtitlePicker,
 		showEpisodePicker,
@@ -534,6 +558,7 @@ const MediaDetailsPanel = ({
 		isElegantTheme,
 		useHeaderLogo,
 		headerLogoUrl,
+		isHeaderLogoLoaded,
 		headerTitle,
 		hasCreatorCredits,
 		directorNames,
@@ -555,7 +580,8 @@ const MediaDetailsPanel = ({
 		onBack: handleBack,
 		onOpenEpisodeSeries: handleOpenEpisodeSeries,
 		onOpenEpisodePicker: openEpisodePicker,
-		onHeaderLogoError: handleHeaderLogoError,
+		onHeaderLogoError: handleHeaderLogoRevealError,
+		onHeaderLogoLoad: handleHeaderLogoLoad,
 		renderCreditNames,
 		onToggleFavorite: handleToggleFavorite,
 		onToggleWatchedMain: handleToggleWatchedMain,
@@ -567,6 +593,8 @@ const MediaDetailsPanel = ({
 		onPlay: handlePlay,
 		onNonSeriesPlayKeyDown: handleNonSeriesPlayKeyDown,
 		showSectionHints: hasSecondarySection,
+		showLogoStage,
+		showContentStage,
 		onIntroActionKeyDown: handleIntroActionKeyDown,
 		onIntroTopNavKeyDown: handleIntroTopNavKeyDown
 	};
@@ -598,7 +626,7 @@ const MediaDetailsPanel = ({
 						onWheelCapture={handleSectionWheelCapture}
 				>
 					{!loading && (
-						<div className={`${css.backdrop} ${hasBackdropImage ? '' : css.backdropFallback} ${isElegantTheme ? css.backdropElegant : ''}`}>
+						<div className={`${css.backdrop} ${showBackdropStage ? css.backdropRevealVisible : css.backdropRevealHidden} ${hasBackdropImage ? '' : css.backdropFallback} ${isElegantTheme ? css.backdropElegant : ''}`}>
 							{hasBackdropImage && (
 								<img
 									src={backdropUrl}
@@ -632,7 +660,7 @@ const MediaDetailsPanel = ({
 											refs={introRefs}
 										/>
 
-										<div className={css.contentSection} ref={contentSectionRef}>
+										<div className={`${css.contentSection} ${showContentStage ? css.contentRevealVisible : css.contentRevealHidden}`} ref={contentSectionRef}>
 											{hasSecondarySection && (
 												<div className={css.sectionSwitchRow}>
 													<div className={css.sectionHint}>

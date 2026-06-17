@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react'
 import { Spottable } from '@enact/spotlight/Spottable';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
+import {KeyCodes} from '../utils/keyCodes';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
@@ -11,6 +12,7 @@ import { useMapById } from '../hooks/useMapById';
 import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import {buildUserPrimaryImageUrl, normalizeImageTag} from '../utils/imageUrls';
 import ToolbarLibraryPicker from './toolbar/ToolbarLibraryPicker';
 import ToolbarElegantLayout from './toolbar/ToolbarElegantLayout';
 import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
@@ -51,6 +53,7 @@ const Toolbar = ({
 	const isWebOS6Compat = runtimeCapabilities.webosV6Compat;
 	const glassFilterId = useId();
 	const centerRef = useRef(null);
+	const toolbarRootRef = useRef(null);
 	const userMenuScopeRef = useRef(null);
 	const libraryMenuScopeRef = useRef(null);
 	const librariesPopupContentRef = useRef(null);
@@ -59,6 +62,12 @@ const Toolbar = ({
 	const librariesById = useMapById(libraries);
 	const isElegantTheme = toolbarTheme === TOOLBAR_THEME_ELEGANT;
 	const isHomeSection = activeSection === 'home';
+	const primaryToolbarNavSelector = useMemo(() => ([
+		`.${css.iconButton}`,
+		`.${css.toolbarButton}`,
+		`.${css.tabButton}`,
+		`.${css.userButton}`
+	].join(', ')), []);
 	usePopupInitialFocus(showLibrariesPopup, librariesPopupContentRef);
 	const elegantPanelTitle = useMemo(() => {
 		if (isHomeSection) return '';
@@ -83,8 +92,13 @@ const Toolbar = ({
 	}, []);
 
 	const buildUserAvatarUrl = useCallback((user) => {
-		if (!user?.Id || !jellyfinService?.serverUrl || !jellyfinService?.accessToken || !user?.PrimaryImageTag) return '';
-		return jellyfinService.getUserImageUrl(user.Id, 96, {tag: user.PrimaryImageTag}) || '';
+		return buildUserPrimaryImageUrl({
+			baseUrl: jellyfinService.serverUrl,
+			userId: user?.Id,
+			accessToken: jellyfinService.accessToken,
+			width: 96,
+			tag: normalizeImageTag(user?.PrimaryImageTag)
+		});
 	}, []);
 
 	const loadUserInfo = useCallback(async () => {
@@ -262,6 +276,59 @@ const Toolbar = ({
 		onNavigate('library', library);
 	}, [closeDisclosure, librariesById, onNavigate]);
 
+	const handleToolbarKeyDownCapture = useCallback((event) => {
+		const code = event.keyCode || event.which;
+		const isDirectionalLockKey =
+			code === KeyCodes.LEFT ||
+			code === KeyCodes.RIGHT ||
+			code === KeyCodes.UP;
+		if (!isDirectionalLockKey) return;
+
+		const currentControl = event.target?.closest?.(primaryToolbarNavSelector);
+		if (!currentControl) return;
+
+		if (code === KeyCodes.UP) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			return;
+		}
+
+		const root = toolbarRootRef.current || event.currentTarget;
+		const controls = Array.from(root.querySelectorAll(primaryToolbarNavSelector))
+			.filter((element) => (
+				element &&
+				element.nodeType === 1 &&
+				element.offsetParent !== null &&
+				!element.closest?.(`.${css.userMenu}`) &&
+				!element.closest?.(`.${css.elegantLibraryPopup}`)
+			));
+		if (controls.length === 0) return;
+
+		const currentIndex = controls.indexOf(currentControl);
+		if (currentIndex < 0) return;
+
+		const nextIndex = code === KeyCodes.LEFT
+			? Math.max(0, currentIndex - 1)
+			: Math.min(controls.length - 1, currentIndex + 1);
+		const nextControl = controls[nextIndex];
+		if (!nextControl || nextControl === currentControl) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			return;
+		}
+
+		event.preventDefault();
+		event.stopPropagation();
+		event.stopImmediatePropagation?.();
+		try {
+			nextControl.focus({preventScroll: true});
+		} catch (_) {
+			nextControl.focus();
+		}
+	}, [primaryToolbarNavSelector]);
+
 	const runUserMenuAction = useCallback((primaryAction, fallbackAction = null) => {
 		suppressUserMenuUntilRef.current = Date.now() + 500;
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
@@ -327,11 +394,13 @@ const Toolbar = ({
 
 	return (
 		<div
+			ref={toolbarRootRef}
 			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''}`}
 			data-bf-navbar="true"
 			data-bf-navbar-theme={toolbarTheme}
 			data-bf-navbar-legacy={isWebOS6Compat ? 'on' : 'off'}
 			style={toolbarStyle}
+			onKeyDownCapture={handleToolbarKeyDownCapture}
 		>
 			{isElegantTheme ? (
 				<ToolbarElegantLayout

@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = {
 	showPerformanceOverlay: false,
 	showExtendedPlayerDebugOverlay: false,
 	showFocusDebugOverlay: false,
+	showDebugErrorMenu: false,
 	forceDolbyVision: false,
 	enableFmp4HlsContainerPreference: false,
 	forceFmp4HlsContainerPreference: false,

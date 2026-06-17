@@ -6,8 +6,8 @@
 }
 
 .rowTitleCompactWebos6 {
-	margin-bottom: 0.1rem;
-	padding: 0 0.6rem;
+	margin: 0;
+	padding: 0;
 }
 
 .cardContainerCompactWebos6 {
@@ -24,10 +24,16 @@
 	margin-bottom: 0.3rem;
 }
 
-:global([data-bf-webos-v6-compat='on']) .rowTitle,
-:global([data-bf-webos-legacy='on']) .rowTitle {
+:global([data-bf-webos-v6-compat='on']) .rowHeader,
+:global([data-bf-webos-legacy='on']) .rowHeader {
 	margin-bottom: 0.12rem;
 	padding: 0 0.75rem;
+}
+
+:global([data-bf-webos-v6-compat='on']) .rowTitle,
+:global([data-bf-webos-legacy='on']) .rowTitle {
+	margin: 0;
+	padding: 0;
 }
 
 :global([data-bf-webos-v6-compat='on']) .cardContainer,

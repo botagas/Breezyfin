@@ -1,0 +1,91 @@
+@import (reference) '../styles/debugStyles.less';
+
+.menuDock {
+	position: fixed;
+	top: auto;
+	left: auto;
+	right: var(--bf-theme-debug-overlay-inset);
+	bottom: var(--bf-theme-debug-overlay-inset);
+	z-index: calc(var(--bf-theme-debug-overlay-z-index) + 2);
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.5rem;
+	pointer-events: auto;
+}
+
+.menuDockExpanded {
+	gap: 0.55rem;
+}
+
+.menuActions {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.45rem;
+	opacity: 0;
+	transform: translateY(0.35rem) scale(0.96);
+	transform-origin: right bottom;
+	pointer-events: none;
+	transition: opacity 130ms ease, transform 130ms ease;
+}
+
+.menuActionsOpen {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+	pointer-events: auto;
+}
+
+.menuAction,
+.menuToggle {
+	font: inherit;
+	color: var(--bf-theme-debug-value-color);
+	letter-spacing: var(--bf-theme-debug-letter-spacing);
+	border-radius: var(--bf-theme-debug-pill-radius);
+	border: var(--bf-theme-debug-border-width) solid var(--bf-theme-debug-close-border);
+	background: var(--bf-theme-debug-close-bg);
+	backdrop-filter: blur(var(--bf-theme-debug-surface-blur));
+	-webkit-backdrop-filter: blur(var(--bf-theme-debug-surface-blur));
+	box-shadow: var(--bf-theme-debug-surface-shadow);
+	cursor: pointer;
+}
+
+.menuAction {
+	min-height: 2rem;
+	padding: 0.35rem 0.8rem;
+	font-size: 0.74rem;
+	text-transform: uppercase;
+}
+
+.menuToggle {
+	width: 2.5rem;
+	height: 2.5rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+}
+
+.menuToggleGlyph {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.35rem;
+	font-weight: 600;
+	line-height: 1;
+	transition: transform 130ms ease;
+}
+
+.menuToggleGlyphOpen {
+	transform: rotate(45deg);
+}
+
+.menuAction:hover,
+.menuAction:focus,
+.menuToggle:hover,
+.menuToggle:focus {
+	outline: none;
+	color: var(--bf-theme-text-primary);
+	border-color: var(--bf-theme-debug-close-hover-border);
+	background: var(--bf-theme-debug-close-hover-bg);
+}

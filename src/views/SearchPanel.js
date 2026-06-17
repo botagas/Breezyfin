@@ -14,6 +14,7 @@ import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import {KeyCodes} from '../utils/keyCodes';
 import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
 import {getPosterCardClassProps} from '../utils/posterCardClassProps';
+import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
@@ -21,6 +22,8 @@ import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
+import {buildMediaListItemKey} from '../utils/reactKeys';
+import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
 
 import css from './SearchPanel.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
@@ -42,7 +45,7 @@ const INITIAL_SEARCH_DISCLOSURES = {
 	[SEARCH_DISCLOSURE_KEYS.FILTER_POPUP]: false
 };
 const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
-const SEARCH_PAGE_SIZE = 60;
+const SEARCH_PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
 const SEARCH_FOCUS_PREFETCH_THRESHOLD = 12;
 const SearchResultsSpotlightContainer = createLastFocusedSpotlightContainer();
 const sanitizeSelectedFilterIds = (candidateIds) => {
@@ -404,6 +407,7 @@ const SearchPanel = ({
 	}, []);
 
 	const handleResultCardFocus = useCallback((event) => {
+		ensureFocusTargetVisibleWithTopChrome(event.currentTarget);
 		if (!hasMore || loadingMoreRef.current) return;
 		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
 		if (!Number.isInteger(itemIndex)) return;
@@ -425,6 +429,7 @@ const SearchPanel = ({
 			<Header title="Search" />
 				<Toolbar
 					activeSection="search"
+					isActive={isActive}
 					{...toolbarActions}
 				/>
 			<div className={css.searchContainer}>
@@ -484,7 +489,7 @@ const SearchPanel = ({
 											});
 											return (
 												<PosterMediaCard
-													key={item.Id}
+													key={buildMediaListItemKey('search-results', item, index)}
 													itemId={item.Id}
 													data-item-index={index}
 													className={css.resultCard}
@@ -543,7 +548,7 @@ const SearchPanel = ({
 									selected={selectedFilterIds.includes(filter.id)}
 									onClick={handleFilterToggleClick}
 									size="small"
-									className={css.filterPopupOptionButton}
+									className={`${css.filterPopupOptionButton} ${selectedFilterIds.includes(filter.id) ? css.filterPopupOptionButtonSelected : ''}`}
 								>
 									{filter.label}
 								</Button>

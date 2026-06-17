@@ -11,6 +11,8 @@ This guide covers shared UI components in `src/components/`.
 - For larger shared components, prefer local decomposition folders (for example `src/components/toolbar/`) to keep root files focused on orchestration.
 - Reuse shared feedback primitives (for example `src/components/BreezyToast.js`) instead of panel-specific toast styling/markup.
 - Reuse shared loading primitives (for example `src/components/BreezyLoadingOverlay.js`) instead of panel-specific loading spinners.
+- Keep developer-only diagnostics UI shared (for example `src/components/DebugErrorMenu.js`) instead of per-panel debug menu clones.
+- Reuse `MediaFilterControls` for Library-like filter trigger/popup UI instead of duplicating filter popup markup in each panel.
 
 ## Styling
 
@@ -29,6 +31,9 @@ This guide covers shared UI components in `src/components/`.
 - Avoid relying on hover-only affordances for critical actions.
 - Keep focus/selected visuals consistent with toolbar/media-details/player button states.
 - For image components, route fallback behavior through `useImageErrorFallback` unless panel-specific fallback chains are required.
+- Reuse `PanelPosterMediaCard` for Library-like poster grids so watched/progress overlays and image fallback behavior stay aligned.
+- Reuse `MediaFilterControls` with `useMediaFilterState` for Library-like filter popups so selected, draft, reset, apply, and first-focus behavior stay aligned.
+- For Home rows, `MediaRow` may expose an optional icon-only section action via `onMoreClick` / `sectionKey`; keep this action generic and route destination behavior through the owning panel.
 
 ## Related docs
 

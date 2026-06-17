@@ -19,13 +19,11 @@ export const useMediaDetailsFocusOrchestrator = ({
 	showAudioPicker,
 	showSubtitlePicker,
 	css,
-	getDetailsScrollElement,
 	getScrollSnapshot,
 	describeNode,
 	logDetailsDebug,
 	focusNodeWithoutScroll,
 	detailsContainerRef,
-	detailsScrollToRef,
 	favoriteActionButtonRef,
 	watchedActionButtonRef,
 	audioSelectorButtonRef,
@@ -78,64 +76,25 @@ export const useMediaDetailsFocusOrchestrator = ({
 		return false;
 	}, [css.seasonCard, seasonScrollerRef]);
 
-	const alignElementBelowPanelHeader = useCallback((element, behavior = 'smooth') => {
-		const scrollEl = getDetailsScrollElement();
-		if (!scrollEl || !element) return;
-		const visualBuffer = 16;
-		const headingStackElement = detailsContainerRef.current?.querySelector?.(`.${css.detailsHeadingStack}`);
-		const topBarElement = detailsContainerRef.current?.querySelector?.(`.${css.detailsTopBar}`);
-		let desiredTop = scrollEl.getBoundingClientRect().top + visualBuffer;
-		if (headingStackElement) {
-			desiredTop = headingStackElement.getBoundingClientRect().bottom + visualBuffer;
-		} else if (topBarElement) {
-			desiredTop = topBarElement.getBoundingClientRect().bottom + visualBuffer;
-		} else {
-			const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-			const panelHeaderOffset = 9 * rootFontSize;
-			desiredTop = scrollEl.getBoundingClientRect().top + panelHeaderOffset + visualBuffer;
-		}
-		const elementTop = element.getBoundingClientRect().top;
-		const delta = elementTop - desiredTop;
-		if (Math.abs(delta) < 2) return;
-		const nextTop = Math.max(0, scrollEl.scrollTop + delta);
-		scrollEl.scrollTo({top: nextTop, behavior});
-	}, [css.detailsHeadingStack, css.detailsTopBar, detailsContainerRef, getDetailsScrollElement]);
-
 	const focusTopHeaderAction = useCallback(() => {
+		if (Spotlight?.focus?.('details-favorite-action')) return true;
 		const favoriteTarget = document.querySelector('[data-spotlight-id="details-favorite-action"]') ||
 			favoriteActionButtonRef.current?.nodeRef?.current ||
 			favoriteActionButtonRef.current;
-		const watchedTarget = document.querySelector('[data-spotlight-id="details-watched-action"]') ||
-			watchedActionButtonRef.current?.nodeRef?.current ||
-			watchedActionButtonRef.current;
-		const primaryTarget = favoriteTarget || watchedTarget;
-
-		if (primaryTarget?.focus) {
-			primaryTarget.focus({preventScroll: true});
-		}
-		if (typeof detailsScrollToRef.current === 'function') {
-			detailsScrollToRef.current({align: 'top', animate: true});
-		}
-		alignElementBelowPanelHeader(primaryTarget, 'smooth');
-		window.requestAnimationFrame(() => {
-			alignElementBelowPanelHeader(primaryTarget, 'auto');
-		});
 		if (favoriteTarget?.focus) {
-			favoriteTarget.focus({preventScroll: true});
-			return true;
-		}
-		if (Spotlight?.focus?.('details-favorite-action')) return true;
-		if (favoriteTarget?.focus) {
-			favoriteTarget.focus({preventScroll: true});
-			return true;
-		}
-		if (watchedTarget?.focus) {
-			watchedTarget.focus({preventScroll: true});
+			focusNodeWithoutScroll(favoriteTarget);
 			return true;
 		}
 		if (Spotlight?.focus?.('details-watched-action')) return true;
+		const watchedTarget = document.querySelector('[data-spotlight-id="details-watched-action"]') ||
+			watchedActionButtonRef.current?.nodeRef?.current ||
+			watchedActionButtonRef.current;
+		if (watchedTarget?.focus) {
+			focusNodeWithoutScroll(watchedTarget);
+			return true;
+		}
 		return false;
-	}, [alignElementBelowPanelHeader, detailsScrollToRef, favoriteActionButtonRef, watchedActionButtonRef]);
+	}, [favoriteActionButtonRef, focusNodeWithoutScroll, watchedActionButtonRef]);
 
 	const focusEpisodeCardByIndex = useCallback((index) => {
 		const cards = Array.from(episodesListRef.current?.querySelectorAll(`.${css.episodeCard}`) || []);

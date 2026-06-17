@@ -47,6 +47,9 @@ export const createSubtitlePreference = (index, stream) => {
 	return {
 		index,
 		language: stream?.Language || null,
-		isForced: !!stream?.IsForced
+		isForced: !!stream?.IsForced,
+		isDefault: !!stream?.IsDefault,
+		title: stream?.DisplayTitle || stream?.Title || null,
+		codec: stream?.Codec || null
 	};
 };

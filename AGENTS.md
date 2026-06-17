@@ -107,6 +107,12 @@ For non-trivial work:
 
 Avoid broad refactors unless explicitly requested.
 
+Audit findings should improve the codebase, not distort it. Do not add temporary workarounds only to satisfy an audit, such as reshaping equivalent helper calls, adding explicit CSS references solely for dead-class detection, or duplicating intent under different syntax. If an audit reports a false positive or encourages worse code, prefer one of these outcomes:
+
+1. improve the shared helper/component API so usage is explicit and reusable
+2. improve the audit rule so it understands the intended pattern
+3. document a real limitation and propose a follow-up, rather than hiding it with awkward code
+
 ## 7) Verification gates
 
 Minimum gate before handoff:
@@ -178,3 +184,4 @@ Use absolute file paths when referencing edited files.
 - Adding panel-specific one-off versions of shared primitives (toasts/loading/popup shells/status badges) without clear need.
 - Growing `jellyfinService.js` with domain logic that belongs in `src/services/jellyfin/*`.
 - Leaving feature behavior undocumented when it changes shared architecture or conventions.
+- Reshaping code purely to appease audits instead of fixing the underlying helper/API/audit rule.

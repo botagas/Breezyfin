@@ -5,10 +5,12 @@
 	.panel-fill-container(var(--bf-theme-panel-bg));
 }
 
-.scroller {
+.nativeScroller {
 	flex: 1;
 	min-height: 0;
 	background: var(--bf-theme-panel-bg);
+	overflow-y: auto;
+	overflow-x: hidden;
 	overscroll-behavior: contain;
 }
 
@@ -19,14 +21,36 @@
 	height: 80vh;
 }
 
+.contentFrame {
+	position: relative;
+}
+
+.emptyState {
+	padding: calc(var(--bf-panel-top-offset) + 1rem) 6rem 0 4rem;
+	color: var(--bf-theme-muted-text);
+}
+
 .gridContainer {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
 	gap: 2rem;
 	/* Panel body already sits below native header; offset content by toolbar chrome only. */
-	padding: calc(var(--bf-panel-top-offset) - 0.75rem) 4rem clamp(2rem, var(--bf-panel-content-bottom-padding), 4rem);
+	padding: calc(var(--bf-panel-top-offset) - 0.75rem) 6rem clamp(2rem, var(--bf-panel-content-bottom-padding), 4rem) 4rem;
 	background: var(--bf-theme-panel-bg);
 	.panel-grid-performance();
+}
+
+.filterOverlay {
+	position: sticky;
+	top: calc(var(--bf-panel-top-offset) + 0.5rem);
+	display: flex;
+	justify-content: flex-end;
+	padding-right: 1.2rem;
+	z-index: 6;
+}
+
+.filterOverlayControls {
+	position: relative;
 }
 
 .loadingMore {

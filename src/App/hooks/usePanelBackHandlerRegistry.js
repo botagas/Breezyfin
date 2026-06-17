@@ -4,6 +4,7 @@ export const usePanelBackHandlerRegistry = () => {
 	const playerBackHandlerRef = useRef(null);
 	const detailsBackHandlerRef = useRef(null);
 	const homeBackHandlerRef = useRef(null);
+	const homeSectionBackHandlerRef = useRef(null);
 	const libraryBackHandlerRef = useRef(null);
 	const searchBackHandlerRef = useRef(null);
 	const favoritesBackHandlerRef = useRef(null);
@@ -24,6 +25,10 @@ export const usePanelBackHandlerRegistry = () => {
 
 	const registerHomeBackHandler = useCallback((handler) => {
 		homeBackHandlerRef.current = handler;
+	}, []);
+
+	const registerHomeSectionBackHandler = useCallback((handler) => {
+		homeSectionBackHandlerRef.current = handler;
 	}, []);
 
 	const registerLibraryBackHandler = useCallback((handler) => {
@@ -47,6 +52,7 @@ export const usePanelBackHandlerRegistry = () => {
 			playerBackHandlerRef,
 			detailsBackHandlerRef,
 			homeBackHandlerRef,
+			homeSectionBackHandlerRef,
 			libraryBackHandlerRef,
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
@@ -56,6 +62,7 @@ export const usePanelBackHandlerRegistry = () => {
 		registerDetailsBackHandler,
 		registerPlayerBackHandler,
 		registerHomeBackHandler,
+		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,

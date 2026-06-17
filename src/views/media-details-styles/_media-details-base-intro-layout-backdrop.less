@@ -15,6 +15,11 @@
 	overflow: hidden;
 	z-index: 0;
 	pointer-events: none;
+	opacity: 1;
+	visibility: visible;
+	transition:
+		opacity var(--bf-md-reveal-duration-medium) var(--bf-md-reveal-ease),
+		visibility 0s linear 0s;
 
 	img {
 		width: 100%;
@@ -24,6 +29,19 @@
 		filter: blur(18px);
 		transform: scale(1.05);
 	}
+}
+
+.backdropRevealHidden {
+	opacity: 0;
+	visibility: hidden;
+	transition:
+		opacity var(--bf-md-reveal-duration-short) var(--bf-md-reveal-ease),
+		visibility 0s linear var(--bf-md-reveal-duration-short);
+}
+
+.backdropRevealVisible {
+	opacity: 1;
+	visibility: visible;
 }
 
 .backdropImage {

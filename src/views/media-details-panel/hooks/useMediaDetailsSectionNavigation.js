@@ -109,6 +109,15 @@ export const useMediaDetailsSectionNavigation = ({
 		return false;
 	}, [cast, episodes.length, itemType, seasons.length]);
 
+	const isFirstSectionAlignedToViewport = useCallback(() => {
+		const scrollEl = getDetailsScrollElement();
+		const firstSection = firstSectionRef.current;
+		if (!scrollEl || !firstSection) return false;
+		const scrollRect = scrollEl.getBoundingClientRect();
+		const firstRect = firstSection.getBoundingClientRect();
+		return Math.abs(firstRect.top - scrollRect.top) <= SECTION_SNAP_TOLERANCE_PX;
+	}, [firstSectionRef, getDetailsScrollElement]);
+
 	const getContentSectionTop = useCallback(() => {
 		const scrollEl = getDetailsScrollElement();
 		const contentSection = contentSectionRef.current;
@@ -181,6 +190,48 @@ export const useMediaDetailsSectionNavigation = ({
 		return focusSectionOneControls();
 	}, [focusSectionOneControls]);
 
+	const focusNeighborIntroAction = useCallback((currentTarget, direction) => {
+		const introRoot = firstSectionRef.current;
+		if (!introRoot) return false;
+		const actionButtons = Array.from(
+			introRoot.querySelectorAll(
+				`.${css.actionButton}, [data-spotlight-id="details-favorite-action"], [data-spotlight-id="details-watched-action"]`
+			)
+		).filter((node) => typeof node?.focus === 'function');
+		if (actionButtons.length === 0) return false;
+		const active = currentTarget || document.activeElement;
+		let currentIndex = actionButtons.findIndex((node) => node === active || node.contains?.(active));
+		if (currentIndex < 0) {
+			currentIndex = 0;
+		}
+		if (direction === 'left' && currentIndex <= 0) {
+			const introPlayTarget = playPrimaryButtonRef.current?.nodeRef?.current ||
+				playPrimaryButtonRef.current ||
+				introRoot.querySelector(`.${css.introPlayButton}, .${css.primaryButton}`);
+			if (introPlayTarget?.focus) {
+				focusNodeWithoutScroll(introPlayTarget);
+				return true;
+			}
+			if (focusSectionOnePrimary()) return true;
+			return false;
+		}
+		const nextIndex = direction === 'right'
+			? Math.min(currentIndex + 1, actionButtons.length - 1)
+			: Math.max(currentIndex - 1, 0);
+		const nextTarget = actionButtons[nextIndex];
+		if (!nextTarget?.focus) return false;
+		focusNodeWithoutScroll(nextTarget);
+		return true;
+	}, [
+		css.actionButton,
+		css.introPlayButton,
+		css.primaryButton,
+		firstSectionRef,
+		focusNodeWithoutScroll,
+		focusSectionOnePrimary,
+		playPrimaryButtonRef
+	]);
+
 	const focusIntroTopNavigation = useCallback(() => {
 		const introRoot = firstSectionRef.current;
 		if (!introRoot) return false;
@@ -238,7 +289,8 @@ export const useMediaDetailsSectionNavigation = ({
 		const sectionTwoTop = getContentSectionTop();
 		if (sectionTwoTop === null) return false;
 		const nextTop = sectionKey === 'content' ? sectionTwoTop : 0;
-		if (Math.abs(scrollEl.scrollTop - nextTop) > 1) {
+		const shouldForceIntroScroll = sectionKey === 'intro';
+		if (shouldForceIntroScroll || Math.abs(scrollEl.scrollTop - nextTop) > 1) {
 			if (animate) {
 				beginSectionSwitch(nextTop);
 			}
@@ -270,8 +322,18 @@ export const useMediaDetailsSectionNavigation = ({
 		return true;
 	}, [focusSectionTwoPrimary, isSectionSwitchInProgress, scrollToDetailsSection]);
 
-	const focusFirstSectionAfterScrollSettles = useCallback((scrollEl) => {
-		if (!scrollEl) return focusSectionOnePrimary();
+	const focusFirstSectionAfterScrollSettles = useCallback((scrollEl, options = {}) => {
+		const focusTargetMode = options?.focusTarget === 'topNav' ? 'topNav' : (options?.focusTarget || 'primary');
+		const focusFirstSectionTarget = () => {
+			if (focusTargetMode === 'none') return true;
+			if (focusTargetMode === 'topNav') {
+				if (focusIntroTopNavigation()) return true;
+				return focusSectionOnePrimary();
+			}
+			return focusSectionOnePrimary();
+		};
+
+		if (!scrollEl) return focusFirstSectionTarget();
 		cancelPendingIntroFocus();
 
 		const startedAt = Date.now();
@@ -280,12 +342,12 @@ export const useMediaDetailsSectionNavigation = ({
 
 		const finish = () => {
 			cancelPendingIntroFocus();
-			focusSectionOnePrimary();
+			focusFirstSectionTarget();
 		};
 
 		const watchScrollSettle = () => {
 			const currentTop = scrollEl.scrollTop;
-			const nearIntroTop = currentTop <= SECTION_SNAP_TOLERANCE_PX;
+			const nearIntroTop = isFirstSectionAlignedToViewport() || currentTop <= SECTION_SNAP_TOLERANCE_PX;
 			if (nearIntroTop) {
 				finish();
 				return;
@@ -304,23 +366,40 @@ export const useMediaDetailsSectionNavigation = ({
 		introFocusRafRef.current = window.requestAnimationFrame(watchScrollSettle);
 		introFocusTimeoutRef.current = window.setTimeout(finish, SECTION_FOCUS_SETTLE_TIMEOUT_MS + 120);
 		return true;
-	}, [cancelPendingIntroFocus, focusSectionOnePrimary]);
+	}, [
+		cancelPendingIntroFocus,
+		focusIntroTopNavigation,
+		focusSectionOnePrimary,
+		isFirstSectionAlignedToViewport
+	]);
 
-	const focusAndShowFirstSection = useCallback(() => {
+	const focusAndShowFirstSection = useCallback((options = {}) => {
+		const forceScroll = options?.forceScroll === true;
+		const focusTargetMode = options?.focusTarget || 'primary';
+		const focusFirstSectionTarget = () => {
+			if (focusTargetMode === 'none') return true;
+			if (focusTargetMode === 'topNav') {
+				if (focusIntroTopNavigation()) return true;
+				return focusSectionOnePrimary();
+			}
+			return focusSectionOnePrimary();
+		};
 		if (isSectionSwitchInProgress()) return true;
 		const scrollEl = getDetailsScrollElement();
-		if (!scrollEl) return focusSectionOnePrimary();
-		if (scrollEl.scrollTop <= SECTION_SNAP_TOLERANCE_PX) {
-			return focusSectionOnePrimary();
+		if (!scrollEl) return focusFirstSectionTarget();
+		if (!forceScroll && isFirstSectionAlignedToViewport()) {
+			return focusFirstSectionTarget();
 		}
 		cancelPendingIntroFocus();
 		scrollToDetailsSection('intro', {animate: true, focusTarget: false});
-		return focusFirstSectionAfterScrollSettles(scrollEl);
+		return focusFirstSectionAfterScrollSettles(scrollEl, {focusTarget: focusTargetMode});
 	}, [
 		cancelPendingIntroFocus,
 		focusFirstSectionAfterScrollSettles,
+		focusIntroTopNavigation,
 		focusSectionOnePrimary,
 		getDetailsScrollElement,
+		isFirstSectionAlignedToViewport,
 		isSectionSwitchInProgress,
 		scrollToDetailsSection
 	]);
@@ -333,11 +412,35 @@ export const useMediaDetailsSectionNavigation = ({
 			return;
 		}
 		const code = event.keyCode || event.which;
-		if (code !== KeyCodes.DOWN) return;
-		if (!focusSectionOnePrimaryFromIntroAction()) return;
-		event.preventDefault();
-		event.stopPropagation();
-	}, [focusSectionOnePrimaryFromIntroAction, isSectionSwitchInProgress]);
+		if (code === KeyCodes.DOWN) {
+			if (!focusSectionOnePrimaryFromIntroAction()) return;
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		if (code === KeyCodes.UP) {
+			if (!focusIntroTopNavigation()) return;
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		if (code === KeyCodes.RIGHT) {
+			if (!focusNeighborIntroAction(event.currentTarget, 'right')) return;
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		if (code === KeyCodes.LEFT) {
+			if (!focusNeighborIntroAction(event.currentTarget, 'left')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		}
+	}, [
+		focusSectionOnePrimaryFromIntroAction,
+		focusIntroTopNavigation,
+		focusNeighborIntroAction,
+		isSectionSwitchInProgress
+	]);
 
 	const handleIntroTopNavKeyDown = useCallback((event) => {
 		if (isSectionSwitchInProgress()) {
@@ -407,7 +510,7 @@ export const useMediaDetailsSectionNavigation = ({
 			if (isSectionSwitchInProgress()) return;
 
 			if (firstSectionRef.current?.contains(targetNode)) {
-				if (scrollEl.scrollTop > SECTION_SNAP_TOLERANCE_PX) {
+				if (!isFirstSectionAlignedToViewport()) {
 					scrollToDetailsSection('intro');
 				}
 				return;
@@ -427,6 +530,7 @@ export const useMediaDetailsSectionNavigation = ({
 		getDetailsScrollElement,
 		hasSecondarySection,
 		isActive,
+		isFirstSectionAlignedToViewport,
 		isSectionSwitchInProgress,
 		loading,
 		scrollToDetailsSection,

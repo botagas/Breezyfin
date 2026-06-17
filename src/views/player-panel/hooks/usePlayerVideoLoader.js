@@ -71,6 +71,7 @@ export const usePlayerVideoLoader = ({
 	loadVideoRef,
 	resetRecoveryGuards,
 	setLoading,
+	setLoadingStatusMessage,
 	reloadAttemptedRef,
 	subtitleCompatibilityFallbackAttemptedRef,
 	lastProgressRef,
@@ -110,6 +111,9 @@ export const usePlayerVideoLoader = ({
 		}
 
 		resetRecoveryGuards();
+		if (playbackOverrideRef.current?.forceNewSession !== true) {
+			setLoadingStatusMessage('Loading...');
+		}
 		setLoading(true);
 		reloadAttemptedRef.current = false;
 		subtitleCompatibilityFallbackAttemptedRef.current = false;
@@ -181,8 +185,9 @@ export const usePlayerVideoLoader = ({
 			let playbackInfo = null;
 			let playbackInfoError = null;
 			try {
+				const playbackOverrideOptions = {...((playbackOverrideRef.current ?? playbackOptions) || {})};
 				const options = {
-					...((playbackOverrideRef.current ?? playbackOptions) || {}),
+					...playbackOverrideOptions,
 					...playbackSettingsRef.current
 				};
 				playbackInfo = await jellyfinService.getPlaybackInfo(item.Id, options);
@@ -524,6 +529,7 @@ export const usePlayerVideoLoader = ({
 		playing,
 		reloadAttemptedRef,
 		resetRecoveryGuards,
+		setLoadingStatusMessage,
 		seekOffsetRef,
 		setAudioTracks,
 		setCurrentAudioTrack,

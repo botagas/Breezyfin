@@ -1,5 +1,6 @@
 import LoginPanel from '../../views/LoginPanel';
 import HomePanel from '../../views/HomePanel';
+import HomeSectionPanel from '../../views/HomeSectionPanel';
 import LibraryPanel from '../../views/LibraryPanel';
 import SearchPanel from '../../views/SearchPanel';
 import FavoritesPanel from '../../views/FavoritesPanel';
@@ -11,10 +12,12 @@ export const createPanelChildren = ({
 	currentView,
 	selectedItem,
 	selectedLibrary,
+	selectedHomeSection,
 	playbackOptions,
 	loginNotice,
 	loginNoticeNonce,
 	homePanelState,
+	homeSectionPanelStateById,
 	libraryPanelStateById,
 	searchPanelState,
 	favoritesPanelState,
@@ -34,17 +37,20 @@ export const createPanelChildren = ({
 	playerControlsVisible,
 	handleSearchPanelStateChange,
 	handleHomePanelStateChange,
+	handleHomeSectionPanelStateChange,
 	handleLibraryPanelStateChange,
 	handleFavoritesPanelStateChange,
 	handleSettingsPanelStateChange,
 	handleDetailsPanelStateChange,
 	registerHomeBackHandler,
+	registerHomeSectionBackHandler,
 	registerLibraryBackHandler,
 	registerSearchBackHandler,
 	registerFavoritesBackHandler,
 	registerSettingsBackHandler,
 	registerDetailsBackHandler,
-	registerPlayerBackHandler
+	registerPlayerBackHandler,
+	inputMode
 }) => {
 	const panelChildren = [
 		<LoginPanel
@@ -67,9 +73,25 @@ export const createPanelChildren = ({
 			registerBackHandler={registerHomeBackHandler}
 			noCloseButton
 		/>,
+		<HomeSectionPanel
+			key="homeSection"
+			isActive={currentView === 'homeSection'}
+			inputMode={inputMode}
+			section={selectedHomeSection}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={selectedHomeSection?.id ? homeSectionPanelStateById[String(selectedHomeSection.id)] || null : null}
+			onCacheState={handleHomeSectionPanelStateChange}
+			registerBackHandler={registerHomeSectionBackHandler}
+			noCloseButton
+		/>,
 		<LibraryPanel
 			key="library"
 			isActive={currentView === 'library'}
+			inputMode={inputMode}
 			library={selectedLibrary}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}

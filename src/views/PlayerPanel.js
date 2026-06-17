@@ -122,6 +122,7 @@ const PlayerPanel = ({
 	} = useTrackPreferences();
 
 	const [loading, setLoading] = useState(true);
+	const [loadingStatusMessage, setLoadingStatusMessage] = useState('Loading...');
 	const [error, setError] = useState(null);
 	const [playing, setPlaying] = useState(false);
 	const [currentTime, setCurrentTime] = useState(0);
@@ -232,6 +233,7 @@ const PlayerPanel = ({
 		setError,
 		setShowControls,
 		setLoading,
+		setLoadingStatusMessage,
 		setPlaying,
 		handleStop,
 		currentAudioTrackRef,
@@ -268,6 +270,7 @@ const PlayerPanel = ({
 		setError,
 		seekOffsetRef,
 		loadTrackPreferences,
+		setLoadingStatusMessage,
 		playbackOverrideRef,
 		playbackOptions,
 		playbackSettingsRef,
@@ -315,6 +318,7 @@ const PlayerPanel = ({
 		setPlaying,
 		setShowControls,
 		setError,
+		setLoadingStatusMessage,
 		setToastMessage,
 		showPlaybackError,
 		resetRecoveryGuards,
@@ -483,9 +487,58 @@ const PlayerPanel = ({
 		setDebugOverlayVisible(false);
 	}, []);
 
+	const handleDebugErrorTrigger = useCallback(async (actionId) => {
+		switch (actionId) {
+			case 'playback-error':
+			case 'player-playback-error':
+				showPlaybackError('Debug: simulated playback failure');
+				break;
+			case 'session-rebuild':
+			case 'player-session-rebuild': {
+				const restarted = attemptPlaybackSessionRebuild('Debug forced session rebuild', {
+					toast: 'Debug: restarting stream with a fresh session...'
+				});
+				if (!restarted) {
+					setToastMessage('Debug: stream restart is unavailable for the current state.');
+				}
+				break;
+			}
+			case 'transcode-fallback':
+			case 'player-transcode-fallback': {
+				const applied = await attemptTranscodeFallback('Debug forced transcode fallback');
+				if (!applied) {
+					setToastMessage('Debug: transcode fallback was not applicable to this stream.');
+				}
+				break;
+			}
+			default:
+				break;
+		}
+	}, [
+		attemptPlaybackSessionRebuild,
+		attemptTranscodeFallback,
+		setToastMessage,
+		showPlaybackError
+	]);
+
+	useEffect(() => {
+		if (!isActive) return undefined;
+		const handleDebugActionEvent = (event) => {
+			const actionId = event?.detail?.action;
+			if (!actionId) return;
+			handleDebugErrorTrigger(actionId);
+		};
+		window.addEventListener('breezyfin:debug-error-action', handleDebugActionEvent, true);
+		return () => {
+			window.removeEventListener('breezyfin:debug-error-action', handleDebugActionEvent, true);
+		};
+	}, [handleDebugErrorTrigger, isActive]);
+
 	const {
 		handleInternalBack
 	} = usePlayerBackNavigation({
+		hasPlaybackError: Boolean(error),
+		handleBackButton,
 		showAudioPopup,
 		closeAudioPopup,
 		showSubtitlePopup,
@@ -628,7 +681,7 @@ const PlayerPanel = ({
 					</div>
 				)}
 
-				<PlayerLoadingOverlay loading={loading} />
+				<PlayerLoadingOverlay loading={loading} label={loadingStatusMessage} />
 				<PlayerSeekFeedback seekFeedback={seekFeedback} />
 
 				<PlayerErrorPopup
@@ -643,7 +696,6 @@ const PlayerPanel = ({
 					visible={skipOverlayVisible}
 					currentSkipSegment={currentSkipSegment}
 					showNextEpisodePrompt={showNextEpisodePrompt}
-					nextEpisodeData={nextEpisodeData}
 					skipCountdown={skipCountdown}
 					onSkip={handleSkipSegment}
 					onDismiss={handleDismissSkipOverlay}

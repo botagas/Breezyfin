@@ -5,6 +5,7 @@ import { Panels } from '../components/BreezyPanels';
 
 import PerformanceOverlay from '../components/PerformanceOverlay';
 import FocusDebugOverlay from '../components/FocusDebugOverlay';
+import DebugErrorMenu from '../components/DebugErrorMenu';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
@@ -12,6 +13,15 @@ import { useInputMode } from '../hooks/useInputMode';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {isNonStableBuild} from '../utils/featureFlags';
+import {
+	CRASH_RECOVERY_ACTIONS,
+	consumeCrashRecoveryAction,
+	peekCrashRecoveryAction,
+	readCrashNavigationSnapshot,
+	saveCrashNavigationSnapshot,
+	clearCrashPlaybackContext
+} from '../utils/crashRecovery';
 import AppCrashBoundary from './AppCrashBoundary';
 import {normalizePanelStatePayload, upsertKeyedPanelState, clearKeyedPanelState} from './utils/panelStateCache';
 import {getPanelIndexForView} from './utils/panelIndex';
@@ -22,7 +32,26 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 
 import css from './App.module.less';
 
-const DETAIL_RETURN_VIEWS = new Set(['home', 'library', 'search', 'favorites', 'settings']);
+const DETAIL_RETURN_VIEWS = new Set(['home', 'homeSection', 'library', 'search', 'favorites', 'settings']);
+const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
+
+const emitAppDebugEvent = (name, detail) => {
+	if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') {
+		return;
+	}
+	try {
+		window.dispatchEvent(new CustomEvent(name, {detail}));
+	} catch (_) {
+		// Debug telemetry must never alter runtime behavior.
+	}
+};
+const isEditableTarget = (target) => {
+	if (!target || target.nodeType !== 1) return false;
+	if (target.isContentEditable) return true;
+	const tagName = target.tagName?.toLowerCase();
+	if (tagName === 'input' || tagName === 'textarea') return true;
+	return Boolean(target.closest?.('input, textarea, [contenteditable="true"], [role="textbox"]'));
+};
 
 const resolveInitialVisualSettings = () => {
 	const settings = readBreezyfinSettings();
@@ -31,7 +60,8 @@ const resolveInitialVisualSettings = () => {
 		allAnimationsDisabled: settings.disableAllAnimations === true,
 		navbarTheme: settings.navbarTheme === 'classic' ? 'classic' : 'elegant',
 		performanceOverlayEnabled: settings.showPerformanceOverlay === true,
-		focusDebugOverlayEnabled: settings.showFocusDebugOverlay === true
+		focusDebugOverlayEnabled: settings.showFocusDebugOverlay === true,
+		debugErrorMenuEnabled: SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true
 	};
 };
 
@@ -41,9 +71,11 @@ const App = (props) => {
 	const [currentView, setCurrentView] = useState('login');
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
+	const [selectedHomeSection, setSelectedHomeSection] = useState(null);
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [previousItem, setPreviousItem] = useState(null);
 	const [homePanelState, setHomePanelState] = useState(null);
+	const [homeSectionPanelStateById, setHomeSectionPanelStateById] = useState({});
 	const [libraryPanelStateById, setLibraryPanelStateById] = useState({});
 	const [searchPanelState, setSearchPanelState] = useState(null);
 	const [favoritesPanelState, setFavoritesPanelState] = useState(null);
@@ -56,15 +88,20 @@ const App = (props) => {
 	const [navbarTheme, setNavbarTheme] = useState(initialVisualSettingsRef.current.navbarTheme);
 	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
 	const [focusDebugOverlayEnabled, setFocusDebugOverlayEnabled] = useState(initialVisualSettingsRef.current.focusDebugOverlayEnabled);
+	const [debugErrorMenuEnabled, setDebugErrorMenuEnabled] = useState(initialVisualSettingsRef.current.debugErrorMenuEnabled);
+	const [debugErrorMenuOpen, setDebugErrorMenuOpen] = useState(false);
+	const [lastNavigateDebug, setLastNavigateDebug] = useState(null);
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
 	const handleBackRef = useRef(null);
+	const crashRecoveryPendingRef = useRef(Boolean(peekCrashRecoveryAction()));
 	const {
 		refs: {
 			playerBackHandlerRef,
 			detailsBackHandlerRef,
 			homeBackHandlerRef,
+			homeSectionBackHandlerRef,
 			libraryBackHandlerRef,
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
@@ -74,6 +111,7 @@ const App = (props) => {
 		registerDetailsBackHandler,
 		registerPlayerBackHandler,
 		registerHomeBackHandler,
+		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
@@ -89,6 +127,7 @@ const App = (props) => {
 		currentView,
 		selectedItem,
 		selectedLibrary,
+		selectedHomeSection,
 		playbackOptions,
 		previousItem,
 		detailsReturnView,
@@ -96,6 +135,7 @@ const App = (props) => {
 		setCurrentView,
 		setSelectedItem,
 		setSelectedLibrary,
+		setSelectedHomeSection,
 		setPlaybackOptions,
 		setPreviousItem,
 		setDetailsReturnView,
@@ -105,9 +145,11 @@ const App = (props) => {
 	const resetSessionState = useCallback(() => {
 		setSelectedItem(null);
 		setSelectedLibrary(null);
+		setSelectedHomeSection(null);
 		setPlaybackOptions(null);
 		setPreviousItem(null);
 		setHomePanelState(null);
+		setHomeSectionPanelStateById({});
 		setLibraryPanelStateById({});
 		setSearchPanelState(null);
 		setFavoritesPanelState(null);
@@ -116,14 +158,18 @@ const App = (props) => {
 		setDetailsReturnView('home');
 		setPlayerControlsVisible(true);
 		clearPanelHistory();
+		clearCrashPlaybackContext();
 	}, [clearPanelHistory]);
 
 	const clearPanelSelection = useCallback((options = {}) => {
-		const {clearLibrary = true} = options;
+		const {clearLibrary = true, clearHomeSection = true} = options;
 		setSelectedItem(null);
 		setPlaybackOptions(null);
 		if (clearLibrary) {
 			setSelectedLibrary(null);
+		}
+		if (clearHomeSection) {
+			setSelectedHomeSection(null);
 		}
 	}, []);
 
@@ -143,8 +189,11 @@ const App = (props) => {
 		if (detailsReturnView === 'library') {
 			return selectedLibrary ? 'library' : 'home';
 		}
+		if (detailsReturnView === 'homeSection') {
+			return selectedHomeSection ? 'homeSection' : 'home';
+		}
 		return DETAIL_RETURN_VIEWS.has(detailsReturnView) ? detailsReturnView : 'home';
-	}, [detailsReturnView, selectedLibrary]);
+	}, [detailsReturnView, selectedHomeSection, selectedLibrary]);
 
 	const navigateBackFromDetails = useCallback(() => {
 		if (navigateBackInHistory()) {
@@ -152,7 +201,10 @@ const App = (props) => {
 		}
 
 		const targetView = resolveDetailsReturnView();
-		navigateToViewAndClearSelection(targetView, {clearLibrary: targetView === 'home'});
+		navigateToViewAndClearSelection(targetView, {
+			clearLibrary: targetView === 'home',
+			clearHomeSection: targetView !== 'homeSection'
+		});
 		return true;
 	}, [navigateBackInHistory, navigateToViewAndClearSelection, resolveDetailsReturnView]);
 	const fallbackToDetailsFromPlayer = useCallback(() => {
@@ -186,9 +238,39 @@ const App = (props) => {
 		setNavbarTheme(settings.navbarTheme === 'classic' ? 'classic' : 'elegant');
 		setPerformanceOverlayEnabled(settings.showPerformanceOverlay === true);
 		setFocusDebugOverlayEnabled(settings.showFocusDebugOverlay === true);
+		setDebugErrorMenuEnabled(SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true);
 	}, []);
 
 	useBreezyfinSettingsSync(applyVisualSettings);
+
+	useEffect(() => {
+		if (!debugErrorMenuEnabled && debugErrorMenuOpen) {
+			setDebugErrorMenuOpen(false);
+		}
+	}, [debugErrorMenuEnabled, debugErrorMenuOpen]);
+
+	useEffect(() => {
+		if (crashRecoveryPendingRef.current) return;
+		saveCrashNavigationSnapshot({
+			currentView,
+			selectedItem,
+			selectedLibrary,
+			selectedHomeSection,
+			playbackOptions,
+			previousItem,
+			detailsReturnView,
+			playerControlsVisible
+		});
+	}, [
+		currentView,
+		selectedItem,
+		selectedLibrary,
+		selectedHomeSection,
+		playbackOptions,
+		previousItem,
+		detailsReturnView,
+		playerControlsVisible
+	]);
 
 	const handleSessionExpired = useCallback((message = SESSION_EXPIRED_MESSAGE) => {
 		jellyfinService.switchUser();
@@ -197,6 +279,58 @@ const App = (props) => {
 		setLoginNotice(message);
 		setLoginNoticeNonce((value) => value + 1);
 	}, [resetSessionState]);
+
+	const applyPendingCrashRecovery = useCallback(() => {
+		const pendingRecoveryAction = consumeCrashRecoveryAction();
+		crashRecoveryPendingRef.current = false;
+		if (!pendingRecoveryAction) return;
+
+		if (pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.HOME) {
+			setSelectedItem(null);
+			setSelectedLibrary(null);
+			setSelectedHomeSection(null);
+			setPlaybackOptions(null);
+			setPreviousItem(null);
+			setDetailsReturnView('home');
+			setPlayerControlsVisible(true);
+			setCurrentView('home');
+			return;
+		}
+
+		if (
+			pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.BACK ||
+			pendingRecoveryAction === CRASH_RECOVERY_ACTIONS.DETAILS
+		) {
+			const crashSnapshot = readCrashNavigationSnapshot();
+			if (!crashSnapshot) {
+				setCurrentView('home');
+				return;
+			}
+			const recoverView = crashSnapshot.currentView === 'player' ? 'details' : crashSnapshot.currentView;
+			const recoverSelectedItem = crashSnapshot.selectedItem || null;
+			const recoverHomeSection = crashSnapshot.selectedHomeSection || null;
+			setSelectedItem(crashSnapshot.selectedItem || null);
+			setSelectedLibrary(crashSnapshot.selectedLibrary || null);
+			setSelectedHomeSection(recoverHomeSection);
+			setPlaybackOptions(crashSnapshot.playbackOptions || null);
+			setPreviousItem(crashSnapshot.previousItem || null);
+			setDetailsReturnView(
+				DETAIL_RETURN_VIEWS.has(crashSnapshot.detailsReturnView)
+					? crashSnapshot.detailsReturnView
+					: 'home'
+			);
+			setPlayerControlsVisible(crashSnapshot.playerControlsVisible !== false);
+			if (recoverView === 'details' && !recoverSelectedItem?.Id) {
+				setCurrentView('home');
+				return;
+			}
+			if (recoverView === 'homeSection' && !recoverHomeSection?.id) {
+				setCurrentView('home');
+				return;
+			}
+			setCurrentView(recoverView || 'home');
+		}
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -207,6 +341,7 @@ const App = (props) => {
 			if (cancelled) return;
 			if (user) {
 				setCurrentView('home');
+				applyPendingCrashRecovery();
 				return;
 			}
 			handleSessionExpired();
@@ -215,7 +350,7 @@ const App = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [handleSessionExpired]);
+	}, [applyPendingCrashRecovery, handleSessionExpired]);
 
 	useEffect(() => {
 		const onSessionExpired = (event) => {
@@ -264,7 +399,13 @@ const App = (props) => {
 	}, [runtimeDataAttributes]);
 
 	const handleBack = useCallback(() => {
+		if (debugErrorMenuOpen) {
+			setDebugErrorMenuOpen(false);
+			return true;
+		}
 		switch (currentView) {
+			case 'homeSection':
+				return handleSectionBack(homeSectionBackHandlerRef, 'home');
 			case 'library':
 				return handleSectionBack(libraryBackHandlerRef, 'home');
 			case 'search':
@@ -294,11 +435,13 @@ const App = (props) => {
 		}
 		}, [
 			currentView,
+			debugErrorMenuOpen,
 			detailsBackHandlerRef,
 			fallbackToDetailsFromPlayer,
 			favoritesBackHandlerRef,
 			handleSectionBack,
 			homeBackHandlerRef,
+			homeSectionBackHandlerRef,
 			libraryBackHandlerRef,
 			navigateBackFromDetails,
 			navigateBackInHistory,
@@ -317,6 +460,10 @@ const App = (props) => {
 	useEffect(() => {
 		const handleGlobalKeyDown = (e) => {
 			const code = e.keyCode || e.which;
+			const isBackspaceDelete = code === 8 || e.key === 'Backspace';
+			if (isBackspaceDelete && isEditableTarget(e.target)) {
+				return;
+			}
 			if (isBackKey(code)) {
 				const handled = handleBack();
 				if (handled) {
@@ -374,6 +521,13 @@ const App = (props) => {
 	}, [resetSessionState]);
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
+		emitAppDebugEvent('breezyfin:item-select-debug', {
+			at: Date.now(),
+			itemId: item?.Id ? String(item.Id) : '-',
+			itemType: item?.Type || '-',
+			fromView: currentView || '-',
+			fromItemId: fromItem?.Id ? String(fromItem.Id) : '-'
+		});
 		if (DETAIL_RETURN_VIEWS.has(currentView) && currentView !== 'details') {
 			setDetailsReturnView(currentView);
 			pushPanelHistory();
@@ -394,15 +548,60 @@ const App = (props) => {
 
 	const handleNavigate = useCallback((section, data) => {
 		const targetView = section;
+		const nextHomeSectionId = targetView === 'homeSection' ? data?.id : null;
 		const nextLibraryId = targetView === 'library' ? data?.Id : null;
+		const currentHomeSectionId = selectedHomeSection?.id || null;
 		const currentLibraryId = selectedLibrary?.Id || null;
+		const navigateDebugBase = {
+			at: Date.now(),
+			fromView: currentView || '-',
+			targetView: targetView || '-',
+			nextHomeSectionId: nextHomeSectionId ? String(nextHomeSectionId) : '-',
+			currentHomeSectionId: currentHomeSectionId ? String(currentHomeSectionId) : '-',
+			nextLibraryId: nextLibraryId ? String(nextLibraryId) : '-',
+			currentLibraryId: currentLibraryId ? String(currentLibraryId) : '-'
+		};
+		const isSameHomeSectionNavigation =
+			targetView === 'homeSection' &&
+			currentView === 'homeSection' &&
+			nextHomeSectionId !== null &&
+			currentHomeSectionId !== null &&
+			String(nextHomeSectionId) === String(currentHomeSectionId);
+		if (isSameHomeSectionNavigation) {
+			setLastNavigateDebug({
+				...navigateDebugBase,
+				ignored: true,
+				reason: 'same-home-section'
+			});
+			return;
+		}
+		const isSameLibraryNavigation =
+			targetView === 'library' &&
+			currentView === 'library' &&
+			nextLibraryId !== null &&
+			currentLibraryId !== null &&
+			String(nextLibraryId) === String(currentLibraryId);
+		if (isSameLibraryNavigation) {
+			setLastNavigateDebug({
+				...navigateDebugBase,
+				ignored: true,
+				reason: 'same-library'
+			});
+			return;
+		}
+		setLastNavigateDebug({
+			...navigateDebugBase,
+			ignored: false,
+			reason: 'dispatch'
+		});
 		const shouldTrackHistory =
 			targetView === 'home' ||
+			targetView === 'homeSection' ||
 			targetView === 'library' ||
 			targetView === 'search' ||
 			targetView === 'favorites' ||
 			targetView === 'settings'
-				? (targetView !== currentView || nextLibraryId !== currentLibraryId)
+				? (targetView !== currentView || nextLibraryId !== currentLibraryId || nextHomeSectionId !== currentHomeSectionId)
 				: false;
 		if (shouldTrackHistory) {
 			pushPanelHistory();
@@ -410,6 +609,13 @@ const App = (props) => {
 		switch (section) {
 			case 'home':
 				setHomePanelState(null);
+				break;
+			case 'homeSection':
+				if (nextHomeSectionId) {
+					setHomeSectionPanelStateById((previousState) => clearKeyedPanelState(previousState, nextHomeSectionId));
+				} else {
+					setHomeSectionPanelStateById({});
+				}
 				break;
 			case 'library':
 				if (nextLibraryId) {
@@ -433,11 +639,20 @@ const App = (props) => {
 		switch (section) {
 			case 'home':
 				setCurrentView('home');
+				setSelectedHomeSection(null);
 				setSelectedLibrary(null);
 				setSelectedItem(null);
 				setPlaybackOptions(null);
 				break;
+			case 'homeSection':
+				setSelectedHomeSection(data);
+				setSelectedLibrary(null);
+				setSelectedItem(null);
+				setPlaybackOptions(null);
+				setCurrentView('homeSection');
+				break;
 			case 'library':
+				setSelectedHomeSection(null);
 				setSelectedLibrary(data);
 				setSelectedItem(null);
 				setPlaybackOptions(null);
@@ -448,13 +663,14 @@ const App = (props) => {
 			case 'settings':
 				setCurrentView(section);
 				setSelectedItem(null);
+				setSelectedHomeSection(null);
 				setSelectedLibrary(null);
 				setPlaybackOptions(null);
 				break;
 			default:
 				break;
 		}
-	}, [currentView, pushPanelHistory, selectedLibrary?.Id]);
+	}, [currentView, pushPanelHistory, selectedHomeSection?.id, selectedLibrary?.Id]);
 
 	const handlePlay = useCallback((item, options = null) => {
 		if (currentView !== 'player') {
@@ -486,6 +702,13 @@ const App = (props) => {
 		setHomePanelState(normalizePanelStatePayload(nextState));
 	}, []);
 
+	const handleHomeSectionPanelStateChange = useCallback((sectionId, nextState) => {
+		if (!sectionId) return;
+		setHomeSectionPanelStateById((previousState) => (
+			upsertKeyedPanelState(previousState, sectionId, nextState)
+		));
+	}, []);
+
 	const handleLibraryPanelStateChange = useCallback((libraryId, nextState) => {
 		if (!libraryId) return;
 		setLibraryPanelStateById((previousState) => (
@@ -508,14 +731,68 @@ const App = (props) => {
 		));
 	}, []);
 
+	const debugErrorActions = useMemo(() => {
+		const actions = [
+			{id: 'runtime-crash', label: 'App Crash Boundary'},
+			{id: 'unhandled-rejection', label: 'Unhandled Rejection'}
+		];
+		if (currentView === 'player') {
+			actions.unshift(
+				{id: 'player-transcode-fallback', label: 'Player: Transcode Fallback'},
+				{id: 'player-session-rebuild', label: 'Player: Restart Stream'},
+				{id: 'player-playback-error', label: 'Player: Playback Error'}
+			);
+		}
+		return actions;
+	}, [currentView]);
+
+	const handleDebugErrorMenuOpenChange = useCallback((open) => {
+		if (!debugErrorMenuEnabled) return;
+		setDebugErrorMenuOpen(Boolean(open));
+	}, [debugErrorMenuEnabled]);
+
+	const dispatchPlayerDebugAction = useCallback((action) => {
+		emitAppDebugEvent('breezyfin:debug-error-action', {
+			action,
+			at: Date.now(),
+			source: 'app-debug-menu'
+		});
+	}, []);
+
+	const handleDebugErrorMenuAction = useCallback((actionId) => {
+		if (!debugErrorMenuEnabled) return;
+		switch (actionId) {
+			case 'runtime-crash':
+				window.setTimeout(() => {
+					throw new Error('Debug: simulated app runtime crash');
+				}, 0);
+				break;
+			case 'unhandled-rejection':
+				window.setTimeout(() => {
+					Promise.reject(new Error('Debug: simulated unhandled rejection'));
+				}, 0);
+				break;
+			case 'player-playback-error':
+			case 'player-session-rebuild':
+			case 'player-transcode-fallback':
+				dispatchPlayerDebugAction(actionId);
+				break;
+			default:
+				break;
+		}
+		setDebugErrorMenuOpen(false);
+	}, [debugErrorMenuEnabled, dispatchPlayerDebugAction]);
+
 	const panelChildren = createPanelChildren({
 		currentView,
 		selectedItem,
 		selectedLibrary,
+		selectedHomeSection,
 		playbackOptions,
 		loginNotice,
 		loginNoticeNonce,
 		homePanelState,
+		homeSectionPanelStateById,
 		libraryPanelStateById,
 		searchPanelState,
 		favoritesPanelState,
@@ -535,17 +812,20 @@ const App = (props) => {
 		playerControlsVisible,
 		handleSearchPanelStateChange,
 		handleHomePanelStateChange,
+		handleHomeSectionPanelStateChange,
 		handleLibraryPanelStateChange,
 		handleFavoritesPanelStateChange,
 		handleSettingsPanelStateChange,
 		handleDetailsPanelStateChange,
 		registerHomeBackHandler,
+		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
 		registerSettingsBackHandler,
 		registerDetailsBackHandler,
-		registerPlayerBackHandler
+		registerPlayerBackHandler,
+		inputMode
 	});
 
 	return (
@@ -561,10 +841,19 @@ const App = (props) => {
 					>
 					{panelChildren}
 					</Panels>
+					<DebugErrorMenu
+						enabled={debugErrorMenuEnabled}
+						actions={debugErrorActions}
+						open={debugErrorMenuOpen}
+						onOpenChange={handleDebugErrorMenuOpenChange}
+						onAction={handleDebugErrorMenuAction}
+						ariaLabel="Debug error actions"
+					/>
 					<FocusDebugOverlay
 						enabled={focusDebugOverlayEnabled}
 						currentView={currentView}
 						inputMode={inputMode}
+						lastNavigateDebug={lastNavigateDebug}
 					/>
 					<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />
 				</div>

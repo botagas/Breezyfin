@@ -387,6 +387,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 								onClick={handlePlay}
 								icon="play"
 								className={css.heroBannerButton}
+								spotlightId="home-hero-play"
 							>
 								Play
 							</Button>
@@ -394,6 +395,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 								size="small"
 								onClick={handleMoreInfo}
 								className={css.heroBannerButton}
+								spotlightId="home-hero-more-info"
 							>
 								More Info
 							</Button>
@@ -404,6 +406,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 								icon="arrowlargeleft"
 								onClick={handlePrevious}
 								className={css.navButton}
+								spotlightId="home-hero-previous"
 							/>
 							{items.map((_, index) => (
 								<div
@@ -418,6 +421,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 								icon="arrowlargeright"
 								onClick={handleNext}
 								className={css.navButton}
+								spotlightId="home-hero-next"
 							/>
 						</div>
 					</div>

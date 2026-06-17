@@ -25,9 +25,12 @@ const PosterMediaCard = ({
 	onKeyDown,
 	onFocus,
 	onPointerDown,
+	onMouseDown,
+	spotlightDisabled = false,
 	overlayContent = null,
 	placeholderText = '?',
 	usePlaceholderClassWhenNoImage = false,
+	spottable = true,
 	...rest
 }) => {
 	const [imageLoaded, setImageLoaded] = useState(false);
@@ -58,17 +61,23 @@ const PosterMediaCard = ({
 		imageClassName,
 		((!hasImage && usePlaceholderClassWhenNoImage) || imageFailed) && placeholderClassName
 	);
+	const RootComponent = spottable ? SpottableDiv : 'div';
+	const rootProps = {
+		'data-item-id': itemId,
+		className,
+		onClick,
+		onKeyDown,
+		onFocus,
+		onPointerDown,
+		onMouseDown,
+		...rest
+	};
+	if (spottable) {
+		rootProps.spotlightDisabled = spotlightDisabled;
+	}
 
 	return (
-		<SpottableDiv
-			data-item-id={itemId}
-			className={className}
-			onClick={onClick}
-			onKeyDown={onKeyDown}
-			onFocus={onFocus}
-			onPointerDown={onPointerDown}
-			{...rest}
-		>
+		<RootComponent {...rootProps}>
 			<div className={imageContainerClassName}>
 				{showImage ? (
 					<img
@@ -108,7 +117,7 @@ const PosterMediaCard = ({
 					{subtitle ? <BodyText className={subtitleClassName}>{subtitle}</BodyText> : null}
 				</>
 			)}
-		</SpottableDiv>
+		</RootComponent>
 	);
 };
 

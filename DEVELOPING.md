@@ -30,6 +30,8 @@ Quick quality audit commands:
 - `npm run audit:style-tokens` (raw color usage outside token declarations)
 - `npm run audit:duplicates` (cross-file duplicate snippet candidates)
 
+Audit results are decision inputs, not style targets. If an audit flags an intentional helper/component pattern, improve the shared API or audit rule instead of reshaping code only to make the report disappear.
+
 ## Shared building blocks (prefer these first)
 
 - Back handling: `src/hooks/usePanelBackHandler.js`
@@ -67,6 +69,7 @@ Quick quality audit commands:
 - Media details overview overflow + play-label derivation: `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
 - Media details panel sync effects: `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
 - Media details per-item bootstrap effect: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
+- Media details staged loading reveal orchestration: `src/views/media-details-panel/hooks/useMediaDetailsStagedReveal.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
 - Settings runtime capability label derivation: `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
 - Settings bootstrap loader/effects: `src/views/settings-panel/hooks/useSettingsBootstrap.js`
@@ -110,11 +113,15 @@ Other shared utilities:
 - Shared poster card class helper: `src/utils/posterCardClassProps.js`
 - Shared integer parser helper: `src/utils/numberParsing.js`
 - Shared DOM node debug descriptor helper: `src/utils/domNodeDescription.js`
+- Crash-boundary recovery context/action helper: `src/utils/crashRecovery.js`
 - Shared player view helpers: `src/views/player-panel/utils/playerPanelHelpers.js`
 - Shared episode next/previous helpers: `src/views/player-panel/utils/episodeNavigation.js`
 - Shared media details formatting/image helpers: `src/views/media-details-panel/utils/mediaDetailsHelpers.js`
 
 ## Panel decomposition conventions
+
+Library panel decomposition paths:
+- `src/views/library-panel/hooks/` (`useLibraryPagination`, `useLibraryScrollPersistence`)
 
 Player panel decomposition paths:
 - `src/views/player-panel/components/`

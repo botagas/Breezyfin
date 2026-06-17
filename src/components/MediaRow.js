@@ -2,11 +2,13 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
 import Spinner from '@enact/sandstone/Spinner';
+import Icon from '@enact/sandstone/Icon';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
 
 import css from './MediaRow.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
@@ -184,7 +186,20 @@ const Container = createLastFocusedSpotlightContainer('div', {
 	restrict: 'self-only'
 });
 
-const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisodeProgress = false, rowIndex = 0, onCardKeyDown, ...rest }) => {
+const MediaRow = ({
+	title,
+	items,
+	loading,
+	onItemClick,
+	getImageUrl,
+	showEpisodeProgress = false,
+	rowIndex = 0,
+	onCardKeyDown,
+	onMoreClick,
+	moreSpotlightId,
+	sectionKey,
+	...rest
+}) => {
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const isLegacyCompactLayout = runtimeCapabilities.webosV6Compat
 		|| runtimeCapabilities.legacyWebOS
@@ -211,16 +226,29 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 				}
 				focusDebounceTimeoutRef.current = window.setTimeout(() => {
 					scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
+					ensureFocusTargetVisibleWithTopChrome(element, {
+						topPadding: 12,
+						bottomPadding: 16,
+						behavior: 'auto'
+					});
 					focusDebounceTimeoutRef.current = null;
 				}, 45);
 			}
 		}
 	}, []);
 
+	const handleMoreClick = useCallback(() => {
+		if (typeof onMoreClick === 'function') {
+			onMoreClick(sectionKey);
+		}
+	}, [onMoreClick, sectionKey]);
+
 	if (loading) {
 		return (
 			<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
-				<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
+				<div className={css.rowHeader}>
+					<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
+				</div>
 				<div className={css.loading}>
 					<Spinner />
 				</div>
@@ -234,7 +262,21 @@ const MediaRow = ({ title, items, loading, onItemClick, getImageUrl, showEpisode
 
 	return (
 		<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
-			<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
+			<div className={css.rowHeader}>
+				<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
+				{typeof onMoreClick === 'function' ? (
+					<SpottableDiv
+						role="button"
+						className={css.rowMoreButton}
+						spotlightId={moreSpotlightId}
+						onClick={handleMoreClick}
+						aria-label={`View more ${title}`}
+						title={`View more ${title}`}
+					>
+						<Icon className={css.rowMoreIcon}>arrowsmallright</Icon>
+					</SpottableDiv>
+				) : null}
+			</div>
 			<Container
 				className={css.rowContent}
 				onFocus={handleFocus}

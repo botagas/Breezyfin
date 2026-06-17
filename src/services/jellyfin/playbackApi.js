@@ -8,7 +8,7 @@ import {
 	shouldTranscodeForSubtitleSelection,
 	toInteger
 } from './playbackSelection';
-import {buildPlaybackRequestContext} from './playbackProfileBuilder';
+import {buildPlaybackRequestContext, resolveFmp4HlsContainerPreference} from './playbackProfileBuilder';
 import {fetchPlaybackInfo, buildPlaystatePayload} from './playback-api/network';
 import {buildPlaybackRequestDebug} from './playback-api/requestDebug';
 import {
@@ -78,15 +78,12 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			throw new Error('Force DV is enabled, but this TV does not report Dolby Vision support.');
 		}
 		const avoidDolbyVision = !forceDolbyVision && options.avoidDolbyVision === true;
-			const legacyPreferFmp4Preference = typeof options.preferDolbyVisionMp4 === 'boolean'
-				? options.preferDolbyVisionMp4
-				: undefined;
-			const hasEnableFmp4Preference = typeof options.enableFmp4HlsContainerPreference === 'boolean';
-			const enableFmp4HlsContainerPreference = hasEnableFmp4Preference
-				? options.enableFmp4HlsContainerPreference === true
-				: (legacyPreferFmp4Preference ?? false);
+		const {
+			enableFmp4HlsContainerPreference,
+			forceFmp4HlsContainerPreference: forceFmp4HlsContainerPreferenceRequested
+		} = resolveFmp4HlsContainerPreference(options);
 		const forceFmp4HlsContainerPreference =
-			options.forceFmp4HlsContainerPreference === true &&
+			forceFmp4HlsContainerPreferenceRequested === true &&
 			enableFmp4HlsContainerPreference === true;
 		const canUseFmp4HlsContainerPreference =
 			!forceTranscoding &&

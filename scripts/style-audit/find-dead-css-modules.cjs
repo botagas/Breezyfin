@@ -80,6 +80,12 @@ const parseUsedClassesForAlias = (source, alias) => {
 	return used;
 };
 
+const hasForwardedCssAlias = (source, alias) => {
+	const safeAlias = escapeRegExp(alias);
+	const forwardedCssPropRegex = new RegExp(`\\bcss\\s*=\\s*{\\s*${safeAlias}\\s*}`);
+	return forwardedCssPropRegex.test(source);
+};
+
 const POSTER_CARD_CLASS_PROP_KEYS = [
 	'cardImage',
 	'placeholder',
@@ -89,12 +95,28 @@ const POSTER_CARD_CLASS_PROP_KEYS = [
 	'cardSubtitle'
 ];
 
+const PANEL_POSTER_CARD_CLASS_PROP_KEYS = [
+	'gridCard',
+	'cardImage',
+	'placeholder',
+	'cardTitle',
+	'cardSubtitle',
+	'watchedBadge',
+	'progressBadge',
+	'progressBar',
+	'progress'
+];
+
 const parseHelperMappedClassesForAlias = (source, alias) => {
 	const used = new Set();
 	const safeAlias = escapeRegExp(alias);
 	const posterCardClassPropsRegex = new RegExp(`getPosterCardClassProps\\(\\s*${safeAlias}\\s*\\)`);
 	if (posterCardClassPropsRegex.test(source)) {
 		POSTER_CARD_CLASS_PROP_KEYS.forEach((className) => used.add(className));
+	}
+	const panelPosterCardClassPropsRegex = new RegExp(`getPanelPosterCardClassProps\\(\\s*${safeAlias}\\s*\\)`);
+	if (panelPosterCardClassPropsRegex.test(source)) {
+		PANEL_POSTER_CARD_CLASS_PROP_KEYS.forEach((className) => used.add(className));
 	}
 	return used;
 };
@@ -156,11 +178,13 @@ for (const jsFile of jsFiles) {
 		if (!moduleImportUsage.has(resolvedModule)) {
 			moduleImportUsage.set(resolvedModule, {
 				importers: new Set(),
-				usedClasses: new Set()
+				usedClasses: new Set(),
+				forwardedCssAlias: false
 			});
 		}
 		const usage = moduleImportUsage.get(resolvedModule);
 		usage.importers.add(jsFile);
+		usage.forwardedCssAlias = usage.forwardedCssAlias || hasForwardedCssAlias(source, imported.alias);
 		usedClasses.forEach((className) => usage.usedClasses.add(className));
 		helperMappedClasses.forEach((className) => usage.usedClasses.add(className));
 	}
@@ -171,8 +195,10 @@ const report = [];
 for (const moduleFile of moduleLessFiles) {
 	const usage = moduleImportUsage.get(moduleFile) || {
 		importers: new Set(),
-		usedClasses: new Set()
+		usedClasses: new Set(),
+		forwardedCssAlias: false
 	};
+	if (usage.forwardedCssAlias) continue;
 	const classMap = collectLessGraph(moduleFile);
 	const allDefinedClasses = new Set();
 	for (const classes of classMap.values()) {

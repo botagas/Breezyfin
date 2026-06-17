@@ -6,6 +6,8 @@ import Heading from '@enact/sandstone/Heading';
 import {getCrashErrorMessage} from '../utils/errorMessages';
 import {appendAppLog} from '../utils/appLogger';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {isBackKey} from '../utils/keyCodes';
+import {CRASH_RECOVERY_ACTIONS, queueCrashRecoveryAction} from '../utils/crashRecovery';
 
 import css from './AppCrashBoundary.module.less';
 
@@ -42,11 +44,13 @@ class AppCrashBoundary extends Component {
 	componentDidMount() {
 		window.addEventListener('error', this.handleWindowError);
 		window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
+		document.addEventListener('keydown', this.handleCrashKeyDown, true);
 	}
 
 	componentWillUnmount() {
 		window.removeEventListener('error', this.handleWindowError);
 		window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
+		document.removeEventListener('keydown', this.handleCrashKeyDown, true);
 	}
 
 	handleWindowError = (event) => {
@@ -79,6 +83,29 @@ class AppCrashBoundary extends Component {
 		}));
 	};
 
+	handleRecoverWithAction = (action) => {
+		queueCrashRecoveryAction(action);
+		this.handleRecover();
+	};
+
+	handleCrashKeyDown = (event) => {
+		if (!this.state?.error) return;
+		const code = event?.keyCode || event?.which;
+		if (!isBackKey(code)) return;
+		event.preventDefault?.();
+		event.stopPropagation?.();
+		event.stopImmediatePropagation?.();
+		this.handleRecoverWithAction(CRASH_RECOVERY_ACTIONS.BACK);
+	};
+
+	handleRecoverBack = () => {
+		this.handleRecoverWithAction(CRASH_RECOVERY_ACTIONS.BACK);
+	};
+
+	handleRecoverToHome = () => {
+		this.handleRecoverWithAction(CRASH_RECOVERY_ACTIONS.HOME);
+	};
+
 	render() {
 		const {children} = this.props;
 		const {error, resetToken} = this.state;
@@ -92,7 +119,10 @@ class AppCrashBoundary extends Component {
 							{getCrashErrorMessage(error)}
 						</BodyText>
 						<div className={`${css.crashActions} bf-error-actions`}>
-							<Button size="large" onClick={this.handleRecover} autoFocus>
+							<Button size="large" onClick={this.handleRecoverBack} autoFocus className="bf-error-action-button">
+								Back
+							</Button>
+							<Button size="large" onClick={this.handleRecoverToHome} className="bf-error-action-button">
 								Return Home
 							</Button>
 						</div>

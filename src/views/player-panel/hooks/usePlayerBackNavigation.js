@@ -1,6 +1,8 @@
 import {useCallback} from 'react';
 
 export const usePlayerBackNavigation = ({
+	hasPlaybackError,
+	handleBackButton,
 	showAudioPopup,
 	closeAudioPopup,
 	showSubtitlePopup,
@@ -11,6 +13,10 @@ export const usePlayerBackNavigation = ({
 	setShowControls
 }) => {
 	const handleInternalBack = useCallback(() => {
+		if (hasPlaybackError) {
+			handleBackButton();
+			return true;
+		}
 		if (showAudioPopup) {
 			closeAudioPopup();
 			return true;
@@ -31,7 +37,9 @@ export const usePlayerBackNavigation = ({
 	}, [
 		closeAudioPopup,
 		closeSubtitlePopup,
+		handleBackButton,
 		handleDismissSkipOverlay,
+		hasPlaybackError,
 		setShowControls,
 		showAudioPopup,
 		showControls,
@@ -43,4 +51,3 @@ export const usePlayerBackNavigation = ({
 		handleInternalBack
 	};
 };
-

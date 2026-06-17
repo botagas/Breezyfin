@@ -48,6 +48,8 @@ import {
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
+import {getMyRequestItems} from './jellyfin/requestsApi';
+// import {getSubtitleTrackEvents} from './jellyfin/subtitleApi';
 
 class JellyfinService {
 	constructor() {
@@ -269,20 +271,20 @@ class JellyfinService {
 		);
 	}
 
-	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16) {
-		return getLatestMediaItems(this, includeItemTypes, limit);
+	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) {
+		return getLatestMediaItems(this, includeItemTypes, limit, startIndex);
 	}
 
-	async getRecentlyAdded(limit = 20) {
-		return getRecentlyAddedItems(this, limit);
+	async getRecentlyAdded(limit = 20, startIndex = 0) {
+		return getRecentlyAddedItems(this, limit, startIndex);
 	}
 
-	async getNextUp(limit = 24) {
-		return getNextUpItems(this, limit);
+	async getNextUp(limit = 24, startIndex = 0) {
+		return getNextUpItems(this, limit, startIndex);
 	}
 
-	async getResumeItems(limit = 10) {
-		return getResumeMediaItems(this, limit);
+	async getResumeItems(limit = 10, startIndex = 0) {
+		return getResumeMediaItems(this, limit, startIndex);
 	}
 
 	async getCurrentUser() {
@@ -293,8 +295,8 @@ class JellyfinService {
 		return getLibraryViewItems(this);
 	}
 
-	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0) {
-		return getLibraryChildItems(this, parentId, itemTypes, limit, startIndex);
+	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0, options = {}) {
+		return getLibraryChildItems(this, parentId, itemTypes, limit, startIndex, options);
 	}
 
 	async getItem(itemId) {
@@ -341,8 +343,18 @@ class JellyfinService {
 		return searchLibraryItems(this, searchTerm, itemTypes, limit, startIndex);
 	}
 
-	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100) {
-		return getFavoriteMediaItems(this, itemTypes, limit);
+	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '') {
+		return getMyRequestItems(this, {
+			parentId,
+			itemTypes,
+			limit,
+			startIndex,
+			username
+		});
+	}
+
+	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0) {
+		return getFavoriteMediaItems(this, itemTypes, limit, startIndex);
 	}
 
 	async toggleFavorite(itemId, isFavorite) {
@@ -380,6 +392,10 @@ class JellyfinService {
 	async getMediaSegments(itemId, options = {}) {
 		return getItemMediaSegments(this, itemId, options);
 	}
+	/*
+	async getSubtitleEvents(itemId, mediaSourceId, subtitleStreamIndex) {
+		return getSubtitleTrackEvents(this, itemId, mediaSourceId, subtitleStreamIndex);
+	} */
 }
 
 export default new JellyfinService();

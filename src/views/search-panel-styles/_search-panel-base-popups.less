@@ -25,6 +25,7 @@
 	border: none !important;
 	background: transparent !important;
 	box-shadow: none !important;
+	overflow: hidden !important;
 
 	:global(.bf-button-bg),
 	:global(.bg) {
@@ -44,10 +45,22 @@
 		border: none !important;
 	}
 
-	&:hover,
-	&:focus,
-	&:global(.spottable):focus,
-	&:global(.selected) {
+	&:global(.selected) :global(.bf-button-bg),
+	&:global(.selected) :global(.bg) {
 		background: var(--bf-theme-tab-hover-bg) !important;
+		border: none !important;
+	}
+
+	&:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+}
+
+.filterPopupOptionButtonSelected {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+		border: none !important;
 	}
 }
