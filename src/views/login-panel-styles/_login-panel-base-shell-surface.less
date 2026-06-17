@@ -47,8 +47,34 @@
 	background: transparent !important;
 }
 
+.headerTitle {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	text-align: center;
+}
+
 .inlineSpinner {
 	margin-left: auto;
+}
+
+.settingsIconButton {
+	flex: 0 0 auto;
+	width: auto !important;
+	min-width: 0 !important;
+	margin-left: 0 !important;
+	padding-left: 0.35rem !important;
+	padding-right: 0.35rem !important;
+	align-self: flex-end;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		min-width: 0 !important;
+	}
 }
 
 .lead {

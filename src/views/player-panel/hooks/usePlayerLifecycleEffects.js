@@ -1,4 +1,5 @@
 import {useEffect} from 'react';
+import {buildMediaSegmentsLoadDiagnostic} from '../utils/playerDiagnostics';
 
 export const usePlayerLifecycleEffects = ({
 	item,
@@ -16,6 +17,7 @@ export const usePlayerLifecycleEffects = ({
 	loadVideo,
 	getMediaSegmentsForItem,
 	setMediaSegments,
+	appendPlaybackDiagnostic,
 	handleStop,
 	showControls,
 	playing,
@@ -33,10 +35,13 @@ export const usePlayerLifecycleEffects = ({
 	skipOverlayVisible,
 	wasSkipOverlayVisibleRef,
 	focusSkipOverlayAction,
-	playPauseButtonRef
+	playPauseButtonRef,
+	loadRequestIdRef,
+	playbackStartedRef
 }) => {
 	useEffect(() => {
 		if (item) {
+			playbackStartedRef.current = false;
 			resetRecoveryGuards();
 			playSessionRebuildAttemptsRef.current = 0;
 			transcodeFallbackAttemptedRef.current = false;
@@ -51,9 +56,17 @@ export const usePlayerLifecycleEffects = ({
 			loadVideo();
 			getMediaSegmentsForItem(item.Id, {
 				itemRunTimeTicks: item.RunTimeTicks
-			}).then(setMediaSegments).catch(() => setMediaSegments([]));
+			}).then((segments) => {
+				setMediaSegments(segments);
+				appendPlaybackDiagnostic?.(buildMediaSegmentsLoadDiagnostic({segments}));
+			}).catch((error) => {
+				setMediaSegments([]);
+				appendPlaybackDiagnostic?.(buildMediaSegmentsLoadDiagnostic({error}));
+			});
 		}
 		return () => {
+			loadRequestIdRef.current += 1;
+			playbackStartedRef.current = false;
 			handleStop();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps

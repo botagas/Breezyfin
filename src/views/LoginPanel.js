@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Panel } from '../components/BreezyPanels';
+import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
@@ -21,7 +22,7 @@ import imageLoadCss from '../components/ImageLoadReveal.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
+const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
 	const [serverUrl, setServerUrl] = useState('http://');
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
@@ -32,7 +33,6 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'login'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
-	const [loadedSavedAvatarKeys, setLoadedSavedAvatarKeys] = useState(() => new Set());
 	const savedServerKeySelector = useCallback(
 		(entry) => `${entry.serverId}:${entry.userId}`,
 		[]
@@ -51,11 +51,6 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		isActive,
 		savedServers
 	});
-	const savedAvatarKeysSignature = useMemo(
-		() => savedServers.map((entry) => `${entry.serverId}:${entry.userId}`).join('|'),
-		[savedServers]
-	);
-
 	const getInitialStep = useCallback((entries) => {
 		return entries.length > 0 ? 'saved' : 'server';
 	}, []);
@@ -103,10 +98,6 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 			window.clearTimeout(timer);
 		};
 	}, [sessionNotice, sessionNoticeNonce]);
-
-	useEffect(() => {
-		setLoadedSavedAvatarKeys(new Set());
-	}, [savedAvatarKeysSignature]);
 
 	const normalizedServerUrl = useMemo(
 		() => serverUrl.trim().replace(/\/+$/, ''),
@@ -171,6 +162,11 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		setStatus('');
 		setStep('server');
 	}, []);
+
+	const handleOpenSettings = useCallback(() => {
+		if (typeof onNavigate !== 'function') return;
+		onNavigate('settings');
+	}, [onNavigate]);
 
 	const handleResume = useCallback(async (entry) => {
 		if (!entry) return;
@@ -245,29 +241,7 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 		});
 	}, []);
 
-	const handleSavedAvatarLoad = useCallback((event) => {
-		const avatarKey = event.currentTarget?.dataset?.savedAvatarKey;
-		if (!avatarKey) return;
-		setLoadedSavedAvatarKeys((currentKeys) => {
-			if (currentKeys.has(avatarKey)) return currentKeys;
-			const nextKeys = new Set(currentKeys);
-			nextKeys.add(avatarKey);
-			return nextKeys;
-		});
-	}, []);
-
-	const handleSavedAvatarError = useImageErrorFallback(null, {
-		onError: (_, {image}) => {
-			const avatarKey = image?.dataset?.savedAvatarKey;
-			if (!avatarKey) return;
-			setLoadedSavedAvatarKeys((currentKeys) => {
-				if (!currentKeys.has(avatarKey)) return currentKeys;
-				const nextKeys = new Set(currentKeys);
-				nextKeys.delete(avatarKey);
-				return nextKeys;
-			});
-		}
-	});
+	const handleSavedAvatarError = useImageErrorFallback(null);
 
 	const headingText = step === 'saved'
 		? 'Choose Account'
@@ -296,12 +270,26 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 						onBackdropLoad={handleBackdropLoad}
 						onBackdropError={handleBackdropError}
 					/>
+					{onNavigate ? (
+						<div className={css.topActions}>
+							<Button
+								onClick={handleOpenSettings}
+								size="small"
+								icon="gear"
+								aria-label="Open settings and diagnostics"
+								focusEffect="static"
+								className={css.settingsIconButton}
+							/>
+						</div>
+					) : null}
 					<div className={css.loginBox}>
 						<div className={css.header}>
-							<Heading size="large" spacing="medium">
-								{headingText}
-							</Heading>
-							{loading && <Spinner className={css.inlineSpinner} />}
+							<div className={css.headerTitle}>
+								<Heading size="large" spacing="medium">
+									{headingText}
+								</Heading>
+								{loading && <Spinner className={css.inlineSpinner} />}
+							</div>
 						</div>
 
 						<BodyText className={css.lead}>{leadText}</BodyText>
@@ -312,14 +300,11 @@ const LoginPanel = ({ onLogin, isActive = false, sessionNotice = '', sessionNoti
 								savedServers={savedServers}
 								resumingKey={resumingKey}
 								loading={loading}
-								loadedSavedAvatarKeys={loadedSavedAvatarKeys}
 								getSavedUserAvatarUrl={getSavedUserAvatarUrl}
 								onResumeClick={handleResumeClick}
 								onManualLogin={handleManualLogin}
-								onSavedAvatarLoad={handleSavedAvatarLoad}
 								onSavedAvatarError={handleSavedAvatarError}
 								css={css}
-								imageLoadCss={imageLoadCss}
 							/>
 						) : step === 'server' ? (
 							<LoginServerConnectStep

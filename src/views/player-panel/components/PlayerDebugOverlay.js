@@ -100,6 +100,9 @@ const PlayerDebugOverlay = ({
 	duration,
 	currentAudioTrack,
 	currentSubtitleTrack,
+	subtitleRendererPolicy,
+	subtitleRendererState,
+	runtimeDiagnostics = [],
 	isCurrentTranscoding,
 	skipOverlayVisible,
 	showNextEpisodePrompt
@@ -200,6 +203,22 @@ const PlayerDebugOverlay = ({
 			.join(', ')
 		: '(none)';
 	const requestDebug = mediaSourceData?.__debugRequest || null;
+	const decisionDebug = mediaSourceData?.__debugDecision || null;
+	const subtitlePolicy = subtitleRendererPolicy || mediaSourceData?.__debugSubtitlePolicy || null;
+	const playbackDiagnostics = [
+		...(Array.isArray(mediaSourceData?.__debugDiagnostics) ? mediaSourceData.__debugDiagnostics : []),
+		...(Array.isArray(runtimeDiagnostics) ? runtimeDiagnostics : [])
+	];
+	const diagnosticsSummary = playbackDiagnostics.length > 0
+		? playbackDiagnostics
+			.slice(-10)
+			.map((entry) => joinInfo(
+				`${entry?.scope || 'playback'}/${entry?.stage || 'unknown'}=${entry?.status || 'info'}`,
+				entry?.reason || '',
+				entry?.message || ''
+			))
+			.join(' ; ')
+		: '-';
 	const requestSummary = requestDebug
 		? joinInfo(
 			`hevcRange=${requestDebug.hevcVideoRangeTypes || '-'}`,
@@ -209,6 +228,22 @@ const PlayerDebugOverlay = ({
 			`ds=${requestDebug.enableDirectStream ? 'yes' : 'no'}`,
 			`tc=${requestDebug.enableTranscoding ? 'yes' : 'no'}`,
 			`sources=${requestDebug.mediaSourceCount ?? '-'}`
+		)
+		: '-';
+	const decisionSummary = decisionDebug
+		? joinInfo(
+			decisionDebug.playMethod || '-',
+			`source=${decisionDebug.selectedMediaSourceId || '-'}`,
+			`range=${decisionDebug.dynamicRangeId || '-'}`,
+			`container=${decisionDebug.container || '-'}`,
+			`reqA=${decisionDebug.requestedAudioStreamIndex ?? '-'}`,
+			`selA=${decisionDebug.selectedAudioStreamIndex ?? '-'}`,
+			`selS=${decisionDebug.selectedSubtitleStreamIndex ?? '-'}`,
+			`cap=${decisionDebug.dynamicRangeCap || 'auto'}`,
+			`fmp4=${decisionDebug.fmp4HlsPreference?.forced ? 'force' : (decisionDebug.fmp4HlsPreference?.enabled ? 'on' : 'off')}`,
+			decisionDebug.forceDolbyVision ? 'forceDV=yes' : '',
+			decisionDebug.avoidDolbyVision ? 'avoidDV=yes' : '',
+			decisionDebug.forceSubtitleBurnIn ? 'subBurn=yes' : ''
 		)
 		: '-';
 
@@ -238,6 +273,10 @@ const PlayerDebugOverlay = ({
 		{
 			label: 'Request',
 			value: requestSummary
+		},
+		{
+			label: 'Decision',
+			value: decisionSummary
 		},
 		{
 			label: 'Stream',
@@ -297,6 +336,40 @@ const PlayerDebugOverlay = ({
 					selectedSubtitleStream?.Codec || '-',
 					selectedSubtitleStream?.DisplayTitle || '-'
 				)
+		},
+		{
+			label: 'Subtitle Policy',
+			value: subtitlePolicy
+				? joinInfo(
+					`mode=${subtitlePolicy.mode || '-'}`,
+					`burn=${subtitlePolicy.forceBurnIn || subtitlePolicy.requiresBurnIn ? 'yes' : 'no'}`,
+					`renderer=${subtitlePolicy.renderer || '-'}`,
+					`codec=${subtitlePolicy.codec || '-'}`,
+					`reason=${subtitlePolicy.reason || '-'}`
+				)
+				: '-'
+		},
+		{
+			label: 'Subtitle Render',
+			value: subtitleRendererState
+				? joinInfo(
+					`renderer=${subtitleRendererState.renderer || '-'}`,
+					`status=${subtitleRendererState.status || '-'}`,
+					`events=${subtitleRendererState.eventCount ?? subtitleRendererState.cueCount ?? '-'}`,
+					`cues=${subtitleRendererState.cueCount ?? '-'}`,
+					`active=${subtitleRendererState.activeCueCount ?? '-'}`,
+					subtitleRendererState.fallbackReason ? `fallback=${subtitleRendererState.fallbackReason}` : '',
+					subtitleRendererState.debug?.cacheHit === true ? 'cache=yes' : '',
+					subtitleRendererState.debug?.fetchMs >= 0 ? `fetch=${subtitleRendererState.debug.fetchMs}ms` : '',
+					subtitleRendererState.debug?.rawShape ? `shape=${subtitleRendererState.debug.rawShape}` : '',
+					subtitleRendererState.debug?.path ? `path=${subtitleRendererState.debug.path}` : '',
+					subtitleRendererState.error ? `error=${subtitleRendererState.error}` : ''
+				)
+				: '-'
+		},
+		{
+			label: 'Diagnostics',
+			value: diagnosticsSummary
 		},
 		{
 			label: 'Element',

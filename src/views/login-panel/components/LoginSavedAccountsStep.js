@@ -6,14 +6,11 @@ const LoginSavedAccountsStep = ({
 	savedServers,
 	resumingKey,
 	loading,
-	loadedSavedAvatarKeys,
 	getSavedUserAvatarUrl,
 	onResumeClick,
 	onManualLogin,
-	onSavedAvatarLoad,
 	onSavedAvatarError,
-	css,
-	imageLoadCss
+	css
 }) => (
 	<div className={css.savedServers}>
 		<div className={css.savedList}>
@@ -22,8 +19,6 @@ const LoginSavedAccountsStep = ({
 				const isResuming = resumingKey === key;
 				const userInitial = (entry.username || '?').charAt(0).toUpperCase();
 				const avatarUrl = getSavedUserAvatarUrl(entry);
-				const avatarLoaded = loadedSavedAvatarKeys.has(key);
-				const avatarClassName = `${imageLoadCss.imageReveal} ${avatarLoaded ? imageLoadCss.imageRevealLoaded : ''}`;
 				return (
 					<SavedItemComponent
 						key={key}
@@ -38,16 +33,9 @@ const LoginSavedAccountsStep = ({
 										src={avatarUrl}
 										alt={`${entry.username || 'User'} avatar`}
 										data-saved-avatar-key={key}
-										className={avatarClassName}
-										onLoad={onSavedAvatarLoad}
 										onError={onSavedAvatarError}
-										loading="lazy"
-										decoding="async"
 										draggable={false}
 									/>
-									{!avatarLoaded ? (
-										<div className={`${imageLoadCss.imageLoadingHint} ${css.savedAvatarLoadingHint}`} aria-hidden="true" />
-									) : null}
 								</>
 							)}
 							<span className={css.savedAvatarFallback}>{userInitial}</span>

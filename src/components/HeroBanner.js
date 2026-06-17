@@ -64,7 +64,7 @@ const preloadHeroBackdrop = (url) => {
 	image.src = url;
 };
 
-const HeroBanner = ({ items, onPlayClick }) => {
+const HeroBanner = ({ items, onPlayClick, isActive = false }) => {
 	const itemCount = items?.length || 0;
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [previousIndex, setPreviousIndex] = useState(null);
@@ -83,14 +83,16 @@ const HeroBanner = ({ items, onPlayClick }) => {
 		const settings = settingsPayload || {};
 		setPerformanceModeEnabled(settings.disableAnimations === true || settings.disableAllAnimations === true);
 	}, []);
-	useBreezyfinSettingsSync(applyMotionSettings);
+	useBreezyfinSettingsSync(applyMotionSettings, {enabled: isActive});
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		if (itemCount === 0) return;
 		setCurrentIndex((prev) => (prev < itemCount ? prev : 0));
-	}, [itemCount]);
+	}, [isActive, itemCount]);
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		const node = heroRootRef.current;
 		if (!node) return undefined;
 		if (typeof window === 'undefined' || typeof window.IntersectionObserver !== 'function') {
@@ -113,7 +115,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 		return () => {
 			observer.disconnect();
 		};
-	}, []);
+	}, [isActive]);
 
 	const changeIndex = useCallback((resolveNext) => {
 		if (itemCount === 0) return;
@@ -127,6 +129,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 	}, [itemCount, reducedMotionMode]);
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		if (!shouldAutoRotate) return undefined;
 
 		const interval = setInterval(() => {
@@ -134,7 +137,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 		}, AUTO_ROTATE_INTERVAL_MS);
 
 		return () => clearInterval(interval);
-	}, [changeIndex, shouldAutoRotate]);
+	}, [changeIndex, isActive, shouldAutoRotate]);
 
 	useEffect(() => {
 		if (!reducedMotionMode) return;
@@ -177,6 +180,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 	}, [backdropUrlsByIndex, currentIndex, itemCount, preloadAdjacentCount]);
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		if (!Array.isArray(backdropUrlsByIndex) || backdropUrlsByIndex.length === 0) return;
 		setLoadedBackdropUrls((prev) => {
 			let next = prev;
@@ -189,7 +193,7 @@ const HeroBanner = ({ items, onPlayClick }) => {
 			});
 			return next;
 		});
-	}, [backdropUrlsByIndex]);
+	}, [backdropUrlsByIndex, isActive]);
 
 	const currentItem = useMemo(() => (
 		itemCount > 0 ? items[currentIndex % itemCount] : null

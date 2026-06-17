@@ -7,15 +7,21 @@ import {toInteger} from '../../../utils/numberParsing';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 import {
 	getDynamicRangeDisplayLabel,
-	getDynamicRangeInfo,
-	normalizeDynamicRangeCap
+	getDynamicRangeInfo
 } from '../../../utils/playbackDynamicRange';
+import {
+	buildPlayerPlaybackSettingsSnapshot,
+	resolveInitialTrackSelection,
+	resolvePlaybackVideoUrl,
+	selectHlsEnginePreference
+} from '../utils/playerVideoLoaderHelpers';
 
 const NATIVE_HLS_HDR_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
+const DEBUG_SOURCE_SUMMARY_LIMIT = 8;
 
 const buildSourceDebugSummary = (mediaSources = []) => {
 	if (!Array.isArray(mediaSources) || mediaSources.length === 0) return [];
-	return mediaSources.map((source) => {
+	return mediaSources.slice(0, DEBUG_SOURCE_SUMMARY_LIMIT).map((source) => {
 		const videoStream = source?.MediaStreams?.find((stream) => stream?.Type === 'Video') || null;
 		return {
 			id: source?.Id || '',
@@ -68,7 +74,10 @@ export const usePlayerVideoLoader = ({
 	item,
 	videoRef,
 	hlsRef,
+	nativeHlsFallbackCleanupRef,
 	loadVideoRef,
+	loadRequestIdRef,
+	playbackStartedRef,
 	resetRecoveryGuards,
 	setLoading,
 	setLoadingStatusMessage,
@@ -100,17 +109,27 @@ export const usePlayerVideoLoader = ({
 	attemptPlaybackSessionRebuild,
 	playbackFailureLockedRef,
 	failStartTimerRef,
-	playbackSessionRef
+	playbackSessionRef,
+	appendPlaybackDiagnostic
 }) => {
 	const loadVideo = useCallback(async (forceTranscodeOverride = false) => {
 		if (!item) return;
 
+		const requestId = (loadRequestIdRef.current || 0) + 1;
+		loadRequestIdRef.current = requestId;
+		const isStaleLoad = () => loadRequestIdRef.current !== requestId;
+
 		if (!videoRef.current) {
-			setTimeout(() => loadVideo(forceTranscodeOverride), 100);
+			setTimeout(() => {
+				if (!isStaleLoad()) {
+					loadVideo(forceTranscodeOverride);
+				}
+			}, 100);
 			return;
 		}
 
 		resetRecoveryGuards();
+		playbackStartedRef.current = false;
 		if (playbackOverrideRef.current?.forceNewSession !== true) {
 			setLoadingStatusMessage('Loading...');
 		}
@@ -126,75 +145,37 @@ export const usePlayerVideoLoader = ({
 			hlsRef.current.destroy();
 			hlsRef.current = null;
 		}
+		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
+			nativeHlsFallbackCleanupRef.current();
+		}
 
 		loadVideoRef.current = loadVideo;
 
-			try {
-				const settings = readBreezyfinSettings();
-				let forceTranscoding = forceTranscodeOverride || settings.forceTranscoding || false;
-				const forceDolbyVision = settings.forceDolbyVision === true;
-				const legacyPreferFmp4Preference = typeof settings.preferDolbyVisionMp4 === 'boolean'
-					? settings.preferDolbyVisionMp4
-					: undefined;
-				const enableFmp4HlsContainerPreference = typeof settings.enableFmp4HlsContainerPreference === 'boolean'
-					? settings.enableFmp4HlsContainerPreference
-					: (legacyPreferFmp4Preference ?? false);
-				const forceFmp4HlsContainerPreference =
-					settings.forceFmp4HlsContainerPreference === true &&
-					enableFmp4HlsContainerPreference === true;
-				const preferredAudioLanguage = String(settings.preferredAudioLanguage || '').trim().toLowerCase();
-				const enableTranscoding = settings.enableTranscoding !== false;
-				const maxBitrate = settings.maxBitrate;
-				const autoPlayNext = settings.autoPlayNext !== false;
-				const relaxedPlaybackProfile = settings.relaxedPlaybackProfile === true;
-				const requestedDynamicRangeCap = forceDolbyVision
-					? 'auto'
-					: normalizeDynamicRangeCap(
-						playbackOverrideRef.current?.dynamicRangeCap ??
-						playbackOptions?.dynamicRangeCap ??
-						'auto'
-					);
-				const subtitleBurnInEnabled = settings.enableSubtitleBurnIn !== false;
-				const subtitleBurnInOnHdrEnabled = settings.forceTranscodingWithSubtitles === true;
-				const subtitleBurnInTextCodecs = Array.isArray(settings.subtitleBurnInTextCodecs)
-					? settings.subtitleBurnInTextCodecs
-						.map((codec) => String(codec || '').trim().toLowerCase())
-						.filter(Boolean)
-					: [];
-				const strictTranscodingMode = settings.forceTranscoding === true;
-				const forceSubtitleBurnIn = false;
-
-				playbackSettingsRef.current = {
-					forceTranscoding,
-					strictTranscodingMode,
-					enableTranscoding,
-					maxBitrate,
-					autoPlayNext,
-					relaxedPlaybackProfile,
-					forceDolbyVision,
-					enableFmp4HlsContainerPreference,
-					forceFmp4HlsContainerPreference,
-					preferredAudioLanguage,
-					enableSubtitleBurnIn: subtitleBurnInEnabled,
-					forceSubtitleBurnInOnHdr: subtitleBurnInOnHdrEnabled,
-					forceSubtitleBurnIn,
-					subtitleBurnInTextCodecs,
-					dynamicRangeCap: requestedDynamicRangeCap
-				};
+		try {
+			const settings = readBreezyfinSettings();
+			const playbackSettingsSnapshot = buildPlayerPlaybackSettingsSnapshot({
+				settings,
+				playbackOptions,
+				playbackOverride: playbackOverrideRef.current,
+				forceTranscodeOverride
+			});
+			const requestedDynamicRangeCap = playbackSettingsSnapshot.dynamicRangeCap;
+			playbackSettingsRef.current = playbackSettingsSnapshot;
 
 			let playbackInfo = null;
 			let playbackInfoError = null;
 			try {
 				const playbackOverrideOptions = {...((playbackOverrideRef.current ?? playbackOptions) || {})};
 				const options = {
-					...playbackOverrideOptions,
-					...playbackSettingsRef.current
+					...playbackSettingsRef.current,
+					...playbackOverrideOptions
 				};
 				playbackInfo = await jellyfinService.getPlaybackInfo(item.Id, options);
 			} catch (infoError) {
 				playbackInfoError = infoError;
 				console.error('Failed to get playback info:', infoError);
 			}
+			if (isStaleLoad()) return;
 
 			const mediaSource = playbackInfo?.MediaSources?.[0];
 			if (!mediaSource) {
@@ -204,34 +185,34 @@ export const usePlayerVideoLoader = ({
 				throw new Error('No media source available');
 			}
 
-				const playbackMeta = playbackInfo?.__breezyfin || {};
-				const playbackRequestDebug = playbackMeta.requestDebug || null;
-				const resolvedPlayMethod =
-					playbackMeta.playMethod ||
-					(mediaSource.TranscodingUrl
-						? 'Transcode'
-						: (mediaSource.SupportsDirectPlay ? 'DirectPlay' : 'DirectStream'));
-				const dynamicRangeInfo = playbackMeta.dynamicRange || getDynamicRangeInfo(mediaSource);
-				const dynamicRangeLabel = playbackMeta.dynamicRange?.displayLabel ||
-					getDynamicRangeDisplayLabel(dynamicRangeInfo, playbackMeta.dynamicRangeCap || requestedDynamicRangeCap);
-				const videoStream =
-					mediaSource.MediaStreams?.find((stream) => stream.Type === 'Video') || null;
-				const compatibilityToast = buildPlaybackCompatibilityToast({
-					dynamicRangeLabel,
-					resolvedPlayMethod,
-					adjustments: playbackMeta.adjustments
-				});
-				if (compatibilityToast) {
-					setToastMessage(compatibilityToast);
-				}
+			const playbackMeta = playbackInfo?.__breezyfin || {};
+			const playbackRequestDebug = playbackMeta.requestDebug || null;
+			const resolvedPlayMethod =
+				playbackMeta.playMethod ||
+				(mediaSource.TranscodingUrl
+					? 'Transcode'
+					: (mediaSource.SupportsDirectPlay ? 'DirectPlay' : 'DirectStream'));
+			const dynamicRangeInfo = playbackMeta.dynamicRange || getDynamicRangeInfo(mediaSource);
+			const dynamicRangeLabel = playbackMeta.dynamicRange?.displayLabel ||
+				getDynamicRangeDisplayLabel(dynamicRangeInfo, playbackMeta.dynamicRangeCap || requestedDynamicRangeCap);
+			const videoStream =
+				mediaSource.MediaStreams?.find((stream) => stream.Type === 'Video') || null;
+			const compatibilityToast = buildPlaybackCompatibilityToast({
+				dynamicRangeLabel,
+				resolvedPlayMethod,
+				adjustments: playbackMeta.adjustments
+			});
+			if (compatibilityToast) {
+				setToastMessage(compatibilityToast);
+			}
 
-				if (playbackSettingsRef.current.forceTranscoding && !mediaSource.TranscodingUrl) {
-					throw new Error('Transcoding was forced, but the server did not return a transcoding URL.');
-				}
-				const isHdrLikeStream = NATIVE_HLS_HDR_RANGE_IDS.has(dynamicRangeInfo?.id);
+			if (playbackSettingsRef.current.forceTranscoding && !mediaSource.TranscodingUrl) {
+				throw new Error('Transcoding was forced, but the server did not return a transcoding URL.');
+			}
+			const isHdrLikeStream = NATIVE_HLS_HDR_RANGE_IDS.has(dynamicRangeInfo?.id);
 
-				playbackSessionRef.current = {
-					playSessionId: playbackInfo?.PlaySessionId || null,
+			playbackSessionRef.current = {
+				playSessionId: playbackInfo?.PlaySessionId || null,
 				mediaSourceId: mediaSource?.Id || null,
 				playMethod: resolvedPlayMethod
 			};
@@ -241,14 +222,17 @@ export const usePlayerVideoLoader = ({
 				__selectedPlayMethod: resolvedPlayMethod,
 				__dynamicRangeInfo: dynamicRangeInfo,
 				__dynamicRangeLabel: dynamicRangeLabel,
-					__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
-					__debugVideoRangeType: videoStream?.VideoRangeType || '',
-					__debugVideoRange: videoStream?.VideoRange || '',
-					__debugVideoCodec: videoStream?.Codec || '',
-					__debugRequest: playbackRequestDebug,
-					__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
-					__debugSelectedSourceId: mediaSource?.Id || ''
-				});
+				__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
+				__debugVideoRangeType: videoStream?.VideoRangeType || '',
+				__debugVideoRange: videoStream?.VideoRange || '',
+				__debugVideoCodec: videoStream?.Codec || '',
+				__debugRequest: playbackRequestDebug,
+				__debugDecision: playbackMeta.decision || null,
+				__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
+				__debugDiagnostics: Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
+				__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
+				__debugSelectedSourceId: mediaSource?.Id || ''
+			});
 
 			if (mediaSource.RunTimeTicks) {
 				const totalDuration = mediaSource.RunTimeTicks / JELLYFIN_TICKS_PER_SECOND;
@@ -264,109 +248,50 @@ export const usePlayerVideoLoader = ({
 			setAudioTracks(audioStreams);
 			setSubtitleTracks(subtitleStreams);
 
-			const defaultAudio = audioStreams.find((s) => s.IsDefault) || audioStreams[0];
-			const defaultSubtitle = subtitleStreams.find((s) => s.IsDefault);
-
-			const providedAudio = Number.isInteger(playbackOptions?.audioStreamIndex)
-				? playbackOptions.audioStreamIndex
-				: null;
-			const providedSubtitle = Number.isInteger(playbackOptions?.subtitleStreamIndex)
-				? playbackOptions.subtitleStreamIndex
-				: null;
-
-			const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
-			const initialSubtitle = pickPreferredSubtitle(subtitleStreams, providedSubtitle, defaultSubtitle);
-
-			const overrideAudio = Number.isInteger(playbackOverrideRef.current?.audioStreamIndex)
-				? playbackOverrideRef.current.audioStreamIndex
-				: null;
-			const overrideSubtitle =
-				(playbackOverrideRef.current?.subtitleStreamIndex === -1 ||
-					Number.isInteger(playbackOverrideRef.current?.subtitleStreamIndex))
-					? playbackOverrideRef.current.subtitleStreamIndex
-					: null;
-
-			const selectedAudio = Number.isInteger(overrideAudio) ? overrideAudio : initialAudio;
-			const selectedSubtitle =
-				(overrideSubtitle === -1 || Number.isInteger(overrideSubtitle))
-					? overrideSubtitle
-					: initialSubtitle;
+			const {selectedAudio, selectedSubtitle} = resolveInitialTrackSelection({
+				audioStreams,
+				subtitleStreams,
+				playbackOptions,
+				playbackOverride: playbackOverrideRef.current,
+				pickPreferredAudio,
+				pickPreferredSubtitle
+			});
 
 			setCurrentAudioTrack(selectedAudio);
 			setCurrentSubtitleTrack(selectedSubtitle);
 
-				let videoUrl;
-				let isHls = false;
-				let hlsEngine = null;
-				const useTranscoding = resolvedPlayMethod === 'Transcode';
+			const {
+				videoUrl,
+				isHls,
+				useTranscoding
+			} = resolvePlaybackVideoUrl({
+				service: jellyfinService,
+				itemId: item.Id,
+				mediaSource,
+				playbackInfo,
+				resolvedPlayMethod
+			});
+			let hlsEngine = null;
 
-			if (useTranscoding) {
-				if (!mediaSource.TranscodingUrl) {
-					throw new Error('Transcoding selected, but no transcoding URL was returned.');
-				}
-				videoUrl = `${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`;
-				isHls = mediaSource.TranscodingUrl.includes('.m3u8') ||
-					mediaSource.TranscodingUrl.includes('/hls/') ||
-					mediaSource.TranscodingContainer?.toLowerCase() === 'ts';
-			} else if (resolvedPlayMethod === 'DirectStream' && mediaSource.SupportsDirectStream) {
-				videoUrl = jellyfinService.getPlaybackUrl(
-					item.Id,
-					mediaSource.Id,
-					playbackInfo.PlaySessionId,
-					mediaSource.ETag,
-					mediaSource.Container,
-					mediaSource.LiveStreamId
-				);
-			} else if (resolvedPlayMethod === 'DirectPlay' && mediaSource.SupportsDirectPlay) {
-				videoUrl = jellyfinService.getPlaybackUrl(
-					item.Id,
-					mediaSource.Id,
-					playbackInfo.PlaySessionId,
-					mediaSource.ETag,
-					mediaSource.Container,
-					mediaSource.LiveStreamId
-				);
-			} else {
-				throw new Error('No supported playback method available');
-			}
-
-				if (useTranscoding && mediaSource.TranscodingUrl) {
-					const forceSubtitleEncode = playbackMeta.subtitlePolicy?.forceBurnIn === true;
-					const url = new URL(`${jellyfinService.serverUrl}${mediaSource.TranscodingUrl}`);
-					if (Number.isInteger(selectedAudio)) {
-						url.searchParams.set('AudioStreamIndex', selectedAudio);
-					}
-					if (selectedSubtitle === -1 || Number.isInteger(selectedSubtitle)) {
-						url.searchParams.set('SubtitleStreamIndex', selectedSubtitle);
-						if (selectedSubtitle >= 0 && forceSubtitleEncode) {
-							url.searchParams.set('SubtitleMethod', 'Encode');
-						} else {
-							url.searchParams.delete('SubtitleMethod');
-						}
-					}
-					if (playbackOverrideRef.current?.forceNewSession) {
-						const newSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-						url.searchParams.set('PlaySessionId', newSessionId);
-					}
-					videoUrl = url.toString();
-				}
-
-					setMediaSourceData((previousValue) => ({
-						...(previousValue || mediaSource),
-						__selectedPlayMethod: resolvedPlayMethod,
-					__dynamicRangeInfo: dynamicRangeInfo,
-					__dynamicRangeLabel: dynamicRangeLabel,
-					__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
-					__debugVideoRangeType: videoStream?.VideoRangeType || '',
-					__debugVideoRange: videoStream?.VideoRange || '',
-					__debugVideoCodec: videoStream?.Codec || '',
-					__debugRequest: playbackRequestDebug,
-						__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
-						__debugSelectedSourceId: mediaSource?.Id || '',
-						__debugVideoUrl: videoUrl,
-						__debugIsHls: isHls,
-						__debugHlsEngine: isHls ? 'pending' : null
-					}));
+			setMediaSourceData((previousValue) => ({
+				...(previousValue || mediaSource),
+				__selectedPlayMethod: resolvedPlayMethod,
+				__dynamicRangeInfo: dynamicRangeInfo,
+				__dynamicRangeLabel: dynamicRangeLabel,
+				__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
+				__debugVideoRangeType: videoStream?.VideoRangeType || '',
+				__debugVideoRange: videoStream?.VideoRange || '',
+				__debugVideoCodec: videoStream?.Codec || '',
+				__debugRequest: playbackRequestDebug,
+				__debugDecision: playbackMeta.decision || null,
+				__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
+				__debugDiagnostics: Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
+				__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
+				__debugSelectedSourceId: mediaSource?.Id || '',
+				__debugVideoUrl: videoUrl,
+				__debugIsHls: isHls,
+				__debugHlsEngine: isHls ? 'pending' : null
+			}));
 
 			pendingOverrideClearRef.current = !!playbackOverrideRef.current;
 
@@ -374,84 +299,156 @@ export const usePlayerVideoLoader = ({
 			if (!video) {
 				throw new Error('Video element not available');
 			}
+			if (isStaleLoad()) return;
 
 			if (!useTranscoding && mediaSource.SupportsTranscoding) {
 				if (startupFallbackTimerRef.current) {
 					clearTimeout(startupFallbackTimerRef.current);
 				}
 				startupFallbackTimerRef.current = setTimeout(() => {
+					if (isStaleLoad()) return;
 					console.warn('[Player] Direct playback startup timeout, attempting transcode fallback');
 					attemptTranscodeFallback('Startup timeout');
 				}, 12000);
 			}
 
-					if (isHls) {
-						const nativeHls =
-							video.canPlayType('application/vnd.apple.mpegURL') ||
-							video.canPlayType('application/x-mpegURL');
-						const preferNativeHls = isHdrLikeStream && Boolean(nativeHls);
+			if (isHls) {
+				const nativeHlsSupported = Boolean(
+					video.canPlayType('application/vnd.apple.mpegURL') ||
+					video.canPlayType('application/x-mpegURL')
+				);
+				const hlsJsSupported = Hls.isSupported();
+				const hlsPreference = selectHlsEnginePreference({
+					isHls,
+					isHdrLikeStream,
+					nativeHlsSupported,
+					hlsJsSupported
+				});
 
-						if (nativeHls) {
-							if (preferNativeHls) {
-								video.src = videoUrl;
-								hlsEngine = 'native';
-							} else {
-								let fallbackTriggered = false;
+				if (hlsPreference.engine === 'native') {
+					appendPlaybackDiagnostic?.({
+						scope: 'hls-engine',
+						stage: 'select',
+						status: 'applied',
+						reason: hlsPreference.reason,
+						message: 'Using native HLS playback.'
+					});
 
-								const tryHlsJsFallback = () => {
-									if (fallbackTriggered || !Hls.isSupported()) return;
-									fallbackTriggered = true;
-									hlsEngine = 'hls.js';
-
-									video.src = '';
-									video.removeAttribute('src');
-									attachHlsPlayback(video, videoUrl, 'HLS.js');
-								};
-
-							const fallbackTimer = setTimeout(() => {
-								if (video.readyState === 0) {
-									tryHlsJsFallback();
-								}
-							}, 3500);
-
-							const errorHandler = (e) => {
-								console.error('Native HLS error:', e);
+					if (hlsPreference.allowNativeFallback) {
+						let fallbackTriggered = false;
+						let fallbackTimer = null;
+						let errorHandler = null;
+						let startupHandler = null;
+						const cleanupNativeFallback = () => {
+							if (fallbackTimer) {
 								clearTimeout(fallbackTimer);
-								tryHlsJsFallback();
-							};
-							video.addEventListener('error', errorHandler, {once: true});
-
-								video.addEventListener('loadstart', () => {
-									clearTimeout(fallbackTimer);
-									video.removeEventListener('error', errorHandler);
-								}, {once: true});
-
-								video.src = videoUrl;
-								hlsEngine = 'native';
+								fallbackTimer = null;
 							}
-						} else if (Hls.isSupported()) {
-							attachHlsPlayback(video, videoUrl, 'HLS.js');
+							if (errorHandler) {
+								video.removeEventListener('error', errorHandler);
+							}
+							if (startupHandler) {
+								video.removeEventListener('loadeddata', startupHandler);
+								video.removeEventListener('canplay', startupHandler);
+							}
+							if (nativeHlsFallbackCleanupRef?.current === cleanupNativeFallback) {
+								nativeHlsFallbackCleanupRef.current = null;
+							}
+						};
+						nativeHlsFallbackCleanupRef.current = cleanupNativeFallback;
+
+						const tryHlsJsFallback = (reason = 'native-hls-timeout') => {
+							if (fallbackTriggered || !hlsJsSupported || isStaleLoad()) return;
+							fallbackTriggered = true;
+							cleanupNativeFallback();
 							hlsEngine = 'hls.js';
-						} else {
-							throw new Error('HLS playback not supported on this device');
-						}
-					} else {
-						video.src = videoUrl;
+							appendPlaybackDiagnostic?.({
+								scope: 'hls-engine',
+								stage: 'fallback',
+								status: 'applied',
+								reason,
+								message: 'Native HLS fallback started with HLS.js.'
+							});
+
+							video.src = '';
+							video.removeAttribute('src');
+							attachHlsPlayback(video, videoUrl, 'HLS.js');
+							setMediaSourceData((previousValue) => ({
+								...(previousValue || mediaSource),
+								__debugHlsEngine: 'hls.js'
+							}));
+						};
+
+						fallbackTimer = setTimeout(() => {
+							if (!isStaleLoad() && video.readyState < 2) {
+								tryHlsJsFallback('native-hls-timeout');
+							}
+						}, 3500);
+
+						errorHandler = (event) => {
+							if (isStaleLoad()) return;
+							console.error('Native HLS error:', event);
+							cleanupNativeFallback();
+							appendPlaybackDiagnostic?.({
+								scope: 'hls-engine',
+								stage: 'native-error',
+								status: 'failed',
+								reason: 'native-hls-error',
+								message: 'Native HLS emitted an error before startup.'
+							});
+							tryHlsJsFallback('native-hls-error');
+						};
+						startupHandler = () => {
+							cleanupNativeFallback();
+						};
+
+						video.addEventListener('error', errorHandler, {once: true});
+						video.addEventListener('loadeddata', startupHandler, {once: true});
+						video.addEventListener('canplay', startupHandler, {once: true});
 					}
 
-				setMediaSourceData((previousValue) => ({
-					...(previousValue || mediaSource),
-					__debugHlsEngine: isHls ? (hlsEngine || 'unknown') : null
-				}));
+					video.src = videoUrl;
+					hlsEngine = 'native';
+				} else if (hlsPreference.engine === 'hls.js') {
+					appendPlaybackDiagnostic?.({
+						scope: 'hls-engine',
+						stage: 'select',
+						status: 'applied',
+						reason: hlsPreference.reason,
+						message: 'Using HLS.js playback.'
+					});
+					attachHlsPlayback(video, videoUrl, 'HLS.js');
+					hlsEngine = 'hls.js';
+				} else {
+					appendPlaybackDiagnostic?.({
+						scope: 'hls-engine',
+						stage: 'select',
+						status: 'failed',
+						reason: hlsPreference.reason,
+						message: 'No supported HLS playback engine is available.'
+					});
+					throw new Error('HLS playback not supported on this device');
+				}
+			} else {
+				video.src = videoUrl;
+			}
+			if (isStaleLoad()) return;
 
-				video.load();
+			setMediaSourceData((previousValue) => ({
+				...(previousValue || mediaSource),
+				__debugHlsEngine: isHls ? (hlsEngine || 'unknown') : null
+			}));
+
+			video.load();
 			try {
 				await video.play();
 			} catch (playError) {
+				if (isStaleLoad()) return;
 				if (isFatalPlaybackError(playError)) {
 					const errorMessage = getPlaybackErrorMessage(playError);
 					if (!useTranscoding) {
 						const didFallback = await attemptTranscodeFallback(errorMessage);
+						if (isStaleLoad()) return;
 						if (didFallback) {
 							return;
 						}
@@ -460,11 +457,13 @@ export const usePlayerVideoLoader = ({
 					return;
 				}
 			}
+			if (isStaleLoad()) return;
 
 			if (startWatchTimerRef.current) {
 				clearTimeout(startWatchTimerRef.current);
 			}
 			startWatchTimerRef.current = setTimeout(() => {
+				if (isStaleLoad()) return;
 				if (!videoRef.current) return;
 
 				const last = lastProgressRef.current || {time: 0, timestamp: 0};
@@ -497,6 +496,7 @@ export const usePlayerVideoLoader = ({
 				clearTimeout(failStartTimerRef.current);
 			}
 			failStartTimerRef.current = setTimeout(() => {
+				if (isStaleLoad()) return;
 				if (playbackFailureLockedRef.current) return;
 				const videoElement = videoRef.current;
 				if (!videoElement) return;
@@ -505,22 +505,27 @@ export const usePlayerVideoLoader = ({
 				showPlaybackError('Playback failed to start. Please try again.');
 			}, 12000);
 		} catch (err) {
+			if (isStaleLoad()) return;
 			console.error('Failed to load video:', err);
 			showPlaybackError(getPlaybackErrorMessage(err, 'Failed to load video'));
 		}
 	}, [
+		appendPlaybackDiagnostic,
 		attachHlsPlayback,
 		attemptPlaybackSessionRebuild,
 		attemptTranscodeFallback,
 		failStartTimerRef,
 		hlsRef,
 		item,
+		nativeHlsFallbackCleanupRef,
 		lastProgressRef,
+		loadRequestIdRef,
 		loadTrackPreferences,
 		loadVideoRef,
 		pendingOverrideClearRef,
 		pickPreferredAudio,
 		pickPreferredSubtitle,
+		playbackStartedRef,
 		playbackFailureLockedRef,
 		playbackOptions,
 		playbackOverrideRef,

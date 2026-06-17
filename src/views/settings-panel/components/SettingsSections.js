@@ -50,6 +50,22 @@ const SettingsSections = ({
 	openSubtitleLangPopup,
 	subtitleBurnInTextCodecsLabel,
 	openSubtitleBurnInTextCodecsPopup,
+	subtitleOverlaySizeLabel,
+	subtitleOverlayPositionLabel,
+	subtitleOverlayBackgroundLabel,
+	subtitleOverlayWeightLabel,
+	subtitleOverlayTextColorLabel,
+	subtitleOverlayBorderStyleLabel,
+	subtitleOverlayBorderColorLabel,
+	subtitleOverlayBorderStrengthLabel,
+	openSubtitleOverlaySizePopup,
+	openSubtitleOverlayPositionPopup,
+	openSubtitleOverlayBackgroundPopup,
+	openSubtitleOverlayWeightPopup,
+	openSubtitleOverlayTextColorPopup,
+	openSubtitleOverlayBorderStylePopup,
+	openSubtitleOverlayBorderColorPopup,
+	openSubtitleOverlayBorderStrengthPopup,
 	getBitrateLabel,
 	openBitratePopup,
 	getNavbarThemeLabel,
@@ -83,6 +99,7 @@ const SettingsSections = ({
 	});
 	const activeSectionKeys = TAB_SECTION_KEYS[activeTabKey] || TAB_SECTION_KEYS[DEFAULT_TAB_KEY];
 	const userIdLabel = userInfo?.Id ? `${userInfo.Id.substring(0, 8)}...` : 'Unknown';
+	const smartSubtitleTranscodingEnabled = settings.smartSubtitleTranscoding !== false;
 
 	const handleTabClick = useCallback((event) => {
 		const tabKey = event.currentTarget.dataset.settingsTab;
@@ -356,10 +373,18 @@ const SettingsSections = ({
 						</SwitchItem>
 						<SwitchItem
 							className={css.switchItem}
+							onToggle={settingToggleHandlers.smartSubtitleTranscoding}
+							selected={smartSubtitleTranscodingEnabled}
+						>
+							Smart Subtitle Transcoding
+						</SwitchItem>
+						<SwitchItem
+							className={css.switchItem}
 							onToggle={settingToggleHandlers.enableSubtitleBurnIn}
+							disabled={smartSubtitleTranscodingEnabled}
 							selected={settings.enableSubtitleBurnIn !== false}
 						>
-							Enable Subtitle Burn-in
+							Manual Subtitle Burn-in
 						</SwitchItem>
 						<SwitchItem
 							className={css.switchItem}
@@ -371,8 +396,13 @@ const SettingsSections = ({
 						<Item
 							className={css.settingItem}
 							label="Subtitle Burn-in Formats"
-							slotAfter={settings.enableSubtitleBurnIn === false ? 'Disabled' : subtitleBurnInTextCodecsLabel}
-							onClick={openSubtitleBurnInTextCodecsPopup}
+							disabled={smartSubtitleTranscodingEnabled}
+							slotAfter={
+								smartSubtitleTranscodingEnabled
+									? 'Managed by Smart'
+									: (settings.enableSubtitleBurnIn === false ? 'Disabled' : subtitleBurnInTextCodecsLabel)
+							}
+							onClick={smartSubtitleTranscodingEnabled ? null : openSubtitleBurnInTextCodecsPopup}
 						/>
 					</section>
 				) : null}
@@ -385,6 +415,54 @@ const SettingsSections = ({
 						label="Navigation Theme"
 						slotAfter={getNavbarThemeLabel(settings.navbarTheme)}
 						onClick={openNavbarThemePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Size"
+						slotAfter={subtitleOverlaySizeLabel}
+						onClick={openSubtitleOverlaySizePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Position"
+						slotAfter={subtitleOverlayPositionLabel}
+						onClick={openSubtitleOverlayPositionPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Background"
+						slotAfter={subtitleOverlayBackgroundLabel}
+						onClick={openSubtitleOverlayBackgroundPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Font Weight"
+						slotAfter={subtitleOverlayWeightLabel}
+						onClick={openSubtitleOverlayWeightPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Text Color"
+						slotAfter={subtitleOverlayTextColorLabel}
+						onClick={openSubtitleOverlayTextColorPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Border Style"
+						slotAfter={subtitleOverlayBorderStyleLabel}
+						onClick={openSubtitleOverlayBorderStylePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Border Color"
+						slotAfter={subtitleOverlayBorderColorLabel}
+						onClick={openSubtitleOverlayBorderColorPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Border Strength"
+						slotAfter={subtitleOverlayBorderStrengthLabel}
+						onClick={openSubtitleOverlayBorderStrengthPopup}
 					/>
 					<SwitchItem
 						className={css.switchItem}
@@ -481,6 +559,13 @@ const SettingsSections = ({
 						selected={settings.showFocusDebugOverlay === true}
 					>
 						Focus Debug Overlay (All Panels)
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.verboseAppLogs}
+						selected={settings.verboseAppLogs === true}
+					>
+						Verbose App Logs
 					</SwitchItem>
 					{isNonStableBuild ? (
 						<SwitchItem

@@ -21,6 +21,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Auto-focus first actionable popup option on open | `usePopupInitialFocus` |
 | Centralize PlayerPanel remote/media-key handling | `usePlayerKeyboardShortcuts` |
 | Centralize PlayerPanel external/internal controls-visibility synchronization | `usePlayerVisibilitySync` |
+| Reveal PlayerPanel controls from wheel/pointer-edge interaction | `usePlayerInteractionReveal` |
 | Centralize PlayerPanel video loading/session selection flow | `usePlayerVideoLoader` |
 | Centralize PlayerPanel playback option/session-context builders | `usePlayerPlaybackContext` |
 | Centralize PlayerPanel skip overlay + next-episode prompt state machine | `usePlayerSkipOverlayState` |
@@ -48,11 +49,14 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize Media Details per-item bootstrap effect (data load + selection reset) | `useMediaDetailsItemBootstrap` |
 | Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
 | Keep component state synced to settings changes | `useBreezyfinSettingsSync` |
+| Gate settings-sync and other panel-scoped side effects behind `isActive` | pass `enabled: isActive` to `useBreezyfinSettingsSync` and similar effect hooks |
 | Persist crash recovery action/context across ErrorBoundary remounts | `src/utils/crashRecovery.js` helpers |
 | Fast lookup of items by id/key | `useMapById` |
 | Fetch item metadata with cancel-safe effect | `useItemMetadata` |
 | Reusable toast lifecycle | `useToastMessage` |
 | Reusable image fallback behavior | `useImageErrorFallback` |
+| Build shared Jellyfin image URLs without panel/service coupling | `buildItemImageUrl` / `buildUserPrimaryImageUrl` |
+| Build duplicate-safe media list React keys | `buildMediaListItemKey` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
 | Derive Settings runtime capability labels from capability snapshot | `useRuntimeCapabilityLabels` |
 | Centralize Settings bootstrap data loading/effects | `useSettingsBootstrap` |
@@ -68,6 +72,13 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Keep focused grid cards visible and trigger load-more prefetch | `shouldLoadMoreFromGridFocus` |
 | Route right-most grid-card focus to adjacent filter controls | `focusTargetFromRightMostGridItem` |
 | Resolve current Jellyfin username for request/tag matching | `getJellyfinUsername` |
+| Decide Smart/manual subtitle burn-in policy | `getSubtitleTranscodePolicy` |
+| Build structured playback/player diagnostic entries | `createPlaybackDiagnostic` / `appendPlaybackDiagnostic` / `buildMediaSegmentsLoadDiagnostic` |
+| Build consistent playback restart/reload overrides | `buildPlaybackOverride` / `resolveVideoSeekSeconds` |
+| Keep PlayerPanel loader decisions pure/testable | `buildPlayerPlaybackSettingsSnapshot` / `resolveInitialTrackSelection` / `resolvePlaybackVideoUrl` / `selectHlsEnginePreference` |
+| Normalize PlayerPanel subtitle renderer failure and fallback status names | `normalizeSubtitleRendererFailureReason` / `getSubtitleBurnInFallbackStatus` |
+| Fetch, normalize, place, cache, and render PlayerPanel subtitle cues | `getSubtitleTrackEvents` / `normalizeSubtitleEvents` / `usePlayerSubtitleRenderer` |
+| Normalize PlayerPanel subtitle overlay appearance and cue grouping | `getSubtitleOverlayAttributes` / `groupSubtitleCuesByPlacement` |
 
 ---
 
@@ -89,16 +100,19 @@ usePanelScrollState({
 - Returns:
   - `scrollTop`
   - `setScrollTop`
+  - `commitScrollTop(rawTop)` for explicitly flushing the latest scroll position before navigation/back
   - `captureScrollTo` (pass to `Scroller` `cbScrollTo`)
   - `handleScrollStop` (pass to `Scroller` `onScrollStop`)
 - Use when:
   - panel has cached state and should restore scroll on return.
   - panel wants keyed cache (`cacheKey`), e.g. per library id/item id.
+  - panel must persist scroll before leaving, e.g. Back/item navigation can happen before `onScrollStop`.
 - Example:
 ```js
 const {
   captureScrollTo,
-  handleScrollStop
+  handleScrollStop,
+  commitScrollTop
 } = usePanelScrollState({
   cachedState,
   isActive,
@@ -310,6 +324,23 @@ usePlayerVisibilitySync({
 })
 ```
 
+### `usePlayerInteractionReveal`
+- File: `src/views/player-panel/hooks/usePlayerInteractionReveal.js`
+- Purpose: reveal PlayerPanel controls from non-keyboard interaction without changing focus or playback state:
+  - wheel/scroll-wheel always reveals controls
+  - pointer/mouse movement reveals controls only near the top or bottom screen edge
+  - passive listeners and `requestAnimationFrame` throttling keep the handler low-risk during playback
+- Signature:
+```js
+usePlayerInteractionReveal({
+  enabled,
+  disabled,
+  showControls,
+  setShowControls,
+  lastInteractionRef
+})
+```
+
 ### `usePlayerVideoLoader`
 - File: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
 - Purpose: encapsulate the PlayerPanel playback load pipeline:
@@ -355,7 +386,8 @@ const loadVideo = usePlayerVideoLoader({
   attemptPlaybackSessionRebuild,
   playbackFailureLockedRef,
   failStartTimerRef,
-  playbackSessionRef
+  playbackSessionRef,
+  appendPlaybackDiagnostic
 });
 ```
 
@@ -628,6 +660,10 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer.
 
 ### Player and media detail helpers
+- `src/utils/imageUrls.js`
+  - shared image URL builders for item/user image URLs with preferred image format handling.
+- `src/utils/reactKeys.js`
+  - `buildMediaListItemKey(scope, item, index)` keeps repeated media list keys unique when Jellyfin returns duplicate item ids.
 - `src/views/player-panel/utils/playerPanelHelpers.js`
   - `formatPlaybackTime(seconds)`
   - `getPlayerHeaderTitle(item)` (builds formatted episode title with season/episode prefix when available)
@@ -637,6 +673,28 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/player-panel/utils/episodeNavigation.js`
   - `getNextEpisodeForItem(service, item)`
   - `getPreviousEpisodeForItem(service, item)`
+- `src/services/jellyfin/playback-api/diagnostics.js`
+  - `createPlaybackDiagnostic(entry)`
+  - `appendPlaybackDiagnostic(diagnostics, entry)`
+- `src/views/player-panel/utils/playbackOverride.js`
+  - `buildPlaybackOverride(options)`
+  - `resolveVideoSeekSeconds(video, seekOffset?)`
+- `src/views/player-panel/utils/playerVideoLoaderHelpers.js`
+  - `buildPlayerPlaybackSettingsSnapshot({settings, playbackOptions, playbackOverride, forceTranscodeOverride})`
+  - `resolveInitialTrackSelection({audioStreams, subtitleStreams, playbackOptions, playbackOverride, pickPreferredAudio, pickPreferredSubtitle})`
+  - `resolvePlaybackVideoUrl({service, itemId, mediaSource, playbackInfo, resolvedPlayMethod})`
+  - `selectHlsEnginePreference({isHls, isHdrLikeStream, nativeHlsSupported, hlsJsSupported})`
+- `src/views/player-panel/utils/playerDiagnostics.js`
+  - `buildMediaSegmentsLoadDiagnostic({segments?, error?})`
+- `src/views/player-panel/utils/subtitleRendererStatus.js`
+  - `normalizeSubtitleRendererFailureReason(reason, fallback?)`
+  - `getSubtitleBurnInFallbackStatus({fallbackAllowed?, fallbackAlreadyStarted?, hasFallbackHandler?})`
+- `src/views/player-panel/utils/subtitleRenderer.js`
+  - `normalizeSubtitleEvents(events)` stores sanitized cue lines, strips unsupported ASS/SSA override blocks, maps ASS `\an` placement/alignment, and keeps basic bold/italic/underline hints.
+  - `findActiveSubtitleCues(events, currentTimeSeconds)` returns normalized active cues for overlay rendering.
+- `src/views/player-panel/utils/subtitleOverlaySettings.js`
+  - `getSubtitleOverlayAttributes(settings, controlsVisible)` normalizes subtitle appearance settings into overlay `data-*` attributes.
+  - `groupSubtitleCuesByPlacement(cues)` groups active cues into top/middle/bottom and left/center/right render buckets.
 - `src/views/media-details-panel/utils/mediaDetailsHelpers.js`
   - language display mapping, track summary labels
   - season/episode image fallback resolution
@@ -663,6 +721,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes player keyboard/media key handling with seek/context guards.
 - `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
   - centralizes external/internal controls-visibility synchronization effects.
+- `src/views/player-panel/hooks/usePlayerInteractionReveal.js`
+  - centralizes wheel and pointer-edge PlayerPanel controls reveal behavior without focus/playback side effects.
 - `src/views/player-panel/hooks/usePlayerVideoLoader.js`
   - centralizes playback source/session selection and video load orchestration.
 - `src/views/player-panel/hooks/usePlayerPlaybackContext.js`

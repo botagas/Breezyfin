@@ -397,9 +397,10 @@ export const buildPlaybackRequestContext = (options = {}) => {
 	// Keep base payload conservative for HDR/DV. Non-forced preference is applied later as a source probe.
 	const preferFmp4Mp4 = forceFmp4HlsContainerPreference || (!hasEnableFmp4Preference && legacyPreferFmp4Preference === true);
 	const forceSubtitleBurnIn = options.forceSubtitleBurnIn === true;
+	const smartSubtitleTranscoding = options.smartSubtitleTranscoding !== false;
 	const enableSubtitleBurnIn = options.enableSubtitleBurnIn !== false;
 	const allowSubtitleBurnInOnHdr = options.forceSubtitleBurnInOnHdr === true;
-	const subtitleBurnInTextCodecs = Array.isArray(options.subtitleBurnInTextCodecs)
+	const subtitleBurnInTextCodecs = !smartSubtitleTranscoding && Array.isArray(options.subtitleBurnInTextCodecs)
 		? options.subtitleBurnInTextCodecs
 			.map((codec) => String(codec || '').trim().toLowerCase())
 			.filter(Boolean)
@@ -450,6 +451,7 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		enableTranscoding,
 		requestedAudioStreamIndex,
 		forceSubtitleBurnIn,
+		smartSubtitleTranscoding,
 		enableSubtitleBurnIn,
 		allowSubtitleBurnInOnHdr,
 		subtitleBurnInTextCodecs,

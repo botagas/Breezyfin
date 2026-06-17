@@ -171,6 +171,35 @@ export const useMediaDetailsFocusOrchestrator = ({
 		null
 	), [css.introPlayButton, css.primaryButton, detailsContainerRef, playPrimaryButtonRef]);
 
+	const getFavoriteActionTarget = useCallback(() => (
+		resolveRefNode(favoriteActionButtonRef) ||
+		detailsContainerRef.current?.querySelector?.('[data-spotlight-id="details-favorite-action"]') ||
+		null
+	), [detailsContainerRef, favoriteActionButtonRef]);
+
+	const getWatchedActionTarget = useCallback(() => (
+		resolveRefNode(watchedActionButtonRef) ||
+		detailsContainerRef.current?.querySelector?.('[data-spotlight-id="details-watched-action"]') ||
+		null
+	), [detailsContainerRef, watchedActionButtonRef]);
+
+	const getFirstSectionControlTargets = useCallback(() => ([
+		getAudioSelectorTarget(),
+		getSubtitleSelectorTarget(),
+		getPrimaryPlayTarget(),
+		getFavoriteActionTarget(),
+		getWatchedActionTarget()
+	].filter((target, index, targets) => (
+		target?.focus &&
+		targets.findIndex((candidate) => candidate === target || candidate?.contains?.(target)) === index
+	))), [
+		getAudioSelectorTarget,
+		getFavoriteActionTarget,
+		getPrimaryPlayTarget,
+		getSubtitleSelectorTarget,
+		getWatchedActionTarget
+	]);
+
 	const getBackNavigationTarget = useCallback(() => (
 		detailsContainerRef.current?.querySelector?.('[data-bf-md-nav="back"]') || null
 	), [detailsContainerRef]);
@@ -206,6 +235,27 @@ export const useMediaDetailsFocusOrchestrator = ({
 		}
 		return false;
 	}, [focusNodeWithoutScroll, getPrimaryPlayTarget]);
+
+	const focusFirstSectionControlByDirection = useCallback((currentTarget, direction) => {
+		const controls = getFirstSectionControlTargets();
+		if (controls.length === 0) return false;
+		const active = currentTarget || document.activeElement;
+		let currentIndex = controls.findIndex((target) => (
+			target === active ||
+			target?.contains?.(active) ||
+			active?.contains?.(target)
+		));
+		if (currentIndex < 0) {
+			currentIndex = direction === 'left' ? controls.length : -1;
+		}
+		const nextIndex = direction === 'left'
+			? Math.max(0, currentIndex - 1)
+			: Math.min(controls.length - 1, currentIndex + 1);
+		const nextTarget = controls[nextIndex];
+		if (!nextTarget?.focus || nextTarget === controls[currentIndex]) return false;
+		focusNodeWithoutScroll(nextTarget);
+		return true;
+	}, [focusNodeWithoutScroll, getFirstSectionControlTargets]);
 
 	const focusBackNavigationNoScroll = useCallback(() => {
 		const target = getBackNavigationTarget();
@@ -439,6 +489,7 @@ export const useMediaDetailsFocusOrchestrator = ({
 		focusNonSeriesAudioSelector,
 		focusNonSeriesSubtitleSelector,
 		focusNonSeriesPrimaryPlay,
+		focusFirstSectionControlByDirection,
 		handleDetailsPointerDownCapture,
 		handleDetailsPointerClickCapture
 	};

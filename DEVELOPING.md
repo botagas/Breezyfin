@@ -7,7 +7,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 - Reuse existing shared hooks/components before introducing new abstractions.
 - Keep panel logic modular with panel-local `components/`, `hooks/`, and `utils/` folders.
 - Keep styling token-driven and theme-consistent.
-- Keep Media Details section-switch focus playback-first (`Audio -> Subtitle -> Play`, then fallbacks).
+- Keep Media Details first-section focus playback-first (`Audio -> Subtitle -> Play -> Favorite -> Watched`, skipping missing controls).
 - Keep comments minimal; only document non-obvious constraints, tradeoffs, or behavior.
 
 ## Related docs
@@ -58,6 +58,10 @@ Audit results are decision inputs, not style targets. If an audit flags an inten
 - Player episode/surface interaction handlers: `src/views/player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers.js`
 - Player recovery/fallback handlers: `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
 - Player lifecycle effects: `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
+- Smart/manual subtitle burn-in policy: `src/services/jellyfin/playbackSelection.js` (`getSubtitleTranscodePolicy`)
+- Player client-side subtitle renderer/cue cache: `src/views/player-panel/hooks/usePlayerSubtitleRenderer.js`
+- Playback diagnostics: record optional probe/fallback outcomes via `src/services/jellyfin/playback-api/diagnostics.js` and expose them through PlayerPanel debug state instead of adding noisy user-facing toasts.
+- Jellyfin subtitle event fetch contract: `src/services/jellyfin/subtitleApi.js` returns structured `{ok, events, rawShape, error, path}` results.
 - Media details focus debug tracing: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
 - Media details focus orchestration: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
 - Media details section snap/focus navigation orchestration: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
@@ -158,6 +162,8 @@ Jellyfin service paths:
 - `src/services/jellyfin/playbackApi.js` (playback info, playback URLs, playback progress reporting)
 - `src/services/jellyfin/playbackSelection.js` (media-source/audio selection and compatibility logic)
 - `src/services/jellyfin/playbackProfileBuilder.js` (playback profile request context)
+- `src/services/jellyfin/subtitleApi.js` (subtitle event fetch helpers for client-side rendering)
+- `src/services/jellyfin/requestsApi.js` (plugin-first My Requests paging with bounded tag fallback)
 
 Service rule:
 - Keep `jellyfinService` as a thin orchestrator; move domain-specific behavior to `src/services/jellyfin/*` modules.

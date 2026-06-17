@@ -56,6 +56,7 @@ export const createPanelChildren = ({
 		<LoginPanel
 			key="login"
 			onLogin={handleLogin}
+			onNavigate={handleNavigate}
 			isActive={currentView === 'login'}
 			sessionNotice={loginNotice}
 			sessionNoticeNonce={loginNoticeNonce}

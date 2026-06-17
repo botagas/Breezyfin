@@ -29,9 +29,9 @@ export const useMediaDetailsInteractionHandlers = ({
 	focusNonSeriesSubtitleSelector,
 	focusNonSeriesPrimaryPlay,
 	focusNonSeriesAudioSelector,
+	focusFirstSectionControlByDirection,
 	focusNodeWithoutScroll,
 	focusIntroTopNavigation,
-	focusTopHeaderAction,
 	focusFirstSectionPrimary,
 	focusSecondSectionPrimary,
 	showEpisodeInfoButton,
@@ -450,7 +450,17 @@ export const useMediaDetailsInteractionHandlers = ({
 	]);
 
 	const handleAudioSelectorKeyDown = useCallback((event) => {
-		if (event.keyCode === KeyCodes.DOWN) {
+		if (event.keyCode === KeyCodes.RIGHT) {
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'right')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		} else if (event.keyCode === KeyCodes.LEFT) {
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'left')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		} else if (event.keyCode === KeyCodes.DOWN) {
 			if (typeof focusSecondSectionPrimary === 'function' && focusSecondSectionPrimary()) {
 				event.preventDefault();
 				event.stopPropagation();
@@ -471,12 +481,23 @@ export const useMediaDetailsInteractionHandlers = ({
 	}, [
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesSubtitleSelector,
+		focusFirstSectionControlByDirection,
 		focusIntroTopNavigation,
 		focusSecondSectionPrimary
 	]);
 
 	const handleSubtitleSelectorKeyDown = useCallback((event) => {
-		if (event.keyCode === KeyCodes.DOWN) {
+		if (event.keyCode === KeyCodes.RIGHT) {
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'right')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		} else if (event.keyCode === KeyCodes.LEFT) {
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'left')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		} else if (event.keyCode === KeyCodes.DOWN) {
 			if (typeof focusSecondSectionPrimary === 'function' && focusSecondSectionPrimary()) {
 				event.preventDefault();
 				event.stopPropagation();
@@ -495,11 +516,22 @@ export const useMediaDetailsInteractionHandlers = ({
 		focusIntroTopNavigation,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
+		focusFirstSectionControlByDirection,
 		focusSecondSectionPrimary
 	]);
 
 	const handleNonSeriesPlayKeyDown = useCallback((event) => {
-		if (event.keyCode === KeyCodes.DOWN) {
+		if (event.keyCode === KeyCodes.LEFT) {
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'left')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		} else if (event.keyCode === KeyCodes.RIGHT) {
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'right')) return;
+			event.preventDefault();
+			event.stopPropagation();
+		} else if (event.keyCode === KeyCodes.DOWN) {
 			event.preventDefault();
 			event.stopPropagation();
 			if (typeof focusSecondSectionPrimary === 'function' && focusSecondSectionPrimary()) return;
@@ -509,18 +541,13 @@ export const useMediaDetailsInteractionHandlers = ({
 			event.stopPropagation();
 			if (typeof focusIntroTopNavigation === 'function' && focusIntroTopNavigation()) return;
 			if (!focusNonSeriesSubtitleSelector()) focusNonSeriesAudioSelector();
-		} else if (event.keyCode === KeyCodes.RIGHT) {
-			if (typeof focusTopHeaderAction !== 'function') return;
-			if (!focusTopHeaderAction()) return;
-			event.preventDefault();
-			event.stopPropagation();
 		}
 	}, [
 		focusIntroTopNavigation,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesSubtitleSelector,
-		focusTopHeaderAction,
+		focusFirstSectionControlByDirection,
 		focusSecondSectionPrimary
 	]);
 

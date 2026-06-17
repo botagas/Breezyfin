@@ -1,7 +1,11 @@
 import {useCallback} from 'react';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
-import {shouldTranscodeForSubtitleSelection} from '../../../services/jellyfin/playbackSelection';
+import {
+	getSubtitleTranscodePolicy,
+	shouldTranscodeForSubtitleSelection
+} from '../../../services/jellyfin/playbackSelection';
+import {buildPlaybackOverride} from '../utils/playbackOverride';
 
 const normalizeTrackToken = (value) => String(value || '').trim().toLowerCase();
 
@@ -157,15 +161,14 @@ export const usePlayerSeekAndTrackSwitching = ({
 			try {
 				const seekTicks = Math.floor(seekTime * JELLYFIN_TICKS_PER_SECOND);
 				setLoading(true);
-				playbackOverrideRef.current = {
-					...(playbackOptions || {}),
-					mediaSourceId: mediaSourceData?.Id || playbackOptions?.mediaSourceId,
-					audioStreamIndex: Number.isInteger(currentAudioTrack) ? currentAudioTrack : undefined,
-					subtitleStreamIndex: currentSubtitleTrack >= 0 ? currentSubtitleTrack : undefined,
+				playbackOverrideRef.current = buildPlaybackOverride({
+					baseOptions: playbackOptions,
+					mediaSourceId: mediaSourceData?.Id,
+					audioStreamIndex: currentAudioTrack,
+					subtitleStreamIndex: currentSubtitleTrack,
 					startTimeTicks: seekTicks,
-					seekSeconds: seekTime,
-					forceNewSession: true
-				};
+					seekSeconds: seekTime
+				});
 				await handleStop();
 				loadVideo();
 			} catch (err) {
@@ -197,14 +200,13 @@ export const usePlayerSeekAndTrackSwitching = ({
 	const reloadWithTrackSelection = useCallback(async (audioIndex, subtitleIndex) => {
 		if (!videoRef.current) return;
 		const currentPosition = videoRef.current.currentTime || 0;
-		playbackOverrideRef.current = {
-			...(playbackOptions || {}),
-			mediaSourceId: mediaSourceData?.Id || playbackOptions?.mediaSourceId,
-			audioStreamIndex: Number.isInteger(audioIndex) ? audioIndex : undefined,
-			subtitleStreamIndex: (subtitleIndex === -1 || Number.isInteger(subtitleIndex)) ? subtitleIndex : undefined,
-			seekSeconds: currentPosition,
-			forceNewSession: true
-		};
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex: audioIndex,
+			subtitleStreamIndex: subtitleIndex,
+			seekSeconds: currentPosition
+		});
 		setLoading(true);
 		await handleStop();
 		loadVideo();
@@ -214,10 +216,23 @@ export const usePlayerSeekAndTrackSwitching = ({
 		if (!(Number.isInteger(trackIndex) && trackIndex >= 0)) return false;
 		const settings = playbackSettingsRef?.current || {};
 		return shouldTranscodeForSubtitleSelection(mediaSourceData, trackIndex, {
+			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
 			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
 			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
 		});
+	}, [mediaSourceData, playbackSettingsRef]);
+
+	const shouldUseClientSubtitleRenderer = useCallback((trackIndex) => {
+		if (!(Number.isInteger(trackIndex) && trackIndex >= 0)) return false;
+		const settings = playbackSettingsRef?.current || {};
+		const policy = getSubtitleTranscodePolicy(mediaSourceData, trackIndex, {
+			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
+			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
+			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
+			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
+		});
+		return policy.clientRender === true;
 	}, [mediaSourceData, playbackSettingsRef]);
 
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
@@ -258,6 +273,11 @@ export const usePlayerSeekAndTrackSwitching = ({
 			return;
 		}
 
+		if (shouldUseClientSubtitleRenderer(trackIndex)) {
+			setToastMessage('Rendering subtitles in app.');
+			return;
+		}
+
 		if (hlsRef.current) {
 			if (typeof hlsRef.current.subtitleTrack === 'number' && hlsRef.current.subtitleTracks) {
 				const hlsTrackIndex = resolveHlsTrackIndex({
@@ -282,6 +302,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		saveSubtitleSelection,
 		setCurrentSubtitleTrack,
 		shouldForceSubtitleReload,
+		shouldUseClientSubtitleRenderer,
 		setToastMessage,
 		subtitleTracks
 	]);

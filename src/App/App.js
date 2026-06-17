@@ -335,6 +335,15 @@ const App = (props) => {
 	useEffect(() => {
 		let cancelled = false;
 		const restoreSession = async () => {
+			if (peekCrashRecoveryAction() === CRASH_RECOVERY_ACTIONS.HOME) {
+				consumeCrashRecoveryAction();
+				crashRecoveryPendingRef.current = false;
+				resetSessionState();
+				setCurrentView('login');
+				setLoginNotice('Crash recovery paused automatic sign-in. Choose an account or open diagnostics.');
+				setLoginNoticeNonce((value) => value + 1);
+				return;
+			}
 			const restored = jellyfinService.restoreSession();
 			if (!restored) return;
 			const user = await jellyfinService.getCurrentUser();
@@ -350,7 +359,7 @@ const App = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [applyPendingCrashRecovery, handleSessionExpired]);
+	}, [applyPendingCrashRecovery, handleSessionExpired, resetSessionState]);
 
 	useEffect(() => {
 		const onSessionExpired = (event) => {

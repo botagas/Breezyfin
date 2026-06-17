@@ -4,9 +4,18 @@ export const DEFAULT_SETTINGS = {
 	maxBitrate: '40',
 	enableTranscoding: true,
 	forceTranscoding: false,
+	smartSubtitleTranscoding: true,
 	enableSubtitleBurnIn: true,
 	forceTranscodingWithSubtitles: false,
 	subtitleBurnInTextCodecs: ['ass', 'ssa'],
+	subtitleOverlaySize: 'medium',
+	subtitleOverlayPosition: 'standard',
+	subtitleOverlayBackground: 'medium',
+	subtitleOverlayWeight: 'bold',
+	subtitleOverlayTextColor: 'white',
+	subtitleOverlayBorderStyle: 'shadow',
+	subtitleOverlayBorderColor: 'black',
+	subtitleOverlayBorderStrength: 'medium',
 	relaxedPlaybackProfile: false,
 	preferredAudioLanguage: 'eng',
 	preferredSubtitleLanguage: 'eng',
@@ -26,6 +35,7 @@ export const DEFAULT_SETTINGS = {
 	showExtendedPlayerDebugOverlay: false,
 	showFocusDebugOverlay: false,
 	showDebugErrorMenu: false,
+	verboseAppLogs: false,
 	forceDolbyVision: false,
 	enableFmp4HlsContainerPreference: false,
 	forceFmp4HlsContainerPreference: false,
@@ -85,12 +95,72 @@ export const SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS = [
 	{value: 'ttml', label: 'TTML/DFXP'}
 ];
 
+export const SUBTITLE_OVERLAY_SIZE_OPTIONS = [
+	{value: 'small', label: 'Small'},
+	{value: 'medium', label: 'Medium (Default)'},
+	{value: 'large', label: 'Large'}
+];
+
+export const SUBTITLE_OVERLAY_POSITION_OPTIONS = [
+	{value: 'low', label: 'Low'},
+	{value: 'standard', label: 'Standard (Default)'},
+	{value: 'raised', label: 'Raised'}
+];
+
+export const SUBTITLE_OVERLAY_BACKGROUND_OPTIONS = [
+	{value: 'none', label: 'None'},
+	{value: 'low', label: 'Low'},
+	{value: 'medium', label: 'Medium (Default)'},
+	{value: 'high', label: 'High'}
+];
+
+export const SUBTITLE_OVERLAY_WEIGHT_OPTIONS = [
+	{value: 'regular', label: 'Regular'},
+	{value: 'bold', label: 'Bold (Default)'},
+	{value: 'black', label: 'Black'}
+];
+
+export const SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS = [
+	{value: 'white', label: 'White (Default)'},
+	{value: 'warmWhite', label: 'Warm White'},
+	{value: 'yellow', label: 'Yellow'},
+	{value: 'black', label: 'Black'}
+];
+
+export const SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS = [
+	{value: 'none', label: 'None'},
+	{value: 'shadow', label: 'Shadow (Default)'},
+	{value: 'outline', label: 'Outline'},
+	{value: 'box', label: 'Box'}
+];
+
+export const SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS = [
+	{value: 'black', label: 'Black (Default)'},
+	{value: 'white', label: 'White'},
+	{value: 'yellow', label: 'Yellow'},
+	{value: 'accent', label: 'Theme Accent'}
+];
+
+export const SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS = [
+	{value: 'low', label: 'Low'},
+	{value: 'medium', label: 'Medium (Default)'},
+	{value: 'high', label: 'High'}
+];
+
 export const SETTINGS_DISCLOSURE_KEYS = {
 	BITRATE: 'bitratePopup',
 	CAPABILITY_PROBE_REFRESH: 'capabilityProbeRefreshPopup',
 	AUDIO_LANGUAGE: 'audioLanguagePopup',
 	SUBTITLE_LANGUAGE: 'subtitleLanguagePopup',
 	SUBTITLE_BURN_IN_TEXT_CODECS: 'subtitleBurnInTextCodecsPopup',
+	SUBTITLE_OVERLAY_SIZE: 'subtitleOverlaySizePopup',
+	SUBTITLE_OVERLAY_POSITION: 'subtitleOverlayPositionPopup',
+	SUBTITLE_OVERLAY_BACKGROUND: 'subtitleOverlayBackgroundPopup',
+	SUBTITLE_OVERLAY_WEIGHT: 'subtitleOverlayWeightPopup',
+	SUBTITLE_OVERLAY_TEXT_COLOR: 'subtitleOverlayTextColorPopup',
+	SUBTITLE_OVERLAY_BORDER_STYLE: 'subtitleOverlayBorderStylePopup',
+	SUBTITLE_OVERLAY_BORDER_COLOR: 'subtitleOverlayBorderColorPopup',
+	SUBTITLE_OVERLAY_BORDER_STRENGTH: 'subtitleOverlayBorderStrengthPopup',
 	NAVBAR_THEME: 'navbarThemePopup',
 	PLAY_NEXT_PROMPT_MODE: 'playNextPromptModePopup',
 	LOGOUT_CONFIRM: 'logoutConfirmPopup',
@@ -104,6 +174,14 @@ export const SETTINGS_DISCLOSURE_KEY_LIST = [
 	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_STYLE,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_COLOR,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_STRENGTH,
 	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
 	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
 	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
@@ -117,6 +195,14 @@ export const INITIAL_SETTINGS_DISCLOSURES = {
 	[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_STYLE]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_COLOR]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_STRENGTH]: false,
 	[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME]: false,
 	[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM]: false,
@@ -131,6 +217,14 @@ export const DISCLOSURE_BACK_PRIORITY = [
 	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
 	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
 	SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_STRENGTH,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_COLOR,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BORDER_STYLE,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,

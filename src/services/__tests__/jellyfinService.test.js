@@ -94,6 +94,20 @@ describe('jellyfinService', () => {
 		expect(parsedImageUrl.searchParams.get('format')).toBe('Jpg');
 	});
 
+	it('builds user image urls without requiring an image tag', () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'token-123';
+
+		const imageUrl = jellyfinService.getUserImageUrl('user-1', 96);
+		const parsedImageUrl = new URL(imageUrl);
+
+		expect(parsedImageUrl.origin).toBe('http://media.local');
+		expect(parsedImageUrl.pathname).toBe('/Users/user-1/Images/Primary');
+		expect(parsedImageUrl.searchParams.get('api_key')).toBe('token-123');
+		expect(parsedImageUrl.searchParams.get('width')).toBe('96');
+		expect(parsedImageUrl.searchParams.has('tag')).toBe(false);
+	});
+
 	it('returns null image url when required context is missing', () => {
 		jellyfinService.serverUrl = null;
 		jellyfinService.accessToken = null;

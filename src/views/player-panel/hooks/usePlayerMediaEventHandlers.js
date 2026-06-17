@@ -8,6 +8,7 @@ export const usePlayerMediaEventHandlers = ({
 	item,
 	loading,
 	videoRef,
+	playbackStartedRef,
 	playbackOverrideRef,
 	setCurrentTime,
 	setLoading,
@@ -45,27 +46,23 @@ export const usePlayerMediaEventHandlers = ({
 		}
 	}, [item, playbackOverrideRef, setCurrentTime, videoRef]);
 
-	const handleLoadedData = useCallback(async () => {
-		if (loading && videoRef.current) {
-			setLoading(false);
-			try {
-				await videoRef.current.play();
-			} catch (playError) {
-				// Ignore non-fatal autoplay interruptions; surface unsupported formats immediately.
-				if (isFatalPlaybackError(playError)) {
-					showPlaybackError(getPlaybackErrorMessage(playError));
-				}
-			}
-		}
-	}, [loading, setLoading, showPlaybackError, videoRef]);
+	const handleLoadedData = useCallback(() => {
+		if (!videoRef.current || !loading) return;
+		// `canplay` owns startup finalization. `loadeddata` can fire too early on webOS.
+		lastProgressRef.current = {
+			time: videoRef.current.currentTime || 0,
+			timestamp: Date.now()
+		};
+	}, [lastProgressRef, loading, videoRef]);
 
 	const handleCanPlay = useCallback(async () => {
-		if (!videoRef.current || !loading) return;
+		if (!videoRef.current || playbackStartedRef.current) return;
 
-		setLoading(false);
+		playbackStartedRef.current = true;
 
 		try {
 			await videoRef.current.play();
+			setLoading(false);
 			setPlaying(true);
 			if (pendingOverrideClearRef.current) {
 				playbackOverrideRef.current = null;
@@ -81,6 +78,7 @@ export const usePlayerMediaEventHandlers = ({
 			await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
 			startProgressReporting();
 		} catch (playError) {
+			playbackStartedRef.current = false;
 			console.error('Auto-play failed:', playError);
 			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
 			setPlaying(false);
@@ -101,8 +99,8 @@ export const usePlayerMediaEventHandlers = ({
 		clearStartWatch,
 		getPlaybackSessionContext,
 		item,
-		loading,
 		pendingOverrideClearRef,
+		playbackStartedRef,
 		playbackOverrideRef,
 		setLoading,
 		setPlaying,

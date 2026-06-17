@@ -2,11 +2,26 @@ import {useCallback, useEffect, useState} from 'react';
 
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import jellyfinService from '../../../services/jellyfinService';
-import {getAppLogs} from '../../../utils/appLogger';
+import {getAppLogs, isVerboseLoggingEnabled, setVerboseLoggingEnabled} from '../../../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../../../utils/appInfo';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 import {setRuntimeCapabilityProbeRefreshDays} from '../../../utils/platformCapabilities';
-import {DEFAULT_SETTINGS, SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS} from '../constants';
+import {
+	DEFAULT_SETTINGS,
+	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
+	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
+	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
+	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
+	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
+	SUBTITLE_OVERLAY_POSITION_OPTIONS,
+	SUBTITLE_OVERLAY_SIZE_OPTIONS,
+	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
+	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
+} from '../constants';
+
+const normalizeOptionValue = (value, options, fallback) => {
+	return options.some((option) => option.value === value) ? value : fallback;
+};
 
 export const useSettingsBootstrap = ({
 	setSettings,
@@ -50,14 +65,65 @@ export const useSettingsBootstrap = ({
 				: DEFAULT_SETTINGS.forceFmp4HlsContainerPreference;
 			const forceFmp4HlsContainerPreference =
 				forceFmp4HlsContainerPreferenceRaw === true && enableFmp4HlsContainerPreference === true;
+			const subtitleOverlaySize = normalizeOptionValue(
+				parsed.subtitleOverlaySize,
+				SUBTITLE_OVERLAY_SIZE_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlaySize
+			);
+			const subtitleOverlayPosition = normalizeOptionValue(
+				parsed.subtitleOverlayPosition,
+				SUBTITLE_OVERLAY_POSITION_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayPosition
+			);
+			const subtitleOverlayBackground = normalizeOptionValue(
+				parsed.subtitleOverlayBackground,
+				SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayBackground
+			);
+			const subtitleOverlayWeight = normalizeOptionValue(
+				parsed.subtitleOverlayWeight,
+				SUBTITLE_OVERLAY_WEIGHT_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayWeight
+			);
+			const subtitleOverlayTextColor = normalizeOptionValue(
+				parsed.subtitleOverlayTextColor,
+				SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayTextColor
+			);
+			const subtitleOverlayBorderStyle = normalizeOptionValue(
+				parsed.subtitleOverlayBorderStyle,
+				SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayBorderStyle
+			);
+			const subtitleOverlayBorderColor = normalizeOptionValue(
+				parsed.subtitleOverlayBorderColor,
+				SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayBorderColor
+			);
+			const subtitleOverlayBorderStrength = normalizeOptionValue(
+				parsed.subtitleOverlayBorderStrength,
+				SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayBorderStrength
+			);
+			const verboseAppLogs = parsed.verboseAppLogs === true || isVerboseLoggingEnabled();
+			setVerboseLoggingEnabled(verboseAppLogs);
 			setRuntimeCapabilityProbeRefreshDays(capabilityProbeRefreshDays);
 			setSettings({
 				...DEFAULT_SETTINGS,
 				...parsedWithoutLegacyFmp4Preference,
 				capabilityProbeRefreshDays,
 				subtitleBurnInTextCodecs,
+				subtitleOverlaySize,
+				subtitleOverlayPosition,
+				subtitleOverlayBackground,
+				subtitleOverlayWeight,
+				subtitleOverlayTextColor,
+				subtitleOverlayBorderStyle,
+				subtitleOverlayBorderColor,
+				subtitleOverlayBorderStrength,
 				enableFmp4HlsContainerPreference,
 				forceFmp4HlsContainerPreference,
+				verboseAppLogs,
 				homeRows: {
 					...DEFAULT_SETTINGS.homeRows,
 					...(parsed.homeRows || {})

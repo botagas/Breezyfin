@@ -20,7 +20,15 @@ import {
 	DEFAULT_SETTINGS,
 	LANGUAGE_OPTIONS,
 	NAVBAR_THEME_OPTIONS,
-	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS
+	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
+	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
+	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
+	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
+	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
+	SUBTITLE_OVERLAY_POSITION_OPTIONS,
+	SUBTITLE_OVERLAY_SIZE_OPTIONS,
+	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
+	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from './settings-panel/constants';
 import {
 	getCapabilityProbeRefreshLabel,
@@ -80,10 +88,18 @@ const SettingsPanel = ({
 		closeDisclosure,
 		bitratePopupOpen,
 		capabilityProbeRefreshPopupOpen,
-		audioLangPopupOpen,
-		subtitleLangPopupOpen,
-		subtitleBurnInTextCodecsPopupOpen,
-		navbarThemePopupOpen,
+	audioLangPopupOpen,
+	subtitleLangPopupOpen,
+	subtitleBurnInTextCodecsPopupOpen,
+	subtitleOverlaySizePopupOpen,
+	subtitleOverlayPositionPopupOpen,
+	subtitleOverlayBackgroundPopupOpen,
+	subtitleOverlayWeightPopupOpen,
+	subtitleOverlayTextColorPopupOpen,
+	subtitleOverlayBorderStylePopupOpen,
+	subtitleOverlayBorderColorPopupOpen,
+	subtitleOverlayBorderStrengthPopupOpen,
+	navbarThemePopupOpen,
 		playNextPromptModePopupOpen,
 		logoutConfirmOpen,
 		logsPopupOpen,
@@ -96,9 +112,25 @@ const SettingsPanel = ({
 		closeAudioLangPopup,
 		openSubtitleLangPopup,
 		closeSubtitleLangPopup,
-		openSubtitleBurnInTextCodecsPopup,
-		closeSubtitleBurnInTextCodecsPopup,
-		openNavbarThemePopup,
+	openSubtitleBurnInTextCodecsPopup,
+	closeSubtitleBurnInTextCodecsPopup,
+	openSubtitleOverlaySizePopup,
+	closeSubtitleOverlaySizePopup,
+	openSubtitleOverlayPositionPopup,
+	closeSubtitleOverlayPositionPopup,
+	openSubtitleOverlayBackgroundPopup,
+	closeSubtitleOverlayBackgroundPopup,
+	openSubtitleOverlayWeightPopup,
+	closeSubtitleOverlayWeightPopup,
+	openSubtitleOverlayTextColorPopup,
+	closeSubtitleOverlayTextColorPopup,
+	openSubtitleOverlayBorderStylePopup,
+	closeSubtitleOverlayBorderStylePopup,
+	openSubtitleOverlayBorderColorPopup,
+	closeSubtitleOverlayBorderColorPopup,
+	openSubtitleOverlayBorderStrengthPopup,
+	closeSubtitleOverlayBorderStrengthPopup,
+	openNavbarThemePopup,
 		closeNavbarThemePopup,
 		openLogoutConfirm,
 		closeLogoutConfirm,
@@ -191,22 +223,46 @@ const SettingsPanel = ({
 		handleNavbarThemeSelect,
 		handleBitrateSelect,
 		handleCapabilityProbeRefreshSelect,
-		handleAudioLanguageSelect,
-		handleSubtitleLanguageSelect,
-		handleSubtitleBurnInTextCodecToggle,
-		setSegmentsOnlyPromptMode,
-		setSegmentsOrLast60PromptMode,
-		subtitleBurnInTextCodecsLabel
-	} = useSettingsOptionHandlers({
+	handleAudioLanguageSelect,
+	handleSubtitleLanguageSelect,
+	handleSubtitleBurnInTextCodecToggle,
+	handleSubtitleOverlaySizeSelect,
+	handleSubtitleOverlayPositionSelect,
+	handleSubtitleOverlayBackgroundSelect,
+	handleSubtitleOverlayWeightSelect,
+	handleSubtitleOverlayTextColorSelect,
+	handleSubtitleOverlayBorderStyleSelect,
+	handleSubtitleOverlayBorderColorSelect,
+	handleSubtitleOverlayBorderStrengthSelect,
+	setSegmentsOnlyPromptMode,
+	setSegmentsOrLast60PromptMode,
+	subtitleBurnInTextCodecsLabel,
+	subtitleOverlaySizeLabel,
+	subtitleOverlayPositionLabel,
+	subtitleOverlayBackgroundLabel,
+	subtitleOverlayWeightLabel,
+	subtitleOverlayTextColorLabel,
+	subtitleOverlayBorderStyleLabel,
+	subtitleOverlayBorderColorLabel,
+	subtitleOverlayBorderStrengthLabel
+} = useSettingsOptionHandlers({
 		settings,
 		setSettings,
 		handleSettingChange,
 		openDisclosure,
 		closeBitratePopup,
-		closeCapabilityProbeRefreshPopup,
-		closeAudioLangPopup,
-		closeSubtitleLangPopup,
-		closeNavbarThemePopup,
+	closeCapabilityProbeRefreshPopup,
+	closeAudioLangPopup,
+	closeSubtitleLangPopup,
+	closeSubtitleOverlaySizePopup,
+	closeSubtitleOverlayPositionPopup,
+	closeSubtitleOverlayBackgroundPopup,
+	closeSubtitleOverlayWeightPopup,
+	closeSubtitleOverlayTextColorPopup,
+	closeSubtitleOverlayBorderStylePopup,
+	closeSubtitleOverlayBorderColorPopup,
+	closeSubtitleOverlayBorderStrengthPopup,
+	closeNavbarThemePopup,
 		closePlayNextPromptModePopup,
 		normalizeCapabilityProbeRefreshDaysSetting,
 		setRuntimeCapabilityProbeRefreshDays,
@@ -245,6 +301,7 @@ const SettingsPanel = ({
 			<Panel {...rest}>
 				<Header title="Settings" />
 				<SettingsToolbar
+					isActive={isActive}
 					{...toolbarActions}
 				/>
 				<BreezyToast message={toastMessage} visible={toastVisible} />
@@ -276,6 +333,22 @@ const SettingsPanel = ({
 						openSubtitleLangPopup={openSubtitleLangPopup}
 						subtitleBurnInTextCodecsLabel={subtitleBurnInTextCodecsLabel}
 						openSubtitleBurnInTextCodecsPopup={openSubtitleBurnInTextCodecsPopup}
+						subtitleOverlaySizeLabel={subtitleOverlaySizeLabel}
+						subtitleOverlayPositionLabel={subtitleOverlayPositionLabel}
+						subtitleOverlayBackgroundLabel={subtitleOverlayBackgroundLabel}
+						subtitleOverlayWeightLabel={subtitleOverlayWeightLabel}
+						subtitleOverlayTextColorLabel={subtitleOverlayTextColorLabel}
+						subtitleOverlayBorderStyleLabel={subtitleOverlayBorderStyleLabel}
+						subtitleOverlayBorderColorLabel={subtitleOverlayBorderColorLabel}
+						subtitleOverlayBorderStrengthLabel={subtitleOverlayBorderStrengthLabel}
+						openSubtitleOverlaySizePopup={openSubtitleOverlaySizePopup}
+						openSubtitleOverlayPositionPopup={openSubtitleOverlayPositionPopup}
+						openSubtitleOverlayBackgroundPopup={openSubtitleOverlayBackgroundPopup}
+						openSubtitleOverlayWeightPopup={openSubtitleOverlayWeightPopup}
+						openSubtitleOverlayTextColorPopup={openSubtitleOverlayTextColorPopup}
+						openSubtitleOverlayBorderStylePopup={openSubtitleOverlayBorderStylePopup}
+						openSubtitleOverlayBorderColorPopup={openSubtitleOverlayBorderColorPopup}
+						openSubtitleOverlayBorderStrengthPopup={openSubtitleOverlayBorderStrengthPopup}
 						getBitrateLabel={getBitrateLabel}
 						openBitratePopup={openBitratePopup}
 						getNavbarThemeLabel={getNavbarThemeLabel}
@@ -325,6 +398,38 @@ const SettingsPanel = ({
 					closeSubtitleBurnInTextCodecsPopup={closeSubtitleBurnInTextCodecsPopup}
 					subtitleBurnInTextCodecOptions={SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS}
 					handleSubtitleBurnInTextCodecToggle={handleSubtitleBurnInTextCodecToggle}
+					subtitleOverlaySizePopupOpen={subtitleOverlaySizePopupOpen}
+					closeSubtitleOverlaySizePopup={closeSubtitleOverlaySizePopup}
+					subtitleOverlaySizeOptions={SUBTITLE_OVERLAY_SIZE_OPTIONS}
+					handleSubtitleOverlaySizeSelect={handleSubtitleOverlaySizeSelect}
+					subtitleOverlayPositionPopupOpen={subtitleOverlayPositionPopupOpen}
+					closeSubtitleOverlayPositionPopup={closeSubtitleOverlayPositionPopup}
+					subtitleOverlayPositionOptions={SUBTITLE_OVERLAY_POSITION_OPTIONS}
+					handleSubtitleOverlayPositionSelect={handleSubtitleOverlayPositionSelect}
+					subtitleOverlayBackgroundPopupOpen={subtitleOverlayBackgroundPopupOpen}
+					closeSubtitleOverlayBackgroundPopup={closeSubtitleOverlayBackgroundPopup}
+					subtitleOverlayBackgroundOptions={SUBTITLE_OVERLAY_BACKGROUND_OPTIONS}
+					handleSubtitleOverlayBackgroundSelect={handleSubtitleOverlayBackgroundSelect}
+					subtitleOverlayWeightPopupOpen={subtitleOverlayWeightPopupOpen}
+					closeSubtitleOverlayWeightPopup={closeSubtitleOverlayWeightPopup}
+					subtitleOverlayWeightOptions={SUBTITLE_OVERLAY_WEIGHT_OPTIONS}
+					handleSubtitleOverlayWeightSelect={handleSubtitleOverlayWeightSelect}
+					subtitleOverlayTextColorPopupOpen={subtitleOverlayTextColorPopupOpen}
+					closeSubtitleOverlayTextColorPopup={closeSubtitleOverlayTextColorPopup}
+					subtitleOverlayTextColorOptions={SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS}
+					handleSubtitleOverlayTextColorSelect={handleSubtitleOverlayTextColorSelect}
+					subtitleOverlayBorderStylePopupOpen={subtitleOverlayBorderStylePopupOpen}
+					closeSubtitleOverlayBorderStylePopup={closeSubtitleOverlayBorderStylePopup}
+					subtitleOverlayBorderStyleOptions={SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS}
+					handleSubtitleOverlayBorderStyleSelect={handleSubtitleOverlayBorderStyleSelect}
+					subtitleOverlayBorderColorPopupOpen={subtitleOverlayBorderColorPopupOpen}
+					closeSubtitleOverlayBorderColorPopup={closeSubtitleOverlayBorderColorPopup}
+					subtitleOverlayBorderColorOptions={SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS}
+					handleSubtitleOverlayBorderColorSelect={handleSubtitleOverlayBorderColorSelect}
+					subtitleOverlayBorderStrengthPopupOpen={subtitleOverlayBorderStrengthPopupOpen}
+					closeSubtitleOverlayBorderStrengthPopup={closeSubtitleOverlayBorderStrengthPopup}
+					subtitleOverlayBorderStrengthOptions={SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS}
+					handleSubtitleOverlayBorderStrengthSelect={handleSubtitleOverlayBorderStrengthSelect}
 					navbarThemePopupOpen={navbarThemePopupOpen}
 					closeNavbarThemePopup={closeNavbarThemePopup}
 					navbarThemeOptions={NAVBAR_THEME_OPTIONS}

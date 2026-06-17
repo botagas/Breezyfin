@@ -29,6 +29,38 @@ const SettingsPopups = ({
 	closeSubtitleBurnInTextCodecsPopup,
 	subtitleBurnInTextCodecOptions,
 	handleSubtitleBurnInTextCodecToggle,
+	subtitleOverlaySizePopupOpen,
+	closeSubtitleOverlaySizePopup,
+	subtitleOverlaySizeOptions,
+	handleSubtitleOverlaySizeSelect,
+	subtitleOverlayPositionPopupOpen,
+	closeSubtitleOverlayPositionPopup,
+	subtitleOverlayPositionOptions,
+	handleSubtitleOverlayPositionSelect,
+	subtitleOverlayBackgroundPopupOpen,
+	closeSubtitleOverlayBackgroundPopup,
+	subtitleOverlayBackgroundOptions,
+	handleSubtitleOverlayBackgroundSelect,
+	subtitleOverlayWeightPopupOpen,
+	closeSubtitleOverlayWeightPopup,
+	subtitleOverlayWeightOptions,
+	handleSubtitleOverlayWeightSelect,
+	subtitleOverlayTextColorPopupOpen,
+	closeSubtitleOverlayTextColorPopup,
+	subtitleOverlayTextColorOptions,
+	handleSubtitleOverlayTextColorSelect,
+	subtitleOverlayBorderStylePopupOpen,
+	closeSubtitleOverlayBorderStylePopup,
+	subtitleOverlayBorderStyleOptions,
+	handleSubtitleOverlayBorderStyleSelect,
+	subtitleOverlayBorderColorPopupOpen,
+	closeSubtitleOverlayBorderColorPopup,
+	subtitleOverlayBorderColorOptions,
+	handleSubtitleOverlayBorderColorSelect,
+	subtitleOverlayBorderStrengthPopupOpen,
+	closeSubtitleOverlayBorderStrengthPopup,
+	subtitleOverlayBorderStrengthOptions,
+	handleSubtitleOverlayBorderStrengthSelect,
 	navbarThemePopupOpen,
 	closeNavbarThemePopup,
 	navbarThemeOptions,
@@ -62,6 +94,14 @@ const SettingsPopups = ({
 	const capabilityProbeRefreshPopupContentRef = useRef(null);
 	const subtitleLangPopupContentRef = useRef(null);
 	const subtitleBurnInTextCodecsPopupContentRef = useRef(null);
+	const subtitleOverlaySizePopupContentRef = useRef(null);
+	const subtitleOverlayPositionPopupContentRef = useRef(null);
+	const subtitleOverlayBackgroundPopupContentRef = useRef(null);
+	const subtitleOverlayWeightPopupContentRef = useRef(null);
+	const subtitleOverlayTextColorPopupContentRef = useRef(null);
+	const subtitleOverlayBorderStylePopupContentRef = useRef(null);
+	const subtitleOverlayBorderColorPopupContentRef = useRef(null);
+	const subtitleOverlayBorderStrengthPopupContentRef = useRef(null);
 	const navbarThemePopupContentRef = useRef(null);
 	const playNextPromptModePopupContentRef = useRef(null);
 	const logoutConfirmPopupContentRef = useRef(null);
@@ -73,11 +113,53 @@ const SettingsPopups = ({
 	usePopupInitialFocus(capabilityProbeRefreshPopupOpen, capabilityProbeRefreshPopupContentRef);
 	usePopupInitialFocus(subtitleLangPopupOpen, subtitleLangPopupContentRef);
 	usePopupInitialFocus(subtitleBurnInTextCodecsPopupOpen, subtitleBurnInTextCodecsPopupContentRef);
+	usePopupInitialFocus(subtitleOverlaySizePopupOpen, subtitleOverlaySizePopupContentRef);
+	usePopupInitialFocus(subtitleOverlayPositionPopupOpen, subtitleOverlayPositionPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayBackgroundPopupOpen, subtitleOverlayBackgroundPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayWeightPopupOpen, subtitleOverlayWeightPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayTextColorPopupOpen, subtitleOverlayTextColorPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayBorderStylePopupOpen, subtitleOverlayBorderStylePopupContentRef);
+	usePopupInitialFocus(subtitleOverlayBorderColorPopupOpen, subtitleOverlayBorderColorPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayBorderStrengthPopupOpen, subtitleOverlayBorderStrengthPopupContentRef);
 	usePopupInitialFocus(navbarThemePopupOpen, navbarThemePopupContentRef);
 	usePopupInitialFocus(playNextPromptModePopupOpen, playNextPromptModePopupContentRef);
 	usePopupInitialFocus(logoutConfirmOpen, logoutConfirmPopupContentRef);
 	usePopupInitialFocus(logsPopupOpen, logsPopupContentRef);
 	usePopupInitialFocus(wipeCacheConfirmOpen, wipeCacheConfirmPopupContentRef);
+
+	const renderSubtitleOptionPopup = ({
+		open,
+		onClose,
+		contentRef,
+		title,
+		options,
+		settingKey,
+		onSelect,
+		fallback
+	}) => (
+		<Popup
+			open={open}
+			onClose={onClose}
+			css={popupShellCss}
+		>
+			<div ref={contentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<BodyText className={css.popupTitle}>{title}</BodyText>
+				<div className={css.popupOptions}>
+					{options.map((option) => (
+						<Button
+							key={option.value}
+							data-value={option.value}
+							className={css.popupOption}
+							selected={(settings[settingKey] || fallback) === option.value}
+							onClick={onSelect}
+						>
+							{option.label}
+						</Button>
+					))}
+				</div>
+			</div>
+		</Popup>
+	);
 
 	return (
 		<>
@@ -101,6 +183,61 @@ const SettingsPopups = ({
 					))}
 				</div>
 			</Popup>
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayWeightPopupOpen,
+				onClose: closeSubtitleOverlayWeightPopup,
+				contentRef: subtitleOverlayWeightPopupContentRef,
+				title: 'Subtitle Font Weight',
+				options: subtitleOverlayWeightOptions,
+				settingKey: 'subtitleOverlayWeight',
+				onSelect: handleSubtitleOverlayWeightSelect,
+				fallback: 'bold'
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayTextColorPopupOpen,
+				onClose: closeSubtitleOverlayTextColorPopup,
+				contentRef: subtitleOverlayTextColorPopupContentRef,
+				title: 'Subtitle Text Color',
+				options: subtitleOverlayTextColorOptions,
+				settingKey: 'subtitleOverlayTextColor',
+				onSelect: handleSubtitleOverlayTextColorSelect,
+				fallback: 'white'
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayBorderStylePopupOpen,
+				onClose: closeSubtitleOverlayBorderStylePopup,
+				contentRef: subtitleOverlayBorderStylePopupContentRef,
+				title: 'Subtitle Border Style',
+				options: subtitleOverlayBorderStyleOptions,
+				settingKey: 'subtitleOverlayBorderStyle',
+				onSelect: handleSubtitleOverlayBorderStyleSelect,
+				fallback: 'shadow'
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayBorderColorPopupOpen,
+				onClose: closeSubtitleOverlayBorderColorPopup,
+				contentRef: subtitleOverlayBorderColorPopupContentRef,
+				title: 'Subtitle Border Color',
+				options: subtitleOverlayBorderColorOptions,
+				settingKey: 'subtitleOverlayBorderColor',
+				onSelect: handleSubtitleOverlayBorderColorSelect,
+				fallback: 'black'
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayBorderStrengthPopupOpen,
+				onClose: closeSubtitleOverlayBorderStrengthPopup,
+				contentRef: subtitleOverlayBorderStrengthPopupContentRef,
+				title: 'Subtitle Border Strength',
+				options: subtitleOverlayBorderStrengthOptions,
+				settingKey: 'subtitleOverlayBorderStrength',
+				onSelect: handleSubtitleOverlayBorderStrengthSelect,
+				fallback: 'medium'
+			})}
 
 			<Popup
 				open={audioLangPopupOpen}
@@ -177,7 +314,7 @@ const SettingsPopups = ({
 				<div ref={subtitleBurnInTextCodecsPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Subtitle Burn-in Formats</BodyText>
 					<BodyText className={css.popupMessage}>
-						Selected formats will prefer burn-in/transcoding. Leave empty to keep quality-first playback.
+						Manual mode only. Selected formats will prefer burn-in/transcoding. Leave empty to keep quality-first playback.
 					</BodyText>
 					<div className={css.popupOptions}>
 						{subtitleBurnInTextCodecOptions.map((option) => (
@@ -214,6 +351,75 @@ const SettingsPopups = ({
 								selected={settings.navbarTheme === option.value}
 								onClick={handleNavbarThemeSelect}
 								className={css.popupOption}
+							>
+								{option.label}
+							</Button>
+						))}
+					</div>
+				</div>
+			</Popup>
+
+			<Popup
+				open={subtitleOverlaySizePopupOpen}
+				onClose={closeSubtitleOverlaySizePopup}
+				css={popupShellCss}
+			>
+				<div ref={subtitleOverlaySizePopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Subtitle Size</BodyText>
+					<div className={css.popupOptions}>
+						{subtitleOverlaySizeOptions.map((option) => (
+							<Button
+								key={option.value}
+								data-value={option.value}
+								className={css.popupOption}
+								selected={(settings.subtitleOverlaySize || 'medium') === option.value}
+								onClick={handleSubtitleOverlaySizeSelect}
+							>
+								{option.label}
+							</Button>
+						))}
+					</div>
+				</div>
+			</Popup>
+
+			<Popup
+				open={subtitleOverlayPositionPopupOpen}
+				onClose={closeSubtitleOverlayPositionPopup}
+				css={popupShellCss}
+			>
+				<div ref={subtitleOverlayPositionPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Subtitle Position</BodyText>
+					<div className={css.popupOptions}>
+						{subtitleOverlayPositionOptions.map((option) => (
+							<Button
+								key={option.value}
+								data-value={option.value}
+								className={css.popupOption}
+								selected={(settings.subtitleOverlayPosition || 'standard') === option.value}
+								onClick={handleSubtitleOverlayPositionSelect}
+							>
+								{option.label}
+							</Button>
+						))}
+					</div>
+				</div>
+			</Popup>
+
+			<Popup
+				open={subtitleOverlayBackgroundPopupOpen}
+				onClose={closeSubtitleOverlayBackgroundPopup}
+				css={popupShellCss}
+			>
+				<div ref={subtitleOverlayBackgroundPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+					<BodyText className={css.popupTitle}>Subtitle Background</BodyText>
+					<div className={css.popupOptions}>
+						{subtitleOverlayBackgroundOptions.map((option) => (
+							<Button
+								key={option.value}
+								data-value={option.value}
+								className={css.popupOption}
+								selected={(settings.subtitleOverlayBackground || 'medium') === option.value}
+								onClick={handleSubtitleOverlayBackgroundSelect}
 							>
 								{option.label}
 							</Button>

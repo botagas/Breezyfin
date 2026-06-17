@@ -29,7 +29,8 @@ export const useMediaDetailsSectionNavigation = ({
 	focusNonSeriesPrimaryPlay,
 	focusNonSeriesAudioSelector,
 	focusNonSeriesSubtitleSelector,
-	focusEpisodeSelector
+	focusEpisodeSelector,
+	focusFirstSectionControlByDirection
 }) => {
 	const introFocusRafRef = useRef(null);
 	const introFocusTimeoutRef = useRef(null);
@@ -189,48 +190,6 @@ export const useMediaDetailsSectionNavigation = ({
 	const focusSectionOnePrimaryFromIntroAction = useCallback(() => {
 		return focusSectionOneControls();
 	}, [focusSectionOneControls]);
-
-	const focusNeighborIntroAction = useCallback((currentTarget, direction) => {
-		const introRoot = firstSectionRef.current;
-		if (!introRoot) return false;
-		const actionButtons = Array.from(
-			introRoot.querySelectorAll(
-				`.${css.actionButton}, [data-spotlight-id="details-favorite-action"], [data-spotlight-id="details-watched-action"]`
-			)
-		).filter((node) => typeof node?.focus === 'function');
-		if (actionButtons.length === 0) return false;
-		const active = currentTarget || document.activeElement;
-		let currentIndex = actionButtons.findIndex((node) => node === active || node.contains?.(active));
-		if (currentIndex < 0) {
-			currentIndex = 0;
-		}
-		if (direction === 'left' && currentIndex <= 0) {
-			const introPlayTarget = playPrimaryButtonRef.current?.nodeRef?.current ||
-				playPrimaryButtonRef.current ||
-				introRoot.querySelector(`.${css.introPlayButton}, .${css.primaryButton}`);
-			if (introPlayTarget?.focus) {
-				focusNodeWithoutScroll(introPlayTarget);
-				return true;
-			}
-			if (focusSectionOnePrimary()) return true;
-			return false;
-		}
-		const nextIndex = direction === 'right'
-			? Math.min(currentIndex + 1, actionButtons.length - 1)
-			: Math.max(currentIndex - 1, 0);
-		const nextTarget = actionButtons[nextIndex];
-		if (!nextTarget?.focus) return false;
-		focusNodeWithoutScroll(nextTarget);
-		return true;
-	}, [
-		css.actionButton,
-		css.introPlayButton,
-		css.primaryButton,
-		firstSectionRef,
-		focusNodeWithoutScroll,
-		focusSectionOnePrimary,
-		playPrimaryButtonRef
-	]);
 
 	const focusIntroTopNavigation = useCallback(() => {
 		const introRoot = firstSectionRef.current;
@@ -425,20 +384,22 @@ export const useMediaDetailsSectionNavigation = ({
 			return;
 		}
 		if (code === KeyCodes.RIGHT) {
-			if (!focusNeighborIntroAction(event.currentTarget, 'right')) return;
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'right')) return;
 			event.preventDefault();
 			event.stopPropagation();
 			return;
 		}
 		if (code === KeyCodes.LEFT) {
-			if (!focusNeighborIntroAction(event.currentTarget, 'left')) return;
+			if (typeof focusFirstSectionControlByDirection !== 'function') return;
+			if (!focusFirstSectionControlByDirection(event.currentTarget, 'left')) return;
 			event.preventDefault();
 			event.stopPropagation();
 		}
 	}, [
+		focusFirstSectionControlByDirection,
 		focusSectionOnePrimaryFromIntroAction,
 		focusIntroTopNavigation,
-		focusNeighborIntroAction,
 		isSectionSwitchInProgress
 	]);
 
