@@ -335,6 +335,15 @@ const App = (props) => {
 	useEffect(() => {
 		let cancelled = false;
 		const restoreSession = async () => {
+			if (peekCrashRecoveryAction() === CRASH_RECOVERY_ACTIONS.HOME) {
+				consumeCrashRecoveryAction();
+				crashRecoveryPendingRef.current = false;
+				resetSessionState();
+				setCurrentView('login');
+				setLoginNotice('Crash recovery paused automatic sign-in. Choose an account or open diagnostics.');
+				setLoginNoticeNonce((value) => value + 1);
+				return;
+			}
 			const restored = jellyfinService.restoreSession();
 			if (!restored) return;
 			const user = await jellyfinService.getCurrentUser();
@@ -350,7 +359,7 @@ const App = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [applyPendingCrashRecovery, handleSessionExpired]);
+	}, [applyPendingCrashRecovery, handleSessionExpired, resetSessionState]);
 
 	useEffect(() => {
 		const onSessionExpired = (event) => {
@@ -785,47 +794,61 @@ const App = (props) => {
 
 	const panelChildren = createPanelChildren({
 		currentView,
-		selectedItem,
-		selectedLibrary,
-		selectedHomeSection,
-		playbackOptions,
-		loginNotice,
-		loginNoticeNonce,
-		homePanelState,
-		homeSectionPanelStateById,
-		libraryPanelStateById,
-		searchPanelState,
-		favoritesPanelState,
-		settingsPanelState,
-		detailsPanelStateByItemId,
-		handleLogin,
-		handleItemSelect,
-		handleNavigate,
-		handleSwitchUser,
-		handleLogout,
-		handleSignOut,
-		handleExit,
-		handlePlay,
-		navigateBackFromDetails,
-		handleBackToDetails,
-		setPlayerControlsVisible,
-		playerControlsVisible,
-		handleSearchPanelStateChange,
-		handleHomePanelStateChange,
-		handleHomeSectionPanelStateChange,
-		handleLibraryPanelStateChange,
-		handleFavoritesPanelStateChange,
-		handleSettingsPanelStateChange,
-		handleDetailsPanelStateChange,
-		registerHomeBackHandler,
-		registerHomeSectionBackHandler,
-		registerLibraryBackHandler,
-		registerSearchBackHandler,
-		registerFavoritesBackHandler,
-		registerSettingsBackHandler,
-		registerDetailsBackHandler,
-		registerPlayerBackHandler,
-		inputMode
+		inputMode,
+		selection: {
+			item: selectedItem,
+			library: selectedLibrary,
+			homeSection: selectedHomeSection,
+			playbackOptions
+		},
+		notices: {
+			login: loginNotice,
+			loginNonce: loginNoticeNonce
+		},
+		cacheState: {
+			home: homePanelState,
+			homeSectionsById: homeSectionPanelStateById,
+			librariesById: libraryPanelStateById,
+			search: searchPanelState,
+			favorites: favoritesPanelState,
+			settings: settingsPanelState,
+			detailsByItemId: detailsPanelStateByItemId
+		},
+		actions: {
+			login: handleLogin,
+			itemSelect: handleItemSelect,
+			navigate: handleNavigate,
+			switchUser: handleSwitchUser,
+			logout: handleLogout,
+			signOut: handleSignOut,
+			exit: handleExit,
+			play: handlePlay,
+			backFromDetails: navigateBackFromDetails,
+			backToDetails: handleBackToDetails
+		},
+		cacheActions: {
+			home: handleHomePanelStateChange,
+			homeSection: handleHomeSectionPanelStateChange,
+			library: handleLibraryPanelStateChange,
+			search: handleSearchPanelStateChange,
+			favorites: handleFavoritesPanelStateChange,
+			settings: handleSettingsPanelStateChange,
+			details: handleDetailsPanelStateChange
+		},
+		backHandlers: {
+			home: registerHomeBackHandler,
+			homeSection: registerHomeSectionBackHandler,
+			library: registerLibraryBackHandler,
+			search: registerSearchBackHandler,
+			favorites: registerFavoritesBackHandler,
+			settings: registerSettingsBackHandler,
+			details: registerDetailsBackHandler,
+			player: registerPlayerBackHandler
+		},
+		playerControls: {
+			visible: playerControlsVisible,
+			setVisible: setPlayerControlsVisible
+		}
 	});
 
 	return (

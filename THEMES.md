@@ -192,6 +192,12 @@ Also verify:
 - Focus/hover states are operational in both pointer and 5-way input.
 - Popup surfaces and toasts still use tokenized colors.
 - No panel uses fixed offsets that bypass shared layout tokens.
+- `npm run audit:style-imports` passes so split style imports do not drift.
+- `npm run audit:style-entries` passes so JS/JSX CSS/LESS entrypoint imports do not drift.
+- `npm run audit:style-reachability` passes so split style files stay reachable from production JS style entrypoints.
+- `npm run audit:stylelint` passes so CSS/LESS correctness rules do not regress.
+- `npm run audit:style-vars` passes so custom property references resolve, include explicit fallbacks, or are narrowly allowlisted runtime-injected variables.
+- `npm run audit:style-tokens` does not report raw-color usage above the checked-in baseline in `scripts/style-audit/raw-color-baseline.json`; reduce that baseline when existing literals are tokenized.
 
 ## 10) Related docs
 

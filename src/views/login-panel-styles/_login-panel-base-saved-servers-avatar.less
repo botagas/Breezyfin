@@ -19,15 +19,25 @@
 		object-fit: cover;
 		position: absolute;
 		inset: 0;
+		z-index: 1;
 	}
-}
-
-.savedAvatarLoadingHint {
-	border-radius: 50%;
-	background: var(--bf-login-avatar-placeholder-gradient);
 }
 
 .savedAvatarFallback {
 	position: relative;
 	z-index: 0;
+}
+
+.savedAvatarWithImage {
+	.savedAvatarFallback {
+		opacity: 0;
+		visibility: hidden;
+	}
+}
+
+.savedAvatarWithImage.savedAvatarImageUnavailable {
+	.savedAvatarFallback {
+		opacity: 1;
+		visibility: visible;
+	}
 }

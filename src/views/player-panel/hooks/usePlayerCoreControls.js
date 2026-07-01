@@ -8,6 +8,7 @@ export const usePlayerCoreControls = ({
 	item,
 	videoRef,
 	hlsRef,
+	nativeHlsFallbackCleanupRef,
 	playbackSessionRef,
 	progressIntervalRef,
 	startupFallbackTimerRef,
@@ -64,6 +65,9 @@ export const usePlayerCoreControls = ({
 			clearTimeout(startupFallbackTimerRef.current);
 			startupFallbackTimerRef.current = null;
 		}
+		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
+			nativeHlsFallbackCleanupRef.current();
+		}
 		clearStartWatch();
 
 		if (hlsRef.current) {
@@ -98,6 +102,7 @@ export const usePlayerCoreControls = ({
 		getPlaybackSessionContext,
 		hlsRef,
 		item,
+		nativeHlsFallbackCleanupRef,
 		playbackSessionRef,
 		progressIntervalRef,
 		startupFallbackTimerRef,

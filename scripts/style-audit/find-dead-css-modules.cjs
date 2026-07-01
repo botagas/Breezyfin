@@ -1,39 +1,20 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = process.cwd();
-const SRC_DIR = path.join(ROOT, 'src');
-const JS_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx']);
+const {
+	fs,
+	path,
+	SRC_DIR,
+	JS_EXTENSIONS,
+	hasExtension,
+	relativePath,
+	stripBlockComments,
+	walkFiles
+} = require('../audit-utils/files.cjs');
 const LESS_MODULE_SUFFIX = '.module.less';
-
-const normalizePath = (value) => value.split(path.sep).join('/');
-const relativePath = (absolutePath) => normalizePath(path.relative(ROOT, absolutePath));
-
-const walkFiles = (directory, predicate) => {
-	const results = [];
-	const stack = [directory];
-	while (stack.length > 0) {
-		const current = stack.pop();
-		const entries = fs.readdirSync(current, {withFileTypes: true});
-		for (const entry of entries) {
-			const resolved = path.join(current, entry.name);
-			if (entry.isDirectory()) {
-				stack.push(resolved);
-				continue;
-			}
-			if (predicate(resolved)) {
-				results.push(resolved);
-			}
-		}
-	}
-	return results;
-};
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const stripBlockComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '');
+const stripGlobalScopes = (source) => source.replace(/:global\([^)]*\)/g, '');
 
 const parseImportedModuleAliases = (source) => {
 	const imports = [];
@@ -58,9 +39,12 @@ const parseLessImports = (source) => {
 
 const parseDefinedClasses = (source) => {
 	const classes = new Set();
-	// Class selectors with declaration blocks (exclude mixin definitions that use parentheses).
-	const selectorRegex = /(^|[\s,>+~])\.([A-Za-z_][A-Za-z0-9_-]*)\s*(?=\{)/gm;
-	for (const match of source.matchAll(selectorRegex)) {
+	const moduleScopedSource = stripGlobalScopes(source);
+	// CSS module selectors can be chained/pseudo-only in LESS. Exclude mixin
+	// definitions that use `.name(...)`, and strip :global(...) first so
+	// Sandstone/global classes are not mistaken for module-local exports.
+	const selectorRegex = /(^|[\s,>+~&])\.([A-Za-z_][A-Za-z0-9_-]*)(?![A-Za-z0-9_-])(?!(?:\s*\())/gm;
+	for (const match of moduleScopedSource.matchAll(selectorRegex)) {
 		classes.add(match[2]);
 	}
 	return classes;
@@ -156,7 +140,7 @@ const collectLessGraph = (entryFile) => {
 
 const jsFiles = walkFiles(
 	SRC_DIR,
-	(filePath) => JS_EXTENSIONS.has(path.extname(filePath))
+	hasExtension(JS_EXTENSIONS)
 );
 
 const moduleLessFiles = walkFiles(

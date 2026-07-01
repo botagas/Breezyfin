@@ -1,6 +1,10 @@
 import {useCallback} from 'react';
 import Hls from 'hls.js';
 import {getDynamicRangeInfo, normalizeDynamicRangeCap} from '../../../utils/playbackDynamicRange';
+import {
+	buildPlaybackOverride,
+	resolveVideoSeekSeconds
+} from '../utils/playbackOverride';
 
 export const usePlayerRecoveryHandlers = ({
 	maxHlsNetworkRecoveryAttempts,
@@ -22,6 +26,7 @@ export const usePlayerRecoveryHandlers = ({
 	hlsNetworkRecoveryAttemptsRef,
 	hlsMediaRecoveryAttemptsRef,
 	hlsRef,
+	nativeHlsFallbackCleanupRef,
 	reloadAttemptedRef,
 	playSessionRebuildAttemptsRef,
 	videoRef,
@@ -30,6 +35,7 @@ export const usePlayerRecoveryHandlers = ({
 	playbackOverrideRef,
 	loadVideoRef,
 	mediaSourceData,
+	appendPlaybackDiagnostic,
 	playbackSettingsRef,
 	transcodeFallbackAttemptedRef,
 	dynamicRangeFallbackAttemptedRef,
@@ -49,6 +55,9 @@ export const usePlayerRecoveryHandlers = ({
 	]);
 
 	const stopHlsRecoveryLoop = useCallback(() => {
+		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
+			nativeHlsFallbackCleanupRef.current();
+		}
 		if (!hlsRef.current) return;
 		try {
 			hlsRef.current.stopLoad?.();
@@ -61,22 +70,45 @@ export const usePlayerRecoveryHandlers = ({
 			console.warn('Error destroying HLS instance during failure handling:', err);
 		}
 		hlsRef.current = null;
-	}, [hlsRef]);
+	}, [hlsRef, nativeHlsFallbackCleanupRef]);
 
 	const attemptPlaybackSessionRebuild = useCallback((reason, options = {}) => {
 		const {
 			toast = '',
 			errorData = null
 		} = options;
-		if (playbackFailureLockedRef.current) return false;
+		if (playbackFailureLockedRef.current) {
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'session-rebuild',
+				status: 'skipped',
+				reason: 'playback-failure-locked',
+				message: 'Session rebuild skipped because playback is already locked in error state.'
+			});
+			return false;
+		}
 		if (reloadAttemptedRef.current) {
 			console.warn(`[Player] ${reason}, rebuild already attempted for this load`);
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'session-rebuild',
+				status: 'skipped',
+				reason: 'already-attempted',
+				message: String(reason || 'Session rebuild already attempted.')
+			});
 			return false;
 		}
 		if (playSessionRebuildAttemptsRef.current >= maxPlaySessionRebuildAttempts) {
 			console.warn(
 				`[Player] ${reason}, rebuild limit reached (${maxPlaySessionRebuildAttempts})`
 			);
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'session-rebuild',
+				status: 'skipped',
+				reason: 'limit-reached',
+				message: `Session rebuild limit reached (${maxPlaySessionRebuildAttempts}).`
+			});
 			return false;
 		}
 
@@ -89,11 +121,21 @@ export const usePlayerRecoveryHandlers = ({
 			`[Player] ${reason}. Rebuilding session with fresh PlaySessionId (${rebuildAttempt}/${maxPlaySessionRebuildAttempts})`,
 			errorData || ''
 		);
+		appendPlaybackDiagnostic?.({
+			scope: 'runtime-fallback',
+			stage: 'session-rebuild',
+			status: 'applied',
+			reason: String(reason || 'session-rebuild'),
+			message: `Rebuilding playback session (${rebuildAttempt}/${maxPlaySessionRebuildAttempts}).`
+		});
 
 		clearStartWatch();
 		if (startupFallbackTimerRef.current) {
 			clearTimeout(startupFallbackTimerRef.current);
 			startupFallbackTimerRef.current = null;
+		}
+		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
+			nativeHlsFallbackCleanupRef.current();
 		}
 
 		if (hlsRef.current) {
@@ -114,17 +156,13 @@ export const usePlayerRecoveryHandlers = ({
 			videoRef.current.load();
 		}
 
-		const nextPlaybackOverride = {
-			...(playbackOptions || {}),
-			audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
-			subtitleStreamIndex:
-				(currentSubtitleTrackRef.current === -1 || Number.isInteger(currentSubtitleTrackRef.current))
-					? currentSubtitleTrackRef.current
-					: undefined,
-			seekSeconds,
-			forceNewSession: true
-		};
-		playbackOverrideRef.current = nextPlaybackOverride;
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex: currentAudioTrackRef.current,
+			subtitleStreamIndex: currentSubtitleTrackRef.current,
+			seekSeconds
+		});
 
 		setError(null);
 		setLoading(true);
@@ -150,10 +188,13 @@ export const usePlayerRecoveryHandlers = ({
 		hlsRef,
 		loadVideoRef,
 		maxPlaySessionRebuildAttempts,
+		mediaSourceData?.Id,
+		nativeHlsFallbackCleanupRef,
 		playSessionRebuildAttemptsRef,
 		playbackFailureLockedRef,
 		playbackOptions,
 		playbackOverrideRef,
+		appendPlaybackDiagnostic,
 		reloadAttemptedRef,
 		seekOffsetRef,
 		setError,
@@ -194,10 +235,24 @@ export const usePlayerRecoveryHandlers = ({
 
 	const attemptTranscodeFallback = useCallback(async (reason) => {
 		if (playbackFailureLockedRef.current) {
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'transcode-fallback',
+				status: 'skipped',
+				reason: 'playback-failure-locked',
+				message: 'Transcode fallback skipped because playback is already locked in error state.'
+			});
 			return false;
 		}
 		if (playbackSettingsRef.current.forceDolbyVision === true) {
 			setToastMessage('Force DV is enabled. Disable it to allow HDR/transcode fallback.');
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'transcode-fallback',
+				status: 'skipped',
+				reason: 'force-dolby-vision',
+				message: 'Transcode fallback skipped because Force DV is enabled.'
+			});
 			return false;
 		}
 		const reasonText = typeof reason === 'string' ? reason.toLowerCase() : '';
@@ -216,22 +271,35 @@ export const usePlayerRecoveryHandlers = ({
 					? 'Dolby Vision failed. Retrying with HDR fallback...'
 					: 'HDR fallback failed. Retrying in SDR mode...'
 			);
-			playbackOverrideRef.current = {
-				...(playbackOptions || {}),
-				audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
-				subtitleStreamIndex:
-					(currentSubtitleTrackRef.current === -1 || Number.isInteger(currentSubtitleTrackRef.current))
-						? currentSubtitleTrackRef.current
-						: undefined,
-				seekSeconds: videoRef.current?.currentTime || 0,
-				forceNewSession: true,
-				dynamicRangeCap: nextDynamicRangeCap,
-				avoidDolbyVision: true
-			};
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'dynamic-range-fallback',
+				status: 'applied',
+				reason: reasonText || 'playback-failure',
+				message: `Retrying playback with ${nextDynamicRangeCap.toUpperCase()} dynamic range cap.`
+			});
+			playbackOverrideRef.current = buildPlaybackOverride({
+				baseOptions: playbackOptions,
+				mediaSourceId: mediaSourceData?.Id,
+				audioStreamIndex: currentAudioTrackRef.current,
+				subtitleStreamIndex: currentSubtitleTrackRef.current,
+				seekSeconds: resolveVideoSeekSeconds(videoRef.current),
+				extra: {
+					dynamicRangeCap: nextDynamicRangeCap,
+					avoidDolbyVision: true
+				}
+			});
 			try {
 				await handleStop();
 			} catch (rangeFallbackError) {
 				console.warn('Failed while preparing dynamic range fallback:', rangeFallbackError);
+				appendPlaybackDiagnostic?.({
+					scope: 'runtime-fallback',
+					stage: 'dynamic-range-fallback',
+					status: 'failed',
+					reason: 'stop-failed',
+					message: rangeFallbackError?.message || 'Failed while preparing dynamic range fallback.'
+				});
 			}
 			setError(null);
 			setLoading(true);
@@ -243,13 +311,41 @@ export const usePlayerRecoveryHandlers = ({
 			}
 		}
 		if (playbackSettingsRef.current.strictTranscodingMode || transcodeFallbackAttemptedRef.current) {
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'transcode-fallback',
+				status: 'skipped',
+				reason: playbackSettingsRef.current.strictTranscodingMode ? 'strict-transcoding-mode' : 'already-attempted',
+				message: 'Transcode fallback was not applicable.'
+			});
 			return false;
 		}
 		if (!mediaSourceData?.SupportsTranscoding) {
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'transcode-fallback',
+				status: 'skipped',
+				reason: 'server-transcoding-unsupported',
+				message: 'Server did not report transcoding support for this source.'
+			});
 			return false;
 		}
 		transcodeFallbackAttemptedRef.current = true;
 		console.warn('[Player] Attempting transcode fallback. Reason:', reason);
+		appendPlaybackDiagnostic?.({
+			scope: 'runtime-fallback',
+			stage: 'transcode-fallback',
+			status: 'applied',
+			reason: String(reason || 'playback-failure'),
+			message: 'Retrying playback with forced transcoding.'
+		});
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex: currentAudioTrackRef.current,
+			subtitleStreamIndex: currentSubtitleTrackRef.current,
+			seekSeconds: resolveVideoSeekSeconds(videoRef.current)
+		});
 		setToastMessage('Switching to transcoding...');
 		await handleStop();
 		setError(null);
@@ -272,6 +368,7 @@ export const usePlayerRecoveryHandlers = ({
 		setToastMessage,
 		playbackOptions,
 		playbackOverrideRef,
+		appendPlaybackDiagnostic,
 		currentAudioTrackRef,
 		currentSubtitleTrackRef,
 		videoRef,
@@ -287,23 +384,44 @@ export const usePlayerRecoveryHandlers = ({
 		if (!isSubtitleCompatibilityError(errorData)) return false;
 		if (playbackSettingsRef.current.strictTranscodingMode) {
 			setToastMessage('Subtitle burn-in failed. Strict transcoding mode is enabled.');
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'subtitle-compatibility',
+				status: 'skipped',
+				reason: 'strict-transcoding-mode',
+				message: 'Subtitle compatibility fallback skipped because strict transcoding is enabled.'
+			});
 			return false;
 		}
 
 		subtitleCompatibilityFallbackAttemptedRef.current = true;
 		setToastMessage('Subtitle track is not supported by server transcoding. Retrying without subtitles.');
-		playbackOverrideRef.current = {
-			...(playbackOptions || {}),
-			audioStreamIndex: Number.isInteger(currentAudioTrackRef.current) ? currentAudioTrackRef.current : undefined,
+		appendPlaybackDiagnostic?.({
+			scope: 'runtime-fallback',
+			stage: 'subtitle-compatibility',
+			status: 'applied',
+			reason: 'subtitle-codec-not-supported',
+			message: 'Retrying playback without subtitles after subtitle compatibility error.'
+		});
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex: currentAudioTrackRef.current,
 			subtitleStreamIndex: -1,
-			seekSeconds: videoRef.current?.currentTime || 0,
-			forceNewSession: true
-		};
+			seekSeconds: resolveVideoSeekSeconds(videoRef.current)
+		});
 		setCurrentSubtitleTrack(-1);
 		try {
 			await handleStop();
 		} catch (fallbackError) {
 			console.warn('Failed while preparing subtitle compatibility fallback:', fallbackError);
+			appendPlaybackDiagnostic?.({
+				scope: 'runtime-fallback',
+				stage: 'subtitle-compatibility',
+				status: 'failed',
+				reason: 'stop-failed',
+				message: fallbackError?.message || 'Failed while preparing subtitle compatibility fallback.'
+			});
 		}
 		if (typeof loadVideoRef.current === 'function') {
 			setLoadingStatusMessage('Restarting stream...');
@@ -316,9 +434,11 @@ export const usePlayerRecoveryHandlers = ({
 		handleStop,
 		isSubtitleCompatibilityError,
 		loadVideoRef,
+		mediaSourceData?.Id,
 		playbackFailureLockedRef,
 		playbackOptions,
 		playbackOverrideRef,
+		appendPlaybackDiagnostic,
 		playbackSettingsRef,
 		setCurrentSubtitleTrack,
 		setLoadingStatusMessage,

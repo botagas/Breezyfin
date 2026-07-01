@@ -38,7 +38,7 @@ describe('requestsApi', () => {
 			itemTypes: ['Movie', 'Series'],
 			limit: 2,
 			startIndex: 0,
-			username: 'teka'
+			username: 'requester'
 		})).resolves.toEqual({
 			items: pluginItems,
 			source: 'plugin',
@@ -59,7 +59,7 @@ describe('requestsApi', () => {
 		service._request.mockRejectedValue(new Error('plugin unavailable'));
 		service.getLibraryItems
 			.mockResolvedValueOnce([
-				makeItem('match-1', ['1 - teka']),
+				makeItem('match-1', ['1 - requester']),
 				makeItem('other-1', ['1 - someone']),
 				makeItem('other-2'),
 				makeItem('other-3'),
@@ -70,7 +70,7 @@ describe('requestsApi', () => {
 			])
 			.mockResolvedValueOnce([
 				makeItem('other-8'),
-				makeItem('played-match', ['2-teka'], {Played: true}),
+				makeItem('played-match', ['2-requester'], {Played: true}),
 				makeItem('other-9')
 			]);
 
@@ -78,11 +78,11 @@ describe('requestsApi', () => {
 			itemTypes: ['Movie', 'Series'],
 			limit: 2,
 			startIndex: 0,
-			username: 'teka'
+			username: 'requester'
 		})).resolves.toEqual({
 			items: [
-				makeItem('match-1', ['1 - teka']),
-				makeItem('played-match', ['2-teka'], {Played: true})
+				makeItem('match-1', ['1 - requester']),
+				makeItem('played-match', ['2-requester'], {Played: true})
 			],
 			source: 'tags-fallback',
 			scannedCount: 10,
@@ -113,19 +113,19 @@ describe('requestsApi', () => {
 		service._request.mockRejectedValue(new Error('getMyRequests plugin failed with status 404'));
 		service.getLibraryItems
 			.mockResolvedValueOnce([
-				makeItem('match-1', ['1 - teka'])
+					makeItem('match-1', ['1 - requester'])
 			])
 			.mockResolvedValueOnce([
-				makeItem('match-2', ['2 - teka'])
+					makeItem('match-2', ['2 - requester'])
 			]);
 
 		await expect(getMyRequestItems(service, {
 			itemTypes: ['Movie'],
 			limit: 1,
 			startIndex: 0,
-			username: 'teka'
+			username: 'requester'
 		})).resolves.toEqual({
-			items: [makeItem('match-1', ['1 - teka'])],
+			items: [makeItem('match-1', ['1 - requester'])],
 			source: 'tags-fallback',
 			scannedCount: 1,
 			nextStartIndex: 1,
@@ -137,9 +137,9 @@ describe('requestsApi', () => {
 			itemTypes: ['Movie'],
 			limit: 1,
 			startIndex: 1,
-			username: 'teka'
+			username: 'requester'
 		})).resolves.toEqual({
-			items: [makeItem('match-2', ['2 - teka'])],
+			items: [makeItem('match-2', ['2 - requester'])],
 			source: 'tags-fallback',
 			scannedCount: 1,
 			nextStartIndex: 2,

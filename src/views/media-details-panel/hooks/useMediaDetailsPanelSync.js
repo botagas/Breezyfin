@@ -4,6 +4,7 @@ import {useBreezyfinSettingsSync} from '../../../hooks/useBreezyfinSettingsSync'
 
 export const useMediaDetailsPanelSync = ({
 	item,
+	isActive = false,
 	setOverviewExpanded,
 	setIsCastCollapsed,
 	castFocusScrollTimeoutRef,
@@ -42,5 +43,5 @@ export const useMediaDetailsPanelSync = ({
 		setUseSidewaysEpisodeList(settings.useSidewaysEpisodeList !== false);
 	}, [setNavbarTheme, setShowSeasonImages, setUseSidewaysEpisodeList]);
 
-	useBreezyfinSettingsSync(applyPanelSettings);
+	useBreezyfinSettingsSync(applyPanelSettings, {enabled: isActive});
 };

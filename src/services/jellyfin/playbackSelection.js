@@ -5,6 +5,10 @@ import {
 	getDynamicRangeInfo,
 	normalizeDynamicRangeCap
 } from '../../utils/playbackDynamicRange';
+import {
+	ASS_SUBTITLE_RENDERERS,
+	normalizeAssSubtitleRenderer as normalizeAssSubtitleRendererValue
+} from '../../utils/assSubtitleRenderers';
 
 export const WEBOS_AUDIO_CODEC_PRIORITY = [
 	'eac3',
@@ -40,6 +44,18 @@ const WEBOS_TEXT_SUBTITLE_CODECS = new Set([
 	'sami',
 	'ttml',
 	'dfxp'
+]);
+const CLIENT_RENDER_TEXT_SUBTITLE_CODECS = new Set([
+	'srt',
+	'subrip',
+	'vtt',
+	'webvtt'
+]);
+const ASS_SUBTITLE_CODECS = new Set([
+	'ass',
+	'ssa',
+	'advancedsubstationalpha',
+	'substationalpha'
 ]);
 
 const getPlaybackCapabilities = () => {
@@ -149,27 +165,201 @@ export const isTextSubtitleCodec = (codec) => {
 	return tokenizedCodecMatches(codec, WEBOS_TEXT_SUBTITLE_CODECS);
 };
 
-export const shouldTranscodeForSubtitleSelection = (mediaSource, subtitleStreamIndex, options = {}) => {
-	const subtitleStream = getSubtitleStreamByIndex(mediaSource, subtitleStreamIndex);
-	if (!subtitleStream) return false;
+export const isClientRenderableSubtitleCodec = (codec) => {
+	return tokenizedCodecMatches(codec, CLIENT_RENDER_TEXT_SUBTITLE_CODECS);
+};
+
+export const isAssSubtitleCodec = (codec) => {
+	return tokenizedCodecMatches(codec, ASS_SUBTITLE_CODECS);
+};
+
+const normalizeAssSubtitleRenderer = (value) => normalizeAssSubtitleRendererValue(value);
+
+const buildSubtitleTranscodePolicy = ({
+	mode = 'manual',
+	streamIndex = null,
+	subtitleStream = null,
+	codec = '',
+	requiresBurnIn = false,
+	reason = 'external-supported',
+	dynamicRangeInfo = null,
+	renderer = 'native',
+	clientRender = false,
+	fallbackBurnInAllowed = false
+} = {}) => ({
+	mode,
+	streamIndex,
+	codec: codec || subtitleStream?.Codec || null,
+	requiresBurnIn,
+	forceBurnIn: requiresBurnIn,
+	reason,
+	renderer,
+	clientRender,
+	fallbackBurnInAllowed,
+	dynamicRangeId: dynamicRangeInfo?.id || 'SDR',
+	deliveryMethod: subtitleStream?.DeliveryMethod || null
+});
+
+export const getSubtitleTranscodePolicy = (mediaSource, subtitleStreamIndex, options = {}) => {
+	const selectedSubtitleStreamIndex = toInteger(subtitleStreamIndex);
+	if (selectedSubtitleStreamIndex === null || selectedSubtitleStreamIndex < 0) {
+		return buildSubtitleTranscodePolicy({
+			mode: options.smartSubtitleTranscoding === false ? 'manual' : 'smart',
+			streamIndex: selectedSubtitleStreamIndex,
+			reason: 'subtitle-off',
+			renderer: 'off'
+		});
+	}
+	const subtitleStream = getSubtitleStreamByIndex(mediaSource, selectedSubtitleStreamIndex);
+	if (!subtitleStream) {
+		return buildSubtitleTranscodePolicy({
+			mode: options.smartSubtitleTranscoding === false ? 'manual' : 'smart',
+			streamIndex: selectedSubtitleStreamIndex,
+			reason: 'subtitle-stream-missing'
+		});
+	}
 	const subtitleBurnInEnabled = options.enableSubtitleBurnIn !== false;
-	if (!subtitleBurnInEnabled) return false;
+	const smartSubtitleTranscoding = options.smartSubtitleTranscoding !== false;
+	const mode = smartSubtitleTranscoding ? 'smart' : 'manual';
+	if (!smartSubtitleTranscoding && !subtitleBurnInEnabled) {
+		return buildSubtitleTranscodePolicy({
+			mode,
+			streamIndex: selectedSubtitleStreamIndex,
+			subtitleStream,
+			codec: normalizeSubtitleCodec(subtitleStream),
+			reason: 'manual-burn-in-disabled'
+		});
+	}
 	const allowSubtitleBurnInOnHdr = options.allowSubtitleBurnInOnHdr === true;
 	const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(mediaSource);
-	if (!allowSubtitleBurnInOnHdr && HDR_DYNAMIC_RANGE_IDS.has(dynamicRangeInfo?.id)) {
-		return false;
-	}
 	const codec = normalizeSubtitleCodec(subtitleStream);
+	const isHdrDynamicRange = HDR_DYNAMIC_RANGE_IDS.has(dynamicRangeInfo?.id);
+	if (smartSubtitleTranscoding && isClientRenderableSubtitleCodec(codec)) {
+		return buildSubtitleTranscodePolicy({
+			mode,
+			streamIndex: selectedSubtitleStreamIndex,
+			subtitleStream,
+			codec,
+			reason: 'client-render-text',
+			dynamicRangeInfo,
+			renderer: 'client-text',
+			clientRender: true,
+			fallbackBurnInAllowed: !isHdrDynamicRange || allowSubtitleBurnInOnHdr
+		});
+	}
+	if (smartSubtitleTranscoding && isAssSubtitleCodec(codec)) {
+		const assSubtitleRenderer = normalizeAssSubtitleRenderer(options.assSubtitleRenderer);
+		if (assSubtitleRenderer === ASS_SUBTITLE_RENDERERS.BURN_IN) {
+			if (!allowSubtitleBurnInOnHdr && isHdrDynamicRange) {
+				return buildSubtitleTranscodePolicy({
+					mode,
+					streamIndex: selectedSubtitleStreamIndex,
+					subtitleStream,
+					codec,
+					reason: 'skip-hdr-dv-preserve-range',
+					dynamicRangeInfo,
+					renderer: 'native'
+				});
+			}
+			return buildSubtitleTranscodePolicy({
+				mode,
+				streamIndex: selectedSubtitleStreamIndex,
+				subtitleStream,
+				codec,
+				requiresBurnIn: true,
+				reason: 'ass-renderer-burn-in',
+				dynamicRangeInfo,
+				renderer: 'burn-in'
+			});
+		}
+		const renderer = {
+			[ASS_SUBTITLE_RENDERERS.LIBASS]: 'client-ass-libass',
+			[ASS_SUBTITLE_RENDERERS.LIBASS_MANUAL]: 'client-ass-libass-manual',
+			[ASS_SUBTITLE_RENDERERS.JASSUB]: 'client-ass-jassub',
+			[ASS_SUBTITLE_RENDERERS.JASSUB_MANUAL]: 'client-ass-jassub-manual',
+			[ASS_SUBTITLE_RENDERERS.ASSJS]: 'client-ass-assjs',
+			[ASS_SUBTITLE_RENDERERS.LIGHTWEIGHT]: 'client-ass-lightweight',
+			[ASS_SUBTITLE_RENDERERS.AUTO]: 'client-ass-lightweight'
+		}[assSubtitleRenderer] || 'client-ass-lightweight';
+		return buildSubtitleTranscodePolicy({
+			mode,
+			streamIndex: selectedSubtitleStreamIndex,
+			subtitleStream,
+			codec,
+			reason: `client-render-ass-${renderer.replace('client-ass-', '')}`,
+			dynamicRangeInfo,
+			renderer,
+			clientRender: true,
+			fallbackBurnInAllowed: !isHdrDynamicRange || allowSubtitleBurnInOnHdr
+		});
+	}
+	if (!allowSubtitleBurnInOnHdr && isHdrDynamicRange) {
+		return buildSubtitleTranscodePolicy({
+			mode,
+			streamIndex: selectedSubtitleStreamIndex,
+			subtitleStream,
+			codec,
+			reason: 'skip-hdr-dv-preserve-range',
+			dynamicRangeInfo,
+			renderer: 'native'
+		});
+	}
+	if (smartSubtitleTranscoding) {
+		return buildSubtitleTranscodePolicy({
+			mode,
+			streamIndex: selectedSubtitleStreamIndex,
+			subtitleStream,
+			codec,
+			requiresBurnIn: true,
+			reason: HDR_DYNAMIC_RANGE_IDS.has(dynamicRangeInfo?.id)
+				? 'smart-forced-hdr-dv'
+				: 'smart-sdr-reliability',
+			dynamicRangeInfo,
+			renderer: 'burn-in'
+		});
+	}
 	if (!codec) {
 		const deliveryMethod = normalizeCodec(subtitleStream?.DeliveryMethod);
-		if (deliveryMethod === 'external') return false;
+		if (deliveryMethod === 'external') {
+			return buildSubtitleTranscodePolicy({
+				mode,
+				streamIndex: selectedSubtitleStreamIndex,
+				subtitleStream,
+				codec,
+				reason: 'manual-external-unknown-codec',
+				dynamicRangeInfo,
+				renderer: 'native'
+			});
+		}
 	}
 	const burnInCodecSet = normalizeSubtitleBurnInCodecSet(options.subtitleBurnInTextCodecs);
 	if (tokenizedCodecMatches(codec, burnInCodecSet)) {
-		return true;
+		return buildSubtitleTranscodePolicy({
+			mode,
+			streamIndex: selectedSubtitleStreamIndex,
+			subtitleStream,
+			codec,
+			requiresBurnIn: true,
+			reason: 'manual-selected-format',
+			dynamicRangeInfo,
+			renderer: 'burn-in'
+		});
 	}
-	// Fail-safe: keep direct/copy only for known text subtitle codecs.
-	return !isTextSubtitleCodec(codec);
+	const requiresBurnIn = !isTextSubtitleCodec(codec);
+	return buildSubtitleTranscodePolicy({
+		mode,
+		streamIndex: selectedSubtitleStreamIndex,
+		subtitleStream,
+		codec,
+		requiresBurnIn,
+		reason: requiresBurnIn ? 'manual-non-text-format' : 'manual-text-external',
+		dynamicRangeInfo,
+		renderer: requiresBurnIn ? 'burn-in' : 'native'
+	});
+};
+
+export const shouldTranscodeForSubtitleSelection = (mediaSource, subtitleStreamIndex, options = {}) => {
+	return getSubtitleTranscodePolicy(mediaSource, subtitleStreamIndex, options).requiresBurnIn === true;
 };
 
 export const findBestCompatibleAudioStreamIndex = (mediaSource) => {
@@ -350,7 +540,11 @@ export const reorderMediaSources = (mediaSources, selectedIndex) => {
 	return reordered;
 };
 
-export const determinePlayMethod = (mediaSource, {forceTranscoding = false, dynamicRangeCap = 'auto'} = {}) => {
+export const determinePlayMethod = (mediaSource, {
+	forceTranscoding = false,
+	disableDirectPlay = false,
+	dynamicRangeCap = 'auto'
+} = {}) => {
 	if (!mediaSource) return 'DirectStream';
 	if (forceTranscoding) return 'Transcode';
 
@@ -374,7 +568,7 @@ export const determinePlayMethod = (mediaSource, {forceTranscoding = false, dyna
 	}
 
 	if (!hasCompatibleAudio && mediaSource.TranscodingUrl) return 'Transcode';
-	if (mediaSource.SupportsDirectPlay) return 'DirectPlay';
+	if (!disableDirectPlay && mediaSource.SupportsDirectPlay) return 'DirectPlay';
 	if (mediaSource.SupportsDirectStream) return 'DirectStream';
 	if (mediaSource.TranscodingUrl) return 'Transcode';
 	return 'DirectStream';

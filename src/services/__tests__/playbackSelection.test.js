@@ -5,6 +5,8 @@ jest.mock('../../utils/platformCapabilities', () => ({
 import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
 import {createVideoAudioMediaSource} from '../testUtils/playbackFixtures';
 import {
+	determinePlayMethod,
+	getSubtitleTranscodePolicy,
 	isTextSubtitleCodec,
 	selectMediaSource,
 	shouldTranscodeForSubtitleSelection
@@ -52,26 +54,144 @@ describe('playbackSelection subtitle compatibility', () => {
 		});
 	});
 
-	it('keeps direct/direct-stream for common text subtitles', () => {
+	it('uses client rendering for supported text subtitles in smart mode on SDR', () => {
 		const mediaSource = createMediaSource({Codec: 'subrip'});
+		const policy = getSubtitleTranscodePolicy(mediaSource, 3);
+
+		expect(policy.mode).toBe('smart');
+		expect(policy.reason).toBe('client-render-text');
+		expect(policy.renderer).toBe('client-text');
+		expect(policy.clientRender).toBe(true);
+		expect(policy.fallbackBurnInAllowed).toBe(true);
 		expect(shouldTranscodeForSubtitleSelection(mediaSource, 3)).toBe(false);
 	});
 
-	it('keeps ASS/SSA direct by default (quality-first policy)', () => {
+	it('keeps ASS/SSA direct in manual mode unless selected for burn-in', () => {
 		const assSource = createMediaSource({Codec: 'ass'});
 		const ssaSource = createMediaSource({Codec: 'ssa'});
 
-		expect(shouldTranscodeForSubtitleSelection(assSource, 3)).toBe(false);
-		expect(shouldTranscodeForSubtitleSelection(ssaSource, 3)).toBe(false);
+		expect(shouldTranscodeForSubtitleSelection(assSource, 3, {smartSubtitleTranscoding: false})).toBe(false);
+		expect(shouldTranscodeForSubtitleSelection(ssaSource, 3, {smartSubtitleTranscoding: false})).toBe(false);
 	});
 
-	it('forces transcoding for user-selected burn-in formats', () => {
+	it('forces transcoding for user-selected burn-in formats in manual mode', () => {
 		const mediaSource = createMediaSource({Codec: 'ass'});
 		expect(
 			shouldTranscodeForSubtitleSelection(mediaSource, 3, {
+				smartSubtitleTranscoding: false,
 				subtitleBurnInTextCodecs: ['ass']
 			})
 		).toBe(true);
+	});
+
+	it('ignores manual burn-in formats for client-renderable text in smart mode', () => {
+		const mediaSource = createMediaSource({Codec: 'srt'});
+		const policy = getSubtitleTranscodePolicy(mediaSource, 3, {
+			subtitleBurnInTextCodecs: []
+		});
+
+		expect(policy.mode).toBe('smart');
+		expect(policy.reason).toBe('client-render-text');
+		expect(policy.requiresBurnIn).toBe(false);
+		expect(policy.clientRender).toBe(true);
+	});
+
+	it('uses lightweight client rendering for ASS/SSA subtitles in smart auto mode on SDR', () => {
+		const mediaSource = createMediaSource({Codec: 'ass'});
+		const policy = getSubtitleTranscodePolicy(mediaSource, 3);
+
+		expect(policy.mode).toBe('smart');
+		expect(policy.reason).toBe('client-render-ass-lightweight');
+		expect(policy.renderer).toBe('client-ass-lightweight');
+		expect(policy.clientRender).toBe(true);
+		expect(policy.requiresBurnIn).toBe(false);
+	});
+
+	it('uses libass client rendering for ASS/SSA subtitles when explicitly selected', () => {
+		const mediaSource = createMediaSource({Codec: 'ass'});
+		const policy = getSubtitleTranscodePolicy(mediaSource, 3, {
+			assSubtitleRenderer: 'libass'
+		});
+
+		expect(policy.mode).toBe('smart');
+		expect(policy.reason).toBe('client-render-ass-libass');
+		expect(policy.renderer).toBe('client-ass-libass');
+		expect(policy.clientRender).toBe(true);
+		expect(policy.requiresBurnIn).toBe(false);
+	});
+
+	it('uses manual-canvas libass client rendering when explicitly selected', () => {
+		const mediaSource = createMediaSource({Codec: 'ass'});
+		const policy = getSubtitleTranscodePolicy(mediaSource, 3, {
+			assSubtitleRenderer: 'libass-manual'
+		});
+
+		expect(policy.mode).toBe('smart');
+		expect(policy.reason).toBe('client-render-ass-libass-manual');
+		expect(policy.renderer).toBe('client-ass-libass-manual');
+		expect(policy.clientRender).toBe(true);
+		expect(policy.requiresBurnIn).toBe(false);
+	});
+
+	it('uses experimental ASS renderer ids when JASSUB or ASS.js are explicitly selected', () => {
+		const mediaSource = createMediaSource({Codec: 'ass'});
+
+		expect(getSubtitleTranscodePolicy(mediaSource, 3, {
+			assSubtitleRenderer: 'jassub'
+		})).toEqual(expect.objectContaining({
+			reason: 'client-render-ass-jassub',
+			renderer: 'client-ass-jassub',
+			clientRender: true,
+			requiresBurnIn: false
+		}));
+		expect(getSubtitleTranscodePolicy(mediaSource, 3, {
+			assSubtitleRenderer: 'jassub-manual'
+		})).toEqual(expect.objectContaining({
+			reason: 'client-render-ass-jassub-manual',
+			renderer: 'client-ass-jassub-manual',
+			clientRender: true,
+			requiresBurnIn: false
+		}));
+		expect(getSubtitleTranscodePolicy(mediaSource, 3, {
+			assSubtitleRenderer: 'assjs'
+		})).toEqual(expect.objectContaining({
+			reason: 'client-render-ass-assjs',
+			renderer: 'client-ass-assjs',
+			clientRender: true,
+			requiresBurnIn: false
+		}));
+	});
+
+	it('honors explicit ASS renderer values without release-channel gating', () => {
+		jest.isolateModules(() => {
+			jest.doMock('../../utils/platformCapabilities', () => ({
+				getRuntimePlatformCapabilities: () => ({playback: {}})
+			}));
+			const {getSubtitleTranscodePolicy: getStableSubtitleTranscodePolicy} = require('../jellyfin/playbackSelection');
+			const mediaSource = createMediaSource({Codec: 'ass'});
+			const policy = getStableSubtitleTranscodePolicy(mediaSource, 3, {
+				assSubtitleRenderer: 'jassub'
+			});
+
+			expect(policy).toEqual(expect.objectContaining({
+				reason: 'client-render-ass-jassub',
+				renderer: 'client-ass-jassub',
+				clientRender: true,
+				requiresBurnIn: false
+			}));
+		});
+	});
+
+	it('uses burn-in for ASS/SSA subtitles when smart ASS renderer is burn-in on SDR', () => {
+		const mediaSource = createMediaSource({Codec: 'ass'});
+		const policy = getSubtitleTranscodePolicy(mediaSource, 3, {
+			assSubtitleRenderer: 'burn-in'
+		});
+
+		expect(policy.mode).toBe('smart');
+		expect(policy.reason).toBe('ass-renderer-burn-in');
+		expect(policy.renderer).toBe('burn-in');
+		expect(policy.requiresBurnIn).toBe(true);
 	});
 
 	it('avoids subtitle-triggered transcode on HDR/DV by default', () => {
@@ -87,6 +207,37 @@ describe('playbackSelection subtitle compatibility', () => {
 		).toBe(false);
 	});
 
+	it('uses client rendering for supported text subtitles on HDR/DV', () => {
+		const hdrSource = createMediaSource({
+			Codec: 'srt'
+		});
+		hdrSource.MediaStreams[0].VideoRangeType = 'DOVIWithHDR10';
+
+		const policy = getSubtitleTranscodePolicy(hdrSource, 3);
+
+		expect(policy.reason).toBe('client-render-text');
+		expect(policy.renderer).toBe('client-text');
+		expect(policy.clientRender).toBe(true);
+		expect(policy.requiresBurnIn).toBe(false);
+		expect(policy.fallbackBurnInAllowed).toBe(false);
+	});
+
+	it('allows burn-in fallback for supported text subtitles on HDR/DV when forced', () => {
+		const hdrSource = createMediaSource({
+			Codec: 'srt'
+		});
+		hdrSource.MediaStreams[0].VideoRangeType = 'DOVIWithHDR10';
+
+		const policy = getSubtitleTranscodePolicy(hdrSource, 3, {
+			allowSubtitleBurnInOnHdr: true
+		});
+
+		expect(policy.reason).toBe('client-render-text');
+		expect(policy.renderer).toBe('client-text');
+		expect(policy.requiresBurnIn).toBe(false);
+		expect(policy.fallbackBurnInAllowed).toBe(true);
+	});
+
 	it('allows subtitle-triggered transcode on HDR/DV when forced', () => {
 		const hdrSource = createMediaSource({
 			Codec: 'ass'
@@ -96,22 +247,35 @@ describe('playbackSelection subtitle compatibility', () => {
 		expect(
 			shouldTranscodeForSubtitleSelection(hdrSource, 3, {
 				subtitleBurnInTextCodecs: ['ass'],
+				assSubtitleRenderer: 'burn-in',
 				allowSubtitleBurnInOnHdr: true
 			})
 		).toBe(true);
 	});
 
-	it('skips subtitle-triggered transcode when subtitle burn-in is disabled', () => {
+	it('skips subtitle-triggered transcode when manual burn-in is disabled in manual mode', () => {
 		const mediaSource = createMediaSource({Codec: 'ass'});
 		expect(
 			shouldTranscodeForSubtitleSelection(mediaSource, 3, {
+				smartSubtitleTranscoding: false,
 				enableSubtitleBurnIn: false,
 				subtitleBurnInTextCodecs: ['ass']
 			})
 		).toBe(false);
 	});
 
-	it('detects ASS tokenized codec labels from display text when selected for burn-in', () => {
+	it('ignores manual burn-in disabled flag in smart mode', () => {
+		const mediaSource = createMediaSource({Codec: 'ass'});
+		expect(
+			shouldTranscodeForSubtitleSelection(mediaSource, 3, {
+				enableSubtitleBurnIn: false,
+				assSubtitleRenderer: 'burn-in',
+				subtitleBurnInTextCodecs: []
+			})
+		).toBe(true);
+	});
+
+	it('detects ASS tokenized codec labels from display text when selected for burn-in in manual mode', () => {
 		const mediaSource = createMediaSource({
 			Codec: null,
 			CodecTag: null,
@@ -120,12 +284,13 @@ describe('playbackSelection subtitle compatibility', () => {
 
 		expect(
 			shouldTranscodeForSubtitleSelection(mediaSource, 3, {
+				smartSubtitleTranscoding: false,
 				subtitleBurnInTextCodecs: ['ass']
 			})
 		).toBe(true);
 	});
 
-	it('keeps external subtitle path when codec metadata is unavailable', () => {
+	it('keeps external subtitle path when codec metadata is unavailable in manual mode', () => {
 		const mediaSource = createMediaSource({
 			Codec: null,
 			CodecTag: null,
@@ -133,7 +298,18 @@ describe('playbackSelection subtitle compatibility', () => {
 			DeliveryMethod: 'External'
 		});
 
-		expect(shouldTranscodeForSubtitleSelection(mediaSource, 3)).toBe(false);
+		expect(shouldTranscodeForSubtitleSelection(mediaSource, 3, {smartSubtitleTranscoding: false})).toBe(false);
+	});
+
+	it('selects DirectStream when DirectPlay is disabled for a compatible source', () => {
+		const mediaSource = createVideoMediaSource({
+			id: 'source-directstream',
+			videoRangeType: 'SDR',
+			supportsDirectPlay: true,
+			supportsDirectStream: true
+		});
+
+		expect(determinePlayMethod(mediaSource, {disableDirectPlay: true})).toBe('DirectStream');
 	});
 
 	it('classifies tokenized subtitle codec names as text codecs', () => {

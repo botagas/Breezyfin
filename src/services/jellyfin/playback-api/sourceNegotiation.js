@@ -10,6 +10,7 @@ import {
 } from '../playbackSelection';
 import {hasNonTranscodingDirectPath, usesMkvContainer} from './dolbyVision';
 import {fetchPlaybackInfo} from './network';
+import {appendPlaybackDiagnostic} from './diagnostics';
 
 const parseTranscodeReasons = (transcodingUrl) => {
 	if (!transcodingUrl) return [];
@@ -41,14 +42,27 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 	forceTranscoding,
 	forceDolbyVision,
 	requestedAudioStreamIndex,
-	createSourceSelectionOptions
+	createSourceSelectionOptions,
+	diagnostics
 }) => {
+	const addDiagnostic = (entry) => appendPlaybackDiagnostic(diagnostics, {
+		scope: 'playback-probe',
+		stage: 'direct-audio',
+		...entry
+	});
 	const canAttemptDirectAudioCompatibilityProbe =
 		!forceTranscoding &&
 		!Number.isInteger(options.audioStreamIndex) &&
 		selectedSource?.TranscodingUrl;
 
 	if (!canAttemptDirectAudioCompatibilityProbe) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: forceTranscoding
+				? 'force-transcoding'
+				: (Number.isInteger(options.audioStreamIndex) ? 'explicit-audio-track' : 'no-transcoding-url'),
+			message: 'Direct-audio probe was not applicable.'
+		});
 		return null;
 	}
 
@@ -64,6 +78,11 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 		!isSupportedAudioCodec(currentAudioStream?.Codec) ||
 		hasAudioRelatedTranscodeReason(selectedSource);
 	if (!shouldProbeForAudioCompatibility) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: 'audio-compatible',
+			message: 'Selected audio track did not require a direct-audio probe.'
+		});
 		return null;
 	}
 	const compatibleAudioProbeIndexes = getAudioStreams(selectedSource)
@@ -86,6 +105,14 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 			if (left.isDefault !== right.isDefault) return left.isDefault ? -1 : 1;
 			return left.order - right.order;
 		});
+	if (compatibleAudioProbeIndexes.length === 0) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: 'no-compatible-audio-candidate',
+			message: 'No alternate direct-audio-compatible track was available.'
+		});
+		return null;
+	}
 
 	for (const audioProbeCandidate of compatibleAudioProbeIndexes) {
 		const audioStreamIndex = audioProbeCandidate.index;
@@ -99,7 +126,14 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 		};
 		try {
 			const directAudioProbeData = await fetchPlaybackInfo(service, itemId, directAudioProbePayload);
-			if (!directAudioProbeData?.MediaSources?.length) continue;
+			if (!directAudioProbeData?.MediaSources?.length) {
+				addDiagnostic({
+					status: 'no-match',
+					reason: 'empty-playback-info',
+					message: `Direct-audio probe returned no source for audio index ${audioStreamIndex}.`
+				});
+				continue;
+			}
 			const directAudioProbeSelection = selectMediaSource(
 				directAudioProbeData.MediaSources,
 				createSourceSelectionOptions({preferredMediaSourceId: selectedSource?.Id})
@@ -112,11 +146,26 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 			}
 			const directAudioProbeSource = directAudioProbeData.MediaSources[0];
 			if (!hasNonTranscodingDirectPath(directAudioProbeSource)) {
+				addDiagnostic({
+					status: 'no-match',
+					reason: 'no-direct-path',
+					message: `Audio index ${audioStreamIndex} still required transcoding.`
+				});
 				continue;
 			}
 			if (forceDolbyVision && getMediaSourceDynamicRangeInfo(directAudioProbeSource)?.id !== 'DV') {
+				addDiagnostic({
+					status: 'no-match',
+					reason: 'not-dolby-vision',
+					message: `Audio index ${audioStreamIndex} did not preserve Dolby Vision.`
+				});
 				continue;
 			}
+			addDiagnostic({
+				status: 'applied',
+				reason: 'direct-path-found',
+				message: `Selected audio index ${audioStreamIndex} to preserve direct playback.`
+			});
 			return {
 				data: directAudioProbeData,
 				selectedSource: directAudioProbeSource,
@@ -129,9 +178,19 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 			};
 		} catch (directAudioProbeError) {
 			console.warn('Direct audio compatibility probe failed:', directAudioProbeError);
+			addDiagnostic({
+				status: 'failed',
+				reason: 'request-failed',
+				message: directAudioProbeError?.message || 'Direct audio compatibility probe failed.'
+			});
 		}
 	}
 
+	addDiagnostic({
+		status: 'no-match',
+		reason: 'no-better-source',
+		message: 'Direct-audio probe found no better source.'
+	});
 	return null;
 };
 
@@ -144,8 +203,14 @@ export const attemptDolbyVisionMkvCompatibilityRetry = async ({
 	enableTranscoding,
 	runtimeSupportsDolbyVision,
 	createSourceSelectionOptions,
-	buildPayloadWithoutMkvDirectPlay
+	buildPayloadWithoutMkvDirectPlay,
+	diagnostics
 }) => {
+	const addDiagnostic = (entry) => appendPlaybackDiagnostic(diagnostics, {
+		scope: 'playback-probe',
+		stage: 'dolby-vision-mkv-retry',
+		...entry
+	});
 	const canAttemptDolbyVisionMkvCompatibilityRetry =
 		!forceTranscoding &&
 		enableTranscoding &&
@@ -154,17 +219,34 @@ export const attemptDolbyVisionMkvCompatibilityRetry = async ({
 		getMediaSourceDynamicRangeInfo(selectedSource)?.id === 'HDR10';
 
 	if (!canAttemptDolbyVisionMkvCompatibilityRetry) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: forceTranscoding
+				? 'force-transcoding'
+				: (runtimeSupportsDolbyVision !== true ? 'no-runtime-dv-support' : 'not-hdr10-mkv-source'),
+			message: 'Dolby Vision MKV compatibility retry was not applicable.'
+		});
 		return null;
 	}
 
 	const dvCompatibilityPayload = buildPayloadWithoutMkvDirectPlay(activePayload, selectedSource?.Id || null);
 	if (!dvCompatibilityPayload) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: 'payload-unavailable',
+			message: 'Could not build a non-MKV direct-play retry payload.'
+		});
 		return null;
 	}
 
 	try {
 		const dvRetryData = await fetchPlaybackInfo(service, itemId, dvCompatibilityPayload);
 		if (!dvRetryData?.MediaSources?.length) {
+			addDiagnostic({
+				status: 'no-match',
+				reason: 'empty-playback-info',
+				message: 'Dolby Vision MKV retry returned no media sources.'
+			});
 			return null;
 		}
 		const dvRetrySelection = selectMediaSource(
@@ -180,8 +262,18 @@ export const attemptDolbyVisionMkvCompatibilityRetry = async ({
 			dvRetryRange?.id === 'DV' ||
 			(!usesMkvContainer(dvRetrySource) && hasNonTranscodingDirectPath(dvRetrySource));
 		if (!dvRetryImproved) {
+			addDiagnostic({
+				status: 'no-match',
+				reason: 'no-improved-source',
+				message: 'Dolby Vision MKV retry did not produce a better source.'
+			});
 			return null;
 		}
+		addDiagnostic({
+			status: 'applied',
+			reason: 'improved-source',
+			message: 'Dolby Vision MKV compatibility retry selected an improved source.'
+		});
 		return {
 			data: dvRetryData,
 			selectedSource: dvRetrySource,
@@ -193,6 +285,11 @@ export const attemptDolbyVisionMkvCompatibilityRetry = async ({
 		};
 	} catch (dvRetryError) {
 		console.warn('Dolby Vision MKV compatibility retry failed:', dvRetryError);
+		addDiagnostic({
+			status: 'failed',
+			reason: 'request-failed',
+			message: dvRetryError?.message || 'Dolby Vision MKV compatibility retry failed.'
+		});
 	}
 
 	return null;
@@ -205,21 +302,44 @@ export const attemptDefaultAudioFallback = async ({
 	selectedSource,
 	options,
 	forceTranscoding,
-	createSourceSelectionOptions
+	createSourceSelectionOptions,
+	diagnostics
 }) => {
+	const addDiagnostic = (entry) => appendPlaybackDiagnostic(diagnostics, {
+		scope: 'playback-probe',
+		stage: 'default-audio-fallback',
+		...entry
+	});
 	if (Number.isInteger(options.audioStreamIndex) || forceTranscoding || !selectedSource) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: Number.isInteger(options.audioStreamIndex)
+				? 'explicit-audio-track'
+				: (forceTranscoding ? 'force-transcoding' : 'no-selected-source'),
+			message: 'Default-audio fallback was not applicable.'
+		});
 		return null;
 	}
 
 	const defaultAudioIndex = getDefaultAudioStreamIndex(selectedSource);
 	const fallbackAudioIndex = findBestCompatibleAudioStreamIndex(selectedSource);
 	if (defaultAudioIndex === null || fallbackAudioIndex === null || defaultAudioIndex === fallbackAudioIndex) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: 'no-alternate-compatible-audio',
+			message: 'No alternate compatible audio fallback was available.'
+		});
 		return null;
 	}
 
 	const defaultAudioStream = getAudioStreams(selectedSource).find((stream) => toInteger(stream.Index) === defaultAudioIndex);
 	const defaultCodecSupported = isSupportedAudioCodec(defaultAudioStream?.Codec);
 	if (defaultCodecSupported) {
+		addDiagnostic({
+			status: 'skipped',
+			reason: 'default-audio-compatible',
+			message: 'Default audio track was already compatible.'
+		});
 		return null;
 	}
 
@@ -228,8 +348,24 @@ export const attemptDefaultAudioFallback = async ({
 		MediaSourceId: selectedSource.Id,
 		AudioStreamIndex: fallbackAudioIndex
 	};
-	const retryData = await fetchPlaybackInfo(service, itemId, retryPayload);
+	let retryData = null;
+	try {
+		retryData = await fetchPlaybackInfo(service, itemId, retryPayload);
+	} catch (fallbackError) {
+		console.warn('Default audio fallback probe failed:', fallbackError);
+		addDiagnostic({
+			status: 'failed',
+			reason: 'request-failed',
+			message: fallbackError?.message || 'Default audio fallback probe failed.'
+		});
+		return null;
+	}
 	if (!retryData?.MediaSources?.length) {
+		addDiagnostic({
+			status: 'no-match',
+			reason: 'empty-playback-info',
+			message: 'Default audio fallback returned no media sources.'
+		});
 		return null;
 	}
 
@@ -241,6 +377,11 @@ export const attemptDefaultAudioFallback = async ({
 		retryData.MediaSources = reorderMediaSources(retryData.MediaSources, retrySelection.index);
 	}
 
+	addDiagnostic({
+		status: 'applied',
+		reason: 'compatible-audio-selected',
+		message: `Selected audio index ${fallbackAudioIndex} for compatibility.`
+	});
 	return {
 		data: retryData,
 		selectedSource: retryData.MediaSources[0],

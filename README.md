@@ -26,7 +26,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
 - Playback that adapts to TV/media compatibility (Direct Play / Direct Stream / Transcode, DV -> HDR -> SDR)
-- Subtitle and audio handling that prioritizes quality while applying compatibility fallbacks when needed
+- Smart subtitle and audio handling, including configurable client-rendered text subtitles where possible to preserve video quality
 - Adaptive image loading (WebP when supported, with automatic fallback on load failure)
 - Built-in diagnostics, logs, and cache tools for easier troubleshooting
 
@@ -85,6 +85,7 @@ Visit [http://localhost:8080](http://localhost:8080) in your browser.
 For implementation and workflow details, use:
 
 - [`DEVELOPING.md`](./DEVELOPING.md) for architecture conventions, decomposition rules, shared hooks/utilities, and style patterns
+- [`QUALITY.md`](./QUALITY.md) for lint/test/audit coverage and external tooling evaluation notes
 - [`HELPERS.md`](./HELPERS.md), [`THEMES.md`](./THEMES.md), [`COMPONENTS.md`](./COMPONENTS.md), [`VIEWS.md`](./VIEWS.md) for focused references
 - [`CHECKS.md`](./CHECKS.md) for recurring validation and pre-release verification
 - [`TODOS.md`](./TODOS.md) for prioritized planned work
@@ -92,7 +93,7 @@ For implementation and workflow details, use:
 ## Diagnostics and debug
 
 Primary diagnostics are runtime toggles under **Settings > Diagnostics** (including the **Device Playback Capabilities** section).
-This includes the performance overlay, extended player debug overlay, focus debug overlay, playback compatibility diagnostics (for example Force DV and fMP4-HLS preference toggles), logs, cache wipe actions, and a non-stable-build debug error menu toggle.
+This includes the performance overlay, extended player debug overlay, focus debug overlay, verbose app logs, playback compatibility diagnostics (for example Force DV and fMP4-HLS preference toggles), logs, cache wipe actions, and a non-stable-build debug error menu toggle.
 
 Build-time log capture flags:
 

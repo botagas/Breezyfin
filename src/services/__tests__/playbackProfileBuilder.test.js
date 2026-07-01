@@ -1,4 +1,23 @@
-import {buildSubtitleProfiles, buildTranscodingProfiles} from '../jellyfin/playbackProfileBuilder';
+jest.mock('../../utils/platformCapabilities', () => ({
+	getRuntimePlatformCapabilities: jest.fn(() => ({
+		playback: {
+			supportsDolbyVision: true,
+			supportsDolbyVisionInMkv: true,
+			supportsHevc: true,
+			nativeHlsFmp4: true,
+			maxAudioChannels: 6,
+			audioCodecsByContainer: {
+				hls: ['aac', 'ac3', 'eac3']
+			}
+		}
+	}))
+}));
+
+import {
+	buildPlaybackRequestContext,
+	buildSubtitleProfiles,
+	buildTranscodingProfiles
+} from '../jellyfin/playbackProfileBuilder';
 
 const hasProfile = (profiles, format, method) => {
 	return profiles.some((profile) => profile.Format === format && profile.Method === method);
@@ -40,6 +59,19 @@ describe('playbackProfileBuilder subtitle profiles', () => {
 		expect(hasProfile(profiles, 'webvtt', 'Encode')).toBe(true);
 	});
 
+	it('keeps smart subtitle mode external until burn-in is explicitly requested', () => {
+		const profiles = buildSubtitleProfiles({
+			relaxedPlaybackProfile: false,
+			forceSubtitleBurnIn: false,
+			subtitleBurnInTextCodecs: []
+		});
+
+		expect(hasProfile(profiles, 'srt', 'External')).toBe(true);
+		expect(hasProfile(profiles, 'srt', 'Encode')).toBe(false);
+		expect(hasProfile(profiles, 'ass', 'External')).toBe(true);
+		expect(hasProfile(profiles, 'ass', 'Encode')).toBe(false);
+	});
+
 	it('forces encode-only profiles when subtitle burn-in is requested', () => {
 		const profiles = buildSubtitleProfiles({
 			relaxedPlaybackProfile: false,
@@ -49,6 +81,21 @@ describe('playbackProfileBuilder subtitle profiles', () => {
 		expect(hasProfile(profiles, 'ass', 'Encode')).toBe(true);
 		expect(hasProfile(profiles, 'pgs', 'Encode')).toBe(true);
 		expect(profiles.some((profile) => profile.Method !== 'Encode')).toBe(false);
+	});
+
+	it('ignores manual subtitle format list in smart request context', () => {
+		const context = buildPlaybackRequestContext({
+			smartSubtitleTranscoding: true,
+			subtitleBurnInTextCodecs: ['ass']
+		});
+
+		expect(context.smartSubtitleTranscoding).toBe(true);
+		expect(context.subtitleBurnInTextCodecs).toEqual([]);
+		expect(
+			context.payload.DeviceProfile.SubtitleProfiles.some((profile) => (
+				profile.Format === 'srt' && profile.Method === 'Encode'
+			))
+		).toBe(false);
 	});
 });
 

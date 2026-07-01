@@ -97,7 +97,8 @@ const MediaDetailsPanel = ({
 	});
 	const {
 		captureScrollTo: captureDetailsScrollRestore,
-		handleScrollStop: handleDetailsScrollMemoryStop
+		handleScrollStop: handleDetailsScrollMemoryStop,
+		commitScrollTop: commitDetailsScrollTop
 	} = usePanelScrollState({
 		cachedState,
 		isActive,
@@ -146,6 +147,25 @@ const MediaDetailsPanel = ({
 		getScrollSnapshot,
 		focusNodeWithoutScroll
 	} = useMediaDetailsDomHelpers({detailsContainerRef});
+	const commitDetailsScrollState = useCallback(() => {
+		const snapshotTop = getScrollSnapshot()?.top;
+		const elementTop = getDetailsScrollElement()?.scrollTop;
+		commitDetailsScrollTop(Number.isFinite(Number(snapshotTop)) ? snapshotTop : elementTop);
+	}, [commitDetailsScrollTop, getDetailsScrollElement, getScrollSnapshot]);
+	const handleBackWithScrollCommit = useCallback((...args) => {
+		commitDetailsScrollState();
+		if (typeof onBack === 'function') {
+			return onBack(...args);
+		}
+		return undefined;
+	}, [commitDetailsScrollState, onBack]);
+	const handleItemSelectWithScrollCommit = useCallback((...args) => {
+		commitDetailsScrollState();
+		if (typeof onItemSelect === 'function') {
+			return onItemSelect(...args);
+		}
+		return undefined;
+	}, [commitDetailsScrollState, onItemSelect]);
 	const {
 		detailsDebugEnabled,
 		describeNode,
@@ -173,6 +193,7 @@ const MediaDetailsPanel = ({
 
 	useMediaDetailsPanelSync({
 		item,
+		isActive,
 		setOverviewExpanded,
 		setIsCastCollapsed,
 		castFocusScrollTimeoutRef,
@@ -191,7 +212,7 @@ const MediaDetailsPanel = ({
 		handleEpisodeClick
 	} = useMediaDetailsDataLoader({
 		item,
-		onItemSelect,
+		onItemSelect: handleItemSelectWithScrollCommit,
 		resolveDefaultTrackSelection,
 		setSelectedAudioTrack,
 		setSelectedSubtitleTrack,
@@ -268,7 +289,7 @@ const MediaDetailsPanel = ({
 	} = useMediaDetailsPrimaryActions({
 		item,
 		onPlay,
-		onBack,
+		onBack: handleBackWithScrollCommit,
 		playbackInfo,
 		selectedAudioTrack,
 		selectedSubtitleTrack,
@@ -376,7 +397,6 @@ const MediaDetailsPanel = ({
 		scrollSeasonIntoView,
 		focusSeasonCardByIndex,
 		focusSeasonWatchedButton,
-		focusTopHeaderAction,
 		focusEpisodeCardByIndex,
 		focusEpisodeInfoButtonByIndex,
 		focusEpisodeFavoriteButtonByIndex,
@@ -386,6 +406,7 @@ const MediaDetailsPanel = ({
 		focusNonSeriesAudioSelector,
 		focusNonSeriesSubtitleSelector,
 		focusNonSeriesPrimaryPlay,
+		focusFirstSectionControlByDirection,
 		handleDetailsPointerDownCapture,
 		handleDetailsPointerClickCapture
 	} = useMediaDetailsFocusOrchestrator({
@@ -453,7 +474,8 @@ const MediaDetailsPanel = ({
 		focusNonSeriesPrimaryPlay,
 		focusNonSeriesAudioSelector,
 		focusNonSeriesSubtitleSelector,
-		focusEpisodeSelector
+		focusEpisodeSelector,
+		focusFirstSectionControlByDirection
 	});
 	const handleSectionSwitchPointerCapture = useCallback((event) => {
 		if (!isSectionSwitchInProgress()) return false;
@@ -486,7 +508,7 @@ const MediaDetailsPanel = ({
 		closeSubtitlePicker,
 		popupEpisodesById,
 		handleEpisodeClick,
-		onItemSelect,
+		onItemSelect: handleItemSelectWithScrollCommit,
 		item,
 		closeEpisodePicker
 	});
@@ -514,7 +536,7 @@ const MediaDetailsPanel = ({
 		handleNonSeriesPlayKeyDown
 	} = useMediaDetailsInteractionHandlers({
 		item,
-		onItemSelect,
+		onItemSelect: handleItemSelectWithScrollCommit,
 		castRowRef,
 		scrollCastIntoView,
 		seasonsById,
@@ -528,25 +550,25 @@ const MediaDetailsPanel = ({
 		episodesById,
 		handleEpisodeClick,
 		isSidewaysEpisodeLayout,
-			episodesListRef,
-			episodeFocusScrollTimeoutRef,
-			focusEpisodeCardByIndex,
-			focusEpisodeInfoButtonByIndex,
-			focusEpisodeFavoriteButtonByIndex,
-			focusEpisodeWatchedButtonByIndex,
-			focusEpisodeSelector,
-			handleToggleFavoriteById,
-			focusNonSeriesSubtitleSelector,
-			focusNonSeriesPrimaryPlay,
-			focusNonSeriesAudioSelector,
-			focusNodeWithoutScroll,
-			focusIntroTopNavigation,
-			focusTopHeaderAction,
-			focusFirstSectionPrimary: focusAndShowFirstSection,
-			focusSecondSectionPrimary: focusAndShowSecondSection,
-			showEpisodeInfoButton: typeof onItemSelect === 'function',
-			css
-		});
+		episodesListRef,
+		episodeFocusScrollTimeoutRef,
+		focusEpisodeCardByIndex,
+		focusEpisodeInfoButtonByIndex,
+		focusEpisodeFavoriteButtonByIndex,
+		focusEpisodeWatchedButtonByIndex,
+		focusEpisodeSelector,
+		handleToggleFavoriteById,
+		focusNonSeriesSubtitleSelector,
+		focusNonSeriesPrimaryPlay,
+		focusNonSeriesAudioSelector,
+		focusFirstSectionControlByDirection,
+		focusNodeWithoutScroll,
+		focusIntroTopNavigation,
+		focusFirstSectionPrimary: focusAndShowFirstSection,
+		focusSecondSectionPrimary: focusAndShowSecondSection,
+		showEpisodeInfoButton: typeof onItemSelect === 'function',
+		css
+	});
 
 	if (!item) return null;
 	const isSeriesMode = item.Type === 'Series';

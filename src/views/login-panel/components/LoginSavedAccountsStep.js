@@ -6,14 +6,12 @@ const LoginSavedAccountsStep = ({
 	savedServers,
 	resumingKey,
 	loading,
-	loadedSavedAvatarKeys,
 	getSavedUserAvatarUrl,
 	onResumeClick,
-	onManualLogin,
-	onSavedAvatarLoad,
+	onAddServer,
+	onAddUser,
 	onSavedAvatarError,
-	css,
-	imageLoadCss
+	css
 }) => (
 	<div className={css.savedServers}>
 		<div className={css.savedList}>
@@ -22,8 +20,7 @@ const LoginSavedAccountsStep = ({
 				const isResuming = resumingKey === key;
 				const userInitial = (entry.username || '?').charAt(0).toUpperCase();
 				const avatarUrl = getSavedUserAvatarUrl(entry);
-				const avatarLoaded = loadedSavedAvatarKeys.has(key);
-				const avatarClassName = `${imageLoadCss.imageReveal} ${avatarLoaded ? imageLoadCss.imageRevealLoaded : ''}`;
+				const avatarClassName = `${css.savedAvatar} ${avatarUrl ? css.savedAvatarWithImage : ''}`;
 				return (
 					<SavedItemComponent
 						key={key}
@@ -31,23 +28,17 @@ const LoginSavedAccountsStep = ({
 						className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
 						onClick={onResumeClick}
 					>
-						<div className={css.savedAvatar}>
+						<div className={avatarClassName}>
 							{avatarUrl && (
 								<>
 									<img
 										src={avatarUrl}
-										alt={`${entry.username || 'User'} avatar`}
+										alt=""
+										aria-hidden="true"
 										data-saved-avatar-key={key}
-										className={avatarClassName}
-										onLoad={onSavedAvatarLoad}
 										onError={onSavedAvatarError}
-										loading="lazy"
-										decoding="async"
 										draggable={false}
 									/>
-									{!avatarLoaded ? (
-										<div className={`${imageLoadCss.imageLoadingHint} ${css.savedAvatarLoadingHint}`} aria-hidden="true" />
-									) : null}
 								</>
 							)}
 							<span className={css.savedAvatarFallback}>{userInitial}</span>
@@ -62,14 +53,26 @@ const LoginSavedAccountsStep = ({
 				);
 			})}
 		</div>
-		<Button
-			onClick={onManualLogin}
-			disabled={loading}
-			size="large"
-			className={css.manualLoginButton}
-		>
-			Log in manually
-		</Button>
+		<div className={css.buttonRow}>
+			<Button
+				onClick={onAddServer}
+				disabled={loading}
+				size="large"
+				focusEffect="static"
+				className={css.authTextButton}
+			>
+				Add Server
+			</Button>
+			<Button
+				onClick={onAddUser}
+				disabled={loading}
+				size="large"
+				focusEffect="static"
+				className={css.authTextButton}
+			>
+				Add User
+			</Button>
+		</div>
 	</div>
 );
 

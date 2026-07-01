@@ -1,5 +1,6 @@
 import {useCallback, useMemo} from 'react';
 
+import {setVerboseLoggingEnabled} from '../../../utils/appLogger';
 import {writeBreezyfinSettings} from '../../../utils/settingsStorage';
 
 const TOGGLE_SETTING_KEYS = [
@@ -8,6 +9,7 @@ const TOGGLE_SETTING_KEYS = [
 	'showPlayNextPrompt',
 	'skipIntro',
 	'forceTranscoding',
+	'smartSubtitleTranscoding',
 	'enableSubtitleBurnIn',
 	'forceTranscodingWithSubtitles',
 	'relaxedPlaybackProfile',
@@ -45,16 +47,16 @@ export const useSettingsToggleHandlers = ({settings, setSettings}) => {
 		handleSettingChange(key, !settings[key]);
 	}, [handleSettingChange, settings]);
 
-		const settingToggleHandlers = useMemo(() => {
-			const handlers = TOGGLE_SETTING_KEYS.reduce((acc, key) => {
-				acc[key] = () => toggleBooleanSetting(key);
-				return acc;
-			}, {});
-			handlers.enableFmp4HlsContainerPreference = () => {
-				const nextEnable = settings.enableFmp4HlsContainerPreference === false;
-				if (!nextEnable) {
-					handleSettingsPatch({
-						enableFmp4HlsContainerPreference: false,
+	const settingToggleHandlers = useMemo(() => {
+		const handlers = TOGGLE_SETTING_KEYS.reduce((acc, key) => {
+			acc[key] = () => toggleBooleanSetting(key);
+			return acc;
+		}, {});
+		handlers.enableFmp4HlsContainerPreference = () => {
+			const nextEnable = settings.enableFmp4HlsContainerPreference !== true;
+			if (!nextEnable) {
+				handleSettingsPatch({
+					enableFmp4HlsContainerPreference: false,
 					forceFmp4HlsContainerPreference: false
 				});
 				return;
@@ -72,8 +74,19 @@ export const useSettingsToggleHandlers = ({settings, setSettings}) => {
 			}
 			handleSettingsPatch({forceFmp4HlsContainerPreference: false});
 		};
+		handlers.verboseAppLogs = () => {
+			const nextVerbose = settings.verboseAppLogs !== true;
+			setVerboseLoggingEnabled(nextVerbose);
+			handleSettingsPatch({verboseAppLogs: nextVerbose});
+		};
 		return handlers;
-	}, [handleSettingsPatch, settings.enableFmp4HlsContainerPreference, settings.forceFmp4HlsContainerPreference, toggleBooleanSetting]);
+	}, [
+		handleSettingsPatch,
+		settings.enableFmp4HlsContainerPreference,
+		settings.forceFmp4HlsContainerPreference,
+		settings.verboseAppLogs,
+		toggleBooleanSetting
+	]);
 
 	return {
 		handleSettingChange,

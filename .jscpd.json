@@ -1,0 +1,11 @@
+{
+	"minTokens": 80,
+	"minLines": 12,
+	"reporters": [
+		"console",
+		"threshold"
+	],
+	"threshold": 0,
+	"output": "/tmp/breezyfin-jscpd",
+	"blame": false
+}

@@ -19,6 +19,7 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 
 - `src/views/HomeSectionPanel.js` expands Home rows into paged section-result grids using shared panel scroll/cache behavior.
 - `src/views/library-panel/` (`hooks/`)
+- `src/views/login-panel/` (`components/`, `hooks/`, `utils/`)
 - `src/views/player-panel/`
 - `src/views/media-details-panel/`
 - `src/views/settings-panel/` (`components/`, `hooks/`, `constants.js`, `labels.js`, panel-local formatting helpers)

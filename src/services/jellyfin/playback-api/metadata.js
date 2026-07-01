@@ -6,7 +6,9 @@ export const attachPlaybackInfoMetadata = (data, {
 	dynamicRange,
 	dynamicRangeCap,
 	subtitlePolicy,
-	requestDebug
+	requestDebug,
+	diagnostics = [],
+	decision = null
 }) => {
 	data.__breezyfin = {
 		playMethod,
@@ -16,7 +18,9 @@ export const attachPlaybackInfoMetadata = (data, {
 		dynamicRange,
 		dynamicRangeCap,
 		subtitlePolicy,
-		requestDebug
+		requestDebug,
+		diagnostics,
+		decision
 	};
 	return data;
 };

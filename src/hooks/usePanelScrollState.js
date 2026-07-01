@@ -1,4 +1,4 @@
-import {useEffect} from 'react';
+import {useCallback, useEffect} from 'react';
 
 import {useCachedScrollTopState, useScrollerScrollMemory} from './useScrollerScrollMemory';
 
@@ -21,6 +21,21 @@ export const usePanelScrollState = ({
 		onScrollTopChange: setScrollTop
 	});
 
+	const commitScrollTop = useCallback((rawTop) => {
+		const nextTop = Number(rawTop);
+		if (!Number.isFinite(nextTop)) return false;
+		const normalizedTop = nextTop <= 0 ? 0 : nextTop;
+		setScrollTop(normalizedTop);
+		if (typeof onCacheState !== 'function') return true;
+		if (!hasCacheKey(cacheKey)) {
+			if (requireCacheKey) return true;
+			onCacheState({scrollTop: normalizedTop});
+			return true;
+		}
+		onCacheState(cacheKey, {scrollTop: normalizedTop});
+		return true;
+	}, [cacheKey, onCacheState, requireCacheKey, setScrollTop]);
+
 	useEffect(() => {
 		if (typeof onCacheState !== 'function') return;
 		if (!hasCacheKey(cacheKey)) {
@@ -34,6 +49,7 @@ export const usePanelScrollState = ({
 	return {
 		scrollTop,
 		setScrollTop,
+		commitScrollTop,
 		captureScrollTo,
 		handleScrollStop
 	};

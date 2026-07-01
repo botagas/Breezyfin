@@ -1,0 +1,349 @@
+.playerContainer :global(.libassjs-canvas-parent) {
+	position: absolute !important;
+	inset: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+	z-index: var(--bf-theme-player-subtitle-z-index);
+	pointer-events: none !important;
+	overflow: hidden !important;
+}
+
+.playerContainer :global(.libassjs-canvas) {
+	pointer-events: none !important;
+	opacity: 1 !important;
+}
+
+.externalSubtitleLayer {
+	position: absolute;
+	inset: 0;
+	z-index: var(--bf-theme-player-subtitle-z-index);
+	pointer-events: none;
+	overflow: hidden;
+	transform: translateY(0);
+	will-change: transform;
+}
+
+.externalSubtitleLayer[data-controls-visible='true'] {
+	transform: translateY(calc(0px - var(--bf-theme-player-subtitle-bottom-controls-low)));
+}
+
+.externalSubtitleLayer :global(*) {
+	pointer-events: none !important;
+}
+
+.externalSubtitleLayer :global(.breezyfin-libass-manual-canvas) {
+	position: absolute !important;
+	pointer-events: none !important;
+	opacity: 1 !important;
+	z-index: var(--bf-theme-player-subtitle-z-index);
+}
+
+.externalSubtitleLayer :global(.ASS-box) {
+	position: absolute !important;
+	inset: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+	overflow: hidden !important;
+}
+
+.videoHidden + :global(.libassjs-canvas-parent) {
+	opacity: 0 !important;
+}
+
+.subtitleOverlay {
+	position: absolute;
+	top: 0;
+	left: var(--bf-theme-player-subtitle-inset-inline);
+	right: var(--bf-theme-player-subtitle-inset-inline);
+	bottom: 0;
+	z-index: var(--bf-theme-player-subtitle-z-index);
+	pointer-events: none;
+	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-white);
+	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-black);
+	--bf-player-subtitle-current-font-size: var(--bf-theme-player-subtitle-font-size);
+	--bf-player-subtitle-current-font-weight: var(--bf-theme-player-subtitle-font-weight);
+	--bf-player-subtitle-current-outline-size: 2px;
+	--bf-player-subtitle-current-shadow-distance: 2px;
+	--bf-player-subtitle-current-shadow-blur: 8px;
+	--bf-player-subtitle-current-shadow-x: 0;
+	--bf-player-subtitle-current-shadow-y: var(--bf-player-subtitle-current-shadow-distance);
+	--bf-player-subtitle-current-shadow: var(--bf-player-subtitle-current-shadow-x)
+		var(--bf-player-subtitle-current-shadow-y)
+		var(--bf-player-subtitle-current-shadow-blur)
+		var(--bf-player-subtitle-current-border-color);
+	--bf-player-subtitle-current-outline: calc(0px - var(--bf-player-subtitle-current-outline-size))
+		calc(0px - var(--bf-player-subtitle-current-outline-size))
+		0 var(--bf-player-subtitle-current-border-color),
+		0 calc(0px - var(--bf-player-subtitle-current-outline-size)) 0 var(--bf-player-subtitle-current-border-color),
+		var(--bf-player-subtitle-current-outline-size)
+		calc(0px - var(--bf-player-subtitle-current-outline-size))
+		0 var(--bf-player-subtitle-current-border-color),
+		calc(0px - var(--bf-player-subtitle-current-outline-size))
+		0
+		0 var(--bf-player-subtitle-current-border-color),
+		var(--bf-player-subtitle-current-outline-size)
+		0
+		0 var(--bf-player-subtitle-current-border-color),
+		calc(0px - var(--bf-player-subtitle-current-outline-size))
+		var(--bf-player-subtitle-current-outline-size)
+		0 var(--bf-player-subtitle-current-border-color),
+		0 var(--bf-player-subtitle-current-outline-size) 0 var(--bf-player-subtitle-current-border-color),
+		var(--bf-player-subtitle-current-outline-size)
+		var(--bf-player-subtitle-current-outline-size)
+		0 var(--bf-player-subtitle-current-border-color);
+	--bf-player-subtitle-current-box-border-width: var(--bf-theme-player-subtitle-box-border-width);
+}
+
+.subtitleRegion {
+	position: absolute;
+	left: 0;
+	right: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bf-theme-player-subtitle-gap);
+	align-items: center;
+	justify-content: center;
+}
+
+.subtitleRegion[data-region='top'] {
+	top: var(--bf-theme-player-subtitle-top);
+}
+
+.subtitleRegion[data-region='middle'] {
+	top: var(--bf-theme-player-subtitle-middle-top);
+	transform: translateY(-50%);
+}
+
+.subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom);
+}
+
+.subtitleAlignGroup {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: var(--bf-theme-player-subtitle-gap);
+	align-items: center;
+}
+
+.subtitleAlignGroup[data-align='left'] {
+	align-items: flex-start;
+}
+
+.subtitleAlignGroup[data-align='right'] {
+	align-items: flex-end;
+}
+
+.subtitleAbsoluteCue {
+	position: absolute;
+	left: var(--bf-player-subtitle-absolute-x);
+	top: var(--bf-player-subtitle-absolute-y);
+	--bf-player-subtitle-absolute-translate-x: -50%;
+	--bf-player-subtitle-absolute-translate-y: -50%;
+	transform:
+		translate(
+			var(--bf-player-subtitle-absolute-translate-x),
+			var(--bf-player-subtitle-absolute-translate-y)
+		);
+	max-width: var(--bf-theme-player-subtitle-max-width);
+	display: flex;
+	justify-content: center;
+}
+
+.subtitleAbsoluteCue[data-align='left'] {
+	--bf-player-subtitle-absolute-translate-x: 0;
+}
+
+.subtitleAbsoluteCue[data-align='right'] {
+	--bf-player-subtitle-absolute-translate-x: -100%;
+}
+
+.subtitleAbsoluteCue[data-region='top'] {
+	--bf-player-subtitle-absolute-translate-y: 0;
+}
+
+.subtitleAbsoluteCue[data-region='bottom'] {
+	--bf-player-subtitle-absolute-translate-y: -100%;
+}
+
+.subtitleClipLayer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+.subtitleTransformLayer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	will-change: transform;
+}
+
+.subtitleOverlay[data-position='low'] .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom-low);
+}
+
+.subtitleOverlay[data-position='raised'] .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom-raised);
+}
+
+.subtitleOverlay[data-controls-visible='true'] .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom-controls);
+}
+
+.subtitleOverlay[data-controls-visible='true'][data-position='low'] .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom-controls-low);
+}
+
+.subtitleOverlay[data-controls-visible='true'][data-position='raised'] .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom-controls-raised);
+}
+
+.subtitleText {
+	max-width: var(--bf-theme-player-subtitle-max-width);
+	padding: var(--bf-theme-player-subtitle-padding-block) var(--bf-theme-player-subtitle-padding-inline);
+	border-radius: var(--bf-theme-player-subtitle-radius);
+	background: var(--bf-theme-player-subtitle-bg);
+	color: var(--bf-player-subtitle-current-text-color);
+	box-shadow: var(--bf-theme-player-subtitle-shadow);
+	font-size: var(--bf-player-subtitle-current-font-size);
+	font-weight: var(--bf-player-subtitle-current-font-weight);
+	line-height: var(--bf-theme-player-subtitle-line-height);
+	text-align: center;
+	text-shadow: var(--bf-player-subtitle-current-shadow);
+	white-space: pre-line;
+}
+
+.subtitleDrawingSvg {
+	display: block;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.subtitleAlignGroup[data-align='left'] .subtitleText {
+	text-align: left;
+}
+
+.subtitleAlignGroup[data-align='right'] .subtitleText {
+	text-align: right;
+}
+
+.subtitleAbsoluteCue[data-align='left'] .subtitleText {
+	text-align: left;
+}
+
+.subtitleAbsoluteCue[data-align='right'] .subtitleText {
+	text-align: right;
+}
+
+.subtitleOverlay[data-weight='regular'] {
+	--bf-player-subtitle-current-font-weight: var(--bf-theme-player-subtitle-font-weight-regular);
+}
+
+.subtitleOverlay[data-weight='black'] {
+	--bf-player-subtitle-current-font-weight: var(--bf-theme-player-subtitle-font-weight-black);
+}
+
+.subtitleOverlay[data-text-color='warmWhite'] {
+	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-warm-white);
+}
+
+.subtitleOverlay[data-text-color='yellow'] {
+	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-yellow);
+}
+
+.subtitleOverlay[data-text-color='black'] {
+	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-black);
+}
+
+.subtitleOverlay[data-border-color='white'] {
+	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-white);
+}
+
+.subtitleOverlay[data-border-color='yellow'] {
+	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-yellow);
+}
+
+.subtitleOverlay[data-border-color='accent'] {
+	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-accent);
+}
+
+.subtitleOverlay[data-border-strength='low'] {
+	--bf-player-subtitle-current-box-border-width: var(--bf-theme-player-subtitle-box-border-width-low);
+}
+
+.subtitleOverlay[data-border-strength='high'] {
+	--bf-player-subtitle-current-box-border-width: var(--bf-theme-player-subtitle-box-border-width-high);
+}
+
+.subtitleOverlay[data-outline-size='thin'] {
+	--bf-player-subtitle-current-outline-size: 1px;
+}
+
+.subtitleOverlay[data-outline-size='thick'] {
+	--bf-player-subtitle-current-outline-size: 3px;
+}
+
+.subtitleOverlay[data-outline-size='extra'] {
+	--bf-player-subtitle-current-outline-size: 4px;
+}
+
+.subtitleOverlay[data-shadow-distance='low'] {
+	--bf-player-subtitle-current-shadow-distance: 1px;
+	--bf-player-subtitle-current-shadow-blur: 4px;
+}
+
+.subtitleOverlay[data-shadow-distance='high'] {
+	--bf-player-subtitle-current-shadow-distance: 4px;
+	--bf-player-subtitle-current-shadow-blur: 11px;
+}
+
+.subtitleOverlay[data-shadow-distance='extra'] {
+	--bf-player-subtitle-current-shadow-distance: 6px;
+	--bf-player-subtitle-current-shadow-blur: 14px;
+}
+
+.subtitleOverlay[data-shadow-angle='downRight'] {
+	--bf-player-subtitle-current-shadow-x: var(--bf-player-subtitle-current-shadow-distance);
+}
+
+.subtitleOverlay[data-shadow-angle='downLeft'] {
+	--bf-player-subtitle-current-shadow-x: calc(0px - var(--bf-player-subtitle-current-shadow-distance));
+}
+
+.subtitleOverlay[data-shadow-angle='upRight'] {
+	--bf-player-subtitle-current-shadow-x: var(--bf-player-subtitle-current-shadow-distance);
+	--bf-player-subtitle-current-shadow-y: calc(0px - var(--bf-player-subtitle-current-shadow-distance));
+}
+
+.subtitleOverlay[data-shadow-angle='upLeft'] {
+	--bf-player-subtitle-current-shadow-x: calc(0px - var(--bf-player-subtitle-current-shadow-distance));
+	--bf-player-subtitle-current-shadow-y: calc(0px - var(--bf-player-subtitle-current-shadow-distance));
+}
+
+.subtitleOverlay[data-border-style='none'] .subtitleText {
+	text-shadow: none;
+}
+
+.subtitleOverlay[data-border-style='outline'] .subtitleText {
+	text-shadow: var(--bf-player-subtitle-current-outline);
+}
+
+.subtitleOverlay[data-border-style='box'] .subtitleText {
+	border: var(--bf-player-subtitle-current-box-border-width) solid var(--bf-player-subtitle-current-border-color);
+	text-shadow: var(--bf-player-subtitle-current-shadow);
+}
+
+.subtitleOverlay[data-background='none'] .subtitleText {
+	background: transparent;
+	box-shadow: none;
+}
+
+.subtitleOverlay[data-background='low'] .subtitleText {
+	background: var(--bf-theme-player-subtitle-bg-low);
+}
+
+.subtitleOverlay[data-background='high'] .subtitleText {
+	background: var(--bf-theme-player-subtitle-bg-high);
+}

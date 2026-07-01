@@ -2,11 +2,23 @@
 	display: flex;
 	flex-direction: column;
 	position: absolute;
+	inset: 0;
 	top: 0;
 	right: 0;
 	bottom: 0;
 	left: 0;
-	inset: 0;
 	background: @background;
 	overflow: hidden;
+}
+
+.panel-backdrop-loading-hint(@baseAlpha: 0.5, @primaryAlpha: 0.14, @secondaryAlpha: 0.13) {
+	background:
+		radial-gradient(120% 90% at 18% 12%, rgba(var(--bf-theme-backdrop-loading-primary-rgb), @primaryAlpha) 0%, rgba(var(--bf-theme-backdrop-loading-primary-rgb), 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(var(--bf-theme-backdrop-loading-secondary-rgb), @secondaryAlpha) 0%, rgba(var(--bf-theme-backdrop-loading-secondary-rgb), 0) 60%),
+		linear-gradient(
+			160deg,
+			rgba(var(--bf-theme-backdrop-loading-base-start-rgb), @baseAlpha) 0%,
+			rgba(var(--bf-theme-backdrop-loading-base-mid-rgb), @baseAlpha) 45%,
+			rgba(var(--bf-theme-backdrop-loading-base-end-rgb), @baseAlpha) 100%
+		);
 }

@@ -26,8 +26,15 @@ import { usePlayerMediaEventHandlers } from './player-panel/hooks/usePlayerMedia
 import { usePlayerVisibilitySync } from './player-panel/hooks/usePlayerVisibilitySync';
 import { usePlayerPlaybackContext } from './player-panel/hooks/usePlayerPlaybackContext';
 import { usePlayerTrackPopupHandlers } from './player-panel/hooks/usePlayerTrackPopupHandlers';
+import {usePlayerSubtitleRenderer} from './player-panel/hooks/usePlayerSubtitleRenderer';
+import {usePlayerInteractionReveal} from './player-panel/hooks/usePlayerInteractionReveal';
+import {
+	buildPlaybackOverride,
+	resolveVideoSeekSeconds
+} from './player-panel/utils/playbackOverride';
 import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
+import {createPlaybackDiagnostic} from '../services/jellyfin/playback-api/diagnostics';
 import PlayerErrorPopup from './player-panel/components/PlayerErrorPopup';
 import PlayerTrackPopup from './player-panel/components/PlayerTrackPopup';
 import PlayerLoadingOverlay from './player-panel/components/PlayerLoadingOverlay';
@@ -36,6 +43,7 @@ import PlayerControlsOverlay from './player-panel/components/PlayerControlsOverl
 import PlayerSeekFeedback from './player-panel/components/PlayerSeekFeedback';
 import PlayerToast from './player-panel/components/PlayerToast';
 import PlayerDebugOverlay from './player-panel/components/PlayerDebugOverlay';
+import PlayerSubtitleOverlay from './player-panel/components/PlayerSubtitleOverlay';
 
 import css from './PlayerPanel.module.less';
 
@@ -73,6 +81,7 @@ const PlayerPanel = ({
 		() => readBreezyfinSettings().showExtendedPlayerDebugOverlay === true
 	);
 	const videoRef = useRef(null);
+	const externalSubtitleLayerRef = useRef(null);
 	const hlsRef = useRef(null);
 	const progressIntervalRef = useRef(null);
 	const seekOffsetRef = useRef(0); // Track offset for transcoded stream seeking
@@ -84,13 +93,17 @@ const PlayerPanel = ({
 	});
 	const currentAudioTrackRef = useRef(null);
 	const currentSubtitleTrackRef = useRef(null);
+	const currentTimeRef = useRef(0);
 	const startupFallbackTimerRef = useRef(null);
 	const transcodeFallbackAttemptedRef = useRef(false);
 	const dynamicRangeFallbackAttemptedRef = useRef(false);
 	const reloadAttemptedRef = useRef(false);
 	const lastProgressRef = useRef({ time: 0, timestamp: 0 });
 	const loadVideoRef = useRef(null);
+	const loadRequestIdRef = useRef(0);
+	const playbackStartedRef = useRef(false);
 	const playbackOverrideRef = useRef(null);
+	const nativeHlsFallbackCleanupRef = useRef(null);
 	const skipButtonRef = useRef(null);
 	const playPauseButtonRef = useRef(null);
 	const skipOverlayRef = useRef(null);
@@ -104,6 +117,7 @@ const PlayerPanel = ({
 	const wasSkipOverlayVisibleRef = useRef(false);
 	const skipFocusRetryTimerRef = useRef(null);
 	const subtitleCompatibilityFallbackAttemptedRef = useRef(false);
+	const nativeAudioFallbackAttemptedRef = useRef(false);
 	const hlsNetworkRecoveryAttemptsRef = useRef(0);
 	const hlsMediaRecoveryAttemptsRef = useRef(0);
 	const playSessionRebuildAttemptsRef = useRef(0);
@@ -144,6 +158,7 @@ const PlayerPanel = ({
 		closeSubtitlePopup
 	} = usePlayerDisclosures();
 	const [mediaSourceData, setMediaSourceData] = useState(null);
+	const [runtimeDiagnostics, setRuntimeDiagnostics] = useState([]);
 	const [mediaSegments, setMediaSegments] = useState([]);
 	const [currentSkipSegment, setCurrentSkipSegment] = useState(null);
 	const [skipCountdown, setSkipCountdown] = useState(null);
@@ -153,8 +168,16 @@ const PlayerPanel = ({
 	const [nextEpisodePromptDismissed, setNextEpisodePromptDismissed] = useState(false);
 	const [seekFeedback, setSeekFeedback] = useState('');
 	const isCurrentTranscoding = mediaSourceData?.__selectedPlayMethod === 'Transcode';
+	const appendPlayerDiagnostic = useCallback((entry) => {
+		const diagnostic = createPlaybackDiagnostic(entry);
+		setRuntimeDiagnostics((current) => [...current, diagnostic].slice(-40));
+	}, []);
 
 	useBreezyfinSettingsSync((settings) => {
+		playbackSettingsRef.current = {
+			...playbackSettingsRef.current,
+			...(settings || {})
+		};
 		setExtendedDebugOverlayEnabled(settings?.showExtendedPlayerDebugOverlay === true);
 	}, {enabled: true, applyOnMount: true});
 
@@ -162,11 +185,28 @@ const PlayerPanel = ({
 		setDebugOverlayVisible(extendedDebugOverlayEnabled);
 	}, [extendedDebugOverlayEnabled]);
 
+	useEffect(() => {
+		setRuntimeDiagnostics([]);
+		nativeAudioFallbackAttemptedRef.current = false;
+	}, [item?.Id]);
+
+	useEffect(() => {
+		currentTimeRef.current = currentTime;
+	}, [currentTime]);
+
 	usePlayerVisibilitySync({
 		requestedControlsVisible,
 		onControlsVisibilityChange,
 		showControls,
 		setShowControls
+	});
+
+	usePlayerInteractionReveal({
+		enabled: isActive,
+		disabled: loading || Boolean(error),
+		showControls,
+		setShowControls,
+		lastInteractionRef
 	});
 
 	const {
@@ -203,6 +243,7 @@ const PlayerPanel = ({
 		item,
 		videoRef,
 		hlsRef,
+		nativeHlsFallbackCleanupRef,
 		playbackSessionRef,
 		progressIntervalRef,
 		startupFallbackTimerRef,
@@ -242,6 +283,7 @@ const PlayerPanel = ({
 		hlsNetworkRecoveryAttemptsRef,
 		hlsMediaRecoveryAttemptsRef,
 		hlsRef,
+		nativeHlsFallbackCleanupRef,
 		reloadAttemptedRef,
 		playSessionRebuildAttemptsRef,
 		videoRef,
@@ -250,18 +292,22 @@ const PlayerPanel = ({
 		playbackOverrideRef,
 		loadVideoRef,
 		mediaSourceData,
-			playbackSettingsRef,
-			transcodeFallbackAttemptedRef,
-			dynamicRangeFallbackAttemptedRef,
-			subtitleCompatibilityFallbackAttemptedRef,
-			setCurrentSubtitleTrack
-		});
+		appendPlaybackDiagnostic: appendPlayerDiagnostic,
+		playbackSettingsRef,
+		transcodeFallbackAttemptedRef,
+		dynamicRangeFallbackAttemptedRef,
+		subtitleCompatibilityFallbackAttemptedRef,
+		setCurrentSubtitleTrack
+	});
 
 	const loadVideo = usePlayerVideoLoader({
 		item,
 		videoRef,
 		hlsRef,
+		nativeHlsFallbackCleanupRef,
 		loadVideoRef,
+		loadRequestIdRef,
+		playbackStartedRef,
 		resetRecoveryGuards,
 		setLoading,
 		reloadAttemptedRef,
@@ -293,7 +339,103 @@ const PlayerPanel = ({
 		attemptPlaybackSessionRebuild,
 		playbackFailureLockedRef,
 		failStartTimerRef,
-		playbackSessionRef
+		playbackSessionRef,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic
+	});
+
+	const handleSubtitleBurnInFallback = useCallback(async ({subtitleStreamIndex, reason}) => {
+		if (!Number.isInteger(subtitleStreamIndex) || subtitleStreamIndex < 0) return;
+		setToastMessage(`Subtitle renderer fallback: ${reason || 'retrying with burn-in'}`);
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex: currentAudioTrack,
+			subtitleStreamIndex,
+			seekSeconds: resolveVideoSeekSeconds(videoRef.current) || currentTimeRef.current || 0,
+			extra: {
+				forceSubtitleBurnIn: true
+			}
+		});
+		setLoading(true);
+		setLoadingStatusMessage('Restarting stream...');
+		try {
+			await handleStop();
+		} catch (fallbackError) {
+			console.warn('Failed while preparing subtitle burn-in fallback:', fallbackError);
+		}
+		loadVideo();
+	}, [
+		currentAudioTrack,
+		handleStop,
+		loadVideo,
+		mediaSourceData?.Id,
+		playbackOptions,
+		playbackOverrideRef,
+		setLoadingStatusMessage,
+		setToastMessage,
+		videoRef
+	]);
+
+	const handleInitialNativeAudioFallback = useCallback(async ({
+		reason,
+		audioStreamIndex,
+		subtitleStreamIndex
+	}) => {
+		if (nativeAudioFallbackAttemptedRef.current) return;
+		nativeAudioFallbackAttemptedRef.current = true;
+		appendPlayerDiagnostic({
+			scope: 'audio-track',
+			stage: 'initial-directstream-fallback',
+			status: 'requested',
+			reason,
+			message: 'Restarting with DirectPlay disabled so Jellyfin can honor the selected audio stream.'
+		});
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex,
+			subtitleStreamIndex,
+			seekSeconds: resolveVideoSeekSeconds(videoRef.current) || currentTime || 0,
+			extra: {
+				disableDirectPlay: true
+			}
+		});
+		setLoading(true);
+		setLoadingStatusMessage('Restarting stream...');
+		try {
+			await handleStop();
+		} catch (fallbackError) {
+			console.warn('Failed while preparing native audio fallback:', fallbackError);
+		}
+		loadVideo();
+	}, [
+		appendPlayerDiagnostic,
+		currentTime,
+		handleStop,
+		loadVideo,
+		mediaSourceData?.Id,
+		playbackOptions,
+		playbackOverrideRef,
+		setLoading,
+		setLoadingStatusMessage,
+		videoRef
+	]);
+
+	const {
+		subtitleCues,
+		subtitleRendererPolicy,
+		subtitleRendererState
+	} = usePlayerSubtitleRenderer({
+		item,
+		videoRef,
+		externalSubtitleLayerRef,
+		mediaSourceData,
+		subtitleTracks,
+		currentSubtitleTrack,
+		currentTime,
+		playbackSettingsRef,
+		onBurnInFallback: handleSubtitleBurnInFallback,
+		setToastMessage
 	});
 
 	const {
@@ -430,7 +572,8 @@ const PlayerPanel = ({
 		saveSubtitleSelection,
 		setCurrentAudioTrack,
 		setCurrentSubtitleTrack,
-		setToastMessage
+		setToastMessage,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic
 	});
 
 	const {
@@ -443,6 +586,7 @@ const PlayerPanel = ({
 		item,
 		loading,
 		videoRef,
+		playbackStartedRef,
 		playbackOverrideRef,
 		setCurrentTime,
 		setLoading,
@@ -464,7 +608,13 @@ const PlayerPanel = ({
 		attemptSubtitleCompatibilityFallback,
 		isCurrentTranscoding,
 		attemptTranscodeFallback,
-		handleStop
+		handleStop,
+		mediaSourceData,
+		audioTracks,
+		currentAudioTrack,
+		currentSubtitleTrack,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic,
+		onNativeAudioSwitchFallback: handleInitialNativeAudioFallback
 	});
 
 	const errorBackdropUrl = getPlayerErrorBackdropUrl(item, jellyfinService);
@@ -568,6 +718,7 @@ const PlayerPanel = ({
 		loadVideo,
 		getMediaSegmentsForItem,
 		setMediaSegments,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		handleStop,
 		showControls,
 		playing,
@@ -585,7 +736,9 @@ const PlayerPanel = ({
 		skipOverlayVisible,
 		wasSkipOverlayVisibleRef,
 		focusSkipOverlayAction,
-		playPauseButtonRef
+		playPauseButtonRef,
+		loadRequestIdRef,
+		playbackStartedRef
 	});
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack, {enabled: isActive});
@@ -683,6 +836,18 @@ const PlayerPanel = ({
 
 				<PlayerLoadingOverlay loading={loading} label={loadingStatusMessage} />
 				<PlayerSeekFeedback seekFeedback={seekFeedback} />
+				<div
+					ref={externalSubtitleLayerRef}
+					className={css.externalSubtitleLayer}
+					data-controls-visible={!loading && !error && showControls ? 'true' : 'false'}
+					aria-hidden
+				/>
+				<PlayerSubtitleOverlay
+					controlsVisible={showControls}
+					cues={subtitleCues}
+					settings={playbackSettingsRef.current}
+					visible={!loading && !error}
+				/>
 
 				<PlayerErrorPopup
 					open={!!error}
@@ -721,6 +886,9 @@ const PlayerPanel = ({
 					duration={duration}
 					currentAudioTrack={currentAudioTrack}
 					currentSubtitleTrack={currentSubtitleTrack}
+					subtitleRendererPolicy={subtitleRendererPolicy}
+					subtitleRendererState={subtitleRendererState}
+					runtimeDiagnostics={runtimeDiagnostics}
 					isCurrentTranscoding={isCurrentTranscoding}
 					skipOverlayVisible={skipOverlayVisible}
 					showNextEpisodePrompt={showNextEpisodePrompt}

@@ -1,44 +1,24 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
+const {
+	fs,
+	path,
+	ROOT,
+	SRC_DIR,
+	STYLE_EXTENSIONS,
+	hasExtension,
+	relativePath,
+	stripBlockCommentsKeepingLines,
+	walkFiles
+} = require('../audit-utils/files.cjs');
 
-const ROOT = process.cwd();
-const SRC_DIR = path.join(ROOT, 'src');
-const STYLE_EXTENSIONS = new Set(['.less', '.css']);
+const BASELINE_PATH = path.join(ROOT, 'scripts', 'style-audit', 'raw-color-baseline.json');
 const MAX_FILE_SUMMARY = 25;
 const MAX_FINDING_LINES = 120;
 const FAIL_ON_FINDINGS = process.argv.includes('--fail-on-findings');
 
 const HEX_COLOR_REGEX = /(?<![A-Za-z0-9_-])#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})(?![A-Za-z0-9_-])/g;
-const FUNCTION_COLOR_REGEX = /\b(?:rgba?|hsla?)\((?!\s*var\()[^)]+\)/g;
-
-const normalizePath = (value) => value.split(path.sep).join('/');
-const relativePath = (absolutePath) => normalizePath(path.relative(ROOT, absolutePath));
-
-const walkFiles = (directory, predicate) => {
-	const results = [];
-	const stack = [directory];
-	while (stack.length > 0) {
-		const current = stack.pop();
-		const entries = fs.readdirSync(current, {withFileTypes: true});
-		for (const entry of entries) {
-			const resolved = path.join(current, entry.name);
-			if (entry.isDirectory()) {
-				stack.push(resolved);
-				continue;
-			}
-			if (predicate(resolved)) {
-				results.push(resolved);
-			}
-		}
-	}
-	return results;
-};
-
-const stripCommentsKeepingLines = (source) => (
-	source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '))
-);
+const FUNCTION_COLOR_REGEX = /\b(?:rgba?|hsla?)\((?!\s*(?:var\(|@))[^)]+\)/g;
 
 const isTokenDeclarationLine = (line) => {
 	const trimmed = line.trim();
@@ -63,7 +43,8 @@ const collectLiterals = (line) => {
 
 const styleFiles = walkFiles(
 	SRC_DIR,
-	(filePath) => STYLE_EXTENSIONS.has(path.extname(filePath))
+	hasExtension(STYLE_EXTENSIONS),
+	{sort: false}
 );
 
 const tokenDeclarationFindings = [];
@@ -71,7 +52,7 @@ const rawUsageFindings = [];
 
 styleFiles.forEach((filePath) => {
 	const source = fs.readFileSync(filePath, 'utf8');
-	const sourceWithoutComments = stripCommentsKeepingLines(source);
+	const sourceWithoutComments = stripBlockCommentsKeepingLines(source);
 	const lines = sourceWithoutComments.split(/\r?\n/);
 	lines.forEach((line, lineIndex) => {
 		const literals = collectLiterals(line);
@@ -108,9 +89,53 @@ const printSummary = (label, findings) => {
 	});
 };
 
+const countByFile = (findings) => {
+	const byFile = new Map();
+	findings.forEach((finding) => {
+		const current = byFile.get(finding.filePath) || 0;
+		byFile.set(finding.filePath, current + 1);
+	});
+	return Object.fromEntries([...byFile.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+};
+
+const readBaseline = () => {
+	if (!fs.existsSync(BASELINE_PATH)) {
+		return null;
+	}
+	return JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+};
+
+const getBaselineRegressions = (baselineConfig, currentCounts) => {
+	if (!baselineConfig) {
+		return [];
+	}
+
+	const baselineFiles = baselineConfig.files || {};
+	return Object.entries(currentCounts)
+		.filter(([filePath, count]) => count > (baselineFiles[filePath] || 0))
+		.map(([filePath, count]) => ({
+			filePath,
+			count,
+			baselineCount: baselineFiles[filePath] || 0
+		}));
+};
+
 console.log(`Scanned ${styleFiles.length} style files under src/.`);
 printSummary('Token declaration literals (expected in token definitions)', tokenDeclarationFindings);
 printSummary('Raw color usage outside token declarations', rawUsageFindings);
+
+const rawCountsByFile = countByFile(rawUsageFindings);
+const baseline = readBaseline();
+const baselineRegressions = getBaselineRegressions(baseline, rawCountsByFile);
+
+if (baseline) {
+	console.log(`Raw color baseline: ${baseline.total} usages across ${Object.keys(baseline.files || {}).length} files.`);
+	if (baselineRegressions.length === 0) {
+		console.log('No raw color usage above baseline found.');
+	}
+} else {
+	console.log('No raw color baseline found; audit is informational only.');
+}
 
 if (rawUsageFindings.length > 0) {
 	console.log('\nTop raw usage findings:');
@@ -121,6 +146,15 @@ if (rawUsageFindings.length > 0) {
 		console.log(`  ... and ${rawUsageFindings.length - MAX_FINDING_LINES} more`);
 	}
 	console.log('\nRecommendation: prefer existing theme tokens / CSS vars over inline color literals.');
+}
+
+if (baselineRegressions.length > 0) {
+	console.error('\nRaw color usage increased above baseline:');
+	baselineRegressions.forEach((item) => {
+		console.error(`  - ${item.filePath}: ${item.count} current, ${item.baselineCount} baseline`);
+	});
+	console.error('\nPrefer tokenizing new colors. If a raw color is intentionally retained, reduce another raw usage in the same file or update the baseline in the same review with justification.');
+	process.exit(1);
 }
 
 if (FAIL_ON_FINDINGS && rawUsageFindings.length > 0) {

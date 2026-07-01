@@ -5,6 +5,11 @@ import {
 	createAudioPreference,
 	createSubtitlePreference
 } from '../utils/trackPreferences';
+import {
+	getLanguageOrdinal,
+	getTrackTitle,
+	normalizeTrackToken
+} from '../utils/trackMatching';
 import {isSupportedAudioCodec} from '../services/jellyfin/playbackSelection';
 
 const isInteger = (value) => Number.isInteger(value);
@@ -25,6 +30,55 @@ const streamMatchesPreferredLanguage = (stream, language) => {
 };
 
 const isCompatibleAudioStream = (stream) => isSupportedAudioCodec(stream?.Codec);
+
+const getAudioTitle = (stream) => normalizeText(getTrackTitle(stream));
+
+const matchesAudioTitle = (stream, preference) => {
+	const preferredTitle = normalizeText(preference?.displayTitle || preference?.title);
+	if (!preferredTitle) return true;
+	return getAudioTitle(stream) === preferredTitle;
+};
+
+const matchesAudioDetails = (stream, preference) => {
+	if (!stream || !preference) return false;
+	if (preference.language && !matchesLanguage(stream, preference.language)) return false;
+	if (!matchesAudioTitle(stream, preference)) return false;
+	const preferredCodec = normalizeTrackToken(preference.codec);
+	if (preferredCodec && normalizeTrackToken(stream?.Codec) !== preferredCodec) return false;
+	const preferredChannels = Number(preference.channels);
+	if (Number.isFinite(preferredChannels) && Number(stream?.Channels) !== preferredChannels) return false;
+	return true;
+};
+
+const matchesAudioOrdinal = (stream, streams, preference) => {
+	if (!stream || !preference) return false;
+	if (!preference.language || !Number.isInteger(preference.languageOrdinal)) return false;
+	if (!matchesLanguage(stream, preference.language)) return false;
+	return getLanguageOrdinal(streams, stream) === preference.languageOrdinal;
+};
+
+const findPreferredAudioStream = (audioStreams, preference) => {
+	if (!preference) return null;
+	const detailedMatch = audioStreams.find(
+		(stream) => isCompatibleAudioStream(stream) && matchesAudioDetails(stream, preference)
+	);
+	if (detailedMatch) return detailedMatch;
+	const ordinalMatch = audioStreams.find(
+		(stream) => isCompatibleAudioStream(stream) && matchesAudioOrdinal(stream, audioStreams, preference)
+	);
+	if (ordinalMatch) return ordinalMatch;
+	if (
+		isInteger(preference.index) &&
+		audioStreams.some((stream) => (
+			stream.Index === preference.index &&
+			isCompatibleAudioStream(stream) &&
+			streamMatchesPreferredLanguage(stream, preference.language)
+		))
+	) {
+		return audioStreams.find((stream) => stream.Index === preference.index);
+	}
+	return null;
+};
 
 const getSubtitleTitle = (stream) => normalizeText(stream?.DisplayTitle || stream?.Title);
 
@@ -89,12 +143,8 @@ export const useTrackPreferences = () => {
 		if (isInteger(providedAudio) && audioStreams.some((stream) => stream.Index === providedAudio)) {
 			return providedAudio;
 		}
-		if (
-			isInteger(preference?.index) &&
-			audioStreams.some((stream) => stream.Index === preference.index && isCompatibleAudioStream(stream))
-		) {
-			return preference.index;
-		}
+		const preferredAudioStream = findPreferredAudioStream(audioStreams, preference);
+		if (preferredAudioStream) return preferredAudioStream.Index;
 		if (preference?.language) {
 			const languageMatch = audioStreams.find(
 				(stream) => matchesLanguage(stream, preference.language) && isCompatibleAudioStream(stream)
@@ -187,7 +237,7 @@ export const useTrackPreferences = () => {
 		const selectedStream = audioStreams.find((stream) => stream.Index === trackIndex);
 		return saveTrackPreferences({
 			...(preferencesRef.current || {}),
-			audio: createAudioPreference(trackIndex, selectedStream),
+			audio: createAudioPreference(trackIndex, selectedStream, audioStreams),
 			subtitle: preferencesRef.current?.subtitle
 		});
 	}, [saveTrackPreferences]);

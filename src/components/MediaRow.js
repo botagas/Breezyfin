@@ -9,6 +9,7 @@ import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
+import {buildMediaListItemKey} from '../utils/reactKeys';
 
 import css from './MediaRow.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
@@ -284,7 +285,7 @@ const MediaRow = ({
 				<div className={`${css.cardContainer} ${isLegacyCompactLayout ? css.cardContainerCompactWebos6 : ''}`} ref={scrollerRef}>
 					{items.map((item, index) => (
 						<MediaCard
-							key={item.Id}
+							key={buildMediaListItemKey(`home-row-${sectionKey || title}`, item, index)}
 							item={item}
 							imageUrl={getImageUrl(item.Id, item)}
 							onClick={onItemClick}
