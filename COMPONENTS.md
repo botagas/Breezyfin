@@ -28,7 +28,7 @@ This guide covers shared UI components in `src/components/`.
 ## Focus and input
 
 - Components that are remote-focusable must be stable in both pointer and 5-way modes.
-- Avoid relying on hover-only affordances for critical actions.
+- Avoid relying on hover-only flows for critical actions.
 - Keep focus/selected visuals consistent with toolbar/media-details/player button states.
 - For image components, route fallback behavior through `useImageErrorFallback` unless panel-specific fallback chains are required.
 - Reuse `PanelPosterMediaCard` for Library-like poster grids so watched/progress overlays and image fallback behavior stay aligned.

@@ -5,70 +5,11 @@ import {
 	getSubtitleTranscodePolicy,
 	shouldTranscodeForSubtitleSelection
 } from '../../../services/jellyfin/playbackSelection';
+import {
+	applyNativeAudioTrackSelection,
+	resolveRuntimeTrackIndex
+} from '../../../utils/trackMatching';
 import {buildPlaybackOverride} from '../utils/playbackOverride';
-
-const normalizeTrackToken = (value) => String(value || '').trim().toLowerCase();
-
-const findUniqueTrackMatchIndex = (tracks, matcher) => {
-	if (!Array.isArray(tracks) || tracks.length === 0 || typeof matcher !== 'function') return -1;
-	const matches = [];
-	tracks.forEach((track, index) => {
-		if (matcher(track, index)) {
-			matches.push(index);
-		}
-	});
-	return matches.length === 1 ? matches[0] : -1;
-};
-
-const resolveHlsTrackIndex = ({
-	hlsTracks,
-	mediaTracks,
-	selectedTrackIndex,
-	allowPositionalFallback = false,
-	getLanguage = (track) => track?.lang,
-	getTitle = (track) => track?.name
-}) => {
-	if (!Array.isArray(hlsTracks) || hlsTracks.length === 0) return -1;
-	if (!Array.isArray(mediaTracks) || mediaTracks.length === 0) return -1;
-
-	const selectedMediaTrack = mediaTracks.find((track) => track?.Index === selectedTrackIndex);
-	if (!selectedMediaTrack) return -1;
-
-	const selectedLanguage = normalizeTrackToken(selectedMediaTrack?.Language);
-	const selectedTitle = normalizeTrackToken(selectedMediaTrack?.Title);
-
-	if (selectedLanguage && selectedTitle) {
-		const exactMatch = findUniqueTrackMatchIndex(hlsTracks, (track) => (
-			normalizeTrackToken(getLanguage(track)) === selectedLanguage &&
-			normalizeTrackToken(getTitle(track)) === selectedTitle
-		));
-		if (exactMatch >= 0) return exactMatch;
-	}
-
-	if (selectedTitle) {
-		const titleMatch = findUniqueTrackMatchIndex(hlsTracks, (track) => (
-			normalizeTrackToken(getTitle(track)) === selectedTitle
-		));
-		if (titleMatch >= 0) return titleMatch;
-	}
-
-	if (selectedLanguage) {
-		const languageMatch = findUniqueTrackMatchIndex(hlsTracks, (track) => (
-			normalizeTrackToken(getLanguage(track)) === selectedLanguage
-		));
-		if (languageMatch >= 0) return languageMatch;
-	}
-
-	if (allowPositionalFallback) {
-		// Last resort for manifests that omit language/title metadata.
-		const mediaTrackOrder = mediaTracks.findIndex((track) => track?.Index === selectedTrackIndex);
-		if (mediaTrackOrder >= 0 && mediaTrackOrder < hlsTracks.length) {
-			return mediaTrackOrder;
-		}
-	}
-
-	return -1;
-};
 
 export const usePlayerSeekAndTrackSwitching = ({
 	item,
@@ -100,7 +41,8 @@ export const usePlayerSeekAndTrackSwitching = ({
 	saveSubtitleSelection,
 	setCurrentAudioTrack,
 	setCurrentSubtitleTrack,
-	setToastMessage
+	setToastMessage,
+	appendPlaybackDiagnostic
 }) => {
 	const isSeekContext = useCallback((target) => {
 		if (!target) return true;
@@ -197,7 +139,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		videoRef
 	]);
 
-	const reloadWithTrackSelection = useCallback(async (audioIndex, subtitleIndex) => {
+	const reloadWithTrackSelection = useCallback(async (audioIndex, subtitleIndex, options = {}) => {
 		if (!videoRef.current) return;
 		const currentPosition = videoRef.current.currentTime || 0;
 		playbackOverrideRef.current = buildPlaybackOverride({
@@ -205,18 +147,42 @@ export const usePlayerSeekAndTrackSwitching = ({
 			mediaSourceId: mediaSourceData?.Id,
 			audioStreamIndex: audioIndex,
 			subtitleStreamIndex: subtitleIndex,
-			seekSeconds: currentPosition
+			seekSeconds: currentPosition,
+			extra: {
+				disableDirectPlay: options.disableDirectPlay === true
+			}
 		});
+		if (typeof appendPlaybackDiagnostic === 'function' && options.reason) {
+			appendPlaybackDiagnostic({
+				scope: 'audio-track',
+				stage: 'stream-reload',
+				status: options.disableDirectPlay ? 'directplay-disabled' : 'requested',
+				reason: options.reason,
+				message: options.disableDirectPlay
+					? 'Reloading with DirectPlay disabled so Jellyfin can honor AudioStreamIndex.'
+					: 'Reloading stream for selected track.'
+			});
+		}
 		setLoading(true);
 		await handleStop();
 		loadVideo();
-	}, [handleStop, loadVideo, mediaSourceData?.Id, playbackOptions, playbackOverrideRef, setLoading, videoRef]);
+	}, [
+		appendPlaybackDiagnostic,
+		handleStop,
+		loadVideo,
+		mediaSourceData?.Id,
+		playbackOptions,
+		playbackOverrideRef,
+		setLoading,
+		videoRef
+	]);
 
 	const shouldForceSubtitleReload = useCallback((trackIndex) => {
 		if (!(Number.isInteger(trackIndex) && trackIndex >= 0)) return false;
 		const settings = playbackSettingsRef?.current || {};
 		return shouldTranscodeForSubtitleSelection(mediaSourceData, trackIndex, {
 			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
+			assSubtitleRenderer: settings.assSubtitleRenderer,
 			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
 			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
@@ -228,6 +194,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		const settings = playbackSettingsRef?.current || {};
 		const policy = getSubtitleTranscodePolicy(mediaSourceData, trackIndex, {
 			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
+			assSubtitleRenderer: settings.assSubtitleRenderer,
 			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
 			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
@@ -241,25 +208,58 @@ export const usePlayerSeekAndTrackSwitching = ({
 		saveAudioSelection(trackIndex, audioTracks);
 
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
-			const hlsTrackIndex = resolveHlsTrackIndex({
-				hlsTracks: hlsRef.current.audioTracks,
+			const hlsTrack = resolveRuntimeTrackIndex({
+				runtimeTracks: hlsRef.current.audioTracks,
 				mediaTracks: audioTracks,
 				selectedTrackIndex: trackIndex
 			});
-			if (hlsTrackIndex >= 0) {
-				hlsRef.current.audioTrack = hlsTrackIndex;
+			if (hlsTrack.index >= 0) {
+				hlsRef.current.audioTrack = hlsTrack.index;
+				if (typeof appendPlaybackDiagnostic === 'function') {
+					appendPlaybackDiagnostic({
+						scope: 'audio-track',
+						stage: 'hls-switch',
+						status: 'applied',
+						reason: hlsTrack.method,
+						message: `Selected HLS audio track ${hlsTrack.index}.`
+					});
+				}
 				return;
 			}
 		}
-		reloadWithTrackSelection(trackIndex, currentSubtitleTrack);
+
+		const nativeResult = applyNativeAudioTrackSelection({
+			video: videoRef.current,
+			mediaTracks: audioTracks,
+			selectedTrackIndex: trackIndex
+		});
+		if (typeof appendPlaybackDiagnostic === 'function') {
+			appendPlaybackDiagnostic({
+				scope: 'audio-track',
+				stage: 'native-switch',
+				status: nativeResult.status,
+				reason: nativeResult.method,
+				message: nativeResult.applied
+					? `Selected native audio track ${nativeResult.index}.`
+					: 'Native audio track switching unavailable or failed.'
+			});
+		}
+		if (nativeResult.applied) return;
+
+		reloadWithTrackSelection(trackIndex, currentSubtitleTrack, {
+			disableDirectPlay: true,
+			reason: nativeResult.status || 'native-audio-switch-failed'
+		});
 	}, [
+		appendPlaybackDiagnostic,
 		audioTracks,
 		closeAudioPopup,
 		currentSubtitleTrack,
 		hlsRef,
 		reloadWithTrackSelection,
 		saveAudioSelection,
-		setCurrentAudioTrack
+		setCurrentAudioTrack,
+		videoRef
 	]);
 
 	const handleSubtitleTrackChange = useCallback(async (trackIndex) => {
@@ -280,13 +280,13 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (hlsRef.current) {
 			if (typeof hlsRef.current.subtitleTrack === 'number' && hlsRef.current.subtitleTracks) {
-				const hlsTrackIndex = resolveHlsTrackIndex({
-					hlsTracks: hlsRef.current.subtitleTracks,
+				const hlsTrackIndex = resolveRuntimeTrackIndex({
+					runtimeTracks: hlsRef.current.subtitleTracks,
 					mediaTracks: subtitleTracks,
 					selectedTrackIndex: trackIndex
 				});
-				if (hlsTrackIndex >= 0) {
-					hlsRef.current.subtitleTrack = hlsTrackIndex;
+				if (hlsTrackIndex.index >= 0) {
+					hlsRef.current.subtitleTrack = hlsTrackIndex.index;
 					return;
 				}
 			}

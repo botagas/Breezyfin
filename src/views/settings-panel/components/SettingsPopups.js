@@ -4,6 +4,11 @@ import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../../../components/AppScroller';
 import Button from '../../../components/BreezyButton';
 import {usePopupInitialFocus} from '../../../hooks/usePopupInitialFocus';
+import {
+	getWipeCacheConfirmCopy,
+	isSubtitleBurnInCodecSelected,
+	isSubtitleOptionSelected
+} from '../utils/settingsViewModel';
 import css from '../../SettingsPanel.module.less';
 import popupStyles from '../../../styles/popupStyles.module.less';
 
@@ -29,10 +34,16 @@ const SettingsPopups = ({
 	closeSubtitleBurnInTextCodecsPopup,
 	subtitleBurnInTextCodecOptions,
 	handleSubtitleBurnInTextCodecToggle,
+	assSubtitleRendererPopupOpen,
+	closeAssSubtitleRendererPopup,
+	assSubtitleRendererOptions,
+	handleAssSubtitleRendererSelect,
 	subtitleOverlaySizePopupOpen,
 	closeSubtitleOverlaySizePopup,
-	subtitleOverlaySizeOptions,
-	handleSubtitleOverlaySizeSelect,
+	subtitleOverlayFontSizeLabel,
+	handleSubtitleOverlayFontSizeDecrease,
+	handleSubtitleOverlayFontSizeIncrease,
+	handleSubtitleOverlayFontSizeReset,
 	subtitleOverlayPositionPopupOpen,
 	closeSubtitleOverlayPositionPopup,
 	subtitleOverlayPositionOptions,
@@ -61,6 +72,20 @@ const SettingsPopups = ({
 	closeSubtitleOverlayBorderStrengthPopup,
 	subtitleOverlayBorderStrengthOptions,
 	handleSubtitleOverlayBorderStrengthSelect,
+	subtitleOverlayOutlineSizePopupOpen,
+	closeSubtitleOverlayOutlineSizePopup,
+	subtitleOverlayOutlineSizeLabel,
+	handleSubtitleOverlayOutlineSizeDecrease,
+	handleSubtitleOverlayOutlineSizeIncrease,
+	handleSubtitleOverlayOutlineSizeReset,
+	subtitleOverlayShadowDistancePopupOpen,
+	closeSubtitleOverlayShadowDistancePopup,
+	subtitleOverlayShadowDistanceOptions,
+	handleSubtitleOverlayShadowDistanceSelect,
+	subtitleOverlayShadowAnglePopupOpen,
+	closeSubtitleOverlayShadowAnglePopup,
+	subtitleOverlayShadowAngleOptions,
+	handleSubtitleOverlayShadowAngleSelect,
 	navbarThemePopupOpen,
 	closeNavbarThemePopup,
 	navbarThemeOptions,
@@ -84,16 +109,17 @@ const SettingsPopups = ({
 	cacheWipeError,
 	handleWipeCacheConfirm
 }) => {
-	const wipeCacheTitle = wipeCacheKeepLogin ? 'Wipe Cache (Keep Login)' : 'Wipe App Cache';
-	const wipeCacheMessage = wipeCacheKeepLogin
-		? 'This clears cache/storage data and reloads the app, while preserving saved login session data.'
-		: 'This clears local storage, session storage, cache storage, and IndexedDB, then reloads the app.';
-	const wipeCacheActionLabel = wipeCacheKeepLogin ? 'Wipe (Keep Login) & Reload' : 'Wipe & Reload';
+	const {
+		title: wipeCacheTitle,
+		message: wipeCacheMessage,
+		actionLabel: wipeCacheActionLabel
+	} = getWipeCacheConfirmCopy(wipeCacheKeepLogin);
 	const bitratePopupContentRef = useRef(null);
 	const audioLangPopupContentRef = useRef(null);
 	const capabilityProbeRefreshPopupContentRef = useRef(null);
 	const subtitleLangPopupContentRef = useRef(null);
 	const subtitleBurnInTextCodecsPopupContentRef = useRef(null);
+	const assSubtitleRendererPopupContentRef = useRef(null);
 	const subtitleOverlaySizePopupContentRef = useRef(null);
 	const subtitleOverlayPositionPopupContentRef = useRef(null);
 	const subtitleOverlayBackgroundPopupContentRef = useRef(null);
@@ -102,6 +128,9 @@ const SettingsPopups = ({
 	const subtitleOverlayBorderStylePopupContentRef = useRef(null);
 	const subtitleOverlayBorderColorPopupContentRef = useRef(null);
 	const subtitleOverlayBorderStrengthPopupContentRef = useRef(null);
+	const subtitleOverlayOutlineSizePopupContentRef = useRef(null);
+	const subtitleOverlayShadowDistancePopupContentRef = useRef(null);
+	const subtitleOverlayShadowAnglePopupContentRef = useRef(null);
 	const navbarThemePopupContentRef = useRef(null);
 	const playNextPromptModePopupContentRef = useRef(null);
 	const logoutConfirmPopupContentRef = useRef(null);
@@ -113,6 +142,7 @@ const SettingsPopups = ({
 	usePopupInitialFocus(capabilityProbeRefreshPopupOpen, capabilityProbeRefreshPopupContentRef);
 	usePopupInitialFocus(subtitleLangPopupOpen, subtitleLangPopupContentRef);
 	usePopupInitialFocus(subtitleBurnInTextCodecsPopupOpen, subtitleBurnInTextCodecsPopupContentRef);
+	usePopupInitialFocus(assSubtitleRendererPopupOpen, assSubtitleRendererPopupContentRef);
 	usePopupInitialFocus(subtitleOverlaySizePopupOpen, subtitleOverlaySizePopupContentRef);
 	usePopupInitialFocus(subtitleOverlayPositionPopupOpen, subtitleOverlayPositionPopupContentRef);
 	usePopupInitialFocus(subtitleOverlayBackgroundPopupOpen, subtitleOverlayBackgroundPopupContentRef);
@@ -121,6 +151,9 @@ const SettingsPopups = ({
 	usePopupInitialFocus(subtitleOverlayBorderStylePopupOpen, subtitleOverlayBorderStylePopupContentRef);
 	usePopupInitialFocus(subtitleOverlayBorderColorPopupOpen, subtitleOverlayBorderColorPopupContentRef);
 	usePopupInitialFocus(subtitleOverlayBorderStrengthPopupOpen, subtitleOverlayBorderStrengthPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayOutlineSizePopupOpen, subtitleOverlayOutlineSizePopupContentRef);
+	usePopupInitialFocus(subtitleOverlayShadowDistancePopupOpen, subtitleOverlayShadowDistancePopupContentRef);
+	usePopupInitialFocus(subtitleOverlayShadowAnglePopupOpen, subtitleOverlayShadowAnglePopupContentRef);
 	usePopupInitialFocus(navbarThemePopupOpen, navbarThemePopupContentRef);
 	usePopupInitialFocus(playNextPromptModePopupOpen, playNextPromptModePopupContentRef);
 	usePopupInitialFocus(logoutConfirmOpen, logoutConfirmPopupContentRef);
@@ -150,12 +183,44 @@ const SettingsPopups = ({
 							key={option.value}
 							data-value={option.value}
 							className={css.popupOption}
-							selected={(settings[settingKey] || fallback) === option.value}
+							selected={isSubtitleOptionSelected(settings, settingKey, fallback, option.value)}
 							onClick={onSelect}
 						>
 							{option.label}
 						</Button>
 					))}
+				</div>
+			</div>
+		</Popup>
+	);
+
+	const renderSubtitleNumericPopup = ({
+		open,
+		onClose,
+		contentRef,
+		title,
+		message,
+		valueLabel,
+		onDecrease,
+		onIncrease,
+		onReset
+	}) => (
+		<Popup
+			open={open}
+			onClose={onClose}
+			css={popupShellCss}
+		>
+			<div ref={contentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
+				<BodyText className={css.popupTitle}>{title}</BodyText>
+				<BodyText className={css.popupMessage}>{message}</BodyText>
+				<BodyText className={css.popupNumericValue}>{valueLabel}</BodyText>
+				<div className={css.popupNumericActions}>
+					<Button className={css.popupOption} onClick={onDecrease}>-</Button>
+					<Button className={css.popupOption} onClick={onReset}>Reset</Button>
+					<Button className={css.popupOption} onClick={onIncrease}>+</Button>
+				</div>
+				<div className={css.popupActions}>
+					<Button onClick={onClose} className={css.popupOption}>Done</Button>
 				</div>
 			</div>
 		</Popup>
@@ -188,7 +253,7 @@ const SettingsPopups = ({
 				open: subtitleOverlayWeightPopupOpen,
 				onClose: closeSubtitleOverlayWeightPopup,
 				contentRef: subtitleOverlayWeightPopupContentRef,
-				title: 'Subtitle Font Weight',
+				title: 'Breezyfin Subtitle Font Weight',
 				options: subtitleOverlayWeightOptions,
 				settingKey: 'subtitleOverlayWeight',
 				onSelect: handleSubtitleOverlayWeightSelect,
@@ -199,7 +264,7 @@ const SettingsPopups = ({
 				open: subtitleOverlayTextColorPopupOpen,
 				onClose: closeSubtitleOverlayTextColorPopup,
 				contentRef: subtitleOverlayTextColorPopupContentRef,
-				title: 'Subtitle Text Color',
+				title: 'Breezyfin Subtitle Text Color',
 				options: subtitleOverlayTextColorOptions,
 				settingKey: 'subtitleOverlayTextColor',
 				onSelect: handleSubtitleOverlayTextColorSelect,
@@ -210,18 +275,18 @@ const SettingsPopups = ({
 				open: subtitleOverlayBorderStylePopupOpen,
 				onClose: closeSubtitleOverlayBorderStylePopup,
 				contentRef: subtitleOverlayBorderStylePopupContentRef,
-				title: 'Subtitle Border Style',
+				title: 'Breezyfin Subtitle Border Style',
 				options: subtitleOverlayBorderStyleOptions,
 				settingKey: 'subtitleOverlayBorderStyle',
 				onSelect: handleSubtitleOverlayBorderStyleSelect,
-				fallback: 'shadow'
+				fallback: 'outline'
 			})}
 
 			{renderSubtitleOptionPopup({
 				open: subtitleOverlayBorderColorPopupOpen,
 				onClose: closeSubtitleOverlayBorderColorPopup,
 				contentRef: subtitleOverlayBorderColorPopupContentRef,
-				title: 'Subtitle Border Color',
+				title: 'Breezyfin Subtitle Border Color',
 				options: subtitleOverlayBorderColorOptions,
 				settingKey: 'subtitleOverlayBorderColor',
 				onSelect: handleSubtitleOverlayBorderColorSelect,
@@ -232,11 +297,45 @@ const SettingsPopups = ({
 				open: subtitleOverlayBorderStrengthPopupOpen,
 				onClose: closeSubtitleOverlayBorderStrengthPopup,
 				contentRef: subtitleOverlayBorderStrengthPopupContentRef,
-				title: 'Subtitle Border Strength',
+				title: 'Breezyfin Subtitle Box Border Strength',
 				options: subtitleOverlayBorderStrengthOptions,
 				settingKey: 'subtitleOverlayBorderStrength',
 				onSelect: handleSubtitleOverlayBorderStrengthSelect,
 				fallback: 'medium'
+			})}
+
+			{renderSubtitleNumericPopup({
+				open: subtitleOverlayOutlineSizePopupOpen,
+				onClose: closeSubtitleOverlayOutlineSizePopup,
+				contentRef: subtitleOverlayOutlineSizePopupContentRef,
+				title: 'Breezyfin Subtitle Outline Size',
+				message: 'Controls the pixel width of Breezyfin DOM subtitle outlines.',
+				valueLabel: subtitleOverlayOutlineSizeLabel,
+				onDecrease: handleSubtitleOverlayOutlineSizeDecrease,
+				onIncrease: handleSubtitleOverlayOutlineSizeIncrease,
+				onReset: handleSubtitleOverlayOutlineSizeReset
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayShadowDistancePopupOpen,
+				onClose: closeSubtitleOverlayShadowDistancePopup,
+				contentRef: subtitleOverlayShadowDistancePopupContentRef,
+				title: 'Breezyfin Subtitle Shadow Distance',
+				options: subtitleOverlayShadowDistanceOptions,
+				settingKey: 'subtitleOverlayShadowDistance',
+				onSelect: handleSubtitleOverlayShadowDistanceSelect,
+				fallback: 'medium'
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: subtitleOverlayShadowAnglePopupOpen,
+				onClose: closeSubtitleOverlayShadowAnglePopup,
+				contentRef: subtitleOverlayShadowAnglePopupContentRef,
+				title: 'Breezyfin Subtitle Shadow Angle',
+				options: subtitleOverlayShadowAngleOptions,
+				settingKey: 'subtitleOverlayShadowAngle',
+				onSelect: handleSubtitleOverlayShadowAngleSelect,
+				fallback: 'down'
 			})}
 
 			<Popup
@@ -322,7 +421,7 @@ const SettingsPopups = ({
 								key={option.value}
 								data-codec={option.value}
 								className={css.popupOption}
-								selected={(settings.subtitleBurnInTextCodecs || []).includes(option.value)}
+								selected={isSubtitleBurnInCodecSelected(settings, option.value)}
 								onClick={handleSubtitleBurnInTextCodecToggle}
 							>
 								{option.label}
@@ -334,6 +433,17 @@ const SettingsPopups = ({
 					</div>
 				</div>
 			</Popup>
+
+			{renderSubtitleOptionPopup({
+				open: assSubtitleRendererPopupOpen,
+				onClose: closeAssSubtitleRendererPopup,
+				contentRef: assSubtitleRendererPopupContentRef,
+				title: 'ASS/SSA Subtitle Renderer',
+				options: assSubtitleRendererOptions,
+				settingKey: 'assSubtitleRenderer',
+				onSelect: handleAssSubtitleRendererSelect,
+				fallback: 'auto'
+			})}
 
 			<Popup
 				open={navbarThemePopupOpen}
@@ -359,28 +469,17 @@ const SettingsPopups = ({
 				</div>
 			</Popup>
 
-			<Popup
-				open={subtitleOverlaySizePopupOpen}
-				onClose={closeSubtitleOverlaySizePopup}
-				css={popupShellCss}
-			>
-				<div ref={subtitleOverlaySizePopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Subtitle Size</BodyText>
-					<div className={css.popupOptions}>
-						{subtitleOverlaySizeOptions.map((option) => (
-							<Button
-								key={option.value}
-								data-value={option.value}
-								className={css.popupOption}
-								selected={(settings.subtitleOverlaySize || 'medium') === option.value}
-								onClick={handleSubtitleOverlaySizeSelect}
-							>
-								{option.label}
-							</Button>
-						))}
-					</div>
-				</div>
-			</Popup>
+			{renderSubtitleNumericPopup({
+				open: subtitleOverlaySizePopupOpen,
+				onClose: closeSubtitleOverlaySizePopup,
+				contentRef: subtitleOverlaySizePopupContentRef,
+				title: 'Breezyfin Subtitle Font Size',
+				message: 'Controls Breezyfin DOM subtitles. Libass subtitles keep authored ASS/SSA sizing.',
+				valueLabel: subtitleOverlayFontSizeLabel,
+				onDecrease: handleSubtitleOverlayFontSizeDecrease,
+				onIncrease: handleSubtitleOverlayFontSizeIncrease,
+				onReset: handleSubtitleOverlayFontSizeReset
+			})}
 
 			<Popup
 				open={subtitleOverlayPositionPopupOpen}
@@ -388,7 +487,7 @@ const SettingsPopups = ({
 				css={popupShellCss}
 			>
 				<div ref={subtitleOverlayPositionPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Subtitle Position</BodyText>
+					<BodyText className={css.popupTitle}>Breezyfin Subtitle Position</BodyText>
 					<div className={css.popupOptions}>
 						{subtitleOverlayPositionOptions.map((option) => (
 							<Button
@@ -411,14 +510,14 @@ const SettingsPopups = ({
 				css={popupShellCss}
 			>
 				<div ref={subtitleOverlayBackgroundPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Subtitle Background</BodyText>
+					<BodyText className={css.popupTitle}>Breezyfin Subtitle Background</BodyText>
 					<div className={css.popupOptions}>
 						{subtitleOverlayBackgroundOptions.map((option) => (
 							<Button
 								key={option.value}
 								data-value={option.value}
 								className={css.popupOption}
-								selected={(settings.subtitleOverlayBackground || 'medium') === option.value}
+								selected={(settings.subtitleOverlayBackground || 'none') === option.value}
 								onClick={handleSubtitleOverlayBackgroundSelect}
 							>
 								{option.label}

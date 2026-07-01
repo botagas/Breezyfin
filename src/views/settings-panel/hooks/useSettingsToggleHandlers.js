@@ -53,7 +53,7 @@ export const useSettingsToggleHandlers = ({settings, setSettings}) => {
 			return acc;
 		}, {});
 		handlers.enableFmp4HlsContainerPreference = () => {
-			const nextEnable = settings.enableFmp4HlsContainerPreference === false;
+			const nextEnable = settings.enableFmp4HlsContainerPreference !== true;
 			if (!nextEnable) {
 				handleSettingsPatch({
 					enableFmp4HlsContainerPreference: false,

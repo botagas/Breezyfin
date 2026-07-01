@@ -88,6 +88,8 @@ body,
 	--bf-theme-card-filter-chip-active-border: rgba(138, 180, 248, 0.8);
 	--bf-theme-card-title-color: rgba(236, 241, 247, 0.96);
 	--bf-theme-card-subtitle-color: rgba(173, 185, 203, 0.88);
+	--bf-theme-muted-text: var(--bf-theme-card-subtitle-color);
+	--bf-theme-elevated-shadow-soft: var(--bf-theme-surface-shadow, 0 0.6rem 1.55rem rgba(0, 0, 0, 0.35));
 
 	--bf-theme-player-loading-ring-primary: rgba(255, 255, 255, 0.8);
 	--bf-theme-player-loading-ring-secondary: rgba(255, 255, 255, 0.6);
@@ -164,13 +166,18 @@ body,
 	--bf-theme-player-skip-button-hover-bg: rgba(var(--bf-theme-accent-rgb), 0.3);
 	--bf-theme-player-skip-button-hover-border: rgba(192, 228, 255, 0.88);
 	--bf-theme-player-skip-button-active-bg: rgba(var(--bf-theme-accent-rgb), 0.4);
-	--bf-theme-player-skip-close-bg: rgba(255, 255, 255, 0.08);
-	--bf-theme-player-skip-close-border: rgba(255, 255, 255, 0.24);
-	--bf-theme-player-skip-close-hover-bg: rgba(255, 128, 146, 0.22);
-	--bf-theme-player-skip-close-hover-border: rgba(255, 180, 196, 0.72);
-	--bf-theme-backdrop-fallback:
-		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
-		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
+		--bf-theme-player-skip-close-bg: rgba(255, 255, 255, 0.08);
+		--bf-theme-player-skip-close-border: rgba(255, 255, 255, 0.24);
+		--bf-theme-player-skip-close-hover-bg: rgba(255, 128, 146, 0.22);
+		--bf-theme-player-skip-close-hover-border: rgba(255, 180, 196, 0.72);
+		--bf-theme-backdrop-loading-primary-rgb: 32, 148, 255;
+		--bf-theme-backdrop-loading-secondary-rgb: 0, 216, 195;
+		--bf-theme-backdrop-loading-base-start-rgb: 19, 23, 34;
+		--bf-theme-backdrop-loading-base-mid-rgb: 15, 18, 26;
+		--bf-theme-backdrop-loading-base-end-rgb: 16, 16, 16;
+		--bf-theme-backdrop-fallback:
+			radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
+			radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
 		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
 		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
 	--bf-theme-error-surface-max-width: 64rem;

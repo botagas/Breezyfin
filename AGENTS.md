@@ -75,7 +75,7 @@ Do not add duplicate hooks/helpers for behavior already covered by shared module
 - All focusable interactions must behave in both `5way` and `pointer` modes.
 - Do not rely on hover-only affordances for critical actions.
 - Popups should autofocus first actionable item on open via `usePopupInitialFocus`.
-- In Media Details, keep first-section focus playback-first (`Audio -> Subtitle -> Play`) and avoid automatic Favorite/Watched focus fallback.
+- In Media Details, keep initial/forced first-section focus playback-first (`Audio -> Subtitle -> Play`) and avoid automatic Favorite/Watched fallback. Directional LEFT/RIGHT navigation may continue through Favorite/Watched after Play when those actions are available.
 - Preserve layered back behavior:
   1. close local disclosure(s)
   2. run toolbar/panel-local back handler
@@ -124,19 +124,18 @@ Standard gate for functional changes (recommended default):
 
 1. `npm run lint`
 2. `npm run test -- --watch=false --runInBand`
-3. `npm run audit:styles`
-4. `npm run audit:style-tokens`
-5. `npm run audit:duplicates`
-6. `npm run pack`
+3. `npm run audit`
+4. `npm run pack`
 
 Release-oriented gate:
 
 1. `npm run lint`
 2. `npm run test -- --watch=false --runInBand`
-3. `npm run audit:styles`
-4. `npm run audit:style-tokens`
-5. `npm run audit:duplicates`
-6. `npm run pack-p`
+3. `npm run audit`
+4. `npm run pack-p`
+5. Stable webOS packaging smoke check when the webOS CLI is available: `ares-package dist`
+6. For develop/non-stable release candidates, rebuild production assets with develop flags: `REACT_APP_ENABLE_PERSISTENT_LOGS=1 REACT_APP_RELEASE_CHANNEL=develop npm run pack-p`
+7. For develop/non-stable release candidates, package that flagged `dist/` immediately after step 6: `ares-package dist`
 
 If any gate is skipped, state exactly what was skipped and why.
 

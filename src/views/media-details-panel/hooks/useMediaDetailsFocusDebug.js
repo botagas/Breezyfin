@@ -31,10 +31,10 @@ export const useMediaDetailsFocusDebug = ({
 	const logDetailsDebug = useCallback((message, payload = null) => {
 		if (!detailsDebugEnabled) return;
 		if (payload) {
-			console.log('[MediaDetailsFocusDebug]', message, payload);
+			console.info('[MediaDetailsFocusDebug]', message, payload);
 			return;
 		}
-		console.log('[MediaDetailsFocusDebug]', message);
+		console.info('[MediaDetailsFocusDebug]', message);
 	}, [detailsDebugEnabled]);
 
 	useEffect(() => {

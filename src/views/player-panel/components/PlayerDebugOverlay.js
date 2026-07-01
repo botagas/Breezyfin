@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import Spotlight from '@enact/spotlight';
 import Button from '../../../components/BreezyButton';
 import {describeDomNode} from '../../../utils/domNodeDescription';
@@ -20,6 +20,14 @@ const NETWORK_STATE_LABELS = {
 	2: 'NETWORK_LOADING',
 	3: 'NETWORK_NO_SOURCE'
 };
+
+const DEBUG_TABS = [
+	{id: 'overview', label: 'Overview'},
+	{id: 'playback', label: 'Playback'},
+	{id: 'subtitles', label: 'Subtitles'},
+	{id: 'runtime', label: 'Runtime'},
+	{id: 'diagnostics', label: 'Diagnostics'}
+];
 
 const pickStreamByType = (mediaSource, streamType) => {
 	const streams = mediaSource?.MediaStreams;
@@ -107,6 +115,7 @@ const PlayerDebugOverlay = ({
 	skipOverlayVisible,
 	showNextEpisodePrompt
 }) => {
+	const [activeTab, setActiveTab] = useState('overview');
 	const [runtimeSnapshot, setRuntimeSnapshot] = useState({
 		activeElement: '(none)',
 		pointerMode: 'unknown',
@@ -172,6 +181,10 @@ const PlayerDebugOverlay = ({
 		if (currentSubtitleTrack === -1) return null;
 		return pickTrackByIndex(mediaSourceData, 'Subtitle', currentSubtitleTrack);
 	}, [currentSubtitleTrack, mediaSourceData]);
+	const handleTabClick = useCallback((event) => {
+		const tabId = event.currentTarget?.dataset?.tabId;
+		if (tabId) setActiveTab(tabId);
+	}, []);
 
 	if (!enabled) return null;
 
@@ -241,179 +254,295 @@ const PlayerDebugOverlay = ({
 			`selS=${decisionDebug.selectedSubtitleStreamIndex ?? '-'}`,
 			`cap=${decisionDebug.dynamicRangeCap || 'auto'}`,
 			`fmp4=${decisionDebug.fmp4HlsPreference?.forced ? 'force' : (decisionDebug.fmp4HlsPreference?.enabled ? 'on' : 'off')}`,
+			decisionDebug.disableDirectPlay ? 'dpOff=yes' : '',
 			decisionDebug.forceDolbyVision ? 'forceDV=yes' : '',
 			decisionDebug.avoidDolbyVision ? 'avoidDV=yes' : '',
 			decisionDebug.forceSubtitleBurnIn ? 'subBurn=yes' : ''
 		)
 		: '-';
 
-	const rows = [
-		{label: 'Item', value: `${item?.Id || '-'} (${item?.Type || '-'})`},
-		{
-			label: 'State',
-			value: joinInfo(
-				`loading=${loading ? 'yes' : 'no'}`,
-				`playing=${playing ? 'yes' : 'no'}`,
-				`controls=${showControls ? 'yes' : 'no'}`,
-				`error=${error ? 'yes' : 'no'}`
-			)
-		},
-		{
-			label: 'Session',
-			value: joinInfo(
-				playbackSession?.playMethod || mediaSourceData?.__selectedPlayMethod || '-',
-				`session=${playbackSession?.playSessionId || '-'}`,
-				`source=${playbackSession?.mediaSourceId || mediaSourceData?.Id || '-'}`
+	const subtitleDebug = subtitleRendererState?.debug || {};
+	const debugSections = {
+		overview: [
+			{label: 'Item', value: `${item?.Id || '-'} (${item?.Type || '-'})`},
+			{
+				label: 'State',
+				value: joinInfo(
+					`loading=${loading ? 'yes' : 'no'}`,
+					`playing=${playing ? 'yes' : 'no'}`,
+					`controls=${showControls ? 'yes' : 'no'}`,
+					`error=${error ? 'yes' : 'no'}`
 				)
-		},
-		{
-			label: 'Sources',
-			value: sourceSummary
-		},
-		{
-			label: 'Request',
-			value: requestSummary
-		},
-		{
-			label: 'Decision',
-			value: decisionSummary
-		},
-		{
-			label: 'Stream',
-			value: joinInfo(
-				`container=${mediaSourceData?.Container || '-'}`,
-				`transport=${transportLabel}`,
-				`engine=${mediaSourceData?.__debugHlsEngine || '-'}`,
-				`transcoding=${isCurrentTranscoding ? 'yes' : 'no'}`,
-				`url=${runtimeSnapshot.currentSrc}`
-			)
-		},
-		{
-			label: 'Video',
-			value: joinInfo(
-				videoStream?.Codec || '-',
-				videoStream?.Profile || '-',
-				`lvl=${videoStream?.Level ?? '-'}`,
-				`src=${sourceResolution}`,
-				`el=${videoResolution}`,
-				`br=${formatBitrateMbps(videoStream?.BitRate)}`
-			)
-		},
-		{
-			label: 'Signal',
-			value: joinInfo(
-				`transfer=${videoStream?.ColorTransfer || '-'}`,
-				`primaries=${videoStream?.ColorPrimaries || '-'}`,
-				`space=${videoStream?.ColorSpace || '-'}`,
-				`depth=${videoStream?.BitDepth ?? '-'}`,
-				`codecTag=${videoStream?.CodecTag || '-'}`
-			)
-		},
-		{
-			label: 'Range',
-			value: joinInfo(
-				`label=${dynamicRangeLabel}`,
-				`type=${videoStream?.VideoRangeType || '-'}`,
-				`range=${videoStream?.VideoRange || '-'}`,
-				`cap=${mediaSourceData?.__requestedDynamicRangeCap || 'auto'}`
-			)
-		},
-		{
-			label: 'Audio',
-			value: joinInfo(
-				`idx=${toInteger(currentAudioTrack) ?? '-'}`,
-				selectedAudioStream?.Codec || '-',
-				selectedAudioStream?.ChannelLayout || `ch=${selectedAudioStream?.Channels ?? '-'}`,
-				selectedAudioStream?.DisplayTitle || '-'
-			)
-		},
-		{
-			label: 'Subtitle',
-			value: currentSubtitleTrack === -1
-				? 'off'
-				: joinInfo(
-					`idx=${toInteger(currentSubtitleTrack) ?? '-'}`,
-					selectedSubtitleStream?.Codec || '-',
-					selectedSubtitleStream?.DisplayTitle || '-'
+			},
+			{
+				label: 'Session',
+				value: joinInfo(
+					playbackSession?.playMethod || mediaSourceData?.__selectedPlayMethod || '-',
+					`session=${playbackSession?.playSessionId || '-'}`,
+					`source=${playbackSession?.mediaSourceId || mediaSourceData?.Id || '-'}`
 				)
-		},
-		{
-			label: 'Subtitle Policy',
-			value: subtitlePolicy
-				? joinInfo(
-					`mode=${subtitlePolicy.mode || '-'}`,
-					`burn=${subtitlePolicy.forceBurnIn || subtitlePolicy.requiresBurnIn ? 'yes' : 'no'}`,
-					`renderer=${subtitlePolicy.renderer || '-'}`,
-					`codec=${subtitlePolicy.codec || '-'}`,
-					`reason=${subtitlePolicy.reason || '-'}`
+			},
+			{label: 'Sources', value: sourceSummary},
+			{
+				label: 'Position',
+				value: joinInfo(
+					`${formatNumber(currentTime)} / ${formatNumber(duration)} sec`,
+					`hlsLvl=${runtimeSnapshot.hlsLevel ?? '-'}`,
+					`hlsBw=${formatBitrateMbps(runtimeSnapshot.hlsBandwidth)}`
 				)
-				: '-'
-		},
-		{
-			label: 'Subtitle Render',
-			value: subtitleRendererState
-				? joinInfo(
-					`renderer=${subtitleRendererState.renderer || '-'}`,
-					`status=${subtitleRendererState.status || '-'}`,
-					`events=${subtitleRendererState.eventCount ?? subtitleRendererState.cueCount ?? '-'}`,
-					`cues=${subtitleRendererState.cueCount ?? '-'}`,
-					`active=${subtitleRendererState.activeCueCount ?? '-'}`,
-					subtitleRendererState.fallbackReason ? `fallback=${subtitleRendererState.fallbackReason}` : '',
-					subtitleRendererState.debug?.cacheHit === true ? 'cache=yes' : '',
-					subtitleRendererState.debug?.fetchMs >= 0 ? `fetch=${subtitleRendererState.debug.fetchMs}ms` : '',
-					subtitleRendererState.debug?.rawShape ? `shape=${subtitleRendererState.debug.rawShape}` : '',
-					subtitleRendererState.debug?.path ? `path=${subtitleRendererState.debug.path}` : '',
-					subtitleRendererState.error ? `error=${subtitleRendererState.error}` : ''
+			},
+			{
+				label: 'Overlays',
+				value: joinInfo(
+					`skip=${skipOverlayVisible ? 'yes' : 'no'}`,
+					`nextEpisode=${showNextEpisodePrompt ? 'yes' : 'no'}`
 				)
-				: '-'
-		},
-		{
-			label: 'Diagnostics',
-			value: diagnosticsSummary
-		},
-		{
-			label: 'Element',
-			value: joinInfo(
-				readyLabel,
-				networkLabel,
-				`paused=${runtimeSnapshot.paused ? 'yes' : 'no'}`,
-				`seeking=${runtimeSnapshot.seeking ? 'yes' : 'no'}`,
-				`buffer=${runtimeSnapshot.bufferedAheadSeconds.toFixed(1)}s`,
-				`drop=${frameDropLabel}`
-			)
-		},
-		{
-			label: 'Server',
-			value: joinInfo(
-				`dp=${formatBooleanFlag(mediaSourceData?.SupportsDirectPlay)}`,
-				`ds=${formatBooleanFlag(mediaSourceData?.SupportsDirectStream)}`,
-				`tc=${formatBooleanFlag(mediaSourceData?.SupportsTranscoding)}`,
-				`tcUrl=${mediaSourceData?.TranscodingUrl ? 'yes' : 'no'}`
-			)
-		},
-		{
-			label: 'Position',
-			value: joinInfo(
-				`${formatNumber(currentTime)} / ${formatNumber(duration)} sec`,
-				`hlsLvl=${runtimeSnapshot.hlsLevel ?? '-'}`,
-				`hlsBw=${formatBitrateMbps(runtimeSnapshot.hlsBandwidth)}`
-			)
-		},
-		{
-			label: 'Focus',
-			value: joinInfo(
-				`mode=${runtimeSnapshot.pointerMode}`,
-				runtimeSnapshot.activeElement
-			)
-		},
-		{
-			label: 'Overlays',
-			value: joinInfo(
-				`skip=${skipOverlayVisible ? 'yes' : 'no'}`,
-				`nextEpisode=${showNextEpisodePrompt ? 'yes' : 'no'}`
-			)
-		}
-	];
+			}
+		],
+		playback: [
+			{label: 'Request', value: requestSummary},
+			{label: 'Decision', value: decisionSummary},
+			{
+				label: 'Stream',
+				value: joinInfo(
+					`container=${mediaSourceData?.Container || '-'}`,
+					`transport=${transportLabel}`,
+					`engine=${mediaSourceData?.__debugHlsEngine || '-'}`,
+					`transcoding=${isCurrentTranscoding ? 'yes' : 'no'}`
+				)
+			},
+			{label: 'URL', value: runtimeSnapshot.currentSrc},
+			{
+				label: 'Video',
+				value: joinInfo(
+					videoStream?.Codec || '-',
+					videoStream?.Profile || '-',
+					`lvl=${videoStream?.Level ?? '-'}`,
+					`src=${sourceResolution}`,
+					`el=${videoResolution}`,
+					`br=${formatBitrateMbps(videoStream?.BitRate)}`
+				)
+			},
+			{
+				label: 'Signal',
+				value: joinInfo(
+					`transfer=${videoStream?.ColorTransfer || '-'}`,
+					`primaries=${videoStream?.ColorPrimaries || '-'}`,
+					`space=${videoStream?.ColorSpace || '-'}`,
+					`depth=${videoStream?.BitDepth ?? '-'}`,
+					`codecTag=${videoStream?.CodecTag || '-'}`
+				)
+			},
+			{
+				label: 'Range',
+				value: joinInfo(
+					`label=${dynamicRangeLabel}`,
+					`type=${videoStream?.VideoRangeType || '-'}`,
+					`range=${videoStream?.VideoRange || '-'}`,
+					`cap=${mediaSourceData?.__requestedDynamicRangeCap || 'auto'}`
+				)
+			},
+			{
+				label: 'Audio',
+				value: joinInfo(
+					`idx=${toInteger(currentAudioTrack) ?? '-'}`,
+					selectedAudioStream?.Codec || '-',
+					selectedAudioStream?.ChannelLayout || `ch=${selectedAudioStream?.Channels ?? '-'}`,
+					selectedAudioStream?.DisplayTitle || '-'
+				)
+			},
+			{
+				label: 'Server',
+				value: joinInfo(
+					`dp=${formatBooleanFlag(mediaSourceData?.SupportsDirectPlay)}`,
+					`ds=${formatBooleanFlag(mediaSourceData?.SupportsDirectStream)}`,
+					`tc=${formatBooleanFlag(mediaSourceData?.SupportsTranscoding)}`,
+					`tcUrl=${mediaSourceData?.TranscodingUrl ? 'yes' : 'no'}`
+				)
+			}
+		],
+		subtitles: [
+			{
+				label: 'Track',
+				value: currentSubtitleTrack === -1
+					? 'off'
+					: joinInfo(
+						`idx=${toInteger(currentSubtitleTrack) ?? '-'}`,
+						selectedSubtitleStream?.Codec || '-',
+						selectedSubtitleStream?.DisplayTitle || '-'
+					)
+			},
+			{
+				label: 'Policy',
+				value: subtitlePolicy
+					? joinInfo(
+						`mode=${subtitlePolicy.mode || '-'}`,
+						`burn=${subtitlePolicy.forceBurnIn || subtitlePolicy.requiresBurnIn ? 'yes' : 'no'}`,
+						`renderer=${subtitlePolicy.renderer || '-'}`,
+						`codec=${subtitlePolicy.codec || '-'}`,
+						`reason=${subtitlePolicy.reason || '-'}`
+					)
+					: '-'
+			},
+			{
+				label: 'Renderer',
+				value: subtitleRendererState
+					? joinInfo(
+						`renderer=${subtitleRendererState.renderer || '-'}`,
+						`status=${subtitleRendererState.status || '-'}`,
+						`events=${subtitleRendererState.eventCount ?? subtitleRendererState.cueCount ?? '-'}`,
+						`cues=${subtitleRendererState.cueCount ?? '-'}`,
+						`active=${subtitleRendererState.activeCueCount ?? '-'}`,
+						subtitleRendererState.fallbackReason ? `fallback=${subtitleRendererState.fallbackReason}` : '',
+						subtitleRendererState.error ? `error=${subtitleRendererState.error}` : ''
+					)
+					: '-'
+			},
+			{
+				label: 'Engine',
+				value: joinInfo(
+					subtitleDebug.engine ? `engine=${subtitleDebug.engine}` : '',
+					subtitleDebug.requestedRenderer ? `requested=${subtitleDebug.requestedRenderer}` : '',
+						subtitleDebug.externalStatus ? `external=${subtitleDebug.externalStatus}` : '',
+						subtitleDebug.readyStatus ? `ready=${subtitleDebug.readyStatus}` : '',
+						subtitleDebug.readyWaitMs >= 0 ? `readyWait=${subtitleDebug.readyWaitMs}ms` : '',
+						subtitleDebug.fallbackRenderer ? `fallbackRenderer=${subtitleDebug.fallbackRenderer}` : '',
+						subtitleDebug.mode ? `mode=${subtitleDebug.mode}` : '',
+						subtitleDebug.libassStatus ? `libass=${subtitleDebug.libassStatus}` : ''
+				) || '-'
+			},
+			{
+				label: 'JASSUB Track',
+				value: joinInfo(
+					subtitleDebug.jassubTrackStatus ? `track=${subtitleDebug.jassubTrackStatus}` : '',
+					subtitleDebug.jassubEventStatus ? `events=${subtitleDebug.jassubEventStatus}` : '',
+					subtitleDebug.jassubStyleStatus ? `styles=${subtitleDebug.jassubStyleStatus}` : '',
+					subtitleDebug.jassubEventCount >= 0 ? `eventCount=${subtitleDebug.jassubEventCount}` : '',
+					subtitleDebug.jassubStyleCount >= 0 ? `styleCount=${subtitleDebug.jassubStyleCount}` : '',
+					subtitleDebug.jassubActiveEventsAssMs >= 0 ? `activeSource=${subtitleDebug.jassubActiveEventsAssMs}` : '',
+					subtitleDebug.jassubActiveEventsAssCs >= 0 ? `activeCs=${subtitleDebug.jassubActiveEventsAssCs}` : '',
+					subtitleDebug.jassubCurrentTimeSeconds >= 0 ? `at=${subtitleDebug.jassubCurrentTimeSeconds}s` : '',
+					subtitleDebug.jassubTrackDiagnosticAgeMs >= 0 ? `age=${subtitleDebug.jassubTrackDiagnosticAgeMs}ms` : '',
+					subtitleDebug.jassubTrackError ? `error=${subtitleDebug.jassubTrackError}` : ''
+				) || '-'
+			},
+			{
+				label: 'JASSUB Data',
+				value: joinInfo(
+					subtitleDebug.jassubOptions ? `options=${subtitleDebug.jassubOptions}` : '',
+					subtitleDebug.jassubFirstStyle ? `style=${subtitleDebug.jassubFirstStyle}` : '',
+					subtitleDebug.jassubActiveEvent ? `active=${subtitleDebug.jassubActiveEvent}` : '',
+					subtitleDebug.jassubFirstEvent ? `first=${subtitleDebug.jassubFirstEvent}` : ''
+				) || '-'
+			},
+			{
+				label: 'Timing',
+				value: joinInfo(
+					subtitleDebug.videoPhase ? `phase=${subtitleDebug.videoPhase}` : '',
+					subtitleDebug.videoState ? `video=${subtitleDebug.videoState}` : '',
+					subtitleDebug.videoFrameCallback ? `rvfc=${subtitleDebug.videoFrameCallback}` : '',
+					subtitleDebug.renderMode ? `render=${subtitleDebug.renderMode}` : '',
+					subtitleDebug.targetFps ? `fps=${subtitleDebug.targetFps}` : '',
+					subtitleDebug.rendererLastRenderTime ? `lastRender=${subtitleDebug.rendererLastRenderTime}` : '',
+					subtitleDebug.rendererFrameId ? `frame=${subtitleDebug.rendererFrameId}` : '',
+					subtitleDebug.rendererDemandMediaTime ? `media=${subtitleDebug.rendererDemandMediaTime}` : '',
+					subtitleDebug.rendererBusy ? `busy=${subtitleDebug.rendererBusy}` : ''
+				) || '-'
+			},
+			{
+				label: 'Manual Sync',
+				value: joinInfo(
+					subtitleDebug.manualSyncIntervalMs ? `syncEvery=${subtitleDebug.manualSyncIntervalMs}ms` : '',
+					subtitleDebug.rendererManualSyncCount ? `syncs=${subtitleDebug.rendererManualSyncCount}` : '',
+					subtitleDebug.rendererManualSyncAgeMs >= 0 ? `syncAge=${subtitleDebug.rendererManualSyncAgeMs}ms` : '',
+					subtitleDebug.manualRenderStatus ? `manualRender=${subtitleDebug.manualRenderStatus}` : '',
+					subtitleDebug.manualRenderAgeMs >= 0 ? `renderAge=${subtitleDebug.manualRenderAgeMs}ms` : '',
+					subtitleDebug.manualRenderTimeoutMs ? `timeout=${subtitleDebug.manualRenderTimeoutMs}ms` : '',
+					subtitleDebug.manualRenderError ? `renderError=${subtitleDebug.manualRenderError}` : ''
+				) || '-'
+			},
+			{
+				label: 'Layer',
+				value: joinInfo(
+					subtitleDebug.layerChildren >= 0 ? `children=${subtitleDebug.layerChildren}` : '',
+					subtitleDebug.layerBox ? `layer=${subtitleDebug.layerBox}` : '',
+					subtitleDebug.layerHitTest ? `hit=${subtitleDebug.layerHitTest}` : '',
+					subtitleDebug.assBox ? `assBox=${subtitleDebug.assBox}` : '',
+					subtitleDebug.assDialogueCount >= 0 ? `assNodes=${subtitleDebug.assDialogueCount}` : ''
+				) || '-'
+			},
+			{
+				label: 'Canvas',
+				value: joinInfo(
+					subtitleDebug.canvasMode ? `mode=${subtitleDebug.canvasMode}` : '',
+					subtitleDebug.canvasParent ? `parent=${subtitleDebug.canvasParent}` : '',
+					subtitleDebug.canvasBox ? `box=${subtitleDebug.canvasBox}` : '',
+					subtitleDebug.canvasBackingStore ? `store=${subtitleDebug.canvasBackingStore}` : '',
+					subtitleDebug.canvasParentBox ? `parentBox=${subtitleDebug.canvasParentBox}` : '',
+					subtitleDebug.canvasPixels ? `pixels=${subtitleDebug.canvasPixels}` : '',
+					subtitleDebug.canvasAlphaSamples > 0 ? `alpha=${subtitleDebug.canvasAlphaSamples}` : '',
+					subtitleDebug.canvasMaxAlpha > 0 ? `maxA=${subtitleDebug.canvasMaxAlpha}` : ''
+				) || '-'
+			},
+			{
+				label: 'Fetch',
+				value: joinInfo(
+					subtitleDebug.cacheHit === true ? 'cache=yes' : '',
+					subtitleDebug.fetchMs >= 0 ? `fetch=${subtitleDebug.fetchMs}ms` : '',
+					subtitleDebug.rawShape ? `shape=${subtitleDebug.rawShape}` : '',
+					subtitleDebug.rawFormat ? `raw=${subtitleDebug.rawFormat}` : '',
+					subtitleDebug.rawTried ? `tried=${subtitleDebug.rawTried}` : '',
+					subtitleDebug.path ? `path=${subtitleDebug.path}` : '',
+					subtitleDebug.rawPath ? `rawPath=${subtitleDebug.rawPath}` : ''
+				) || '-'
+			}
+		],
+		runtime: [
+			{
+				label: 'Element',
+				value: joinInfo(
+					readyLabel,
+					networkLabel,
+					`paused=${runtimeSnapshot.paused ? 'yes' : 'no'}`,
+					`seeking=${runtimeSnapshot.seeking ? 'yes' : 'no'}`,
+					`buffer=${runtimeSnapshot.bufferedAheadSeconds.toFixed(1)}s`,
+					`drop=${frameDropLabel}`
+				)
+			},
+			{
+				label: 'Focus',
+				value: joinInfo(
+					`mode=${runtimeSnapshot.pointerMode}`,
+					runtimeSnapshot.activeElement
+				)
+			},
+			{label: 'Video Src', value: runtimeSnapshot.currentSrc}
+		],
+		diagnostics: [
+			{label: 'Playback', value: diagnosticsSummary},
+			{
+				label: 'Subtitle Diag',
+				value: subtitleDebug.diagnosticAtMs ? `diag=${subtitleDebug.diagnosticAtMs}` : '-'
+			},
+			{
+				label: 'Worker',
+				value: subtitleDebug.workerUrl ? `worker=${subtitleDebug.workerUrl}` : '-'
+			},
+			{
+					label: 'Video Source',
+					value: joinInfo(
+						subtitleDebug.videoSourceStatus ? `videoSource=${subtitleDebug.videoSourceStatus}` : '',
+						subtitleDebug.videoSourceWaitMs >= 0 ? `videoWait=${subtitleDebug.videoSourceWaitMs}ms` : '',
+						subtitleDebug.videoReadyState >= 0 ? `readyState=${subtitleDebug.videoReadyState}` : '',
+						subtitleDebug.videoNetworkState >= 0 ? `network=${subtitleDebug.videoNetworkState}` : '',
+						subtitleDebug.videoHasCurrentSrc ? 'currentSrc=yes' : '',
+						subtitleDebug.videoHasSrc ? 'src=yes' : '',
+						subtitleDebug.videoHasSrcObject ? 'srcObject=yes' : ''
+					) || '-'
+				}
+		]
+	};
+	const activeRows = debugSections[activeTab] || debugSections.overview;
 
 	return (
 		<div className={css.debugOverlay} aria-hidden>
@@ -425,12 +554,28 @@ const PlayerDebugOverlay = ({
 					</Button>
 				) : null}
 			</div>
-			{rows.map((row) => (
-				<div key={row.label} className={css.debugOverlayRow}>
-					<span className={css.debugOverlayLabel}>{row.label}</span>
-					<span className={css.debugOverlayValue}>{row.value}</span>
-				</div>
-			))}
+			<div className={css.debugOverlayTabs}>
+				{DEBUG_TABS.map((tab) => (
+					<Button
+						key={tab.id}
+						size="small"
+						onClick={handleTabClick}
+						className={css.debugOverlayTabButton}
+						data-active={activeTab === tab.id}
+						data-tab-id={tab.id}
+					>
+						{tab.label}
+					</Button>
+				))}
+			</div>
+			<div className={css.debugOverlayRows}>
+				{activeRows.map((row) => (
+					<div key={row.label} className={css.debugOverlayRow}>
+						<span className={css.debugOverlayLabel}>{row.label}</span>
+						<span className={css.debugOverlayValue}>{row.value}</span>
+					</div>
+				))}
+			</div>
 		</div>
 	);
 };

@@ -1,6 +1,9 @@
 import {
 	buildSubtitleEventsPath,
-	getSubtitleTrackEvents
+	buildSubtitleStreamPath,
+	buildSubtitleStreamUrl,
+	getSubtitleTrackEvents,
+	getSubtitleTrackText
 } from '../jellyfin/subtitleApi';
 
 describe('subtitleApi', () => {
@@ -9,6 +12,19 @@ describe('subtitleApi', () => {
 			.toBe('/Videos/item%201/source%2F1/Subtitles/3/Stream.js');
 		expect(buildSubtitleEventsPath('item-1', 'source-1', -1)).toBe(null);
 		expect(buildSubtitleEventsPath('', 'source-1', 3)).toBe(null);
+	});
+
+	it('builds raw subtitle stream paths and authenticated urls', () => {
+		expect(buildSubtitleStreamPath('item 1', 'source/1', 3, 'vtt'))
+			.toBe('/Videos/item%201/source%2F1/Subtitles/3/Stream.vtt');
+		expect(buildSubtitleStreamPath('item-1', 'source-1', -1, 'vtt')).toBe(null);
+		expect(buildSubtitleStreamPath('item-1', 'source-1', 3, '')).toBe(null);
+		expect(buildSubtitleStreamUrl({
+			serverUrl: 'https://jellyfin.example',
+			accessToken: 'token'
+		}, 'item-1', 'source-1', 3, 'ass')).toBe(
+			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/Stream.ass?api_key=token'
+		);
 	});
 
 	it('fetches subtitle track events through the service request helper', async () => {
@@ -78,5 +94,53 @@ describe('subtitleApi', () => {
 			error: '',
 			path: '/Videos/item-1/source-1/Subtitles/3/Stream.js'
 		});
+	});
+
+	it('fetches raw subtitle text through the service request helper', async () => {
+		const response = {
+			text: jest.fn().mockResolvedValue('WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello'),
+			headers: {get: jest.fn().mockReturnValue('text/vtt')}
+		};
+		const service = {
+			serverUrl: 'https://jellyfin.example',
+			accessToken: 'token',
+			_request: jest.fn().mockResolvedValue(response)
+		};
+
+		const result = await getSubtitleTrackText(service, 'item-1', 'source-1', 3, 'vtt');
+
+		expect(service._request).toHaveBeenCalledWith(
+			'/Videos/item-1/source-1/Subtitles/3/Stream.vtt',
+			{context: 'getSubtitleTrackText', expectJson: false}
+		);
+		expect(result).toEqual(expect.objectContaining({
+			ok: true,
+			text: 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello',
+			format: 'vtt',
+			path: '/Videos/item-1/source-1/Subtitles/3/Stream.vtt',
+			url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/Stream.vtt?api_key=token',
+			contentType: 'text/vtt'
+		}));
+	});
+
+	it('returns a structured failure for empty raw subtitle text', async () => {
+		const service = {
+			serverUrl: 'https://jellyfin.example',
+			accessToken: 'token',
+			_request: jest.fn().mockResolvedValue({
+				text: jest.fn().mockResolvedValue('   '),
+				headers: {get: jest.fn().mockReturnValue('text/plain')}
+			})
+		};
+
+		await expect(getSubtitleTrackText(service, 'item-1', 'source-1', 3, 'srt')).resolves.toEqual(
+			expect.objectContaining({
+				ok: false,
+				text: '',
+				format: 'srt',
+				error: 'empty-subtitle-text',
+				path: '/Videos/item-1/source-1/Subtitles/3/Stream.srt'
+			})
+		);
 	});
 });

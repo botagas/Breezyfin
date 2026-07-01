@@ -5,27 +5,16 @@ import Item from '@enact/sandstone/Item';
 import SwitchItem from '@enact/sandstone/SwitchItem';
 import Button from '../../../components/BreezyButton';
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
+import {
+	DEFAULT_SETTINGS_TAB_KEY,
+	SETTINGS_TABS,
+	getAssSubtitleRendererControlState,
+	getSettingsSectionKeys,
+	getSubtitleBurnInFormatsControlState,
+	isSettingsTabKey,
+	isSmartSubtitleHandlingEnabled
+} from '../utils/settingsViewModel';
 import css from '../../SettingsPanel.module.less';
-
-const SETTINGS_TABS = [
-	{key: 'info', label: 'Info'},
-	{key: 'home', label: 'Home'},
-	{key: 'playback', label: 'Playback'},
-	{key: 'display', label: 'Display'},
-	{key: 'about', label: 'About'},
-	{key: 'diagnostics', label: 'Diagnostics'}
-];
-
-const TAB_SECTION_KEYS = {
-	info: ['serverInfo', 'savedServers', 'account'],
-	home: ['homeRows'],
-	playback: ['playback', 'transcoding'],
-	display: ['display', 'languages'],
-	about: ['about'],
-	diagnostics: ['diagnostics', 'capabilities']
-};
-
-const DEFAULT_TAB_KEY = SETTINGS_TABS[0].key;
 
 const SettingsSections = ({
 	loading,
@@ -50,7 +39,9 @@ const SettingsSections = ({
 	openSubtitleLangPopup,
 	subtitleBurnInTextCodecsLabel,
 	openSubtitleBurnInTextCodecsPopup,
-	subtitleOverlaySizeLabel,
+	assSubtitleRendererLabel,
+	openAssSubtitleRendererPopup,
+	subtitleOverlayFontSizeLabel,
 	subtitleOverlayPositionLabel,
 	subtitleOverlayBackgroundLabel,
 	subtitleOverlayWeightLabel,
@@ -58,6 +49,9 @@ const SettingsSections = ({
 	subtitleOverlayBorderStyleLabel,
 	subtitleOverlayBorderColorLabel,
 	subtitleOverlayBorderStrengthLabel,
+	subtitleOverlayOutlineSizeLabel,
+	subtitleOverlayShadowDistanceLabel,
+	subtitleOverlayShadowAngleLabel,
 	openSubtitleOverlaySizePopup,
 	openSubtitleOverlayPositionPopup,
 	openSubtitleOverlayBackgroundPopup,
@@ -66,6 +60,9 @@ const SettingsSections = ({
 	openSubtitleOverlayBorderStylePopup,
 	openSubtitleOverlayBorderColorPopup,
 	openSubtitleOverlayBorderStrengthPopup,
+	openSubtitleOverlayOutlineSizePopup,
+	openSubtitleOverlayShadowDistancePopup,
+	openSubtitleOverlayShadowAnglePopup,
 	getBitrateLabel,
 	openBitratePopup,
 	getNavbarThemeLabel,
@@ -92,18 +89,20 @@ const SettingsSections = ({
 	openWipeCacheKeepLoginConfirm,
 	isNonStableBuild = false
 }) => {
-	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_TAB_KEY);
+	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_SETTINGS_TAB_KEY);
 	const [expandedCapabilityRows, setExpandedCapabilityRows] = useState({
 		videoCodecs: false,
 		audioCodecs: false
 	});
-	const activeSectionKeys = TAB_SECTION_KEYS[activeTabKey] || TAB_SECTION_KEYS[DEFAULT_TAB_KEY];
+	const activeSectionKeys = getSettingsSectionKeys(activeTabKey);
 	const userIdLabel = userInfo?.Id ? `${userInfo.Id.substring(0, 8)}...` : 'Unknown';
-	const smartSubtitleTranscodingEnabled = settings.smartSubtitleTranscoding !== false;
+	const smartSubtitleTranscodingEnabled = isSmartSubtitleHandlingEnabled(settings);
+	const assSubtitleRendererControl = getAssSubtitleRendererControlState(settings, assSubtitleRendererLabel);
+	const subtitleBurnInFormatsControl = getSubtitleBurnInFormatsControlState(settings, subtitleBurnInTextCodecsLabel);
 
 	const handleTabClick = useCallback((event) => {
 		const tabKey = event.currentTarget.dataset.settingsTab;
-		if (!tabKey || !TAB_SECTION_KEYS[tabKey]) return;
+		if (!tabKey || !isSettingsTabKey(tabKey)) return;
 		setActiveTabKey(tabKey);
 	}, []);
 
@@ -334,78 +333,165 @@ const SettingsSections = ({
 				</section>
 			) : null}
 
-				{shouldRenderSection('transcoding') ? (
-					<section className={css.section}>
-						<BodyText className={css.sectionTitle}>Transcoding</BodyText>
-						<Item
-							className={css.settingItem}
-							label="Maximum Bitrate"
-							slotAfter={getBitrateLabel(settings.maxBitrate)}
-							onClick={openBitratePopup}
-						/>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.enableTranscoding}
-							selected={settings.enableTranscoding}
-						>
-							Enable Transcoding
-						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.forceTranscoding}
-							selected={settings.forceTranscoding}
-						>
-							Force Transcoding (always)
-						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.enableFmp4HlsContainerPreference}
-							selected={settings.enableFmp4HlsContainerPreference !== false}
-						>
-							Enable fMP4-HLS container preference
-						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.forceFmp4HlsContainerPreference}
-							selected={settings.forceFmp4HlsContainerPreference === true}
-						>
-							Force fMP4-HLS container preference
-						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.smartSubtitleTranscoding}
-							selected={smartSubtitleTranscodingEnabled}
-						>
-							Smart Subtitle Transcoding
-						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.enableSubtitleBurnIn}
-							disabled={smartSubtitleTranscodingEnabled}
-							selected={settings.enableSubtitleBurnIn !== false}
-						>
-							Manual Subtitle Burn-in
-						</SwitchItem>
-						<SwitchItem
-							className={css.switchItem}
-							onToggle={settingToggleHandlers.forceTranscodingWithSubtitles}
-							selected={settings.forceTranscodingWithSubtitles}
-						>
-							Force Subtitle Burn-in on HDR/DV
-						</SwitchItem>
-						<Item
-							className={css.settingItem}
-							label="Subtitle Burn-in Formats"
-							disabled={smartSubtitleTranscodingEnabled}
-							slotAfter={
-								smartSubtitleTranscodingEnabled
-									? 'Managed by Smart'
-									: (settings.enableSubtitleBurnIn === false ? 'Disabled' : subtitleBurnInTextCodecsLabel)
-							}
-							onClick={smartSubtitleTranscodingEnabled ? null : openSubtitleBurnInTextCodecsPopup}
-						/>
-					</section>
-				) : null}
+			{shouldRenderSection('transcoding') ? (
+				<section className={css.section}>
+					<BodyText className={css.sectionTitle}>Transcoding</BodyText>
+					<Item
+						className={css.settingItem}
+						label="Maximum Bitrate"
+						slotAfter={getBitrateLabel(settings.maxBitrate)}
+						onClick={openBitratePopup}
+					/>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.enableTranscoding}
+						selected={settings.enableTranscoding}
+					>
+						Enable Transcoding
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.forceTranscoding}
+						selected={settings.forceTranscoding}
+					>
+						Force Transcoding (always)
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.enableFmp4HlsContainerPreference}
+						selected={settings.enableFmp4HlsContainerPreference === true}
+					>
+						Enable fMP4-HLS container preference
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.forceFmp4HlsContainerPreference}
+						selected={settings.forceFmp4HlsContainerPreference === true}
+					>
+						Force fMP4-HLS container preference
+					</SwitchItem>
+				</section>
+			) : null}
+
+			{shouldRenderSection('subtitles') ? (
+				<section className={css.section}>
+					<BodyText className={css.sectionTitle}>Subtitles</BodyText>
+					<Item
+						className={css.settingItem}
+						label="Preferred Subtitle Language"
+						slotAfter={getLanguageLabel(settings.preferredSubtitleLanguage)}
+						onClick={openSubtitleLangPopup}
+					/>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.smartSubtitleTranscoding}
+						selected={smartSubtitleTranscodingEnabled}
+					>
+						Smart Subtitle Handling
+					</SwitchItem>
+					<Item
+						className={css.settingItem}
+						label="ASS/SSA Subtitle Renderer"
+						disabled={!assSubtitleRendererControl.enabled}
+						slotAfter={assSubtitleRendererControl.label}
+						onClick={assSubtitleRendererControl.enabled ? openAssSubtitleRendererPopup : null}
+					/>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.enableSubtitleBurnIn}
+						disabled={smartSubtitleTranscodingEnabled}
+						selected={settings.enableSubtitleBurnIn !== false}
+					>
+						Manual Subtitle Burn-in
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.forceTranscodingWithSubtitles}
+						selected={settings.forceTranscodingWithSubtitles}
+					>
+						Force Subtitle Burn-in on HDR/DV
+					</SwitchItem>
+					<Item
+						className={css.settingItem}
+						label="Subtitle Burn-in Formats"
+						disabled={!subtitleBurnInFormatsControl.enabled}
+						slotAfter={subtitleBurnInFormatsControl.label}
+						onClick={subtitleBurnInFormatsControl.enabled ? openSubtitleBurnInTextCodecsPopup : null}
+					/>
+				</section>
+			) : null}
+
+			{shouldRenderSection('subtitleAppearance') ? (
+				<section className={css.section}>
+					<BodyText className={css.sectionTitle}>Breezyfin Subtitle Appearance</BodyText>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Font Size"
+						slotAfter={subtitleOverlayFontSizeLabel}
+						onClick={openSubtitleOverlaySizePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Position"
+						slotAfter={subtitleOverlayPositionLabel}
+						onClick={openSubtitleOverlayPositionPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Background"
+						slotAfter={subtitleOverlayBackgroundLabel}
+						onClick={openSubtitleOverlayBackgroundPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Font Weight"
+						slotAfter={subtitleOverlayWeightLabel}
+						onClick={openSubtitleOverlayWeightPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Text Color"
+						slotAfter={subtitleOverlayTextColorLabel}
+						onClick={openSubtitleOverlayTextColorPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Border Style"
+						slotAfter={subtitleOverlayBorderStyleLabel}
+						onClick={openSubtitleOverlayBorderStylePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Border Color"
+						slotAfter={subtitleOverlayBorderColorLabel}
+						onClick={openSubtitleOverlayBorderColorPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Box Border Strength"
+						slotAfter={subtitleOverlayBorderStrengthLabel}
+						onClick={openSubtitleOverlayBorderStrengthPopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Outline Size"
+						slotAfter={subtitleOverlayOutlineSizeLabel}
+						onClick={openSubtitleOverlayOutlineSizePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Shadow Distance"
+						slotAfter={subtitleOverlayShadowDistanceLabel}
+						onClick={openSubtitleOverlayShadowDistancePopup}
+					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Shadow Angle"
+						slotAfter={subtitleOverlayShadowAngleLabel}
+						onClick={openSubtitleOverlayShadowAnglePopup}
+					/>
+				</section>
+			) : null}
 
 			{shouldRenderSection('display') ? (
 				<section className={css.section}>
@@ -415,54 +501,6 @@ const SettingsSections = ({
 						label="Navigation Theme"
 						slotAfter={getNavbarThemeLabel(settings.navbarTheme)}
 						onClick={openNavbarThemePopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Size"
-						slotAfter={subtitleOverlaySizeLabel}
-						onClick={openSubtitleOverlaySizePopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Position"
-						slotAfter={subtitleOverlayPositionLabel}
-						onClick={openSubtitleOverlayPositionPopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Background"
-						slotAfter={subtitleOverlayBackgroundLabel}
-						onClick={openSubtitleOverlayBackgroundPopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Font Weight"
-						slotAfter={subtitleOverlayWeightLabel}
-						onClick={openSubtitleOverlayWeightPopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Text Color"
-						slotAfter={subtitleOverlayTextColorLabel}
-						onClick={openSubtitleOverlayTextColorPopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Border Style"
-						slotAfter={subtitleOverlayBorderStyleLabel}
-						onClick={openSubtitleOverlayBorderStylePopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Border Color"
-						slotAfter={subtitleOverlayBorderColorLabel}
-						onClick={openSubtitleOverlayBorderColorPopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Subtitle Border Strength"
-						slotAfter={subtitleOverlayBorderStrengthLabel}
-						onClick={openSubtitleOverlayBorderStrengthPopup}
 					/>
 					<SwitchItem
 						className={css.switchItem}
@@ -511,18 +549,12 @@ const SettingsSections = ({
 
 			{shouldRenderSection('languages') ? (
 				<section className={css.section}>
-					<BodyText className={css.sectionTitle}>Language Preferences</BodyText>
+					<BodyText className={css.sectionTitle}>Audio Language Preferences</BodyText>
 					<Item
 						className={css.settingItem}
 						label="Preferred Audio Language"
 						slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
 						onClick={openAudioLangPopup}
-					/>
-					<Item
-						className={css.settingItem}
-						label="Preferred Subtitle Language"
-						slotAfter={getLanguageLabel(settings.preferredSubtitleLanguage)}
-						onClick={openSubtitleLangPopup}
 					/>
 				</section>
 			) : null}

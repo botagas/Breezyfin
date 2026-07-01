@@ -16,61 +16,42 @@
 	color: currentColor !important;
 }
 
+.mdActiveMetadataAction(@stateRgb) {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: rgba(@stateRgb, 0.14) !important;
+		border: 1px solid rgba(@stateRgb, 0.5) !important;
+	}
+
+	.actionIcon {
+		color: rgba(@stateRgb, 1) !important;
+	}
+
+	&:hover .actionIcon,
+	&:active .actionIcon,
+	&:global(.spottable):focus .actionIcon {
+		color: var(--bf-md-text-solid) !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: rgba(@stateRgb, 0.28) !important;
+	}
+}
+
 .favoriteAction {
 	&.favoriteActive {
-		:global(.bf-button-bg),
-		:global(.bg) {
-			background: rgba(var(--bf-theme-favorite-rgb), 0.14) !important;
-			border: 1px solid rgba(var(--bf-theme-favorite-rgb), 0.5) !important;
-		}
-
-		.actionIcon {
-			color: rgba(var(--bf-theme-favorite-rgb), 1) !important;
-		}
-
-		&:hover .actionIcon,
-		&:active .actionIcon,
-		&:global(.spottable):focus .actionIcon {
-			color: var(--bf-md-text-solid) !important;
-		}
-
-		&:hover :global(.bf-button-bg),
-		&:focus :global(.bf-button-bg),
-		&:global(.spottable):focus :global(.bf-button-bg),
-		&:hover :global(.bg),
-		&:focus :global(.bg),
-		&:global(.spottable):focus :global(.bg) {
-			background: rgba(var(--bf-theme-favorite-rgb), 0.28) !important;
-		}
+		.mdActiveMetadataAction(var(--bf-theme-favorite-rgb));
 	}
 }
 
 .watchedAction {
 	&.watchedActive {
-		:global(.bf-button-bg),
-		:global(.bg) {
-			background: rgba(var(--bf-theme-success-rgb), 0.14) !important;
-			border: 1px solid rgba(var(--bf-theme-success-rgb), 0.5) !important;
-		}
-
-		.actionIcon {
-			color: rgba(var(--bf-theme-success-rgb), 1) !important;
-		}
-
-		&:hover .actionIcon,
-		&:active .actionIcon,
-		&:global(.spottable):focus .actionIcon {
-			color: var(--bf-md-text-solid) !important;
-		}
-
-		&:hover :global(.bf-button-bg),
-		&:focus :global(.bf-button-bg),
-		&:global(.spottable):focus :global(.bf-button-bg),
-		&:hover :global(.bg),
-		&:focus :global(.bg),
-		&:global(.spottable):focus :global(.bg) {
-			background: rgba(var(--bf-theme-success-rgb), 0.28) !important;
-		}
+		.mdActiveMetadataAction(var(--bf-theme-success-rgb));
 	}
 }
 

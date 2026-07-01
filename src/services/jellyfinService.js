@@ -49,7 +49,11 @@ import {
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
 import {getMyRequestItems} from './jellyfin/requestsApi';
-import {getSubtitleTrackEvents} from './jellyfin/subtitleApi';
+import {
+	buildSubtitleStreamUrl,
+	getSubtitleTrackEvents,
+	getSubtitleTrackText
+} from './jellyfin/subtitleApi';
 
 class JellyfinService {
 	constructor() {
@@ -395,6 +399,14 @@ class JellyfinService {
 
 	async getSubtitleEvents(itemId, mediaSourceId, subtitleStreamIndex) {
 		return getSubtitleTrackEvents(this, itemId, mediaSourceId, subtitleStreamIndex);
+	}
+
+	async getSubtitleText(itemId, mediaSourceId, subtitleStreamIndex, format) {
+		return getSubtitleTrackText(this, itemId, mediaSourceId, subtitleStreamIndex, format);
+	}
+
+	getSubtitleStreamUrl(itemId, mediaSourceId, subtitleStreamIndex, format) {
+		return buildSubtitleStreamUrl(this, itemId, mediaSourceId, subtitleStreamIndex, format);
 	}
 }
 

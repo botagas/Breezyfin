@@ -42,6 +42,15 @@ const resetServiceState = () => {
 	jellyfinService.clientVersionPromise = null;
 };
 
+const expectLegacySessionCleared = (restored) => {
+	expect(restored).toBe(false);
+	expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+	expect(serverManager.addServer).not.toHaveBeenCalled();
+	expect(jellyfinService.serverUrl).toBe(null);
+	expect(jellyfinService.accessToken).toBe(null);
+	expect(jellyfinService.userId).toBe(null);
+};
+
 describe('jellyfinService', () => {
 	let errorSpy;
 	let warnSpy;
@@ -238,12 +247,7 @@ describe('jellyfinService', () => {
 
 		const restored = jellyfinService.restoreSession();
 
-		expect(restored).toBe(false);
-		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
-		expect(serverManager.addServer).not.toHaveBeenCalled();
-		expect(jellyfinService.serverUrl).toBe(null);
-		expect(jellyfinService.accessToken).toBe(null);
-		expect(jellyfinService.userId).toBe(null);
+		expectLegacySessionCleared(restored);
 	});
 
 	it('clears incomplete legacy jellyfinAuth payload and does not restore session', () => {
@@ -258,12 +262,7 @@ describe('jellyfinService', () => {
 
 		const restored = jellyfinService.restoreSession();
 
-		expect(restored).toBe(false);
-		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
-		expect(serverManager.addServer).not.toHaveBeenCalled();
-		expect(jellyfinService.serverUrl).toBe(null);
-		expect(jellyfinService.accessToken).toBe(null);
-		expect(jellyfinService.userId).toBe(null);
+		expectLegacySessionCleared(restored);
 	});
 
 	it('updates saved user metadata when current user profile is loaded', async () => {

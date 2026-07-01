@@ -1,3 +1,34 @@
+.debug-overlay-action-button(@foreground, @active-foreground) {
+	--bf-button-fg: @foreground;
+	--bf-button-fg-hover: @active-foreground;
+	--bf-button-fg-active: @active-foreground;
+	min-width: auto !important;
+	padding: var(--bf-theme-debug-close-padding) !important;
+	border-radius: var(--bf-theme-debug-pill-radius) !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	font-size: var(--bf-theme-debug-close-size) !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-theme-debug-close-bg) !important;
+		border: var(--bf-theme-debug-border-width) solid var(--bf-theme-debug-close-border) !important;
+		border-radius: var(--bf-theme-debug-pill-radius) !important;
+		box-shadow: none !important;
+	}
+
+	&:hover :global(.bf-button-bg),
+	&:focus :global(.bf-button-bg),
+	&:global(.spottable):focus :global(.bf-button-bg),
+	&:hover :global(.bg),
+	&:focus :global(.bg),
+	&:global(.spottable):focus :global(.bg) {
+		background: var(--bf-theme-debug-close-hover-bg) !important;
+		border-color: var(--bf-theme-debug-close-hover-border) !important;
+	}
+}
+
 .debugOverlay {
 	position: absolute;
 	top: var(--bf-theme-debug-overlay-inset);
@@ -34,34 +65,30 @@
 }
 
 .debugOverlayCloseButton {
-	--bf-button-fg: var(--bf-theme-debug-value-color);
-	--bf-button-fg-hover: var(--bf-theme-text-primary);
-	--bf-button-fg-active: var(--bf-theme-text-primary);
-	min-width: auto !important;
-	padding: var(--bf-theme-debug-close-padding) !important;
-	border-radius: var(--bf-theme-debug-pill-radius) !important;
-	background: transparent !important;
-	border: none !important;
-	box-shadow: none !important;
-	font-size: var(--bf-theme-debug-close-size) !important;
+	.debug-overlay-action-button(var(--bf-theme-debug-value-color), var(--bf-theme-text-primary));
+}
 
-		:global(.bf-button-bg),
-		:global(.bg) {
-			background: var(--bf-theme-debug-close-bg) !important;
-			border: var(--bf-theme-debug-border-width) solid var(--bf-theme-debug-close-border) !important;
-			border-radius: var(--bf-theme-debug-pill-radius) !important;
-			box-shadow: none !important;
-		}
+.debugOverlayTabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bf-theme-debug-metric-gap);
+	margin-bottom: var(--bf-theme-debug-header-margin-bottom);
+}
 
-	&:hover :global(.bf-button-bg),
-	&:focus :global(.bf-button-bg),
-	&:global(.spottable):focus :global(.bf-button-bg),
-	&:hover :global(.bg),
-	&:focus :global(.bg),
-	&:global(.spottable):focus :global(.bg) {
+.debugOverlayTabButton {
+	.debug-overlay-action-button(var(--bf-theme-debug-label-color), var(--bf-theme-debug-value-color));
+
+	&[data-active='true'] :global(.bf-button-bg),
+	&[data-active='true'] :global(.bg) {
 		background: var(--bf-theme-debug-close-hover-bg) !important;
 		border-color: var(--bf-theme-debug-close-hover-border) !important;
 	}
+}
+
+.debugOverlayRows {
+	display: flex;
+	flex-direction: column;
+	gap: var(--bf-theme-debug-row-gap);
 }
 
 .debugOverlayRow {
@@ -69,14 +96,21 @@
 	grid-template-columns: var(--bf-theme-player-debug-grid-label-width) minmax(0, 1fr);
 	column-gap: var(--bf-theme-debug-grid-gap);
 	padding: var(--bf-theme-debug-row-padding);
+	align-items: start;
+	min-height: calc(var(--bf-theme-debug-value-line-height) * 1em);
 }
 
 .debugOverlayLabel {
 	.debug-overlay-label();
 	font-weight: 600;
+	padding-top: 0.03rem;
 }
 
 .debugOverlayValue {
 	.debug-overlay-value();
-	word-break: break-word;
+	min-width: 0;
+	line-height: var(--bf-theme-debug-value-line-height);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-variant-numeric: tabular-nums;
 }

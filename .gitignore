@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules
+.venv/
 
 # testing
 coverage
@@ -11,6 +12,7 @@ tests/
 # production
 build
 dist
+release
 *.ipk
 
 # OS files
@@ -21,8 +23,9 @@ Icon?
 Desktop.ini
 
 # misc
-.DS_Store
-npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 *.psd
 
 # IDE files

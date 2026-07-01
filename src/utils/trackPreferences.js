@@ -1,3 +1,5 @@
+import {createAudioTrackIdentity} from './trackMatching';
+
 export const BREEZYFIN_TRACK_PREFERENCES_KEY = 'breezyfinTrackPrefs';
 
 const normalizePreferences = (value) => {
@@ -37,9 +39,9 @@ export const writeTrackPreferences = (preferences) => {
 	}
 };
 
-export const createAudioPreference = (index, stream) => ({
-	index,
-	language: stream?.Language || null
+export const createAudioPreference = (index, stream, streams = []) => ({
+	...createAudioTrackIdentity(stream, streams),
+	index
 });
 
 export const createSubtitlePreference = (index, stream) => {

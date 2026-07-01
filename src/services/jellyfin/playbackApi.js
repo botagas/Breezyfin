@@ -72,6 +72,7 @@ const buildPlaybackDecisionSnapshot = ({
 	dynamicRange,
 	dynamicRangeCap,
 	forceTranscoding,
+	disableDirectPlay,
 	forceDolbyVision,
 	avoidDolbyVision,
 	enableFmp4HlsContainerPreference,
@@ -89,6 +90,7 @@ const buildPlaybackDecisionSnapshot = ({
 	selectedAudioStreamIndex: requestedAudioStreamIndex,
 	selectedSubtitleStreamIndex,
 	forceTranscoding: forceTranscoding === true,
+	disableDirectPlay: disableDirectPlay === true,
 	forceDolbyVision: forceDolbyVision === true,
 	avoidDolbyVision: avoidDolbyVision === true,
 	forceSubtitleBurnIn: forceSubtitleBurnIn === true,
@@ -113,10 +115,12 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		const {
 			payload,
 			forceTranscoding,
+			disableDirectPlay,
 			enableTranscoding,
 			requestedAudioStreamIndex: initialRequestedAudioStreamIndex,
 			forceSubtitleBurnIn,
 			smartSubtitleTranscoding,
+			assSubtitleRenderer,
 			enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr,
 			subtitleBurnInTextCodecs,
@@ -476,6 +480,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		const selectedSubtitleStreamIndex = toInteger(activePayload.SubtitleStreamIndex ?? payload.SubtitleStreamIndex);
 		let subtitlePolicy = getSubtitleTranscodePolicy(selectedSource, selectedSubtitleStreamIndex, {
 			smartSubtitleTranscoding,
+			assSubtitleRenderer,
 			enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr,
 			subtitleBurnInTextCodecs
@@ -484,6 +489,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		const effectiveForceSubtitleBurnIn = forceSubtitleBurnIn || subtitleNeedsTranscoding;
 		let playMethod = determinePlayMethod(selectedSource, {
 			forceTranscoding: forceTranscoding || effectiveForceSubtitleBurnIn,
+			disableDirectPlay,
 			dynamicRangeCap
 		});
 		if (forceDolbyVision && playMethod === 'Transcode') {
@@ -572,6 +578,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 				activePayload = transcodePayload;
 				subtitlePolicy = getSubtitleTranscodePolicy(selectedSource, selectedSubtitleStreamIndex, {
 					smartSubtitleTranscoding,
+					assSubtitleRenderer,
 					enableSubtitleBurnIn,
 					allowSubtitleBurnInOnHdr,
 					subtitleBurnInTextCodecs
@@ -622,6 +629,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			dynamicRange,
 			dynamicRangeCap,
 			forceTranscoding,
+			disableDirectPlay,
 			forceDolbyVision,
 			avoidDolbyVision,
 			enableFmp4HlsContainerPreference,

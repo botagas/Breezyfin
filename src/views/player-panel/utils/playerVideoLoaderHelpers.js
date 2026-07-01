@@ -1,4 +1,52 @@
 import {normalizeDynamicRangeCap} from '../../../utils/playbackDynamicRange';
+import {toInteger} from '../../../utils/numberParsing';
+import {normalizeAssSubtitleRenderer} from '../../../utils/assSubtitleRenderers';
+
+const DEBUG_SOURCE_SUMMARY_LIMIT = 8;
+
+export const buildSourceDebugSummary = (mediaSources = []) => {
+	if (!Array.isArray(mediaSources) || mediaSources.length === 0) return [];
+	return mediaSources.slice(0, DEBUG_SOURCE_SUMMARY_LIMIT).map((source) => {
+		const videoStream = source?.MediaStreams?.find((stream) => stream?.Type === 'Video') || null;
+		return {
+			id: source?.Id || '',
+			container: source?.Container || '',
+			videoCodec: videoStream?.Codec || '',
+			videoRangeType: videoStream?.VideoRangeType || '',
+			videoRange: videoStream?.VideoRange || '',
+			supportsDirectPlay: source?.SupportsDirectPlay === true,
+			supportsDirectStream: source?.SupportsDirectStream === true,
+			supportsTranscoding: source?.SupportsTranscoding === true,
+			defaultAudioStreamIndex: toInteger(source?.DefaultAudioStreamIndex)
+		};
+	});
+};
+
+export const buildMediaSourceDebugData = ({
+	mediaSource,
+	playbackInfo,
+	playbackMeta = {},
+	resolvedPlayMethod,
+	dynamicRangeInfo,
+	dynamicRangeLabel,
+	requestedDynamicRangeCap,
+	playbackRequestDebug,
+	videoStream
+} = {}) => ({
+	__selectedPlayMethod: resolvedPlayMethod,
+	__dynamicRangeInfo: dynamicRangeInfo,
+	__dynamicRangeLabel: dynamicRangeLabel,
+	__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
+	__debugVideoRangeType: videoStream?.VideoRangeType || '',
+	__debugVideoRange: videoStream?.VideoRange || '',
+	__debugVideoCodec: videoStream?.Codec || '',
+	__debugRequest: playbackRequestDebug,
+	__debugDecision: playbackMeta.decision || null,
+	__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
+	__debugDiagnostics: Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
+	__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
+	__debugSelectedSourceId: mediaSource?.Id || ''
+});
 
 export const buildPlayerPlaybackSettingsSnapshot = ({
 	settings = {},
@@ -23,6 +71,7 @@ export const buildPlayerPlaybackSettingsSnapshot = ({
 		: [];
 	return {
 		forceTranscoding: forceTranscodeOverride || settings.forceTranscoding || false,
+		disableDirectPlay: playbackOverride?.disableDirectPlay === true,
 		strictTranscodingMode: settings.forceTranscoding === true,
 		enableTranscoding: settings.enableTranscoding !== false,
 		maxBitrate: settings.maxBitrate,
@@ -33,6 +82,7 @@ export const buildPlayerPlaybackSettingsSnapshot = ({
 		forceFmp4HlsContainerPreference,
 		preferredAudioLanguage: String(settings.preferredAudioLanguage || '').trim().toLowerCase(),
 		smartSubtitleTranscoding: settings.smartSubtitleTranscoding !== false,
+		assSubtitleRenderer: normalizeAssSubtitleRenderer(settings.assSubtitleRenderer),
 		enableSubtitleBurnIn: settings.enableSubtitleBurnIn !== false,
 		forceSubtitleBurnInOnHdr: settings.forceTranscodingWithSubtitles === true,
 		forceSubtitleBurnIn: playbackOverride?.forceSubtitleBurnIn === true,
@@ -102,6 +152,15 @@ export const resolvePlaybackVideoUrl = ({
 		};
 	}
 	if (resolvedPlayMethod === 'DirectStream' && mediaSource?.SupportsDirectStream) {
+		if (mediaSource?.TranscodingUrl) {
+			return {
+				videoUrl: `${service.serverUrl}${mediaSource.TranscodingUrl}`,
+				isHls: mediaSource.TranscodingUrl.includes('.m3u8') ||
+					mediaSource.TranscodingUrl.includes('/hls/') ||
+					mediaSource.TranscodingContainer?.toLowerCase() === 'ts',
+				useTranscoding
+			};
+		}
 		return {
 			videoUrl: service.getPlaybackUrl(
 				itemId,

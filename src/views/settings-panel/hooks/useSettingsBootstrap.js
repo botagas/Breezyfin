@@ -7,17 +7,26 @@ import {getAppVersion, loadAppVersion} from '../../../utils/appInfo';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 import {setRuntimeCapabilityProbeRefreshDays} from '../../../utils/platformCapabilities';
 import {
+	ASS_SUBTITLE_RENDERER_OPTIONS,
 	DEFAULT_SETTINGS,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
+	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
+	SUBTITLE_OVERLAY_OUTLINE_SIZE_OPTIONS,
+	SUBTITLE_OVERLAY_OUTLINE_SIZE_LEGACY_PX,
+	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE,
 	SUBTITLE_OVERLAY_POSITION_OPTIONS,
+	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
+	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
+	SUBTITLE_OVERLAY_SIZE_LEGACY_PX,
 	SUBTITLE_OVERLAY_SIZE_OPTIONS,
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
+import {normalizeNumericSetting} from '../../../utils/subtitleAppearance';
 
 const normalizeOptionValue = (value, options, fallback) => {
 	return options.some((option) => option.value === value) ? value : fallback;
@@ -25,7 +34,8 @@ const normalizeOptionValue = (value, options, fallback) => {
 
 export const useSettingsBootstrap = ({
 	setSettings,
-	normalizeCapabilityProbeRefreshDaysSetting
+	normalizeCapabilityProbeRefreshDaysSetting,
+	assSubtitleRendererOptions = ASS_SUBTITLE_RENDERER_OPTIONS
 }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [serverInfo, setServerInfo] = useState(null);
@@ -52,6 +62,11 @@ export const useSettingsBootstrap = ({
 					.map((codec) => String(codec || '').trim().toLowerCase())
 					.filter((codec) => SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS.some((option) => option.value === codec))
 				: DEFAULT_SETTINGS.subtitleBurnInTextCodecs;
+			const assSubtitleRenderer = normalizeOptionValue(
+				parsed.assSubtitleRenderer,
+				assSubtitleRendererOptions,
+				DEFAULT_SETTINGS.assSubtitleRenderer
+			);
 			const hasEnableFmp4Preference = typeof parsed.enableFmp4HlsContainerPreference === 'boolean';
 			const hasForceFmp4Preference = typeof parsed.forceFmp4HlsContainerPreference === 'boolean';
 			const legacyPreferFmp4Preference = typeof parsed.preferDolbyVisionMp4 === 'boolean'
@@ -69,6 +84,10 @@ export const useSettingsBootstrap = ({
 				parsed.subtitleOverlaySize,
 				SUBTITLE_OVERLAY_SIZE_OPTIONS,
 				DEFAULT_SETTINGS.subtitleOverlaySize
+			);
+			const subtitleOverlayFontSizePx = normalizeNumericSetting(
+				parsed.subtitleOverlayFontSizePx || SUBTITLE_OVERLAY_SIZE_LEGACY_PX[subtitleOverlaySize],
+				SUBTITLE_OVERLAY_FONT_SIZE_RANGE
 			);
 			const subtitleOverlayPosition = normalizeOptionValue(
 				parsed.subtitleOverlayPosition,
@@ -105,6 +124,25 @@ export const useSettingsBootstrap = ({
 				SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 				DEFAULT_SETTINGS.subtitleOverlayBorderStrength
 			);
+			const subtitleOverlayOutlineSize = normalizeOptionValue(
+				parsed.subtitleOverlayOutlineSize,
+				SUBTITLE_OVERLAY_OUTLINE_SIZE_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayOutlineSize
+			);
+			const subtitleOverlayOutlineSizePx = normalizeNumericSetting(
+				parsed.subtitleOverlayOutlineSizePx || SUBTITLE_OVERLAY_OUTLINE_SIZE_LEGACY_PX[subtitleOverlayOutlineSize],
+				SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE
+			);
+			const subtitleOverlayShadowDistance = normalizeOptionValue(
+				parsed.subtitleOverlayShadowDistance,
+				SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayShadowDistance
+			);
+			const subtitleOverlayShadowAngle = normalizeOptionValue(
+				parsed.subtitleOverlayShadowAngle,
+				SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
+				DEFAULT_SETTINGS.subtitleOverlayShadowAngle
+			);
 			const verboseAppLogs = parsed.verboseAppLogs === true || isVerboseLoggingEnabled();
 			setVerboseLoggingEnabled(verboseAppLogs);
 			setRuntimeCapabilityProbeRefreshDays(capabilityProbeRefreshDays);
@@ -112,8 +150,10 @@ export const useSettingsBootstrap = ({
 				...DEFAULT_SETTINGS,
 				...parsedWithoutLegacyFmp4Preference,
 				capabilityProbeRefreshDays,
+				assSubtitleRenderer,
 				subtitleBurnInTextCodecs,
 				subtitleOverlaySize,
+				subtitleOverlayFontSizePx,
 				subtitleOverlayPosition,
 				subtitleOverlayBackground,
 				subtitleOverlayWeight,
@@ -121,6 +161,10 @@ export const useSettingsBootstrap = ({
 				subtitleOverlayBorderStyle,
 				subtitleOverlayBorderColor,
 				subtitleOverlayBorderStrength,
+				subtitleOverlayOutlineSize,
+				subtitleOverlayOutlineSizePx,
+				subtitleOverlayShadowDistance,
+				subtitleOverlayShadowAngle,
 				enableFmp4HlsContainerPreference,
 				forceFmp4HlsContainerPreference,
 				verboseAppLogs,
@@ -133,7 +177,7 @@ export const useSettingsBootstrap = ({
 		} catch (error) {
 			console.error('Failed to load settings:', error);
 		}
-	}, [normalizeCapabilityProbeRefreshDaysSetting, setSettings]);
+	}, [assSubtitleRendererOptions, normalizeCapabilityProbeRefreshDaysSetting, setSettings]);
 
 	const loadServerInfo = useCallback(async () => {
 		setLoading(true);

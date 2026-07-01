@@ -87,6 +87,9 @@ jobs:
       - name: Run tests
         run: CI=true npm run test -- --watch=false --passWithNoTests
 
+      - name: Run code audits
+        run: npm run audit
+
       - name: Build production bundle
         env:
           REACT_APP_DISABLE_PERSISTENT_LOGS: "1"

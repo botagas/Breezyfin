@@ -8,7 +8,8 @@ const LoginSavedAccountsStep = ({
 	loading,
 	getSavedUserAvatarUrl,
 	onResumeClick,
-	onManualLogin,
+	onAddServer,
+	onAddUser,
 	onSavedAvatarError,
 	css
 }) => (
@@ -19,6 +20,7 @@ const LoginSavedAccountsStep = ({
 				const isResuming = resumingKey === key;
 				const userInitial = (entry.username || '?').charAt(0).toUpperCase();
 				const avatarUrl = getSavedUserAvatarUrl(entry);
+				const avatarClassName = `${css.savedAvatar} ${avatarUrl ? css.savedAvatarWithImage : ''}`;
 				return (
 					<SavedItemComponent
 						key={key}
@@ -26,12 +28,13 @@ const LoginSavedAccountsStep = ({
 						className={`${css.savedItem} ${entry.isActive ? css.activeSaved : ''}`}
 						onClick={onResumeClick}
 					>
-						<div className={css.savedAvatar}>
+						<div className={avatarClassName}>
 							{avatarUrl && (
 								<>
 									<img
 										src={avatarUrl}
-										alt={`${entry.username || 'User'} avatar`}
+										alt=""
+										aria-hidden="true"
 										data-saved-avatar-key={key}
 										onError={onSavedAvatarError}
 										draggable={false}
@@ -50,14 +53,26 @@ const LoginSavedAccountsStep = ({
 				);
 			})}
 		</div>
-		<Button
-			onClick={onManualLogin}
-			disabled={loading}
-			size="large"
-			className={css.manualLoginButton}
-		>
-			Log in manually
-		</Button>
+		<div className={css.buttonRow}>
+			<Button
+				onClick={onAddServer}
+				disabled={loading}
+				size="large"
+				focusEffect="static"
+				className={css.authTextButton}
+			>
+				Add Server
+			</Button>
+			<Button
+				onClick={onAddUser}
+				disabled={loading}
+				size="large"
+				focusEffect="static"
+				className={css.authTextButton}
+			>
+				Add User
+			</Button>
+		</div>
 	</div>
 );
 

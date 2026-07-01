@@ -1,3 +1,5 @@
+@import (reference) '../../styles/panelLayoutMixins.less';
+
 .backdropLayer {
 	position: absolute;
 	inset: 0;
@@ -21,10 +23,7 @@
 
 .backdropLoadingHint {
 	z-index: 0;
-	background:
-		radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.14) 0%, rgba(32, 148, 255, 0) 62%),
-		radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.13) 0%, rgba(0, 216, 195, 0) 60%),
-		linear-gradient(160deg, rgba(19, 23, 34, 0.5) 0%, rgba(15, 18, 26, 0.5) 45%, rgba(16, 16, 16, 0.5) 100%);
+	.panel-backdrop-loading-hint();
 }
 
 .backdropImageCurrent {

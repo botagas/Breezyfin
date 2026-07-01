@@ -10,48 +10,70 @@ import MediaDetailsPanel from '../../views/MediaDetailsPanel';
 
 export const createPanelChildren = ({
 	currentView,
-	selectedItem,
-	selectedLibrary,
-	selectedHomeSection,
-	playbackOptions,
-	loginNotice,
-	loginNoticeNonce,
-	homePanelState,
-	homeSectionPanelStateById,
-	libraryPanelStateById,
-	searchPanelState,
-	favoritesPanelState,
-	settingsPanelState,
-	detailsPanelStateByItemId,
-	handleLogin,
-	handleItemSelect,
-	handleNavigate,
-	handleSwitchUser,
-	handleLogout,
-	handleSignOut,
-	handleExit,
-	handlePlay,
-	navigateBackFromDetails,
-	handleBackToDetails,
-	setPlayerControlsVisible,
-	playerControlsVisible,
-	handleSearchPanelStateChange,
-	handleHomePanelStateChange,
-	handleHomeSectionPanelStateChange,
-	handleLibraryPanelStateChange,
-	handleFavoritesPanelStateChange,
-	handleSettingsPanelStateChange,
-	handleDetailsPanelStateChange,
-	registerHomeBackHandler,
-	registerHomeSectionBackHandler,
-	registerLibraryBackHandler,
-	registerSearchBackHandler,
-	registerFavoritesBackHandler,
-	registerSettingsBackHandler,
-	registerDetailsBackHandler,
-	registerPlayerBackHandler,
-	inputMode
+	inputMode,
+	selection,
+	notices,
+	cacheState,
+	actions,
+	cacheActions,
+	backHandlers,
+	playerControls
 }) => {
+	const {
+		item,
+		library,
+		homeSection,
+		playbackOptions
+	} = selection;
+	const {
+		login: loginNotice,
+		loginNonce: loginNoticeNonce
+	} = notices;
+	const {
+		home: homePanelState,
+		homeSectionsById,
+		librariesById,
+		search: searchPanelState,
+		favorites: favoritesPanelState,
+		settings: settingsPanelState,
+		detailsByItemId
+	} = cacheState;
+	const {
+		login: handleLogin,
+		itemSelect: handleItemSelect,
+		navigate: handleNavigate,
+		switchUser: handleSwitchUser,
+		logout: handleLogout,
+		signOut: handleSignOut,
+		exit: handleExit,
+		play: handlePlay,
+		backFromDetails,
+		backToDetails
+	} = actions;
+	const {
+		home: handleHomePanelStateChange,
+		homeSection: handleHomeSectionPanelStateChange,
+		library: handleLibraryPanelStateChange,
+		search: handleSearchPanelStateChange,
+		favorites: handleFavoritesPanelStateChange,
+		settings: handleSettingsPanelStateChange,
+		details: handleDetailsPanelStateChange
+	} = cacheActions;
+	const {
+		home: registerHomeBackHandler,
+		homeSection: registerHomeSectionBackHandler,
+		library: registerLibraryBackHandler,
+		search: registerSearchBackHandler,
+		favorites: registerFavoritesBackHandler,
+		settings: registerSettingsBackHandler,
+		details: registerDetailsBackHandler,
+		player: registerPlayerBackHandler
+	} = backHandlers;
+	const {
+		visible: playerControlsVisible,
+		setVisible: setPlayerControlsVisible
+	} = playerControls;
+
 	const panelChildren = [
 		<LoginPanel
 			key="login"
@@ -78,13 +100,13 @@ export const createPanelChildren = ({
 			key="homeSection"
 			isActive={currentView === 'homeSection'}
 			inputMode={inputMode}
-			section={selectedHomeSection}
+			section={homeSection}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
 			onLogout={handleLogout}
 			onExit={handleExit}
-			cachedState={selectedHomeSection?.id ? homeSectionPanelStateById[String(selectedHomeSection.id)] || null : null}
+			cachedState={homeSection?.id ? homeSectionsById[String(homeSection.id)] || null : null}
 			onCacheState={handleHomeSectionPanelStateChange}
 			registerBackHandler={registerHomeSectionBackHandler}
 			noCloseButton
@@ -93,13 +115,13 @@ export const createPanelChildren = ({
 			key="library"
 			isActive={currentView === 'library'}
 			inputMode={inputMode}
-			library={selectedLibrary}
+			library={library}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
 			onLogout={handleLogout}
 			onExit={handleExit}
-			cachedState={selectedLibrary?.Id ? libraryPanelStateById[String(selectedLibrary.Id)] || null : null}
+			cachedState={library?.Id ? librariesById[String(library.Id)] || null : null}
 			onCacheState={handleLibraryPanelStateChange}
 			registerBackHandler={registerLibraryBackHandler}
 			noCloseButton
@@ -147,13 +169,13 @@ export const createPanelChildren = ({
 
 	panelChildren.push(
 		<MediaDetailsPanel
-			key={`details-${selectedItem?.Id || 'none'}`}
+			key={`details-${item?.Id || 'none'}`}
 			isActive={currentView === 'details'}
-			item={selectedItem}
-			onBack={navigateBackFromDetails}
+			item={item}
+			onBack={backFromDetails}
 			onPlay={handlePlay}
 			onItemSelect={handleItemSelect}
-			cachedState={selectedItem?.Id ? detailsPanelStateByItemId[String(selectedItem.Id)] || null : null}
+			cachedState={item?.Id ? detailsByItemId[String(item.Id)] || null : null}
 			onCacheState={handleDetailsPanelStateChange}
 			registerBackHandler={registerDetailsBackHandler}
 			noCloseButton
@@ -164,9 +186,9 @@ export const createPanelChildren = ({
 		<PlayerPanel
 			key="player"
 			isActive={currentView === 'player'}
-			item={selectedItem}
+			item={item}
 			playbackOptions={playbackOptions}
-			onBack={handleBackToDetails}
+			onBack={backToDetails}
 			onPlay={handlePlay}
 			requestedControlsVisible={playerControlsVisible}
 			onControlsVisibilityChange={setPlayerControlsVisible}

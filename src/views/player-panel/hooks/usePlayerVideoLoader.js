@@ -3,13 +3,13 @@ import Hls from 'hls.js';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
-import {toInteger} from '../../../utils/numberParsing';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 import {
 	getDynamicRangeDisplayLabel,
 	getDynamicRangeInfo
 } from '../../../utils/playbackDynamicRange';
 import {
+	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
@@ -17,25 +17,6 @@ import {
 } from '../utils/playerVideoLoaderHelpers';
 
 const NATIVE_HLS_HDR_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
-const DEBUG_SOURCE_SUMMARY_LIMIT = 8;
-
-const buildSourceDebugSummary = (mediaSources = []) => {
-	if (!Array.isArray(mediaSources) || mediaSources.length === 0) return [];
-	return mediaSources.slice(0, DEBUG_SOURCE_SUMMARY_LIMIT).map((source) => {
-		const videoStream = source?.MediaStreams?.find((stream) => stream?.Type === 'Video') || null;
-		return {
-			id: source?.Id || '',
-			container: source?.Container || '',
-			videoCodec: videoStream?.Codec || '',
-			videoRangeType: videoStream?.VideoRangeType || '',
-			videoRange: videoStream?.VideoRange || '',
-			supportsDirectPlay: source?.SupportsDirectPlay === true,
-			supportsDirectStream: source?.SupportsDirectStream === true,
-			supportsTranscoding: source?.SupportsTranscoding === true,
-			defaultAudioStreamIndex: toInteger(source?.DefaultAudioStreamIndex)
-		};
-	});
-};
 
 const normalizeToastText = (value) => (
 	String(value || '')
@@ -217,21 +198,21 @@ export const usePlayerVideoLoader = ({
 				playMethod: resolvedPlayMethod
 			};
 
+			const mediaSourceDebugData = buildMediaSourceDebugData({
+				mediaSource,
+				playbackInfo,
+				playbackMeta,
+				resolvedPlayMethod,
+				dynamicRangeInfo,
+				dynamicRangeLabel,
+				requestedDynamicRangeCap,
+				playbackRequestDebug,
+				videoStream
+			});
+
 			setMediaSourceData({
 				...mediaSource,
-				__selectedPlayMethod: resolvedPlayMethod,
-				__dynamicRangeInfo: dynamicRangeInfo,
-				__dynamicRangeLabel: dynamicRangeLabel,
-				__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
-				__debugVideoRangeType: videoStream?.VideoRangeType || '',
-				__debugVideoRange: videoStream?.VideoRange || '',
-				__debugVideoCodec: videoStream?.Codec || '',
-				__debugRequest: playbackRequestDebug,
-				__debugDecision: playbackMeta.decision || null,
-				__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
-				__debugDiagnostics: Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
-				__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
-				__debugSelectedSourceId: mediaSource?.Id || ''
+				...mediaSourceDebugData
 			});
 
 			if (mediaSource.RunTimeTicks) {
@@ -275,19 +256,7 @@ export const usePlayerVideoLoader = ({
 
 			setMediaSourceData((previousValue) => ({
 				...(previousValue || mediaSource),
-				__selectedPlayMethod: resolvedPlayMethod,
-				__dynamicRangeInfo: dynamicRangeInfo,
-				__dynamicRangeLabel: dynamicRangeLabel,
-				__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
-				__debugVideoRangeType: videoStream?.VideoRangeType || '',
-				__debugVideoRange: videoStream?.VideoRange || '',
-				__debugVideoCodec: videoStream?.Codec || '',
-				__debugRequest: playbackRequestDebug,
-				__debugDecision: playbackMeta.decision || null,
-				__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
-				__debugDiagnostics: Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
-				__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
-				__debugSelectedSourceId: mediaSource?.Id || '',
+				...mediaSourceDebugData,
 				__debugVideoUrl: videoUrl,
 				__debugIsHls: isHls,
 				__debugHlsEngine: isHls ? 'pending' : null

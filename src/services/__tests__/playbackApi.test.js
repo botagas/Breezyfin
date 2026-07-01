@@ -42,6 +42,51 @@ describe('playbackApi', () => {
 			}
 		]
 	});
+	const expectClientRenderedSubtitlePlayback = async ({
+		videoRangeType,
+		sourceId,
+		subtitleCodec,
+		expectedReason,
+		expectedRenderer
+	}) => {
+		const service = createService();
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [
+					withSubtitleStream(createMediaSource(videoRangeType, {
+						id: sourceId,
+						supportsTranscoding: true
+					}), {Codec: subtitleCodec, Index: 2})
+				]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			subtitleStreamIndex: 2
+		});
+		const initialPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
+
+		expect(global.fetch).toHaveBeenCalledTimes(1);
+		expect(initialPayload.SubtitleMethod).toBeUndefined();
+		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
+			mode: 'smart',
+			reason: expectedReason,
+			renderer: expectedRenderer,
+			clientRender: true,
+			requiresBurnIn: false,
+			forceBurnIn: false
+		}));
+		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual(expect.arrayContaining([
+			expect.objectContaining({
+				scope: 'subtitle-policy',
+				stage: 'burn-in-decision',
+				status: 'skipped',
+				reason: expectedReason
+			})
+		]));
+	};
 	const createTranscodeOnlyDvSource = () => ({
 		Id: 'source-dv-transcode',
 		Container: 'mkv',
@@ -482,46 +527,16 @@ describe('playbackApi', () => {
 	});
 
 	it('keeps smart client-renderable text subtitles off the burn-in path', async () => {
-		const service = createService();
-		global.fetch.mockResolvedValue({
-			ok: true,
-			json: async () => ({
-				PlaySessionId: 'session-1',
-				MediaSources: [
-					withSubtitleStream(createMediaSource('SDR', {
-						id: 'source-sdr-subtitle',
-						supportsTranscoding: true
-					}), {Codec: 'srt', Index: 2})
-				]
-			})
+		await expectClientRenderedSubtitlePlayback({
+			videoRangeType: 'SDR',
+			sourceId: 'source-sdr-subtitle',
+			subtitleCodec: 'srt',
+			expectedReason: 'client-render-text',
+			expectedRenderer: 'client-text'
 		});
-
-		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
-			subtitleStreamIndex: 2
-		});
-		const initialPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
-
-		expect(global.fetch).toHaveBeenCalledTimes(1);
-		expect(initialPayload.SubtitleMethod).toBeUndefined();
-		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
-			mode: 'smart',
-			reason: 'client-render-text',
-			renderer: 'client',
-			clientRender: true,
-			requiresBurnIn: false,
-			forceBurnIn: false
-		}));
-		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual(expect.arrayContaining([
-			expect.objectContaining({
-				scope: 'subtitle-policy',
-				stage: 'burn-in-decision',
-				status: 'skipped',
-				reason: 'client-render-text'
-			})
-		]));
 	});
 
-	it('requests subtitle burn-in through PlaybackInfo in smart mode for non-client-renderable SDR subtitles', async () => {
+	it('requests subtitle burn-in through PlaybackInfo when smart ASS renderer is burn-in on SDR', async () => {
 		const service = createService();
 		global.fetch
 			.mockResolvedValueOnce({
@@ -556,7 +571,8 @@ describe('playbackApi', () => {
 			});
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
-			subtitleStreamIndex: 2
+			subtitleStreamIndex: 2,
+			assSubtitleRenderer: 'burn-in'
 		});
 		const transcodePayload = JSON.parse(global.fetch.mock.calls[1][1].body);
 
@@ -567,7 +583,7 @@ describe('playbackApi', () => {
 		expect(transcodePayload.SubtitleMethod).toBe('Encode');
 		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
 			mode: 'smart',
-			reason: 'smart-sdr-reliability',
+			reason: 'ass-renderer-burn-in',
 			renderer: 'burn-in',
 			requiresBurnIn: true,
 			forceBurnIn: true
@@ -576,14 +592,14 @@ describe('playbackApi', () => {
 			playMethod: 'Transcode',
 			selectedSubtitleStreamIndex: 2,
 			forceSubtitleBurnIn: true,
-			subtitleDecision: 'smart-sdr-reliability'
+			subtitleDecision: 'ass-renderer-burn-in'
 		}));
 		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual(expect.arrayContaining([
 			expect.objectContaining({
 				scope: 'subtitle-policy',
 				stage: 'burn-in-decision',
 				status: 'applied',
-				reason: 'smart-sdr-reliability'
+				reason: 'ass-renderer-burn-in'
 			}),
 			expect.objectContaining({
 				scope: 'playback-probe',
@@ -594,35 +610,14 @@ describe('playbackApi', () => {
 		]));
 	});
 
-	it('skips smart subtitle burn-in for non-client-renderable HDR/DV subtitles unless explicitly forced', async () => {
-		const service = createService();
-		global.fetch.mockResolvedValue({
-			ok: true,
-			json: async () => ({
-				PlaySessionId: 'session-1',
-				MediaSources: [
-					withSubtitleStream(createMediaSource('DOVIWithHDR10', {
-						id: 'source-dv-subtitle',
-						supportsTranscoding: true
-					}), {Codec: 'ass', Index: 2})
-				]
-			})
+	it('uses lightweight client rendering for ASS/SSA HDR/DV subtitles in smart auto mode', async () => {
+		await expectClientRenderedSubtitlePlayback({
+			videoRangeType: 'DOVIWithHDR10',
+			sourceId: 'source-dv-subtitle',
+			subtitleCodec: 'ass',
+			expectedReason: 'client-render-ass-lightweight',
+			expectedRenderer: 'client-ass-lightweight'
 		});
-
-		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
-			subtitleStreamIndex: 2
-		});
-		const initialPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
-
-		expect(global.fetch).toHaveBeenCalledTimes(1);
-		expect(initialPayload.SubtitleMethod).toBeUndefined();
-		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
-			mode: 'smart',
-			reason: 'skip-hdr-dv-preserve-range',
-			renderer: 'native',
-			requiresBurnIn: false,
-			forceBurnIn: false
-		}));
 	});
 
 	it('rejects Force DV when Jellyfin only provides full transcoding output', async () => {

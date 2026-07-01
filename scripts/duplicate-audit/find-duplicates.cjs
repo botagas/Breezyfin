@@ -3,16 +3,26 @@
  * Mixed-language duplicate scanner for Breezyfin source files.
  * Uses normalized sliding windows and reports duplicate snippets across files.
  */
-const fs = require('fs');
-const path = require('path');
 const nodeCrypto = require('crypto');
-const cp = require('child_process');
+const {
+	fs,
+	path,
+	SRC_DIR,
+	JS_EXTENSIONS,
+	STYLE_EXTENSIONS,
+	hasExtension,
+	relativePath,
+	walkFiles
+} = require('../audit-utils/files.cjs');
 
-const SRC_ROOT = 'src';
-const FILE_GLOBS = ['*.js', '*.less'];
+const SCAN_EXTENSIONS = new Set([...STYLE_EXTENSIONS, ...JS_EXTENSIONS]);
 const MIN_LINES_BY_EXT = {
+	'.css': 10,
 	'.js': 8,
-	'.less': 10
+	'.jsx': 8,
+	'.less': 10,
+	'.ts': 8,
+	'.tsx': 8
 };
 const MAX_REPORTS = 60;
 
@@ -48,17 +58,7 @@ const isLowSignalSnippet = (extension, snippetKey) => {
 };
 
 const getFiles = () => {
-	const files = [];
-	for (const glob of FILE_GLOBS) {
-		const output = cp.execSync(`rg --files ${SRC_ROOT} -g '${glob}'`, {encoding: 'utf8'}).trim();
-		if (!output) continue;
-		output
-			.split('\n')
-			.map((entry) => entry.trim())
-			.filter(Boolean)
-			.forEach((entry) => files.push(entry));
-	}
-	return files;
+	return walkFiles(SRC_DIR, hasExtension(SCAN_EXTENSIONS));
 };
 
 const scanFile = (filePath, store) => {
@@ -80,7 +80,7 @@ const scanFile = (filePath, store) => {
 			});
 		}
 		store.get(hash).occurrences.push({
-			filePath,
+			filePath: relativePath(filePath),
 			line: i + 1
 		});
 	}
@@ -120,14 +120,14 @@ const printReport = (report) => {
 		return;
 	}
 
-	console.log(`Found ${report.length} duplicate snippet groups (cross-file).`);
+	console.error(`Found ${report.length} duplicate snippet groups (cross-file).`);
 	report.forEach((entry, index) => {
 		const preview = entry.snippet.split('\n').slice(0, 3).join(' | ');
-		console.log(`\n#${index + 1} [${entry.extension}] files=${entry.fileCount} rawOccurrences=${entry.rawOccurrenceCount}`);
+		console.error(`\n#${index + 1} [${entry.extension}] files=${entry.fileCount} rawOccurrences=${entry.rawOccurrenceCount}`);
 		entry.locations.forEach((location) => {
-			console.log(` - ${location.filePath}:${location.line}`);
+			console.error(` - ${location.filePath}:${location.line}`);
 		});
-		console.log(` snippet: ${preview}`);
+		console.error(` snippet: ${preview}`);
 	});
 };
 
@@ -137,6 +137,9 @@ const main = () => {
 	files.forEach((filePath) => scanFile(filePath, store));
 	const report = buildReport(store);
 	printReport(report);
+	if (report.length > 0) {
+		process.exit(1);
+	}
 };
 
 main();

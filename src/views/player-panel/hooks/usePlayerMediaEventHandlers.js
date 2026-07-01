@@ -3,6 +3,7 @@ import {useCallback} from 'react';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
+import {applyNativeAudioTrackSelection} from '../../../utils/trackMatching';
 
 export const usePlayerMediaEventHandlers = ({
 	item,
@@ -30,8 +31,68 @@ export const usePlayerMediaEventHandlers = ({
 	attemptSubtitleCompatibilityFallback,
 	isCurrentTranscoding,
 	attemptTranscodeFallback,
-	handleStop
+	handleStop,
+	mediaSourceData,
+	audioTracks,
+	currentAudioTrack,
+	currentSubtitleTrack,
+	appendPlaybackDiagnostic,
+	onNativeAudioSwitchFallback
 }) => {
+	const applyInitialNativeAudioSelection = useCallback((phase) => {
+		const defaultAudioTrack = Number.isInteger(mediaSourceData?.DefaultAudioStreamIndex)
+			? mediaSourceData.DefaultAudioStreamIndex
+			: audioTracks.find((track) => track?.IsDefault === true)?.Index;
+		if (
+			mediaSourceData?.__selectedPlayMethod !== 'DirectPlay' ||
+			!Number.isInteger(currentAudioTrack) ||
+			currentAudioTrack < 0 ||
+			currentAudioTrack === defaultAudioTrack ||
+			!Array.isArray(audioTracks) ||
+			audioTracks.length <= 1
+		) {
+			return false;
+		}
+		const nativeResult = applyNativeAudioTrackSelection({
+			video: videoRef.current,
+			mediaTracks: audioTracks,
+			selectedTrackIndex: currentAudioTrack
+		});
+		if (typeof appendPlaybackDiagnostic === 'function') {
+			appendPlaybackDiagnostic({
+				scope: 'audio-track',
+				stage: `initial-native-switch-${phase}`,
+				status: nativeResult.status,
+				reason: nativeResult.method,
+				message: nativeResult.applied
+					? `Selected native audio track ${nativeResult.index} from ${nativeResult.tracks.length} tracks.`
+					: `Native initial audio selection failed with ${nativeResult.tracks.length} tracks.`
+			});
+		}
+		if (nativeResult.applied) return false;
+		if (nativeResult.status === 'native-unavailable' && phase === 'metadata') {
+			return false;
+		}
+		if (typeof onNativeAudioSwitchFallback !== 'function') return false;
+		Promise.resolve(onNativeAudioSwitchFallback({
+			reason: nativeResult.status || 'native-initial-audio-switch-failed',
+			audioStreamIndex: currentAudioTrack,
+			subtitleStreamIndex: currentSubtitleTrack
+		})).catch((error) => {
+			console.warn('Failed to run native audio fallback:', error);
+		});
+		return true;
+	}, [
+		appendPlaybackDiagnostic,
+		audioTracks,
+		currentAudioTrack,
+		currentSubtitleTrack,
+		mediaSourceData?.DefaultAudioStreamIndex,
+		mediaSourceData?.__selectedPlayMethod,
+		onNativeAudioSwitchFallback,
+		videoRef
+	]);
+
 	const handleLoadedMetadata = useCallback(() => {
 		if (videoRef.current) {
 			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
@@ -44,7 +105,8 @@ export const usePlayerMediaEventHandlers = ({
 				setCurrentTime(startPosition);
 			}
 		}
-	}, [item, playbackOverrideRef, setCurrentTime, videoRef]);
+		applyInitialNativeAudioSelection('metadata');
+	}, [applyInitialNativeAudioSelection, item, playbackOverrideRef, setCurrentTime, videoRef]);
 
 	const handleLoadedData = useCallback(() => {
 		if (!videoRef.current || !loading) return;
@@ -57,6 +119,7 @@ export const usePlayerMediaEventHandlers = ({
 
 	const handleCanPlay = useCallback(async () => {
 		if (!videoRef.current || playbackStartedRef.current) return;
+		if (applyInitialNativeAudioSelection('canplay')) return;
 
 		playbackStartedRef.current = true;
 
@@ -97,6 +160,7 @@ export const usePlayerMediaEventHandlers = ({
 		}
 	}, [
 		clearStartWatch,
+		applyInitialNativeAudioSelection,
 		getPlaybackSessionContext,
 		item,
 		pendingOverrideClearRef,

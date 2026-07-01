@@ -14,6 +14,7 @@ import {buildUserPrimaryImageUrl} from './login-panel/utils/loginImageUrls';
 import {useLoginBackdrops} from './login-panel/hooks/useLoginBackdrops';
 import LoginBackdropLayer from './login-panel/components/LoginBackdropLayer';
 import LoginSavedAccountsStep from './login-panel/components/LoginSavedAccountsStep';
+import LoginServerSelectStep from './login-panel/components/LoginServerSelectStep';
 import LoginServerConnectStep from './login-panel/components/LoginServerConnectStep';
 import LoginCredentialsStep from './login-panel/components/LoginCredentialsStep';
 
@@ -30,7 +31,7 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 	const [error, setError] = useState(null);
 	const [status, setStatus] = useState('');
 	const [notice, setNotice] = useState('');
-	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'login'
+	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'serverSelect' | 'login'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
 	const savedServerKeySelector = useCallback(
@@ -38,6 +39,20 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 		[]
 	);
 	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
+	const savedServerChoices = useMemo(() => {
+		const choicesByServerId = new Map();
+		(savedServers || []).forEach((entry) => {
+			if (!entry?.serverId || !entry?.url || choicesByServerId.has(entry.serverId)) return;
+			choicesByServerId.set(entry.serverId, {
+				serverId: entry.serverId,
+				serverName: entry.serverName,
+				url: entry.url,
+				lastConnected: entry.lastConnected
+			});
+		});
+		return Array.from(choicesByServerId.values())
+			.sort((a, b) => (b.lastConnected || '').localeCompare(a.lastConnected || ''));
+	}, [savedServers]);
 	const {
 		currentBackdropUrl,
 		previousBackdropUrl,
@@ -157,11 +172,58 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 		setStep(savedServers.length > 0 ? 'saved' : 'server');
 	}, [savedServers.length]);
 
-	const handleManualLogin = useCallback(() => {
+	const handleAddServer = useCallback(() => {
 		setError(null);
 		setStatus('');
+		setUsername('');
+		setPassword('');
 		setStep('server');
 	}, []);
+
+	const connectToSavedServer = useCallback(async (serverChoice) => {
+		if (!serverChoice?.url) return;
+		setLoading(true);
+		setError(null);
+		setStatus(`Connecting to ${serverChoice.serverName || 'server'}...`);
+		try {
+			await jellyfinService.connect(serverChoice.url);
+			localStorage.setItem('lastJellyfinServer', serverChoice.url);
+			setServerUrl(serverChoice.url);
+			setUsername('');
+			setPassword('');
+			setStep('login');
+			setStatus('Connected. Enter your credentials.');
+		} catch (err) {
+			setError(getUserErrorMessage(err, 'Failed to connect to saved server.'));
+			setStatus('');
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	const handleAddUser = useCallback(() => {
+		setError(null);
+		setStatus('');
+		setUsername('');
+		setPassword('');
+		if (savedServerChoices.length === 0) {
+			setStep('server');
+			setStatus('Add a server first, then sign in.');
+			return;
+		}
+		if (savedServerChoices.length === 1) {
+			connectToSavedServer(savedServerChoices[0]);
+			return;
+		}
+		setStep('serverSelect');
+	}, [connectToSavedServer, savedServerChoices]);
+
+	const handleSavedServerSelect = useCallback((event) => {
+		const serverId = event.currentTarget.dataset.serverId;
+		const serverChoice = savedServerChoices.find((entry) => entry.serverId === serverId);
+		if (!serverChoice) return;
+		connectToSavedServer(serverChoice);
+	}, [connectToSavedServer, savedServerChoices]);
 
 	const handleOpenSettings = useCallback(() => {
 		if (typeof onNavigate !== 'function') return;
@@ -241,18 +303,22 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 		});
 	}, []);
 
-	const handleSavedAvatarError = useImageErrorFallback(null);
+	const handleSavedAvatarError = useImageErrorFallback(css.savedAvatarImageUnavailable);
 
 	const headingText = step === 'saved'
 		? 'Choose Account'
 		: step === 'server'
 			? 'Connect to Jellyfin Server'
-			: 'Sign In';
+			: step === 'serverSelect'
+				? 'Choose Server'
+				: 'Sign In';
 	const leadText = step === 'saved'
-		? 'Select a saved account, or continue with manual login.'
+		? 'Select a saved account, add a server, or add another user.'
 		: step === 'server'
 			? 'Enter your Jellyfin server URL to get started.'
-			: 'Use your Jellyfin credentials to sign in.';
+			: step === 'serverSelect'
+				? 'Select the server you want to sign in to.'
+				: 'Use your Jellyfin credentials to sign in.';
 
 	return (
 		<Panel {...rest} noCloseButton>
@@ -302,7 +368,8 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 								loading={loading}
 								getSavedUserAvatarUrl={getSavedUserAvatarUrl}
 								onResumeClick={handleResumeClick}
-								onManualLogin={handleManualLogin}
+								onAddServer={handleAddServer}
+								onAddUser={handleAddUser}
 								onSavedAvatarError={handleSavedAvatarError}
 								css={css}
 							/>
@@ -314,6 +381,14 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 								onServerUrlChange={handleServerUrlChange}
 								onServerUrlKeyDown={handleServerUrlKeyDown}
 								onConnect={handleConnect}
+								css={css}
+							/>
+						) : step === 'serverSelect' ? (
+							<LoginServerSelectStep
+								servers={savedServerChoices}
+								loading={loading}
+								onServerSelect={handleSavedServerSelect}
+								onBack={handleBack}
 								css={css}
 							/>
 						) : (

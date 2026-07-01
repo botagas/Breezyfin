@@ -2,18 +2,27 @@ import {useCallback, useMemo} from 'react';
 
 import {writeBreezyfinSettings} from '../../../utils/settingsStorage';
 import {
+	ASS_SUBTITLE_RENDERER_OPTIONS,
 	SETTINGS_DISCLOSURE_KEYS,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
+	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
 	SUBTITLE_OVERLAY_POSITION_OPTIONS,
-	SUBTITLE_OVERLAY_SIZE_OPTIONS,
+	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE,
+	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
+	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
 import {getOptionLabel, getSubtitleBurnInTextCodecsLabel} from '../labels';
+import {
+	adjustNumericSetting,
+	getNumericSettingLabel,
+	normalizeNumericSetting
+} from '../../../utils/subtitleAppearance';
 
 export const useSettingsOptionHandlers = ({
 	settings,
@@ -24,7 +33,7 @@ export const useSettingsOptionHandlers = ({
 	closeCapabilityProbeRefreshPopup,
 	closeAudioLangPopup,
 	closeSubtitleLangPopup,
-	closeSubtitleOverlaySizePopup,
+	closeAssSubtitleRendererPopup,
 	closeSubtitleOverlayPositionPopup,
 	closeSubtitleOverlayBackgroundPopup,
 	closeSubtitleOverlayWeightPopup,
@@ -32,13 +41,16 @@ export const useSettingsOptionHandlers = ({
 	closeSubtitleOverlayBorderStylePopup,
 	closeSubtitleOverlayBorderColorPopup,
 	closeSubtitleOverlayBorderStrengthPopup,
+	closeSubtitleOverlayShadowDistancePopup,
+	closeSubtitleOverlayShadowAnglePopup,
 	closeNavbarThemePopup,
 	closePlayNextPromptModePopup,
 	normalizeCapabilityProbeRefreshDaysSetting,
 	setRuntimeCapabilityProbeRefreshDays,
 	setToastMessage,
 	bumpCapabilitySnapshotVersion,
-	getCapabilityProbeRefreshLabel
+	getCapabilityProbeRefreshLabel,
+	assSubtitleRendererOptions = ASS_SUBTITLE_RENDERER_OPTIONS
 }) => {
 	const openPlayNextPromptModePopup = useCallback(() => {
 		if (settings.showPlayNextPrompt !== false) {
@@ -91,6 +103,14 @@ export const useSettingsOptionHandlers = ({
 		closeSubtitleLangPopup();
 	}, [closeSubtitleLangPopup, handleSettingChange]);
 
+	const handleAssSubtitleRendererSelect = useCallback((event) => {
+		if (settings.smartSubtitleTranscoding === false) return;
+		const value = event.currentTarget.dataset.value;
+		if (!assSubtitleRendererOptions.some((option) => option.value === value)) return;
+		handleSettingChange('assSubtitleRenderer', value);
+		closeAssSubtitleRendererPopup();
+	}, [assSubtitleRendererOptions, closeAssSubtitleRendererPopup, handleSettingChange, settings.smartSubtitleTranscoding]);
+
 	const handleSubtitleBurnInTextCodecToggle = useCallback((event) => {
 		if (settings.smartSubtitleTranscoding !== false) return;
 		const codec = String(event.currentTarget.dataset.codec || '').trim().toLowerCase();
@@ -117,12 +137,48 @@ export const useSettingsOptionHandlers = ({
 		});
 	}, [setSettings, settings.smartSubtitleTranscoding]);
 
-	const handleSubtitleOverlaySizeSelect = useCallback((event) => {
-		const value = event.currentTarget.dataset.value;
-		if (!SUBTITLE_OVERLAY_SIZE_OPTIONS.some((option) => option.value === value)) return;
-		handleSettingChange('subtitleOverlaySize', value);
-		closeSubtitleOverlaySizePopup();
-	}, [closeSubtitleOverlaySizePopup, handleSettingChange]);
+	const handleNumericSettingChange = useCallback((settingKey, range, direction) => {
+		if (direction !== 'increase' && direction !== 'decrease') return;
+		setSettings((prevSettings) => {
+			const nextValue = adjustNumericSetting(prevSettings[settingKey], range, direction);
+			if (String(prevSettings[settingKey]) === nextValue) return prevSettings;
+			const updated = {
+				...prevSettings,
+				[settingKey]: nextValue
+			};
+			if (!writeBreezyfinSettings(updated)) {
+				console.error(`Failed to save ${settingKey} setting`);
+			}
+			return updated;
+		});
+	}, [setSettings]);
+
+	const handleNumericSettingReset = useCallback((settingKey, range) => {
+		const nextValue = normalizeNumericSetting(range.defaultValue, range);
+		setSettings((prevSettings) => {
+			if (String(prevSettings[settingKey]) === nextValue) return prevSettings;
+			const updated = {
+				...prevSettings,
+				[settingKey]: nextValue
+			};
+			if (!writeBreezyfinSettings(updated)) {
+				console.error(`Failed to reset ${settingKey} setting`);
+			}
+			return updated;
+		});
+	}, [setSettings]);
+
+	const handleSubtitleOverlayFontSizeDecrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayFontSizePx', SUBTITLE_OVERLAY_FONT_SIZE_RANGE, 'decrease');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayFontSizeIncrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayFontSizePx', SUBTITLE_OVERLAY_FONT_SIZE_RANGE, 'increase');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayFontSizeReset = useCallback(() => {
+		handleNumericSettingReset('subtitleOverlayFontSizePx', SUBTITLE_OVERLAY_FONT_SIZE_RANGE);
+	}, [handleNumericSettingReset]);
 
 	const handleSubtitleOverlayPositionSelect = useCallback((event) => {
 		const value = event.currentTarget.dataset.value;
@@ -173,6 +229,32 @@ export const useSettingsOptionHandlers = ({
 		closeSubtitleOverlayBorderStrengthPopup();
 	}, [closeSubtitleOverlayBorderStrengthPopup, handleSettingChange]);
 
+	const handleSubtitleOverlayOutlineSizeDecrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayOutlineSizePx', SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE, 'decrease');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayOutlineSizeIncrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayOutlineSizePx', SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE, 'increase');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayOutlineSizeReset = useCallback(() => {
+		handleNumericSettingReset('subtitleOverlayOutlineSizePx', SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE);
+	}, [handleNumericSettingReset]);
+
+	const handleSubtitleOverlayShadowDistanceSelect = useCallback((event) => {
+		const value = event.currentTarget.dataset.value;
+		if (!SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS.some((option) => option.value === value)) return;
+		handleSettingChange('subtitleOverlayShadowDistance', value);
+		closeSubtitleOverlayShadowDistancePopup();
+	}, [closeSubtitleOverlayShadowDistancePopup, handleSettingChange]);
+
+	const handleSubtitleOverlayShadowAngleSelect = useCallback((event) => {
+		const value = event.currentTarget.dataset.value;
+		if (!SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS.some((option) => option.value === value)) return;
+		handleSettingChange('subtitleOverlayShadowAngle', value);
+		closeSubtitleOverlayShadowAnglePopup();
+	}, [closeSubtitleOverlayShadowAnglePopup, handleSettingChange]);
+
 	const setSegmentsOnlyPromptMode = useCallback(() => {
 		handleSettingChange('playNextPromptMode', 'segmentsOnly');
 		closePlayNextPromptModePopup();
@@ -189,16 +271,20 @@ export const useSettingsOptionHandlers = ({
 			SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS
 		);
 	}, [settings.subtitleBurnInTextCodecs]);
-	const subtitleOverlaySizeLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_SIZE_OPTIONS, settings.subtitleOverlaySize, 'Medium'),
-		[settings.subtitleOverlaySize]
+	const assSubtitleRendererLabel = useMemo(
+		() => getOptionLabel(assSubtitleRendererOptions, settings.assSubtitleRenderer, 'Auto'),
+		[assSubtitleRendererOptions, settings.assSubtitleRenderer]
+	);
+	const subtitleOverlayFontSizeLabel = useMemo(
+		() => getNumericSettingLabel(settings.subtitleOverlayFontSizePx, SUBTITLE_OVERLAY_FONT_SIZE_RANGE),
+		[settings.subtitleOverlayFontSizePx]
 	);
 	const subtitleOverlayPositionLabel = useMemo(
 		() => getOptionLabel(SUBTITLE_OVERLAY_POSITION_OPTIONS, settings.subtitleOverlayPosition, 'Standard'),
 		[settings.subtitleOverlayPosition]
 	);
 	const subtitleOverlayBackgroundLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_BACKGROUND_OPTIONS, settings.subtitleOverlayBackground, 'Medium'),
+		() => getOptionLabel(SUBTITLE_OVERLAY_BACKGROUND_OPTIONS, settings.subtitleOverlayBackground, 'None'),
 		[settings.subtitleOverlayBackground]
 	);
 	const subtitleOverlayWeightLabel = useMemo(
@@ -210,7 +296,7 @@ export const useSettingsOptionHandlers = ({
 		[settings.subtitleOverlayTextColor]
 	);
 	const subtitleOverlayBorderStyleLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS, settings.subtitleOverlayBorderStyle, 'Shadow'),
+		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS, settings.subtitleOverlayBorderStyle, 'Outline'),
 		[settings.subtitleOverlayBorderStyle]
 	);
 	const subtitleOverlayBorderColorLabel = useMemo(
@@ -221,6 +307,18 @@ export const useSettingsOptionHandlers = ({
 		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS, settings.subtitleOverlayBorderStrength, 'Medium'),
 		[settings.subtitleOverlayBorderStrength]
 	);
+	const subtitleOverlayOutlineSizeLabel = useMemo(
+		() => getNumericSettingLabel(settings.subtitleOverlayOutlineSizePx, SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE),
+		[settings.subtitleOverlayOutlineSizePx]
+	);
+	const subtitleOverlayShadowDistanceLabel = useMemo(
+		() => getOptionLabel(SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS, settings.subtitleOverlayShadowDistance, 'Medium'),
+		[settings.subtitleOverlayShadowDistance]
+	);
+	const subtitleOverlayShadowAngleLabel = useMemo(
+		() => getOptionLabel(SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS, settings.subtitleOverlayShadowAngle, 'Down'),
+		[settings.subtitleOverlayShadowAngle]
+	);
 
 	return {
 		openPlayNextPromptModePopup,
@@ -229,8 +327,11 @@ export const useSettingsOptionHandlers = ({
 		handleCapabilityProbeRefreshSelect,
 		handleAudioLanguageSelect,
 		handleSubtitleLanguageSelect,
+		handleAssSubtitleRendererSelect,
 		handleSubtitleBurnInTextCodecToggle,
-		handleSubtitleOverlaySizeSelect,
+		handleSubtitleOverlayFontSizeDecrease,
+		handleSubtitleOverlayFontSizeIncrease,
+		handleSubtitleOverlayFontSizeReset,
 		handleSubtitleOverlayPositionSelect,
 		handleSubtitleOverlayBackgroundSelect,
 		handleSubtitleOverlayWeightSelect,
@@ -238,16 +339,25 @@ export const useSettingsOptionHandlers = ({
 		handleSubtitleOverlayBorderStyleSelect,
 		handleSubtitleOverlayBorderColorSelect,
 		handleSubtitleOverlayBorderStrengthSelect,
+		handleSubtitleOverlayOutlineSizeDecrease,
+		handleSubtitleOverlayOutlineSizeIncrease,
+		handleSubtitleOverlayOutlineSizeReset,
+		handleSubtitleOverlayShadowDistanceSelect,
+		handleSubtitleOverlayShadowAngleSelect,
 		setSegmentsOnlyPromptMode,
 		setSegmentsOrLast60PromptMode,
 		subtitleBurnInTextCodecsLabel,
-		subtitleOverlaySizeLabel,
+		assSubtitleRendererLabel,
+		subtitleOverlayFontSizeLabel,
 		subtitleOverlayPositionLabel,
 		subtitleOverlayBackgroundLabel,
 		subtitleOverlayWeightLabel,
 		subtitleOverlayTextColorLabel,
 		subtitleOverlayBorderStyleLabel,
 		subtitleOverlayBorderColorLabel,
-		subtitleOverlayBorderStrengthLabel
+		subtitleOverlayBorderStrengthLabel,
+		subtitleOverlayOutlineSizeLabel,
+		subtitleOverlayShadowDistanceLabel,
+		subtitleOverlayShadowAngleLabel
 	};
 };
