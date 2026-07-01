@@ -41,6 +41,7 @@ jobs:
 
       - name: Build production bundle
         env:
+          CI: "false"
           REACT_APP_RELEASE_CHANNEL: ${{ github.ref_name }}
         run: |
           npm run clean
