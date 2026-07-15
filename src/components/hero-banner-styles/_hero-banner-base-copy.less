@@ -4,34 +4,51 @@
 
 .logoWrapper {
 	width: 50vw;
-	height: 10rem;
+	height: var(--bf-theme-hero-branding-slot-height, 10rem);
+	min-height: var(--bf-theme-hero-branding-slot-height, 10rem);
+	max-height: var(--bf-theme-hero-branding-slot-height, 10rem);
 	display: flex;
 	align-items: center;
 	justify-content: flex-start;
 	margin: 0 0 24px 0;
 	padding: 12px 0;
+	overflow: hidden;
 }
 
 .logo {
 	max-width: 50vw;
-	max-height: 10rem;
+	max-height: var(--bf-theme-hero-branding-slot-height, 10rem);
 	object-fit: contain;
-	filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.7));
+	filter: var(--bf-theme-hero-logo-shadow);
 }
 
 .logoTransition {
-	animation: heroTextIn 480ms ease-out !important;
+	animation: none !important;
 }
 
 .title {
 	font-size: 2.5em;
 	font-weight: 700;
-	margin-bottom: 12px;
-	text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+	line-height: 1.08;
+	margin: 0 !important;
+	padding: 0 !important;
+	height: 100%;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	color: var(--bf-theme-hero-title-fg);
+	-webkit-text-stroke: var(--bf-theme-hero-title-outline-width) var(--bf-theme-hero-title-outline);
+	text-shadow: var(--bf-theme-hero-title-shadow);
+
+	:global(*) {
+		line-height: 1.08 !important;
+		margin-block: 0 !important;
+	}
 }
 
 .textTransition {
-	animation: heroTextIn 480ms ease-out !important;
+	animation: none !important;
 }
 
 .overview {
@@ -39,7 +56,7 @@
 	line-height: 1.5;
 	margin: 1rem;
 	opacity: 0.95;
-	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+	text-shadow: var(--bf-theme-hero-copy-shadow);
 	flex: 0 0 4.5rem;
 	min-height: 4.5rem;
 	max-height: 4.5rem;
@@ -59,5 +76,53 @@
 
 .metadataItem {
 	font-weight: 500;
-	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+	text-shadow: var(--bf-theme-hero-copy-shadow);
+}
+
+.heroBannerCinematic {
+	.info {
+		max-width: 54rem;
+	}
+
+	.logoWrapper {
+		width: 42vw;
+		height: 7.5rem;
+		min-height: 7.5rem;
+		max-height: 7.5rem;
+		margin-bottom: 1rem;
+		padding: 0;
+	}
+
+	.logo {
+		max-width: 42vw;
+		max-height: 7.5rem;
+	}
+
+	.title {
+		font-size: 2.15em;
+	}
+
+	.overview {
+		max-width: 44rem;
+		margin: 0 0 1rem;
+		font-size: 0.9em;
+		line-height: 1.42;
+		flex-basis: 3.9rem;
+		min-height: 3.9rem;
+		max-height: 3.9rem;
+	}
+
+	.metadata {
+		gap: 0.45rem;
+		margin: 0 0 0.85rem;
+		opacity: 1;
+	}
+
+	.metadataItem {
+		padding: 0.28rem 0.62rem;
+		border: 1px solid var(--bf-theme-surface-border);
+		border-radius: 0.45rem;
+		background: var(--bf-theme-overlay-ultra-bg);
+		box-shadow: none;
+	}
 }

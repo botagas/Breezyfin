@@ -19,6 +19,10 @@ export const isPersistentAppLoggingEnabled = () => {
 	return isNonProduction;
 };
 
+// Release builds opt into the capability, while runtime collection is still
+// controlled by the Enable Diagnostics setting.
+export const isPersistentAppLoggingAvailable = isPersistentAppLoggingEnabled;
+
 export const isNonStableBuild = () => {
 	if (devToolsForcedOn) return true;
 	if (releaseChannel) return !STABLE_RELEASE_CHANNELS.has(releaseChannel);

@@ -1,6 +1,6 @@
 import {useCallback, useMemo} from 'react';
 
-import {setVerboseLoggingEnabled} from '../../../utils/appLogger';
+import {configureAppDiagnostics} from '../../../utils/appLogger';
 import {writeBreezyfinSettings} from '../../../utils/settingsStorage';
 
 const TOGGLE_SETTING_KEYS = [
@@ -23,6 +23,7 @@ const TOGGLE_SETTING_KEYS = [
 	'showExtendedPlayerDebugOverlay',
 	'showFocusDebugOverlay',
 	'showDebugErrorMenu',
+	'enableDiagnostics',
 	'forceDolbyVision',
 	'enableFmp4HlsContainerPreference',
 	'forceFmp4HlsContainerPreference'
@@ -52,6 +53,14 @@ export const useSettingsToggleHandlers = ({settings, setSettings}) => {
 			acc[key] = () => toggleBooleanSetting(key);
 			return acc;
 		}, {});
+		handlers.enableDiagnostics = () => {
+			const nextEnabled = settings.enableDiagnostics !== true;
+			configureAppDiagnostics({
+				enabled: nextEnabled,
+				verbose: settings.verboseAppLogs === true
+			});
+			handleSettingsPatch({enableDiagnostics: nextEnabled});
+		};
 		handlers.enableFmp4HlsContainerPreference = () => {
 			const nextEnable = settings.enableFmp4HlsContainerPreference !== true;
 			if (!nextEnable) {
@@ -76,13 +85,17 @@ export const useSettingsToggleHandlers = ({settings, setSettings}) => {
 		};
 		handlers.verboseAppLogs = () => {
 			const nextVerbose = settings.verboseAppLogs !== true;
-			setVerboseLoggingEnabled(nextVerbose);
+			configureAppDiagnostics({
+				enabled: settings.enableDiagnostics === true,
+				verbose: nextVerbose
+			});
 			handleSettingsPatch({verboseAppLogs: nextVerbose});
 		};
 		return handlers;
 	}, [
 		handleSettingsPatch,
 		settings.enableFmp4HlsContainerPreference,
+		settings.enableDiagnostics,
 		settings.forceFmp4HlsContainerPreference,
 		settings.verboseAppLogs,
 		toggleBooleanSetting

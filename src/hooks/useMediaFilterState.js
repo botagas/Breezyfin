@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import Spotlight from '@enact/spotlight';
 import {usePopupInitialFocus} from './usePopupInitialFocus';
 import {
 	areMediaFilterSelectionsEqual,
@@ -11,7 +10,6 @@ export const useMediaFilterState = ({
 	cachedState = null,
 	resetKey = null,
 	onCacheState = null,
-	triggerSpotlightId,
 	onApplyFilters = null
 } = {}) => {
 	const filterPopupContentRef = useRef(null);
@@ -19,6 +17,14 @@ export const useMediaFilterState = ({
 	const [activeFilterIds, setActiveFilterIds] = useState(cachedFilterIds);
 	const [draftFilterIds, setDraftFilterIds] = useState(cachedFilterIds);
 	const [filterPopupOpen, setFilterPopupOpen] = useState(false);
+	const pendingFilterIdsRef = useRef(null);
+	const cacheSnapshotRef = useRef(cachedState || {});
+
+	useEffect(() => {
+		if (cachedState && typeof cachedState === 'object') {
+			cacheSnapshotRef.current = cachedState;
+		}
+	}, [cachedState]);
 
 	useEffect(() => {
 		setActiveFilterIds((currentIds) => (
@@ -28,16 +34,20 @@ export const useMediaFilterState = ({
 			areMediaFilterSelectionsEqual(currentIds, cachedFilterIds) ? currentIds : cachedFilterIds
 		));
 		setFilterPopupOpen(false);
+		pendingFilterIdsRef.current = null;
 	}, [cachedFilterIds, resetKey]);
 
 	usePopupInitialFocus(filterPopupOpen, filterPopupContentRef);
 
 	const cacheStateWithFilters = useCallback((cacheKey, nextState) => {
 		if (typeof onCacheState !== 'function') return;
-		onCacheState(cacheKey, {
+		const mergedState = {
+			...cacheSnapshotRef.current,
 			...(nextState || {}),
 			activeFilterIds
-		});
+		};
+		cacheSnapshotRef.current = mergedState;
+		onCacheState(cacheKey, mergedState);
 	}, [activeFilterIds, onCacheState]);
 
 	const openFilterPopup = useCallback(() => {
@@ -46,16 +56,12 @@ export const useMediaFilterState = ({
 	}, [activeFilterIds]);
 
 	const closeFilterPopup = useCallback(({restoreDraft = true} = {}) => {
+		pendingFilterIdsRef.current = null;
 		if (restoreDraft) {
 			setDraftFilterIds(activeFilterIds);
 		}
 		setFilterPopupOpen(false);
-		if (triggerSpotlightId) {
-			setTimeout(() => {
-				Spotlight.focus(triggerSpotlightId);
-			}, 0);
-		}
-	}, [activeFilterIds, triggerSpotlightId]);
+	}, [activeFilterIds]);
 
 	const resetDraftFilters = useCallback(() => {
 		setDraftFilterIds(['all']);
@@ -78,12 +84,23 @@ export const useMediaFilterState = ({
 
 	const applyDraftFilters = useCallback(() => {
 		const normalizedDraft = normalizeMediaFilterIds(draftFilterIds);
-		if (!areMediaFilterSelectionsEqual(normalizedDraft, activeFilterIds)) {
-			onApplyFilters?.(normalizedDraft);
-			setActiveFilterIds(normalizedDraft);
+		pendingFilterIdsRef.current = areMediaFilterSelectionsEqual(normalizedDraft, activeFilterIds)
+			? null
+			: normalizedDraft;
+		setFilterPopupOpen(false);
+	}, [activeFilterIds, draftFilterIds]);
+
+	const handleFilterPopupHide = useCallback(() => {
+		const pendingFilterIds = pendingFilterIdsRef.current;
+		pendingFilterIdsRef.current = null;
+		if (!pendingFilterIds) {
+			setDraftFilterIds(activeFilterIds);
+			return;
 		}
-		closeFilterPopup({restoreDraft: false});
-	}, [activeFilterIds, closeFilterPopup, draftFilterIds, onApplyFilters]);
+		setActiveFilterIds(pendingFilterIds);
+		setDraftFilterIds(pendingFilterIds);
+		onApplyFilters?.(pendingFilterIds);
+	}, [activeFilterIds, onApplyFilters]);
 
 	const activeFilterCount = useMemo(() => (
 		activeFilterIds.includes('all') ? 0 : activeFilterIds.length
@@ -102,6 +119,7 @@ export const useMediaFilterState = ({
 		closeFilterPopup,
 		resetDraftFilters,
 		selectDraftFilter,
-		applyDraftFilters
+		applyDraftFilters,
+		handleFilterPopupHide
 	};
 };

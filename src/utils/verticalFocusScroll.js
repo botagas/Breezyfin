@@ -21,7 +21,7 @@ export const findVerticalScrollableAncestor = (target) => {
 
 const getTopChromeBottom = () => {
 	if (typeof document === 'undefined') return 0;
-	const candidates = document.querySelectorAll('[data-bf-navbar=\"true\"], .bf-header');
+	const candidates = document.querySelectorAll('[data-bf-navbar=\"true\"], [data-bf-panel-controls=\"true\"], .bf-header');
 	let maxBottom = 0;
 	candidates.forEach((node) => {
 		if (!isNodeElement(node)) return;
@@ -32,6 +32,21 @@ const getTopChromeBottom = () => {
 		}
 	});
 	return maxBottom;
+};
+
+export const getVerticalVisibilityDelta = ({
+	targetRect,
+	scrollerRect,
+	topBoundary,
+	topPadding = 12,
+	bottomPadding = 14
+} = {}) => {
+	if (!targetRect || !scrollerRect) return 0;
+	const safeTop = Math.max(scrollerRect.top + topPadding, (topBoundary || 0) + topPadding);
+	const safeBottom = scrollerRect.bottom - bottomPadding;
+	if (targetRect.top < safeTop) return targetRect.top - safeTop;
+	if (targetRect.bottom > safeBottom) return targetRect.bottom - safeBottom;
+	return 0;
 };
 
 export const ensureFocusTargetVisibleWithTopChrome = (
@@ -49,17 +64,15 @@ export const ensureFocusTargetVisibleWithTopChrome = (
 	const scrollerRect = scroller.getBoundingClientRect();
 	const targetRect = target.getBoundingClientRect();
 	const topChromeBottom = getTopChromeBottom();
-	const safeTop = Math.max(scrollerRect.top + topPadding, topChromeBottom + topPadding);
-	const safeBottom = scrollerRect.bottom - bottomPadding;
-
-	let nextScrollTop = null;
-	if (targetRect.top < safeTop) {
-		nextScrollTop = Math.max(0, scroller.scrollTop - (safeTop - targetRect.top));
-	} else if (targetRect.bottom > safeBottom) {
-		nextScrollTop = Math.max(0, scroller.scrollTop + (targetRect.bottom - safeBottom));
-	}
-
-	if (nextScrollTop === null) return false;
+	const delta = getVerticalVisibilityDelta({
+		targetRect,
+		scrollerRect,
+		topBoundary: topChromeBottom,
+		topPadding,
+		bottomPadding
+	});
+	if (!delta) return false;
+	const nextScrollTop = Math.max(0, scroller.scrollTop + delta);
 	if (typeof scroller.scrollTo === 'function') {
 		scroller.scrollTo({top: nextScrollTop, behavior});
 	} else {

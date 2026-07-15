@@ -6,18 +6,13 @@
 	outline: none;
 	position: relative;
 	background: transparent;
-	transform: translateZ(0);
-	will-change: transform;
-	transition: transform 0.15s ease-out;
+	transform: none;
+	transition: none;
 
 	&:hover,
 	&:global(.spottable):focus {
-		transform: scale(1.045) translateZ(0);
-		z-index: 10;
-
 		.cardImage {
 			border-color: var(--bf-theme-card-border-focus);
-			box-shadow: var(--bf-theme-card-shadow-focus);
 		}
 	}
 
@@ -30,7 +25,7 @@
 	:global([data-bf-animations='off']) &:global(.spottable):focus,
 	:global([data-bf-all-animations='off']) &:hover,
 	:global([data-bf-all-animations='off']) &:global(.spottable):focus {
-		transform: translateZ(0);
+		transform: none;
 	}
 }
 
@@ -42,8 +37,8 @@
 	overflow: hidden;
 	position: relative;
 	border: 1px solid var(--bf-theme-card-border-rest);
-	box-shadow: var(--bf-theme-card-shadow-rest);
-	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	box-shadow: none;
+	transition: none;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -55,7 +50,7 @@
 		height: 100%;
 		object-fit: cover;
 		display: block;
-		transform: translateZ(0);
+		transform: none;
 	}
 
 	:global([data-bf-animations='off']) &,
@@ -75,4 +70,8 @@
 	text-align: center;
 	.card-placeholder-surface();
 	color: var(--bf-theme-card-title-color);
+}
+
+.cardCinematic {
+	transition: none;
 }

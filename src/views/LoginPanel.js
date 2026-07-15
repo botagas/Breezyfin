@@ -23,7 +23,15 @@ import imageLoadCss from '../components/ImageLoadReveal.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotice = '', sessionNoticeNonce = 0, ...rest }) => {
+const LoginPanel = ({
+	onLogin,
+	onNavigate = null,
+	isActive = false,
+	deferBackdrops = false,
+	sessionNotice = '',
+	sessionNoticeNonce = 0,
+	...rest
+}) => {
 	const [serverUrl, setServerUrl] = useState('http://');
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
@@ -64,6 +72,7 @@ const LoginPanel = ({ onLogin, onNavigate = null, isActive = false, sessionNotic
 		handleBackdropError
 	} = useLoginBackdrops({
 		isActive,
+		deferLoading: deferBackdrops,
 		savedServers
 	});
 	const getInitialStep = useCallback((entries) => {

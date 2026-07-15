@@ -5,6 +5,30 @@
 	border-bottom: 1px solid var(--settings-row-divider);
 	transition: none;
 
+	:global(.itemContent),
+	:global(.content),
+	:global(.label),
+	:global(.slotAfter) {
+		min-width: 0;
+	}
+
+	:global(.content),
+	:global(.label),
+	:global(.slotAfter) {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	:global(.itemContent) {
+		flex: 1 1 0 !important;
+	}
+
+	:global(.slotAfter) {
+		flex: 0 1 auto !important;
+		max-width: 48%;
+	}
+
 	&:last-of-type {
 		border-bottom: none;
 	}

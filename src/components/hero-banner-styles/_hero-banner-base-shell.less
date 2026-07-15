@@ -12,6 +12,19 @@
 	margin-bottom: 64px;
 }
 
+.heroBannerCinematic {
+	--bf-cinematic-hero-height: min(78vh, 52rem);
+	--bf-cinematic-row-overlap: 0rem;
+	height: var(--bf-cinematic-hero-height);
+	min-height: 38rem;
+	margin-bottom: 2rem;
+
+	.content {
+		justify-content: flex-end;
+		padding: calc(var(--bf-toolbar-height) + 2.5rem) 4rem calc(var(--bf-cinematic-row-overlap) + 3.5rem);
+	}
+}
+
 .content {
 	position: relative;
 	height: 100%;

@@ -1,15 +1,15 @@
 import {
+	getSubtitleAbsolutePositionStyle,
 	getSubtitleClipLayerStyle,
 	getSubtitleCueTextStyle,
 	getSubtitleCueTransformLayerStyle,
-	getSubtitleDrawingClipPath,
 	getSubtitleDrawingSvgStyle,
 	getSubtitleOverlayAttributes,
 	getSubtitleOverlayStyle,
 	getSubtitleTextStyle,
 	groupSubtitleCuesByPlacement,
+	groupSubtitleCuesByLayer,
 	isClippedSubtitleCue,
-	isDrawingVectorClippedSubtitleCue,
 	isDrawingSubtitleCue
 } from '../subtitleOverlaySettings';
 
@@ -73,7 +73,7 @@ describe('subtitleOverlaySettings utilities', () => {
 				fontSizeVh: 4.444444
 			}
 		})).toEqual({
-			fontSize: '4.444vh',
+			fontSize: '48.000px',
 			'--bf-player-subtitle-current-outline-size': '10px'
 		});
 	});
@@ -100,7 +100,7 @@ describe('subtitleOverlaySettings utilities', () => {
 			color: 'rgb(95, 47, 12)',
 			fontFamily: "'Times New Roman', sans-serif",
 			'--bf-player-subtitle-current-border-color': 'rgb(243, 234, 182)',
-			'--bf-player-subtitle-current-outline-size': '0.361vh',
+			'--bf-player-subtitle-current-outline-size': '3.899px',
 			opacity: 0.5
 		});
 	});
@@ -132,63 +132,8 @@ describe('subtitleOverlaySettings utilities', () => {
 			padding: 0
 		});
 		expect(getSubtitleDrawingSvgStyle(cue)).toEqual({
-			width: '10.000vw',
-			height: '10.000vh'
-		});
-	});
-
-	it('builds SVG clip data for ASS vector-clipped drawing cues', () => {
-		const cue = {
-			clip: {
-				type: 'drawing',
-				pathData: 'M 0.000 0.000 L 20.000 0.000 L 20.000 20.000 Z',
-				inverted: false
-			},
-			drawing: {
-				playResX: 100,
-				playResY: 100,
-				viewBox: {
-					x: -2,
-					y: -2,
-					value: '-2 -2 24 24',
-					width: 24,
-					height: 24
-				},
-				paths: [{d: 'M 0 0 L 40 40'}]
-			}
-		};
-
-		expect(isDrawingVectorClippedSubtitleCue(cue)).toBe(true);
-		expect(getSubtitleDrawingClipPath(cue)).toEqual({
-			d: 'M 0.000 0.000 L 20.000 0.000 L 20.000 20.000 Z',
-			inverted: false
-		});
-	});
-
-	it('builds even-odd SVG clip data for inverse ASS vector-clipped drawing cues', () => {
-		const cue = {
-			clip: {
-				type: 'drawing',
-				pathData: 'M 0.000 0.000 L 20.000 0.000 L 20.000 20.000 Z',
-				inverted: true
-			},
-			drawing: {
-				playResX: 100,
-				playResY: 100,
-				viewBox: {
-					x: -2,
-					y: -3,
-					value: '-2 -3 24 25',
-					width: 24,
-					height: 25
-				},
-				paths: [{d: 'M 0 0 L 40 40'}]
-			}
-		};
-
-		expect(getSubtitleDrawingClipPath(cue)).toEqual({
-			d: 'M -2.000 -3.000 H 22.000 V 22.000 H -2.000 Z M 0.000 0.000 L 20.000 0.000 L 20.000 20.000 Z',
-			inverted: true
+			width: '192.000px',
+			height: '108.000px'
 		});
 	});
 
@@ -238,14 +183,14 @@ describe('subtitleOverlaySettings utilities', () => {
 			'--bf-player-subtitle-current-outline-size': '10px',
 			marginLeft: '6.250%',
 			marginRight: '12.500%',
-			marginTop: '7.407vh',
+			marginTop: '80.000px',
 			maxWidth: 'calc(100% - 18.750%)',
 			whiteSpace: 'pre-wrap',
 			overflowWrap: 'anywhere'
 		});
 	});
 
-	it('uses compact page-style layout for large subtitle text blocks', () => {
+	it('leaves large text at its base size for the bounded runtime fit pass', () => {
 		const baseTextStyle = getSubtitleTextStyle({
 			subtitleOverlayFontSizePx: '52',
 			subtitleOverlayOutlineSizePx: '10'
@@ -260,17 +205,15 @@ describe('subtitleOverlaySettings utilities', () => {
 				'Line 5'
 			]
 		})).toEqual({
-			fontSize: '2.200vh',
+			fontSize: '52px',
 			'--bf-player-subtitle-current-outline-size': '10px',
 			lineHeight: 1.12,
-			maxHeight: '86vh',
 			maxWidth: '100%',
-			overflow: 'hidden',
 			padding: '0.08em 0.28em'
 		});
 	});
 
-	it('fits source-authored large ASS page signs into the visible subtitle region', () => {
+	it('keeps source font sizing before the bounded runtime fit pass', () => {
 		const baseTextStyle = getSubtitleTextStyle({
 			subtitleOverlayFontSizePx: '52',
 			subtitleOverlayOutlineSizePx: '10'
@@ -284,9 +227,8 @@ describe('subtitleOverlaySettings utilities', () => {
 				fontSizeVh: 7.222
 			}
 		})).toEqual(expect.objectContaining({
-			fontSize: '2.321vh',
-			lineHeight: 1.12,
-			maxHeight: '86vh'
+			fontSize: '78.000px',
+			lineHeight: 1.12
 		}));
 	});
 
@@ -351,6 +293,20 @@ describe('subtitleOverlaySettings utilities', () => {
 		expect(groups.bottom.center).toEqual([{placement: 'bottom', horizontalAlign: 'center', text: 'dialogue'}]);
 	});
 
+	it('preserves source-authored absolute cue anchors for stage clipping', () => {
+		expect(getSubtitleAbsolutePositionStyle({
+			absolutePosition: {
+				xPercent: -20,
+				yPercent: 140
+			}
+		})).toEqual({
+			'--bf-player-subtitle-absolute-x': '-20.000%',
+			'--bf-player-subtitle-absolute-y': '140.000%',
+			'--bf-player-subtitle-absolute-max-width': 'none',
+			'--bf-player-subtitle-absolute-max-height': 'none'
+		});
+	});
+
 	it('builds full-layer clip-path styles for direct ASS rectangular clips', () => {
 		const cue = {
 			clip: {
@@ -382,7 +338,7 @@ describe('subtitleOverlaySettings utilities', () => {
 			}
 		};
 		const groups = groupSubtitleCuesByPlacement([inverseCue]);
-		const clipPath = 'path(evenodd, "M0 0 H100 V100 H0 Z M10.000 20.000 H60.000 V50.000 H10.000 Z")';
+		const clipPath = 'polygon(evenodd, 10.000% 20.000%, 10.000% 50.000%, 60.000% 50.000%, 60.000% 20.000%, 10.000% 20.000%, 0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%)';
 
 		expect(isClippedSubtitleCue(inverseCue)).toBe(true);
 		expect(getSubtitleClipLayerStyle(inverseCue)).toEqual({
@@ -390,5 +346,58 @@ describe('subtitleOverlaySettings utilities', () => {
 			WebkitClipPath: clipPath
 		});
 		expect(groups.top.left).toEqual([]);
+	});
+
+	it('keeps ASS collision allocation separate per layer', () => {
+		expect(groupSubtitleCuesByLayer([
+			{layer: 2, text: 'upper'},
+			{layer: 0, text: 'dialogue'},
+			{layer: 2, text: 'second upper'}
+		])).toEqual([
+			{layer: 0, cues: [{layer: 0, text: 'dialogue'}]},
+			{layer: 2, cues: [{layer: 2, text: 'upper'}, {layer: 2, text: 'second upper'}]}
+		]);
+	});
+
+	it('scales vector clips into the video-aligned stage for text cues', () => {
+		const cue = {
+			clip: {
+				type: 'drawing',
+				pathData: 'M 0.000 0.000 L 10.000 0.000 L 10.000 10.000 Z',
+				inverted: false
+			},
+			scriptGeometry: {
+				playResX: 100,
+				playResY: 100,
+				layoutResX: 200,
+				layoutResY: 100
+			}
+		};
+		const stageGeometry = {
+			width: 200,
+			height: 100,
+			videoWidth: 200,
+			videoHeight: 100
+		};
+
+		expect(isClippedSubtitleCue(cue)).toBe(true);
+		expect(getSubtitleClipLayerStyle(cue, stageGeometry)).toEqual({
+			clipPath: 'path(evenodd, "M 0.000 0.000 L 20.000 0.000 L 20.000 10.000 Z")',
+			WebkitClipPath: 'path(evenodd, "M 0.000 0.000 L 20.000 0.000 L 20.000 10.000 Z")'
+		});
+	});
+
+	it('keeps ASS border dimensions unscaled when requested by script metadata', () => {
+		const style = getSubtitleCueTextStyle({}, {
+			sourceStyle: {
+				'--bf-player-subtitle-current-outline-size': '1vh'
+			},
+			scriptGeometry: {
+				playResY: 100,
+				scaledBorderAndShadow: false
+			}
+		}, {height: 500});
+
+		expect(style['--bf-player-subtitle-current-outline-size']).toBe('5.000px');
 	});
 });

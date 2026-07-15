@@ -7,15 +7,25 @@ import {
 	reorderMediaSources,
 	selectMediaSource,
 	toInteger
-} from './playbackSelection';
+} from '../../utils/playbackSelection';
 import {
 	buildPlaybackRequestContext,
+	buildSafeSubtitleBurnInDeviceProfile,
 	buildSubtitleProfiles,
 	resolveFmp4HlsContainerPreference
 } from './playbackProfileBuilder';
 import {fetchPlaybackInfo, buildPlaystatePayload} from './playback-api/network';
 import {buildPlaybackRequestDebug} from './playback-api/requestDebug';
-import {appendPlaybackDiagnostic} from './playback-api/diagnostics';
+import {appendPlaybackDiagnostic} from '../../utils/playbackDiagnostics';
+import {
+	formatBurnInUrlValidationMessage,
+	getSubtitleBurnInDiagnosticMessage,
+	validateSubtitleBurnInTranscodingUrl
+} from './playback-api/subtitleBurnIn';
+import {
+	shouldDetachClientRenderedSubtitlePolicy,
+	shouldDetachKnownBitmapSubtitleBeforeRequest
+} from './playback-api/subtitlePolicy';
 import {
 	buildForceDolbyVisionPayload,
 	buildPayloadWithoutMkvDirectPlay,
@@ -24,14 +34,17 @@ import {
 	summarizeMediaSourceRanges,
 	usesMkvContainer
 } from './playback-api/dolbyVision';
-import {attachPlaybackInfoMetadata} from './playback-api/metadata';
+import {attachPlaybackInfoMetadata, buildPlaybackDecisionSnapshot} from './playback-api/metadata';
+import {createNoMediaSourceError, PlaybackNegotiationError} from './playback-api/errors';
 import {
 	attemptDefaultAudioFallback,
+	attemptAudioTrackIntentRemap,
 	attemptDirectAudioCompatibilityProbe,
 	attemptDolbyVisionMkvCompatibilityRetry
 } from './playback-api/sourceNegotiation';
 import {getDynamicRangeDisplayLabel} from '../../utils/playbackDynamicRange';
 import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
+import {resolveSubtitleTrackIndex} from '../../utils/trackMatching';
 
 const DYNAMIC_RANGE_PRIORITY = {
 	DV: 4,
@@ -62,56 +75,9 @@ const selectPreferredSourceFromPlaybackInfo = (data, createSourceSelectionOption
 	};
 };
 
-const buildPlaybackDecisionSnapshot = ({
-	activePayload,
-	selectedSource,
-	playMethod,
-	initialRequestedAudioStreamIndex,
-	requestedAudioStreamIndex,
-	selectedSubtitleStreamIndex,
-	dynamicRange,
-	dynamicRangeCap,
-	forceTranscoding,
-	disableDirectPlay,
-	forceDolbyVision,
-	avoidDolbyVision,
-	enableFmp4HlsContainerPreference,
-	forceFmp4HlsContainerPreference,
-	forceSubtitleBurnIn,
-	subtitlePolicy
-} = {}) => ({
-	playMethod: playMethod || null,
-	selectedMediaSourceId: selectedSource?.Id || null,
-	container: selectedSource?.Container || selectedSource?.TranscodingContainer || null,
-	dynamicRangeId: dynamicRange?.id || null,
-	dynamicRangeLabel: dynamicRange?.displayLabel || dynamicRange?.label || null,
-	dynamicRangeCap: dynamicRangeCap || 'auto',
-	requestedAudioStreamIndex: initialRequestedAudioStreamIndex,
-	selectedAudioStreamIndex: requestedAudioStreamIndex,
-	selectedSubtitleStreamIndex,
-	forceTranscoding: forceTranscoding === true,
-	disableDirectPlay: disableDirectPlay === true,
-	forceDolbyVision: forceDolbyVision === true,
-	avoidDolbyVision: avoidDolbyVision === true,
-	forceSubtitleBurnIn: forceSubtitleBurnIn === true,
-	subtitleDecision: subtitlePolicy?.reason || null,
-	fmp4HlsPreference: {
-		enabled: enableFmp4HlsContainerPreference === true,
-		forced: forceFmp4HlsContainerPreference === true
-	},
-	payload: {
-		enableDirectPlay: activePayload?.EnableDirectPlay === true,
-		enableDirectStream: activePayload?.EnableDirectStream === true,
-		enableTranscoding: activePayload?.EnableTranscoding === true,
-		audioStreamIndex: toInteger(activePayload?.AudioStreamIndex),
-		subtitleStreamIndex: toInteger(activePayload?.SubtitleStreamIndex),
-		subtitleMethod: activePayload?.SubtitleMethod || null,
-		mediaSourceId: activePayload?.MediaSourceId || null
-	}
-});
-
 export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 	try {
+		const collectDiagnostics = options.enableDiagnostics === true;
 		const {
 			payload,
 			forceTranscoding,
@@ -119,8 +85,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			enableTranscoding,
 			requestedAudioStreamIndex: initialRequestedAudioStreamIndex,
 			forceSubtitleBurnIn,
+			confirmedBitmapBurnIn,
+			subtitleFallbackConsent,
 			smartSubtitleTranscoding,
 			assSubtitleRenderer,
+			bitmapSubtitleRenderer,
 			enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr,
 			subtitleBurnInTextCodecs,
@@ -128,6 +97,10 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		} = buildPlaybackRequestContext(options);
 		let requestedAudioStreamIndex = initialRequestedAudioStreamIndex;
 		let activePayload = payload;
+		let safeSubtitleBurnInProfileApplied = forceSubtitleBurnIn === true;
+		const initialRequestedSubtitleStreamIndex = toInteger(payload.SubtitleStreamIndex);
+		let clientRenderedSubtitleStreamIndex = null;
+		let preDetachedSubtitleStream = null;
 		const runtimePlaybackCapabilities = getRuntimePlatformCapabilities()?.playback || {};
 		const forceDolbyVision = options.forceDolbyVision === true;
 		if (forceDolbyVision && runtimePlaybackCapabilities.supportsDolbyVision !== true) {
@@ -164,7 +137,33 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		});
 		const adjustments = [];
 		const diagnostics = [];
-		const addDiagnostic = (entry) => appendPlaybackDiagnostic(diagnostics, entry);
+		const addDiagnostic = collectDiagnostics
+			? (entry) => appendPlaybackDiagnostic(diagnostics, entry)
+			: () => diagnostics;
+
+		const knownBitmapSubtitle = shouldDetachKnownBitmapSubtitleBeforeRequest({
+			options,
+			subtitleStreamIndex: initialRequestedSubtitleStreamIndex,
+			smartSubtitleTranscoding,
+			forceSubtitleBurnIn,
+			confirmedBitmapBurnIn
+		});
+		if (knownBitmapSubtitle && initialRequestedSubtitleStreamIndex !== null && initialRequestedSubtitleStreamIndex >= 0) {
+			activePayload = {
+				...activePayload,
+				SubtitleStreamIndex: -1
+			};
+			delete activePayload.SubtitleMethod;
+			clientRenderedSubtitleStreamIndex = initialRequestedSubtitleStreamIndex;
+			preDetachedSubtitleStream = knownBitmapSubtitle.stream;
+			addDiagnostic({
+				scope: 'subtitle-policy',
+				stage: 'client-render-pre-detach',
+				status: 'applied',
+				reason: 'known-bitmap-subtitle',
+				message: 'Known bitmap subtitle was detached before PlaybackInfo and preserved for client rendering.'
+			});
+		}
 
 		let data = await fetchPlaybackInfo(service, itemId, activePayload);
 
@@ -179,7 +178,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			if (forceDolbyVision) {
 				throw new Error('Force DV is enabled, but no Dolby Vision media source was returned.');
 			}
-			return attachPlaybackInfoMetadata(data || {}, {diagnostics});
+			throw createNoMediaSourceError({
+				forceSubtitleBurnIn,
+				diagnostics,
+				subtitleStreamIndex: initialRequestedSubtitleStreamIndex
+			});
 		}
 		addDiagnostic({
 			scope: 'playback-info',
@@ -261,6 +264,22 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			});
 		}
 
+		const audioIntentResult = await attemptAudioTrackIntentRemap({
+			service,
+			itemId,
+			activePayload,
+			selectedSource,
+			audioTrackIntent: options.audioTrackIntent,
+			createSourceSelectionOptions,
+			diagnostics: collectDiagnostics ? diagnostics : null
+		});
+		if (audioIntentResult) {
+			data = audioIntentResult.data || data;
+			selectedSource = audioIntentResult.selectedSource || selectedSource;
+			activePayload = audioIntentResult.activePayload || activePayload;
+			requestedAudioStreamIndex = audioIntentResult.requestedAudioStreamIndex;
+		}
+
 		const directAudioProbeResult = await attemptDirectAudioCompatibilityProbe({
 			service,
 			itemId,
@@ -271,7 +290,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			forceDolbyVision,
 			requestedAudioStreamIndex,
 			createSourceSelectionOptions,
-			diagnostics
+			diagnostics: collectDiagnostics ? diagnostics : null
 		});
 		if (directAudioProbeResult) {
 			data = directAudioProbeResult.data;
@@ -446,7 +465,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			runtimeSupportsDolbyVision: runtimePlaybackCapabilities.supportsDolbyVision,
 			createSourceSelectionOptions,
 			buildPayloadWithoutMkvDirectPlay,
-			diagnostics
+			diagnostics: collectDiagnostics ? diagnostics : null
 		});
 		if (dvMkvRetryResult) {
 			data = dvMkvRetryResult.data;
@@ -463,7 +482,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			options,
 			forceTranscoding,
 			createSourceSelectionOptions,
-			diagnostics
+			diagnostics: collectDiagnostics ? diagnostics : null
 		});
 		if (defaultAudioFallbackResult) {
 			data = defaultAudioFallbackResult.data;
@@ -477,14 +496,161 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			throw new Error(`Force DV is enabled, but selected source is not Dolby Vision. Available: ${availableRanges}`);
 		}
 
-		const selectedSubtitleStreamIndex = toInteger(activePayload.SubtitleStreamIndex ?? payload.SubtitleStreamIndex);
+		const originalDynamicRangeInfo = getMediaSourceDynamicRangeInfo(selectedSource);
+		const subtitleStreams = Array.isArray(selectedSource?.MediaStreams) ? selectedSource.MediaStreams.filter((stream) => stream?.Type === 'Subtitle') : [];
+		const subtitleIntentMatch = resolveSubtitleTrackIndex({
+			subtitleStreams,
+			intent: options.subtitleTrackIntent,
+			fallbackIndex: initialRequestedSubtitleStreamIndex
+		});
+		const hasExplicitSubtitleIntent = subtitleIntentMatch.method !== 'no-intent';
+		if (hasExplicitSubtitleIntent) {
+			addDiagnostic({
+				scope: 'subtitle-policy',
+				stage: 'subtitle-intent-remap',
+				status: subtitleIntentMatch.index === null ? 'no-match' : 'applied',
+				reason: subtitleIntentMatch.method,
+				message: subtitleIntentMatch.index === -1
+					? 'Subtitle intent resolved to subtitles off.'
+					: `Subtitle intent resolved to stream ${subtitleIntentMatch.index}.`
+			});
+		}
+		let selectedSubtitleStreamIndex =
+			clientRenderedSubtitleStreamIndex ??
+			(subtitleIntentMatch.method !== 'no-intent' ? subtitleIntentMatch.index : initialRequestedSubtitleStreamIndex) ??
+			toInteger(activePayload.SubtitleStreamIndex ?? payload.SubtitleStreamIndex);
+		if (!hasExplicitSubtitleIntent && (selectedSubtitleStreamIndex === null || selectedSubtitleStreamIndex < 0)) {
+			const defaultSubtitleStreamIndex = toInteger(selectedSource?.DefaultSubtitleStreamIndex);
+			const defaultSubtitlePolicy = defaultSubtitleStreamIndex !== null && defaultSubtitleStreamIndex >= 0
+				? getSubtitleTranscodePolicy(selectedSource, defaultSubtitleStreamIndex, {
+					smartSubtitleTranscoding,
+					assSubtitleRenderer,
+					bitmapSubtitleRenderer,
+					enableSubtitleBurnIn,
+					forceSubtitleBurnIn,
+					confirmedBitmapBurnIn,
+					allowSubtitleBurnInOnHdr,
+					subtitleBurnInTextCodecs,
+					originalDynamicRangeInfo
+				})
+				: null;
+			const preliminaryPlayMethod = determinePlayMethod(selectedSource, {
+				forceTranscoding,
+				disableDirectPlay,
+				dynamicRangeCap
+			});
+			const shouldDetachDefaultBitmapSubtitle =
+				preliminaryPlayMethod === 'Transcode' &&
+				defaultSubtitlePolicy?.clientRender === true &&
+				String(defaultSubtitlePolicy?.renderer || '').startsWith('client-bitmap') &&
+				activePayload.SubtitleStreamIndex !== -1;
+			if (shouldDetachDefaultBitmapSubtitle) {
+				const detachedDefaultPayload = {
+					...activePayload,
+					SubtitleStreamIndex: -1
+				};
+				delete detachedDefaultPayload.SubtitleMethod;
+				const detachedDefaultData = await fetchPlaybackInfo(service, itemId, detachedDefaultPayload);
+				if (detachedDefaultData?.MediaSources?.length) {
+					data = detachedDefaultData;
+					const detachedDefaultSelection = selectMediaSource(
+						data.MediaSources,
+						createSourceSelectionOptions({
+							preferredMediaSourceId: selectedSource?.Id,
+							sourceForceTranscoding: forceTranscoding
+						})
+					);
+					if (detachedDefaultSelection.index > 0) {
+						data.MediaSources = reorderMediaSources(data.MediaSources, detachedDefaultSelection.index);
+					}
+					selectedSource = data.MediaSources[0];
+					activePayload = detachedDefaultPayload;
+					selectedSubtitleStreamIndex = defaultSubtitleStreamIndex;
+					clientRenderedSubtitleStreamIndex = defaultSubtitleStreamIndex;
+					addDiagnostic({
+						scope: 'subtitle-policy',
+						stage: 'default-bitmap-detach',
+						status: 'applied',
+						reason: defaultSubtitlePolicy.reason || 'default-bitmap-subtitle',
+						message: 'Server-selected bitmap subtitle was detached from transcode and preserved for client rendering.'
+					});
+				} else {
+					addDiagnostic({
+						scope: 'subtitle-policy',
+						stage: 'default-bitmap-detach',
+						status: 'failed',
+						reason: 'empty-playback-info',
+						message: 'Could not detach server-selected bitmap subtitle from the transcode request.'
+					});
+				}
+			}
+		}
 		let subtitlePolicy = getSubtitleTranscodePolicy(selectedSource, selectedSubtitleStreamIndex, {
 			smartSubtitleTranscoding,
 			assSubtitleRenderer,
+			bitmapSubtitleRenderer,
 			enableSubtitleBurnIn,
+			forceSubtitleBurnIn,
+			confirmedBitmapBurnIn,
 			allowSubtitleBurnInOnHdr,
-			subtitleBurnInTextCodecs
+			subtitleBurnInTextCodecs,
+			originalDynamicRangeInfo
 		});
+		if (
+			shouldDetachClientRenderedSubtitlePolicy(subtitlePolicy) &&
+			selectedSubtitleStreamIndex !== null &&
+			selectedSubtitleStreamIndex >= 0 &&
+			activePayload.SubtitleStreamIndex !== -1
+		) {
+			const detachedSubtitlePayload = {
+				...activePayload,
+				SubtitleStreamIndex: -1
+			};
+			delete detachedSubtitlePayload.SubtitleMethod;
+			const detachedSubtitleData = await fetchPlaybackInfo(service, itemId, detachedSubtitlePayload);
+			if (detachedSubtitleData?.MediaSources?.length) {
+				data = detachedSubtitleData;
+				const detachedSelection = selectMediaSource(
+					data.MediaSources,
+					createSourceSelectionOptions({
+						preferredMediaSourceId: selectedSource?.Id,
+						sourceForceTranscoding: forceTranscoding
+					})
+				);
+				if (detachedSelection.index > 0) {
+					data.MediaSources = reorderMediaSources(data.MediaSources, detachedSelection.index);
+				}
+				selectedSource = data.MediaSources[0];
+				activePayload = detachedSubtitlePayload;
+				subtitlePolicy = getSubtitleTranscodePolicy(selectedSource, selectedSubtitleStreamIndex, {
+					smartSubtitleTranscoding,
+					assSubtitleRenderer,
+					bitmapSubtitleRenderer,
+					enableSubtitleBurnIn,
+					forceSubtitleBurnIn,
+					confirmedBitmapBurnIn,
+					allowSubtitleBurnInOnHdr,
+					subtitleBurnInTextCodecs,
+					originalDynamicRangeInfo
+				});
+				clientRenderedSubtitleStreamIndex = selectedSubtitleStreamIndex;
+				addDiagnostic({
+					scope: 'subtitle-policy',
+					stage: 'client-render-detach',
+					status: 'applied',
+					reason: subtitlePolicy.reason || 'client-render-subtitle',
+					message: 'PlaybackInfo was re-requested without server subtitle delivery for client-side rendering.'
+				});
+			} else {
+				addDiagnostic({
+					scope: 'subtitle-policy',
+					stage: 'client-render-detach',
+					status: 'failed',
+					reason: 'empty-playback-info',
+					message: 'Could not detach client-rendered subtitle from the server playback request.'
+				});
+			}
+		}
 		const subtitleNeedsTranscoding = subtitlePolicy.requiresBurnIn === true;
 		const effectiveForceSubtitleBurnIn = forceSubtitleBurnIn || subtitleNeedsTranscoding;
 		let playMethod = determinePlayMethod(selectedSource, {
@@ -515,7 +681,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 				stage: 'burn-in-decision',
 				status: 'applied',
 				reason: subtitlePolicy.reason || 'requires-burn-in',
-				message: 'Subtitle policy requires server-side burn-in/transcoding.'
+				message: getSubtitleBurnInDiagnosticMessage(subtitlePolicy)
 			});
 		} else if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
 			addDiagnostic({
@@ -523,13 +689,16 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 				stage: 'burn-in-decision',
 				status: 'skipped',
 				reason: subtitlePolicy.reason || 'burn-in-not-required',
-				message: 'Subtitle policy does not require server-side burn-in.'
+				message: getSubtitleBurnInDiagnosticMessage(subtitlePolicy)
 			});
 		}
+		let burnInUrlValidated = false;
+		let burnInUrlValid = !effectiveForceSubtitleBurnIn;
+		const shouldUseSafeSubtitleBurnInProfile = effectiveForceSubtitleBurnIn === true;
 		if (
 			playMethod === 'Transcode' &&
 			enableTranscoding &&
-			(!selectedSource?.TranscodingUrl || (effectiveForceSubtitleBurnIn && activePayload.SubtitleMethod !== 'Encode'))
+			(!selectedSource?.TranscodingUrl || (shouldUseSafeSubtitleBurnInProfile && !safeSubtitleBurnInProfileApplied))
 		) {
 			const transcodePayload = {
 				...activePayload,
@@ -537,6 +706,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 				EnableDirectStream: false,
 				EnableTranscoding: true
 			};
+			delete transcodePayload.SubtitleMethod;
+			if (shouldUseSafeSubtitleBurnInProfile) {
+				transcodePayload.AllowVideoStreamCopy = false;
+				transcodePayload.AllowAudioStreamCopy = false;
+			}
 			if (selectedSource?.Id) {
 				transcodePayload.MediaSourceId = selectedSource.Id;
 			}
@@ -546,19 +720,30 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			if (selectedSubtitleStreamIndex !== null && selectedSubtitleStreamIndex >= 0) {
 				transcodePayload.SubtitleStreamIndex = selectedSubtitleStreamIndex;
 				if (effectiveForceSubtitleBurnIn) {
-					transcodePayload.SubtitleMethod = 'Encode';
+					transcodePayload.AlwaysBurnInSubtitleWhenTranscoding = true;
 					if (transcodePayload.DeviceProfile) {
-						transcodePayload.DeviceProfile = {
-							...transcodePayload.DeviceProfile,
-							SubtitleProfiles: buildSubtitleProfiles({
-								relaxedPlaybackProfile: false,
-								forceSubtitleBurnIn: true
-							})
-						};
+						transcodePayload.DeviceProfile = shouldUseSafeSubtitleBurnInProfile
+							? buildSafeSubtitleBurnInDeviceProfile(transcodePayload.DeviceProfile)
+							: {
+								...transcodePayload.DeviceProfile,
+								SubtitleProfiles: buildSubtitleProfiles({
+									relaxedPlaybackProfile: false,
+									forceSubtitleBurnIn: true
+								})
+							};
 					}
 				} else {
 					delete transcodePayload.SubtitleMethod;
 				}
+			}
+			if (shouldUseSafeSubtitleBurnInProfile) {
+				addDiagnostic({
+					scope: 'subtitle-policy',
+					stage: 'burn-in-safe-profile',
+					status: 'applied',
+					reason: 'subtitle-burn-in-safe-transcode',
+					message: 'Requesting subtitle burn-in with HLS TS, H.264 video, AAC audio, and a 6-channel audio cap.'
+				});
 			}
 			const transcodedData = await fetchPlaybackInfo(service, itemId, transcodePayload);
 			if (transcodedData?.MediaSources?.length) {
@@ -576,12 +761,32 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 				selectedSource = data.MediaSources[0];
 				playMethod = 'Transcode';
 				activePayload = transcodePayload;
+				safeSubtitleBurnInProfileApplied = shouldUseSafeSubtitleBurnInProfile;
+				if (effectiveForceSubtitleBurnIn) {
+					const burnInUrlValidation = validateSubtitleBurnInTranscodingUrl(
+						selectedSource,
+						selectedSubtitleStreamIndex
+					);
+					addDiagnostic({
+						scope: 'subtitle-policy',
+						stage: 'burn-in-url-validation',
+						status: burnInUrlValidation.ok ? 'applied' : 'failed',
+						reason: burnInUrlValidation.ok ? 'subtitle-encode-url' : 'subtitle-encode-url-missing',
+						message: formatBurnInUrlValidationMessage(burnInUrlValidation)
+					});
+					burnInUrlValidated = true;
+					burnInUrlValid = burnInUrlValidation.ok;
+				}
 				subtitlePolicy = getSubtitleTranscodePolicy(selectedSource, selectedSubtitleStreamIndex, {
 					smartSubtitleTranscoding,
 					assSubtitleRenderer,
+					bitmapSubtitleRenderer,
 					enableSubtitleBurnIn,
+					forceSubtitleBurnIn,
+					confirmedBitmapBurnIn,
 					allowSubtitleBurnInOnHdr,
-					subtitleBurnInTextCodecs
+					subtitleBurnInTextCodecs,
+					originalDynamicRangeInfo
 				});
 				adjustments.push({
 					type: 'forcedTranscode',
@@ -602,7 +807,35 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 					reason: 'empty-playback-info',
 					message: 'Transcode PlaybackInfo request returned no media sources.'
 				});
+				if (effectiveForceSubtitleBurnIn) {
+					throw createNoMediaSourceError({
+						forceSubtitleBurnIn: true,
+						diagnostics,
+						subtitleStreamIndex: selectedSubtitleStreamIndex
+					});
+				}
 			}
+		}
+		if (effectiveForceSubtitleBurnIn && selectedSource?.TranscodingUrl && !burnInUrlValidated) {
+			const burnInUrlValidation = validateSubtitleBurnInTranscodingUrl(
+				selectedSource,
+				selectedSubtitleStreamIndex
+			);
+			addDiagnostic({
+				scope: 'subtitle-policy',
+				stage: 'burn-in-url-validation',
+				status: burnInUrlValidation.ok ? 'applied' : 'failed',
+				reason: burnInUrlValidation.ok ? 'subtitle-encode-url' : 'subtitle-encode-url-missing',
+				message: formatBurnInUrlValidationMessage(burnInUrlValidation)
+			});
+			burnInUrlValid = burnInUrlValidation.ok;
+		}
+		if (effectiveForceSubtitleBurnIn && !burnInUrlValid) {
+			throw createNoMediaSourceError({
+				forceSubtitleBurnIn: true,
+				diagnostics,
+				subtitleStreamIndex: selectedSubtitleStreamIndex
+			});
 		}
 
 		const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(selectedSource);
@@ -610,23 +843,28 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			...dynamicRangeInfo,
 			displayLabel: getDynamicRangeDisplayLabel(dynamicRangeInfo, dynamicRangeCap)
 		};
-		const subtitleStream = getSubtitleStreamByIndex(selectedSource, selectedSubtitleStreamIndex);
+		const subtitleStream = getSubtitleStreamByIndex(selectedSource, selectedSubtitleStreamIndex) || preDetachedSubtitleStream;
 		const playbackSubtitlePolicy = {
 			...subtitlePolicy,
 			streamIndex: selectedSubtitleStreamIndex,
 			codec: subtitlePolicy.codec || subtitleStream?.Codec || null,
 			requiresBurnIn: subtitleNeedsTranscoding,
-			forceBurnIn: effectiveForceSubtitleBurnIn
+			forceBurnIn: effectiveForceSubtitleBurnIn,
+			clientRenderedStreamIndex: clientRenderedSubtitleStreamIndex,
+			originalDynamicRangeInfo,
+			originalDynamicRangeId: originalDynamicRangeInfo?.id || dynamicRange?.id || 'SDR'
 		};
-		const requestDebug = buildPlaybackRequestDebug(activePayload, data);
-		const decision = buildPlaybackDecisionSnapshot({
+		const requestDebug = collectDiagnostics ? buildPlaybackRequestDebug(activePayload, data) : null;
+		const decision = collectDiagnostics ? buildPlaybackDecisionSnapshot({
 			activePayload,
 			selectedSource,
 			playMethod,
 			initialRequestedAudioStreamIndex,
 			requestedAudioStreamIndex,
 			selectedSubtitleStreamIndex,
+			clientRenderedSubtitleStreamIndex,
 			dynamicRange,
+			originalDynamicRange: originalDynamicRangeInfo,
 			dynamicRangeCap,
 			forceTranscoding,
 			disableDirectPlay,
@@ -635,8 +873,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			enableFmp4HlsContainerPreference,
 			forceFmp4HlsContainerPreference,
 			forceSubtitleBurnIn: effectiveForceSubtitleBurnIn,
+			confirmedBitmapBurnIn,
+			subtitleFallbackConsent,
+			safeSubtitleBurnInProfile: safeSubtitleBurnInProfileApplied,
 			subtitlePolicy: playbackSubtitlePolicy
-		});
+		}) : null;
 
 		return attachPlaybackInfoMetadata(data, {
 			playMethod,
@@ -648,10 +889,13 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			subtitlePolicy: playbackSubtitlePolicy,
 			requestDebug,
 			diagnostics,
-			decision
+			decision,
+			safeSubtitleBurnInProfile: safeSubtitleBurnInProfileApplied
 		});
 	} catch (error) {
-		console.error('Failed to get playback info:', error);
+		if (!(error instanceof PlaybackNegotiationError)) {
+			console.error('Failed to get playback info:', error);
+		}
 		throw error;
 	}
 };

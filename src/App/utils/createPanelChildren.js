@@ -10,7 +10,10 @@ import MediaDetailsPanel from '../../views/MediaDetailsPanel';
 
 export const createPanelChildren = ({
 	currentView,
+	sessionRestorePending = false,
 	inputMode,
+	screensaverActive = false,
+	diagnosticsEnabled = false,
 	selection,
 	notices,
 	cacheState,
@@ -80,12 +83,14 @@ export const createPanelChildren = ({
 			onLogin={handleLogin}
 			onNavigate={handleNavigate}
 			isActive={currentView === 'login'}
+			deferBackdrops={sessionRestorePending}
 			sessionNotice={loginNotice}
 			sessionNoticeNonce={loginNoticeNonce}
 		/>,
 		<HomePanel
 			key="home"
 			isActive={currentView === 'home'}
+			screensaverActive={screensaverActive}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
@@ -186,6 +191,7 @@ export const createPanelChildren = ({
 		<PlayerPanel
 			key="player"
 			isActive={currentView === 'player'}
+			diagnosticsEnabled={diagnosticsEnabled}
 			item={item}
 			playbackOptions={playbackOptions}
 			onBack={backToDetails}

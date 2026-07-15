@@ -1,60 +1,50 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import jellyfinService from '../../../services/jellyfinService';
-import {getSubtitleTranscodePolicy} from '../../../services/jellyfin/playbackSelection';
+import {useRuntimeSuspended} from '../../../hooks/useRuntimeSuspension';
+import {getSubtitleTranscodePolicy} from '../../../utils/playbackSelection';
 import {toInteger} from '../../../utils/numberParsing';
 import {
 	findActiveSubtitleCues,
 	normalizeSubtitleEvents,
 	normalizeSubtitleText
 } from '../utils/subtitleRenderer';
-import {
-	getSubtitleBurnInFallbackStatus,
-	normalizeSubtitleRendererFailureReason
-} from '../utils/subtitleRendererStatus';
+import {normalizeSubtitleRendererFailureReason} from '../utils/subtitleRendererStatus';
+import {runSubtitleBurnInFallbackDecision} from '../utils/subtitleBurnInFallbackDecision';
 import {
 	disposeExternalAssRenderer,
+	disposeExternalBitmapRenderer,
 	initExternalAssRenderer,
+	initExternalBitmapRenderer,
 	isExternalAssRendererId,
+	isExternalBitmapRendererId,
 	SUBTITLE_RENDERER_IDS,
-	supportsExternalAssRenderer
+	supportsExternalAssRenderer,
+	supportsExternalBitmapRenderer
 } from '../utils/subtitle-renderers/subtitleRendererRegistry';
 import {
 	collectExternalRendererDiagnostics,
-	isExternalRendererEmptyOutputFailure
+	isExternalRendererEmptyOutputFailure,
+	probeExternalRendererOutput
 } from '../utils/subtitle-renderers/rendererDiagnostics';
 import {waitForAttachedVideoSource} from '../utils/subtitle-renderers/videoSourceReady';
+import {
+	BITMAP_SUBTITLE_RAW_FORMATS,
+	buildBitmapDeliveryFetchDebug,
+	getBitmapRendererSequence
+} from '../utils/bitmapSubtitleDeliveryDebug';
+import {getRawSubtitleFormats} from '../utils/subtitleRawFormats';
 
 const SUBTITLE_EVENT_CACHE_LIMIT = 8;
 const EXTERNAL_RENDERER_DIAGNOSTIC_REFRESH_MS = 1500;
 const EXTERNAL_RENDERER_EMPTY_OUTPUT_CHECK_MS = 1000;
 const EXTERNAL_RENDERER_EMPTY_OUTPUT_SAMPLE_LIMIT = 3;
 const subtitleEventCache = new Map();
-const TEXT_SUBTITLE_RAW_FORMATS_BY_CODEC = {
-	srt: ['vtt', 'srt'],
-	subrip: ['vtt', 'srt'],
-	vtt: ['vtt'],
-	webvtt: ['vtt'],
-	ass: ['ass', 'ssa'],
-	ssa: ['ssa', 'ass'],
-	advancedsubstationalpha: ['ass', 'ssa'],
-	substationalpha: ['ssa', 'ass']
-};
-
-const getRawSubtitleFormats = (codec) => (
-	TEXT_SUBTITLE_RAW_FORMATS_BY_CODEC[String(codec || '').trim().toLowerCase()] || ['vtt', 'srt']
-);
-
 const getSubtitleTrack = (tracks, trackIndex) => {
 	const index = toInteger(trackIndex);
 	if (index === null || index < 0) return null;
 	return (tracks || []).find((track) => toInteger(track?.Index) === index) || null;
 };
-
-const isJassubRendererMode = (rendererMode) => (
-	rendererMode === SUBTITLE_RENDERER_IDS.ASS_JASSUB ||
-	rendererMode === SUBTITLE_RENDERER_IDS.ASS_JASSUB_MANUAL
-);
 
 const readSubtitleEventCache = (key) => {
 	if (!key || !subtitleEventCache.has(key)) return null;
@@ -83,12 +73,18 @@ export const usePlayerSubtitleRenderer = ({
 	currentTime,
 	playbackSettingsRef,
 	onBurnInFallback,
-	setToastMessage
+	setToastMessage,
+	playbackGeneration,
+	exitInProgressRef,
+	diagnosticsEnabled = false,
+	debugDiagnosticsEnabled = false
 }) => {
+	const runtimeSuspended = useRuntimeSuspended();
 	const requestIdRef = useRef(0);
 	const fallbackAttemptedKeysRef = useRef(new Set());
 	const onBurnInFallbackRef = useRef(onBurnInFallback);
 	const setToastMessageRef = useRef(setToastMessage);
+	const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
 	const [events, setEvents] = useState([]);
 	const [state, setState] = useState({
 		renderer: 'off',
@@ -100,31 +96,52 @@ export const usePlayerSubtitleRenderer = ({
 		activeCueCount: 0,
 		debug: null
 	});
+	useEffect(() => {
+		diagnosticsEnabledRef.current = diagnosticsEnabled;
+	}, [diagnosticsEnabled]);
 
+	const sourceIsCurrent = Boolean(
+		item?.Id &&
+		mediaSourceData?.Id &&
+		mediaSourceData?.__itemId === item.Id &&
+		mediaSourceData?.__playbackGeneration === playbackGeneration
+	);
 	const selectedSubtitleTrack = useMemo(
-		() => getSubtitleTrack(subtitleTracks, currentSubtitleTrack),
-		[currentSubtitleTrack, subtitleTracks]
+		() => sourceIsCurrent ? getSubtitleTrack(subtitleTracks, currentSubtitleTrack) : null,
+		[currentSubtitleTrack, sourceIsCurrent, subtitleTracks]
 	);
 	const subtitlePolicy = useMemo(() => {
+		if (!sourceIsCurrent) return null;
 		if (!(Number.isInteger(currentSubtitleTrack) && currentSubtitleTrack >= 0)) {
 			return mediaSourceData?.__debugSubtitlePolicy || null;
 		}
 		const settings = playbackSettingsRef?.current || {};
-		return getSubtitleTranscodePolicy(mediaSourceData, currentSubtitleTrack, {
+		const metadataPolicy = mediaSourceData?.__debugSubtitlePolicy || null;
+		const policy = getSubtitleTranscodePolicy(mediaSourceData, currentSubtitleTrack, {
 			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
 			assSubtitleRenderer: settings.assSubtitleRenderer,
+			bitmapSubtitleRenderer: settings.bitmapSubtitleRenderer,
 			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
+			forceSubtitleBurnIn: settings.forceSubtitleBurnIn === true,
 			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
-			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
+			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs,
+			originalDynamicRangeInfo: metadataPolicy?.originalDynamicRangeInfo
 		});
-	}, [currentSubtitleTrack, mediaSourceData, playbackSettingsRef]);
+		return {
+			...policy,
+			originalDynamicRangeInfo: metadataPolicy?.originalDynamicRangeInfo || policy?.originalDynamicRangeInfo || null,
+			originalDynamicRangeId: metadataPolicy?.originalDynamicRangeId || policy?.originalDynamicRangeId || null,
+			clientRenderedStreamIndex: metadataPolicy?.clientRenderedStreamIndex ?? policy?.clientRenderedStreamIndex ?? null
+		};
+	}, [currentSubtitleTrack, mediaSourceData, playbackSettingsRef, sourceIsCurrent]);
 	const shouldUseClientRenderer =
+		sourceIsCurrent &&
 		Number.isInteger(currentSubtitleTrack) &&
 		currentSubtitleTrack >= 0 &&
 		String(subtitlePolicy?.renderer || '').startsWith('client') &&
 		subtitlePolicy?.clientRender === true;
 	const subtitleKey = shouldUseClientRenderer
-		? `${item?.Id || ''}:${mediaSourceData?.Id || ''}:${currentSubtitleTrack}`
+			? `${item?.Id || ''}:${mediaSourceData?.Id || ''}:${playbackGeneration}:${currentSubtitleTrack}`
 		: '';
 	const externalRendererRef = useRef({
 		rendererId: '',
@@ -138,11 +155,13 @@ export const usePlayerSubtitleRenderer = ({
 
 	const disposeCurrentExternalRenderer = useCallback(() => {
 		if (externalRendererRef.current.instance) {
-			disposeExternalAssRenderer(
-				externalRendererRef.current.rendererId,
-				externalRendererRef.current.instance,
-				{containerElement: externalSubtitleLayerRef?.current}
-			);
+			const rendererId = externalRendererRef.current.rendererId;
+			const context = {containerElement: externalSubtitleLayerRef?.current};
+			if (isExternalAssRendererId(rendererId)) {
+				disposeExternalAssRenderer(rendererId, externalRendererRef.current.instance, context);
+			} else if (isExternalBitmapRendererId(rendererId)) {
+				disposeExternalBitmapRenderer(rendererId, externalRendererRef.current.instance, context);
+			}
 		}
 		externalRendererRef.current = {
 			rendererId: '',
@@ -152,38 +171,26 @@ export const usePlayerSubtitleRenderer = ({
 
 	useEffect(() => {
 		fallbackAttemptedKeysRef.current = new Set();
-	}, [item?.Id, mediaSourceData?.Id]);
+	}, [currentSubtitleTrack, item?.Id, mediaSourceData?.Id, playbackGeneration]);
 
 	const fallbackToBurnIn = useCallback((reason) => {
-		const fallbackAllowed = subtitlePolicy?.fallbackBurnInAllowed === true;
-		const fallbackAlreadyStarted = !subtitleKey || fallbackAttemptedKeysRef.current.has(subtitleKey);
-		if (!subtitleKey || fallbackAttemptedKeysRef.current.has(subtitleKey)) {
-			return getSubtitleBurnInFallbackStatus({
-				fallbackAllowed,
-				fallbackAlreadyStarted
-			});
-		}
-		if (!fallbackAllowed) {
-			setToastMessageRef.current?.('Subtitle renderer failed. Preserving HDR/DV without subtitle burn-in.');
-			return getSubtitleBurnInFallbackStatus({fallbackAllowed});
-		}
-		fallbackAttemptedKeysRef.current.add(subtitleKey);
-		setToastMessageRef.current?.('Subtitle renderer failed. Retrying with subtitle burn-in...');
-		if (typeof onBurnInFallbackRef.current !== 'function') {
-			return getSubtitleBurnInFallbackStatus({
-				fallbackAllowed,
-				hasFallbackHandler: false
-			});
-		}
-		onBurnInFallbackRef.current({
-			subtitleStreamIndex: currentSubtitleTrack,
-			reason
+		if (exitInProgressRef.current || !sourceIsCurrent) return 'failed';
+		return runSubtitleBurnInFallbackDecision({
+			reason,
+			subtitlePolicy,
+			subtitleKey,
+			fallbackAttemptedKeys: fallbackAttemptedKeysRef.current,
+			currentSubtitleTrack,
+			onBurnInFallback: onBurnInFallbackRef.current,
+			setToastMessage: setToastMessageRef.current
 		});
-		return getSubtitleBurnInFallbackStatus({
-			fallbackAllowed,
-			hasFallbackHandler: true
-		});
-	}, [currentSubtitleTrack, subtitleKey, subtitlePolicy?.fallbackBurnInAllowed]);
+	}, [
+		currentSubtitleTrack,
+		exitInProgressRef,
+		sourceIsCurrent,
+		subtitleKey,
+		subtitlePolicy
+	]);
 
 	useEffect(() => {
 		requestIdRef.current += 1;
@@ -205,7 +212,22 @@ export const usePlayerSubtitleRenderer = ({
 			});
 			return undefined;
 		}
-		if (!item?.Id || !mediaSourceData?.Id || !selectedSubtitleTrack) {
+			if (!sourceIsCurrent) {
+				disposeCurrentExternalRenderer();
+				setEvents([]);
+				setState({
+					renderer: 'off',
+					status: 'off',
+					error: '',
+					fallbackReason: '',
+					eventCount: 0,
+					cueCount: 0,
+					activeCueCount: 0,
+					debug: {playbackGeneration, transition: 'waiting-source'}
+				});
+				return undefined;
+			}
+			if (!item?.Id || !mediaSourceData?.Id || !selectedSubtitleTrack) {
 			disposeCurrentExternalRenderer();
 			const fallbackStatus = fallbackToBurnIn('missing-subtitle-context');
 			setEvents([]);
@@ -224,6 +246,228 @@ export const usePlayerSubtitleRenderer = ({
 
 		const rendererMode = subtitlePolicy?.renderer || 'client';
 		const domRendererName = rendererMode === 'client-ass-lightweight' ? 'client-ass-lightweight' : 'client-text';
+		if (isExternalBitmapRendererId(rendererMode)) {
+			disposeCurrentExternalRenderer();
+			const videoElement = videoRef.current;
+			const containerElement = externalSubtitleLayerRef?.current;
+			let bitmapCancelled = false;
+			const startedAt = Date.now();
+			const buildBitmapDebug = (extra = {}) => ({
+				cacheKey: subtitleKey,
+				cacheHit: false,
+				requestedRenderer: rendererMode,
+				rawTried: BITMAP_SUBTITLE_RAW_FORMATS.join(','),
+				externalStatus: 'loading',
+				...extra
+			});
+			setEvents([]);
+			setState({
+				renderer: rendererMode,
+				status: 'loading',
+				error: '',
+				fallbackReason: '',
+				eventCount: 0,
+				cueCount: 0,
+				activeCueCount: 0,
+				debug: buildBitmapDebug()
+			});
+			(async () => {
+				const deliveryResult = jellyfinService.getBitmapSubtitleDeliveryCandidates(
+					item.Id,
+					mediaSourceData,
+					currentSubtitleTrack,
+					BITMAP_SUBTITLE_RAW_FORMATS
+				);
+				if (bitmapCancelled || requestId !== requestIdRef.current) return;
+				const deliveryCandidates = Array.isArray(deliveryResult?.candidates)
+					? deliveryResult.candidates
+					: [];
+				let selectedCandidate = deliveryCandidates.find((candidate) => candidate?.source === 'delivery-url') || null;
+				let binaryResult = null;
+				let lastFetchError = '';
+				const probeResults = [];
+				if (!selectedCandidate) {
+					for (const candidate of deliveryCandidates) {
+						if (candidate?.source !== 'generated-raw') continue;
+						const result = await jellyfinService.getSubtitleBinary(
+							item.Id,
+							mediaSourceData.Id,
+							currentSubtitleTrack,
+							candidate.format
+						);
+						if (bitmapCancelled || requestId !== requestIdRef.current) return;
+						probeResults.push({
+							format: candidate.format,
+							path: candidate.path,
+							ok: result?.ok === true,
+							error: result?.error || '',
+							contentType: result?.contentType || '',
+							byteLength: result?.byteLength ?? result?.data?.byteLength ?? 0,
+							pgsMagic: result?.pgsMagic === true
+						});
+						if (result?.ok === true && result.data instanceof ArrayBuffer) {
+							selectedCandidate = candidate;
+							binaryResult = result;
+							break;
+						}
+						lastFetchError = normalizeSubtitleRendererFailureReason(result?.error, 'bitmap-fetch-failed');
+					}
+				}
+				const fetchMs = Date.now() - startedAt;
+				const fetchDebug = buildBitmapDeliveryFetchDebug({
+					baseDebug: buildBitmapDebug(),
+					selectedCandidate,
+					binaryResult,
+					deliveryCandidates,
+					probeResults,
+					fetchMs
+				});
+				if (!selectedCandidate) {
+					const reason = lastFetchError || deliveryResult?.error || 'bitmap-delivery-unavailable';
+					const bitmapFallbackStatus = fallbackToBurnIn(reason);
+					setState({
+						renderer: rendererMode,
+						status: bitmapFallbackStatus,
+						error: reason,
+						fallbackReason: reason,
+						eventCount: 0,
+						cueCount: 0,
+						activeCueCount: 0,
+						debug: {
+							...fetchDebug,
+							externalStatus: 'fetch-failed'
+						}
+					});
+					return;
+				}
+				if (!videoElement || !containerElement) {
+					const reason = 'missing-bitmap-renderer-context';
+					const bitmapFallbackStatus = fallbackToBurnIn(reason);
+					setState({
+						renderer: rendererMode,
+						status: bitmapFallbackStatus,
+						error: reason,
+						fallbackReason: reason,
+						eventCount: 0,
+						cueCount: 0,
+						activeCueCount: 0,
+						debug: {
+							...fetchDebug,
+							externalStatus: 'missing-context'
+						}
+					});
+					return;
+				}
+				const rendererSequence = getBitmapRendererSequence(rendererMode);
+				let lastRendererDebug = null;
+				let lastReason = 'bitmap-renderer-init-failed';
+				for (const bitmapRendererId of rendererSequence) {
+					if (!supportsExternalBitmapRenderer(bitmapRendererId)) {
+						lastReason = `${bitmapRendererId}-unavailable`;
+						lastRendererDebug = {
+							engine: bitmapRendererId,
+							externalStatus: 'unavailable'
+						};
+						continue;
+					}
+					const rendererResult = await initExternalBitmapRenderer(bitmapRendererId, {
+						videoElement,
+						containerElement,
+						subtitleContent: binaryResult?.data || null,
+						subtitleUrl: selectedCandidate.url || binaryResult?.url,
+						sourceFormat: binaryResult?.format || selectedCandidate.format,
+						diagnosticsEnabled: diagnosticsEnabledRef.current,
+						onError: (error) => {
+							if (bitmapCancelled || requestId !== requestIdRef.current) return;
+							disposeCurrentExternalRenderer();
+							const reason = normalizeSubtitleRendererFailureReason(error?.message, 'bitmap-renderer-runtime-error');
+							const runtimeFallbackStatus = fallbackToBurnIn(reason);
+							setState({
+								renderer: bitmapRendererId,
+								status: runtimeFallbackStatus,
+								error: reason,
+								fallbackReason: reason,
+								eventCount: 0,
+								cueCount: 0,
+								activeCueCount: 0,
+								debug: {
+									...fetchDebug,
+									externalStatus: 'runtime-error'
+								}
+							});
+						}
+					});
+					if (bitmapCancelled || requestId !== requestIdRef.current) {
+						disposeExternalBitmapRenderer(bitmapRendererId, rendererResult?.instance, {containerElement});
+						return;
+					}
+					lastRendererDebug = rendererResult?.debug || null;
+					if (!rendererResult?.instance) {
+						lastReason = normalizeSubtitleRendererFailureReason(rendererResult?.debug?.error, 'bitmap-renderer-init-failed');
+						continue;
+					}
+					externalRendererRef.current = {
+						rendererId: bitmapRendererId,
+						instance: rendererResult.instance
+					};
+					setState({
+						renderer: bitmapRendererId,
+						status: 'ready',
+						error: '',
+						fallbackReason: rendererMode === SUBTITLE_RENDERER_IDS.BITMAP_AUTO && bitmapRendererId !== SUBTITLE_RENDERER_IDS.BITMAP_LIBBITSUB
+							? 'libbitsub-fallback'
+							: '',
+						eventCount: 0,
+						cueCount: rendererResult.debug?.bitmapCueCount || 0,
+						activeCueCount: 0,
+						debug: {
+							...fetchDebug,
+							...(rendererResult.debug || {}),
+							requestedRenderer: rendererMode,
+							externalStatus: 'ready',
+							fetchMs
+						}
+					});
+					return;
+				}
+				const fallbackStatus = fallbackToBurnIn(lastReason);
+				setState({
+					renderer: rendererMode,
+					status: fallbackStatus,
+					error: lastReason,
+					fallbackReason: lastReason,
+					eventCount: 0,
+					cueCount: 0,
+					activeCueCount: 0,
+					debug: {
+						...fetchDebug,
+						...(lastRendererDebug || {}),
+						externalStatus: 'init-failed'
+					}
+				});
+			})().catch((error) => {
+				if (bitmapCancelled || requestId !== requestIdRef.current) return;
+				const reason = normalizeSubtitleRendererFailureReason(error?.message, 'bitmap-renderer-error');
+				const fallbackStatus = fallbackToBurnIn(reason);
+				setState({
+					renderer: rendererMode,
+					status: fallbackStatus,
+					error: reason,
+					fallbackReason: reason,
+					eventCount: 0,
+					cueCount: 0,
+					activeCueCount: 0,
+					debug: buildBitmapDebug({
+						externalStatus: 'error',
+						fetchMs: Date.now() - startedAt
+					})
+				});
+			});
+			return () => {
+				bitmapCancelled = true;
+				disposeCurrentExternalRenderer();
+			};
+		}
 		if (isExternalAssRendererId(rendererMode)) {
 			disposeCurrentExternalRenderer();
 			const assFormat = getRawSubtitleFormats(subtitlePolicy?.codec)[0] || 'ass';
@@ -310,7 +554,7 @@ export const usePlayerSubtitleRenderer = ({
 				});
 			};
 			const startEmptyOutputWatchdog = (textResult, rendererResult) => {
-				if (!isJassubRendererMode(rendererMode) || !rendererResult?.instance) return;
+				if (![SUBTITLE_RENDERER_IDS.ASS_JASSUB, SUBTITLE_RENDERER_IDS.ASS_JASSUB_MANUAL].includes(rendererMode) || !rendererResult?.instance) return;
 				clearEmptyOutputWatchdog();
 				emptyOutputWatchdogId = setInterval(() => {
 					if (externalCancelled || requestId !== requestIdRef.current) {
@@ -322,8 +566,7 @@ export const usePlayerSubtitleRenderer = ({
 						clearEmptyOutputWatchdog();
 						return;
 					}
-					const diagnostics = collectExternalRendererDiagnostics({
-						containerElement,
+					const diagnostics = probeExternalRendererOutput({
 						renderer: rendererResult.instance,
 						videoElement
 					});
@@ -432,6 +675,7 @@ export const usePlayerSubtitleRenderer = ({
 					videoElement,
 					containerElement,
 					subtitleContent: textResult.text,
+					diagnosticsEnabled: diagnosticsEnabledRef.current,
 					onError: () => {
 						if (externalCancelled || requestId !== requestIdRef.current) return;
 						disposeCurrentExternalRenderer();
@@ -645,17 +889,25 @@ export const usePlayerSubtitleRenderer = ({
 		externalSubtitleLayerRef,
 		fallbackToBurnIn,
 		item?.Id,
-		mediaSourceData?.Id,
+		mediaSourceData,
+		playbackGeneration,
 		selectedSubtitleTrack,
 		shouldUseClientRenderer,
+		sourceIsCurrent,
 		subtitleKey,
 		subtitlePolicy?.codec,
+		subtitlePolicy?.reason,
 		subtitlePolicy?.renderer,
 		videoRef
 	]);
 
 	useEffect(() => {
-		if (!isExternalAssRendererId(state.renderer) || state.status !== 'ready') return undefined;
+		if (!diagnosticsEnabled || !debugDiagnosticsEnabled || runtimeSuspended) return undefined;
+		if (
+			!isExternalAssRendererId(state.renderer) &&
+			!isExternalBitmapRendererId(state.renderer)
+		) return undefined;
+		if (state.status !== 'ready') return undefined;
 		const rendererId = state.renderer;
 		const updateDiagnostics = () => {
 			const currentRenderer = externalRendererRef.current;
@@ -680,7 +932,13 @@ export const usePlayerSubtitleRenderer = ({
 		updateDiagnostics();
 		const intervalId = setInterval(updateDiagnostics, EXTERNAL_RENDERER_DIAGNOSTIC_REFRESH_MS);
 		return () => clearInterval(intervalId);
-	}, [externalSubtitleLayerRef, state.renderer, state.status, videoRef]);
+	}, [debugDiagnosticsEnabled, diagnosticsEnabled, externalSubtitleLayerRef, runtimeSuspended, state.renderer, state.status, videoRef]);
+
+	useEffect(() => {
+		const renderer = externalRendererRef.current.instance;
+		if (typeof renderer?.__breezyfinSetRuntimeSuspended !== 'function') return;
+		renderer.__breezyfinSetRuntimeSuspended(runtimeSuspended);
+	}, [runtimeSuspended, state.renderer, state.status]);
 
 	const activeSubtitle = useMemo(() => {
 		if (!shouldUseClientRenderer || state.status !== 'ready') {
@@ -711,6 +969,7 @@ export const usePlayerSubtitleRenderer = ({
 		subtitleText: activeSubtitle.text,
 		subtitleCues: activeSubtitle.cues,
 		subtitleRendererPolicy: subtitlePolicy,
-		subtitleRendererState: state
+		subtitleRendererState: state,
+		requestSubtitleRendererFallback: fallbackToBurnIn
 	};
 };

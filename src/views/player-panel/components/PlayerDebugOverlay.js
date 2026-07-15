@@ -3,6 +3,7 @@ import Spotlight from '@enact/spotlight';
 import Button from '../../../components/BreezyButton';
 import {describeDomNode} from '../../../utils/domNodeDescription';
 import {toInteger} from '../../../utils/numberParsing';
+import {redactSensitiveUrl} from '../../../utils/sensitiveData';
 
 import css from '../../PlayerPanel.module.less';
 
@@ -63,12 +64,7 @@ const getBufferedAheadSeconds = (video) => {
 
 const shortenUrl = (value) => {
 	if (!value) return '(none)';
-	try {
-		const url = new URL(value, window.location.origin);
-		return `${url.pathname}${url.search}`;
-	} catch (_) {
-		return String(value);
-	}
+	return redactSensitiveUrl(value, {includeOrigin: false});
 };
 
 const formatBitrateMbps = (value) => {
@@ -88,6 +84,18 @@ const joinInfo = (...parts) => {
 		.map((part) => String(part || '').trim())
 		.filter(Boolean)
 		.join(' | ');
+};
+
+const getAssFitSummary = () => {
+	if (typeof document === 'undefined') return '-';
+	const cues = Array.from(document.querySelectorAll('[data-ass-fit-scale]')).slice(0, 4);
+	if (cues.length === 0) return '-';
+	return cues.map((cue, index) => joinInfo(
+		`cue=${index + 1}`,
+		`scale=${cue.dataset.assFitScale || '-'}`,
+		`reason=${cue.dataset.assFitReason || '-'}`,
+		`plane=${cue.dataset.assPlane || '-'}`
+	)).join(' ; ');
 };
 
 const formatBooleanFlag = (value) => (value ? 'yes' : 'no');
@@ -130,7 +138,8 @@ const PlayerDebugOverlay = ({
 		totalFrames: null,
 		currentSrc: '(none)',
 		hlsLevel: null,
-		hlsBandwidth: null
+		hlsBandwidth: null,
+		assFitSummary: '-'
 	});
 
 	useEffect(() => {
@@ -160,7 +169,8 @@ const PlayerDebugOverlay = ({
 					: null,
 				currentSrc: shortenUrl(video?.currentSrc || mediaSourceData?.__debugVideoUrl || ''),
 				hlsLevel: Number.isFinite(hls?.currentLevel) ? hls.currentLevel : null,
-				hlsBandwidth: Number.isFinite(hls?.bandwidthEstimate) ? hls.bandwidthEstimate : null
+				hlsBandwidth: Number.isFinite(hls?.bandwidthEstimate) ? hls.bandwidthEstimate : null,
+				assFitSummary: getAssFitSummary()
 			});
 		};
 
@@ -252,12 +262,17 @@ const PlayerDebugOverlay = ({
 			`reqA=${decisionDebug.requestedAudioStreamIndex ?? '-'}`,
 			`selA=${decisionDebug.selectedAudioStreamIndex ?? '-'}`,
 			`selS=${decisionDebug.selectedSubtitleStreamIndex ?? '-'}`,
+			`clientS=${decisionDebug.clientRenderedSubtitleStreamIndex ?? '-'}`,
+			`origRange=${decisionDebug.originalDynamicRangeId || '-'}`,
 			`cap=${decisionDebug.dynamicRangeCap || 'auto'}`,
 			`fmp4=${decisionDebug.fmp4HlsPreference?.forced ? 'force' : (decisionDebug.fmp4HlsPreference?.enabled ? 'on' : 'off')}`,
+			`vCopy=${decisionDebug.payload?.allowVideoStreamCopy ? 'yes' : 'no'}`,
+			`aCopy=${decisionDebug.payload?.allowAudioStreamCopy ? 'yes' : 'no'}`,
 			decisionDebug.disableDirectPlay ? 'dpOff=yes' : '',
 			decisionDebug.forceDolbyVision ? 'forceDV=yes' : '',
 			decisionDebug.avoidDolbyVision ? 'avoidDV=yes' : '',
-			decisionDebug.forceSubtitleBurnIn ? 'subBurn=yes' : ''
+			decisionDebug.forceSubtitleBurnIn ? 'subBurn=yes' : '',
+			decisionDebug.safeSubtitleBurnInProfile ? 'safeSubBurn=yes' : ''
 		)
 		: '-';
 
@@ -398,6 +413,7 @@ const PlayerDebugOverlay = ({
 					)
 					: '-'
 			},
+			{label: 'ASS Fit', value: runtimeSnapshot.assFitSummary},
 			{
 				label: 'Engine',
 				value: joinInfo(
@@ -433,6 +449,36 @@ const PlayerDebugOverlay = ({
 					subtitleDebug.jassubFirstStyle ? `style=${subtitleDebug.jassubFirstStyle}` : '',
 					subtitleDebug.jassubActiveEvent ? `active=${subtitleDebug.jassubActiveEvent}` : '',
 					subtitleDebug.jassubFirstEvent ? `first=${subtitleDebug.jassubFirstEvent}` : ''
+				) || '-'
+			},
+			{
+				label: 'Bitmap',
+				value: joinInfo(
+					subtitleDebug.bitmapBackend ? `backend=${subtitleDebug.bitmapBackend}` : '',
+					subtitleDebug.bitmapSource ? `source=${subtitleDebug.bitmapSource}` : '',
+					subtitleDebug.bitmapDeliverySource ? `delivery=${subtitleDebug.bitmapDeliverySource}` : '',
+					subtitleDebug.bitmapDeliveryFormat ? `format=${subtitleDebug.bitmapDeliveryFormat}` : '',
+					Number.isFinite(subtitleDebug.bitmapDeliveryCandidateCount) ? `candidates=${subtitleDebug.bitmapDeliveryCandidateCount}` : '',
+					Number.isFinite(subtitleDebug.bitmapBytes) ? `bytes=${subtitleDebug.bitmapBytes}` : '',
+					subtitleDebug.bitmapPgsMagic !== null && subtitleDebug.bitmapPgsMagic !== undefined ? `pg=${subtitleDebug.bitmapPgsMagic ? 'yes' : 'no'}` : '',
+					Number.isFinite(subtitleDebug.bitmapCueCount) ? `cues=${subtitleDebug.bitmapCueCount}` : '',
+					subtitleDebug.bitmapScreen ? `screen=${subtitleDebug.bitmapScreen}` : '',
+					Number.isFinite(subtitleDebug.bitmapCurrentCue) ? `cue=${subtitleDebug.bitmapCurrentCue}` : '',
+					subtitleDebug.bitmapCache ? `cache=${subtitleDebug.bitmapCache}` : '',
+					subtitleDebug.bitmapWorker ? `worker=${subtitleDebug.bitmapWorker}` : '',
+					Number.isFinite(subtitleDebug.bitmapFrames) ? `frames=${subtitleDebug.bitmapFrames}` : '',
+					Number.isFinite(subtitleDebug.bitmapDropped) ? `dropped=${subtitleDebug.bitmapDropped}` : '',
+					subtitleDebug.bitmapLastStatus ? `last=${subtitleDebug.bitmapLastStatus}` : '',
+					subtitleDebug.bitmapDiagnosticError ? `diagError=${subtitleDebug.bitmapDiagnosticError}` : ''
+				) || '-'
+			},
+			{
+				label: 'Bitmap Delivery',
+				value: joinInfo(
+					subtitleDebug.bitmapDeliveryUrl ? `url=${subtitleDebug.bitmapDeliveryUrl}` : '',
+					subtitleDebug.bitmapDeliveryCandidates ? `candidates=${subtitleDebug.bitmapDeliveryCandidates}` : '',
+					subtitleDebug.bitmapProbeResults ? `probes=${subtitleDebug.bitmapProbeResults}` : '',
+					subtitleDebug.bitmapFirstBytes ? `bytes=${subtitleDebug.bitmapFirstBytes}` : ''
 				) || '-'
 			},
 			{

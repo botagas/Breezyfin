@@ -37,6 +37,9 @@ const JS_LOW_SIGNAL_HOOK_OBJECT_REGEX = /^(?:const \{|[A-Za-z_$][A-Za-z0-9_$]*:\
 const JS_LOW_SIGNAL_HOOK_DESTRUCTURE_REGEX = /^(?:const \{[^}]+} = use[A-Za-z0-9_$]+\(\{|\} = use[A-Za-z0-9_$]+\(\{)$/;
 const JS_LOW_SIGNAL_GUARD_REGEX = /^(?:if \(![A-Za-z_$][A-Za-z0-9_$]*\) return false;|return true;)$/;
 const JS_LOW_SIGNAL_JSX_REGEX = /^(?:\{[A-Za-z_$][A-Za-z0-9_$]*\}|<\/?[A-Za-z][^>]*>?|[A-Za-z_$][A-Za-z0-9_$-]*=.+|\/?>)$/;
+const JS_LOW_SIGNAL_JSX_SCAFFOLD_REGEX = /^(?:const [A-Za-z_$][A-Za-z0-9_$]* = \(|\);|\{[^{}]+\? \(|\) : \(|\)}|<>)$/;
+const JS_LOW_SIGNAL_IMPORT_EXPORT_REGEX = /^(?:import \{|import .+ from .+;|export \{|} from .+;)$/;
+const JS_LOW_SIGNAL_PUNCTUATION_REGEX = /^[()[\]{};,]+$/;
 
 const isLowSignalSnippet = (extension, snippetKey) => {
 	if (extension !== '.js') return false;
@@ -51,7 +54,10 @@ const isLowSignalSnippet = (extension, snippetKey) => {
 		JS_LOW_SIGNAL_HOOK_OBJECT_REGEX.test(line) ||
 		JS_LOW_SIGNAL_HOOK_DESTRUCTURE_REGEX.test(line) ||
 		JS_LOW_SIGNAL_GUARD_REGEX.test(line) ||
-		JS_LOW_SIGNAL_JSX_REGEX.test(line)
+		JS_LOW_SIGNAL_JSX_REGEX.test(line) ||
+		JS_LOW_SIGNAL_JSX_SCAFFOLD_REGEX.test(line) ||
+		JS_LOW_SIGNAL_IMPORT_EXPORT_REGEX.test(line) ||
+		JS_LOW_SIGNAL_PUNCTUATION_REGEX.test(line)
 	)).length;
 	// Ignore windows that are primarily prop lists / hook-helper object arguments / JSX scaffolding and carry little structural value.
 	return lowSignalLineCount / lines.length >= 0.85;

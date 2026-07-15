@@ -6,13 +6,17 @@ import { Panels } from '../components/BreezyPanels';
 import PerformanceOverlay from '../components/PerformanceOverlay';
 import FocusDebugOverlay from '../components/FocusDebugOverlay';
 import DebugErrorMenu from '../components/DebugErrorMenu';
+import ScreensaverOverlay from '../components/ScreensaverOverlay';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { useInputMode } from '../hooks/useInputMode';
+import {RuntimeDiagnosticsProvider} from '../hooks/useRuntimeDiagnostics';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
+import {configureAppDiagnostics} from '../utils/appLogger';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {normalizeScreensaverTimeoutMinutes} from '../utils/screensaver';
 import {isNonStableBuild} from '../utils/featureFlags';
 import {
 	CRASH_RECOVERY_ACTIONS,
@@ -29,6 +33,7 @@ import {createPanelChildren} from './utils/createPanelChildren';
 import {buildRuntimeDataAttributes} from './utils/runtimeDataAttributes';
 import {usePanelHistory} from './hooks/usePanelHistory';
 import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
+import {useAppScreensaver} from './hooks/useAppScreensaver';
 
 import css from './App.module.less';
 
@@ -61,7 +66,9 @@ const resolveInitialVisualSettings = () => {
 		navbarTheme: settings.navbarTheme === 'classic' ? 'classic' : 'elegant',
 		performanceOverlayEnabled: settings.showPerformanceOverlay === true,
 		focusDebugOverlayEnabled: settings.showFocusDebugOverlay === true,
-		debugErrorMenuEnabled: SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true
+		debugErrorMenuEnabled: SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true,
+		diagnosticsEnabled: settings.enableDiagnostics === true,
+		screensaverTimeoutMinutes: normalizeScreensaverTimeoutMinutes(settings.screensaverTimeoutMinutes)
 	};
 };
 
@@ -69,6 +76,8 @@ const App = (props) => {
 	const initialVisualSettingsRef = useRef(resolveInitialVisualSettings());
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [currentView, setCurrentView] = useState('login');
+	const [sessionActive, setSessionActive] = useState(false);
+	const [sessionRestorePending, setSessionRestorePending] = useState(true);
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [selectedLibrary, setSelectedLibrary] = useState(null);
 	const [selectedHomeSection, setSelectedHomeSection] = useState(null);
@@ -89,11 +98,24 @@ const App = (props) => {
 	const [performanceOverlayEnabled, setPerformanceOverlayEnabled] = useState(initialVisualSettingsRef.current.performanceOverlayEnabled);
 	const [focusDebugOverlayEnabled, setFocusDebugOverlayEnabled] = useState(initialVisualSettingsRef.current.focusDebugOverlayEnabled);
 	const [debugErrorMenuEnabled, setDebugErrorMenuEnabled] = useState(initialVisualSettingsRef.current.debugErrorMenuEnabled);
+	const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(initialVisualSettingsRef.current.diagnosticsEnabled);
+	const [screensaverTimeoutMinutes, setScreensaverTimeoutMinutes] = useState(
+		initialVisualSettingsRef.current.screensaverTimeoutMinutes
+	);
 	const [debugErrorMenuOpen, setDebugErrorMenuOpen] = useState(false);
 	const [lastNavigateDebug, setLastNavigateDebug] = useState(null);
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
+	const {
+		active: screensaverActive,
+		dismiss: dismissScreensaver
+	} = useAppScreensaver({
+		authenticated: sessionActive,
+		currentView,
+		timeoutMinutes: screensaverTimeoutMinutes,
+		spotlight: Spotlight
+	});
 	const handleBackRef = useRef(null);
 	const crashRecoveryPendingRef = useRef(Boolean(peekCrashRecoveryAction()));
 	const {
@@ -143,6 +165,7 @@ const App = (props) => {
 	});
 
 	const resetSessionState = useCallback(() => {
+		setSessionActive(false);
 		setSelectedItem(null);
 		setSelectedLibrary(null);
 		setSelectedHomeSection(null);
@@ -239,15 +262,21 @@ const App = (props) => {
 		setPerformanceOverlayEnabled(settings.showPerformanceOverlay === true);
 		setFocusDebugOverlayEnabled(settings.showFocusDebugOverlay === true);
 		setDebugErrorMenuEnabled(SHOW_NON_STABLE_DEBUG_OPTIONS && settings.showDebugErrorMenu === true);
+		setDiagnosticsEnabled(settings.enableDiagnostics === true);
+		configureAppDiagnostics({
+			enabled: settings.enableDiagnostics === true,
+			verbose: settings.verboseAppLogs === true
+		});
+		setScreensaverTimeoutMinutes(normalizeScreensaverTimeoutMinutes(settings.screensaverTimeoutMinutes));
 	}, []);
 
 	useBreezyfinSettingsSync(applyVisualSettings);
 
 	useEffect(() => {
-		if (!debugErrorMenuEnabled && debugErrorMenuOpen) {
+		if ((!diagnosticsEnabled || !debugErrorMenuEnabled) && debugErrorMenuOpen) {
 			setDebugErrorMenuOpen(false);
 		}
-	}, [debugErrorMenuEnabled, debugErrorMenuOpen]);
+	}, [debugErrorMenuEnabled, debugErrorMenuOpen, diagnosticsEnabled]);
 
 	useEffect(() => {
 		if (crashRecoveryPendingRef.current) return;
@@ -335,25 +364,30 @@ const App = (props) => {
 	useEffect(() => {
 		let cancelled = false;
 		const restoreSession = async () => {
-			if (peekCrashRecoveryAction() === CRASH_RECOVERY_ACTIONS.HOME) {
-				consumeCrashRecoveryAction();
-				crashRecoveryPendingRef.current = false;
-				resetSessionState();
-				setCurrentView('login');
-				setLoginNotice('Crash recovery paused automatic sign-in. Choose an account or open diagnostics.');
-				setLoginNoticeNonce((value) => value + 1);
-				return;
+			try {
+				if (peekCrashRecoveryAction() === CRASH_RECOVERY_ACTIONS.HOME) {
+					consumeCrashRecoveryAction();
+					crashRecoveryPendingRef.current = false;
+					resetSessionState();
+					setCurrentView('login');
+					setLoginNotice('Crash recovery paused automatic sign-in. Choose an account or open diagnostics.');
+					setLoginNoticeNonce((value) => value + 1);
+					return;
+				}
+				const restored = jellyfinService.restoreSession();
+				if (!restored) return;
+				const user = await jellyfinService.getCurrentUser();
+				if (cancelled) return;
+				if (user) {
+					setSessionActive(true);
+					setCurrentView('home');
+					applyPendingCrashRecovery();
+					return;
+				}
+				handleSessionExpired();
+			} finally {
+				if (!cancelled) setSessionRestorePending(false);
 			}
-			const restored = jellyfinService.restoreSession();
-			if (!restored) return;
-			const user = await jellyfinService.getCurrentUser();
-			if (cancelled) return;
-			if (user) {
-				setCurrentView('home');
-				applyPendingCrashRecovery();
-				return;
-			}
-			handleSessionExpired();
 		};
 		restoreSession();
 		return () => {
@@ -378,7 +412,8 @@ const App = (props) => {
 			animationsDisabled,
 			allAnimationsDisabled,
 			inputMode,
-			performanceOverlayEnabled,
+			performanceOverlayEnabled: diagnosticsEnabled && performanceOverlayEnabled,
+			diagnosticsEnabled,
 			runtimeCapabilities
 		})
 	), [
@@ -386,6 +421,7 @@ const App = (props) => {
 		animationsDisabled,
 		inputMode,
 		navbarTheme,
+		diagnosticsEnabled,
 		performanceOverlayEnabled,
 		runtimeCapabilities
 	]);
@@ -408,6 +444,10 @@ const App = (props) => {
 	}, [runtimeDataAttributes]);
 
 	const handleBack = useCallback(() => {
+		if (screensaverActive) {
+			dismissScreensaver();
+			return true;
+		}
 		if (debugErrorMenuOpen) {
 			setDebugErrorMenuOpen(false);
 			return true;
@@ -445,6 +485,7 @@ const App = (props) => {
 		}, [
 			currentView,
 			debugErrorMenuOpen,
+			dismissScreensaver,
 			detailsBackHandlerRef,
 			fallbackToDetailsFromPlayer,
 			favoritesBackHandlerRef,
@@ -457,6 +498,7 @@ const App = (props) => {
 			playerBackHandlerRef,
 			playerControlsVisible,
 			searchBackHandlerRef,
+			screensaverActive,
 			syncPlayerBackTargetDetailsItem,
 			runPanelBackHandler,
 			settingsBackHandlerRef
@@ -505,6 +547,7 @@ const App = (props) => {
 	const handleLogin = useCallback(() => {
 		clearPanelHistory();
 		setLoginNotice('');
+		setSessionActive(true);
 		setCurrentView('home');
 	}, [clearPanelHistory]);
 
@@ -530,13 +573,15 @@ const App = (props) => {
 	}, [resetSessionState]);
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
-		emitAppDebugEvent('breezyfin:item-select-debug', {
-			at: Date.now(),
-			itemId: item?.Id ? String(item.Id) : '-',
-			itemType: item?.Type || '-',
-			fromView: currentView || '-',
-			fromItemId: fromItem?.Id ? String(fromItem.Id) : '-'
-		});
+		if (diagnosticsEnabled) {
+			emitAppDebugEvent('breezyfin:item-select-debug', {
+				at: Date.now(),
+				itemId: item?.Id ? String(item.Id) : '-',
+				itemType: item?.Type || '-',
+				fromView: currentView || '-',
+				fromItemId: fromItem?.Id ? String(fromItem.Id) : '-'
+			});
+		}
 		if (DETAIL_RETURN_VIEWS.has(currentView) && currentView !== 'details') {
 			setDetailsReturnView(currentView);
 			pushPanelHistory();
@@ -553,7 +598,7 @@ const App = (props) => {
 		setSelectedItem(item);
 		setPlaybackOptions(null);
 		setCurrentView('details');
-	}, [currentView, pushPanelHistory, selectedItem]);
+	}, [currentView, diagnosticsEnabled, pushPanelHistory, selectedItem]);
 
 	const handleNavigate = useCallback((section, data) => {
 		const targetView = section;
@@ -756,9 +801,9 @@ const App = (props) => {
 	}, [currentView]);
 
 	const handleDebugErrorMenuOpenChange = useCallback((open) => {
-		if (!debugErrorMenuEnabled) return;
+		if (!diagnosticsEnabled || !debugErrorMenuEnabled) return;
 		setDebugErrorMenuOpen(Boolean(open));
-	}, [debugErrorMenuEnabled]);
+	}, [debugErrorMenuEnabled, diagnosticsEnabled]);
 
 	const dispatchPlayerDebugAction = useCallback((action) => {
 		emitAppDebugEvent('breezyfin:debug-error-action', {
@@ -769,7 +814,7 @@ const App = (props) => {
 	}, []);
 
 	const handleDebugErrorMenuAction = useCallback((actionId) => {
-		if (!debugErrorMenuEnabled) return;
+		if (!diagnosticsEnabled || !debugErrorMenuEnabled) return;
 		switch (actionId) {
 			case 'runtime-crash':
 				window.setTimeout(() => {
@@ -790,11 +835,14 @@ const App = (props) => {
 				break;
 		}
 		setDebugErrorMenuOpen(false);
-	}, [debugErrorMenuEnabled, dispatchPlayerDebugAction]);
+	}, [debugErrorMenuEnabled, diagnosticsEnabled, dispatchPlayerDebugAction]);
 
 	const panelChildren = createPanelChildren({
 		currentView,
+		sessionRestorePending,
 		inputMode,
+		screensaverActive,
+		diagnosticsEnabled,
 		selection: {
 			item: selectedItem,
 			library: selectedLibrary,
@@ -852,36 +900,43 @@ const App = (props) => {
 	});
 
 	return (
+		<RuntimeDiagnosticsProvider enabled={diagnosticsEnabled}>
 			<div
 				className={css.app}
 				{...runtimeDataAttributes}
 				{...props}
+			>
+				<Panels
+					index={getPanelIndexForView(currentView)}
+					onBack={handleBack}
+					noAnimation
 				>
-					<Panels
-						index={getPanelIndexForView(currentView)}
-						onBack={handleBack}
-						noAnimation
-					>
 					{panelChildren}
-					</Panels>
-					<DebugErrorMenu
-						enabled={debugErrorMenuEnabled}
-						actions={debugErrorActions}
-						open={debugErrorMenuOpen}
-						onOpenChange={handleDebugErrorMenuOpenChange}
-						onAction={handleDebugErrorMenuAction}
-						ariaLabel="Debug error actions"
-					/>
-					<FocusDebugOverlay
-						enabled={focusDebugOverlayEnabled}
-						currentView={currentView}
-						inputMode={inputMode}
-						lastNavigateDebug={lastNavigateDebug}
-					/>
-					<PerformanceOverlay enabled={performanceOverlayEnabled} inputMode={inputMode} />
-				</div>
-		);
-	};
+				</Panels>
+				<DebugErrorMenu
+					enabled={diagnosticsEnabled && debugErrorMenuEnabled}
+					actions={debugErrorActions}
+					open={debugErrorMenuOpen}
+					onOpenChange={handleDebugErrorMenuOpenChange}
+					onAction={handleDebugErrorMenuAction}
+					ariaLabel="Debug error actions"
+				/>
+				<FocusDebugOverlay
+					enabled={diagnosticsEnabled && focusDebugOverlayEnabled && !screensaverActive}
+					currentView={currentView}
+					inputMode={inputMode}
+					lastNavigateDebug={lastNavigateDebug}
+				/>
+				<PerformanceOverlay
+					enabled={diagnosticsEnabled && performanceOverlayEnabled}
+					inputMode={inputMode}
+					suspended={screensaverActive}
+				/>
+				<ScreensaverOverlay active={screensaverActive} />
+			</div>
+		</RuntimeDiagnosticsProvider>
+	);
+};
 
 const AppWithBoundary = (props) => (
 	<AppCrashBoundary>

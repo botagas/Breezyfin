@@ -1,4 +1,4 @@
-import {getMediaSourceDynamicRangeInfo} from '../playbackSelection';
+import {getMediaSourceDynamicRangeInfo} from '../../../utils/playbackSelection';
 
 const normalizeContainerParts = (container) => (
 	String(container || '')

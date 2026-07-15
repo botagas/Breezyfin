@@ -4,12 +4,14 @@ export const buildRuntimeDataAttributes = ({
 	allAnimationsDisabled,
 	inputMode,
 	performanceOverlayEnabled,
+	diagnosticsEnabled = false,
 	runtimeCapabilities
 }) => ({
 	'data-bf-nav-theme': navbarTheme,
 	'data-bf-animations': animationsDisabled ? 'off' : 'on',
 	'data-bf-all-animations': allAnimationsDisabled ? 'off' : 'on',
 	'data-bf-performance-overlay': performanceOverlayEnabled ? 'on' : 'off',
+	'data-bf-diagnostics': diagnosticsEnabled ? 'on' : 'off',
 	'data-bf-input-mode': inputMode,
 	'data-bf-platform-webos': runtimeCapabilities.webos ? 'on' : 'off',
 	'data-bf-webos-version': runtimeCapabilities.version ?? 'unknown',

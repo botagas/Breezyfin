@@ -7,6 +7,11 @@ jest.mock('../../utils/platformCapabilities', () => ({
 
 import {getPlaystateApi} from '@jellyfin/sdk/lib/utils/api/playstate-api';
 import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
+import {
+	createPlaybackApiTestService,
+	resetPlaybackApiTestRuntime,
+	withSubtitleStream
+} from '../testUtils/playbackApiTestHelpers';
 import {createVideoAudioMediaSource} from '../testUtils/playbackFixtures';
 import {
 	getItemPlaybackInfo,
@@ -18,29 +23,12 @@ import {
 } from '../jellyfin/playbackApi';
 
 describe('playbackApi', () => {
-	const createService = () => ({
-		serverUrl: 'http://media.local',
-		accessToken: 'token-1',
-		userId: 'user-1',
-		getDeviceId: () => 'device-1',
-		_handleAuthFailureStatus: jest.fn(),
-		api: {id: 'api'}
-	});
+	const createService = createPlaybackApiTestService;
 	const createMediaSource = (videoRangeType, overrides = {}) => createVideoAudioMediaSource({
 		id: `source-${videoRangeType}`,
 		videoRangeType,
 		supportsTranscoding: false,
 		...overrides
-	});
-	const withSubtitleStream = (source, subtitle = {Codec: 'srt', Index: 2}) => ({
-		...source,
-		MediaStreams: [
-			...(source.MediaStreams || []),
-			{
-				Type: 'Subtitle',
-				...subtitle
-			}
-		]
 	});
 	const expectClientRenderedSubtitlePlayback = async ({
 		videoRangeType,
@@ -64,12 +52,17 @@ describe('playbackApi', () => {
 		});
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
-			subtitleStreamIndex: 2
+			subtitleStreamIndex: 2,
+			enableDiagnostics: true
 		});
 		const initialPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
+		const detachedPayload = JSON.parse(global.fetch.mock.calls[1][1].body);
 
-		expect(global.fetch).toHaveBeenCalledTimes(1);
+		expect(global.fetch).toHaveBeenCalledTimes(2);
+		expect(initialPayload.SubtitleStreamIndex).toBe(2);
 		expect(initialPayload.SubtitleMethod).toBeUndefined();
+		expect(detachedPayload.SubtitleStreamIndex).toBe(-1);
+		expect(detachedPayload.SubtitleMethod).toBeUndefined();
 		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
 			mode: 'smart',
 			reason: expectedReason,
@@ -84,8 +77,20 @@ describe('playbackApi', () => {
 				stage: 'burn-in-decision',
 				status: 'skipped',
 				reason: expectedReason
+			}),
+			expect.objectContaining({
+				scope: 'subtitle-policy',
+				stage: 'client-render-detach',
+				status: 'applied',
+				reason: expectedReason
 			})
 		]));
+		expect(playbackInfo?.__breezyfin?.decision).toEqual(expect.objectContaining({
+			selectedSubtitleStreamIndex: 2,
+			payload: expect.objectContaining({
+				subtitleStreamIndex: -1
+			})
+		}));
 	};
 	const createTranscodeOnlyDvSource = () => ({
 		Id: 'source-dv-transcode',
@@ -169,13 +174,10 @@ describe('playbackApi', () => {
 	});
 
 	beforeEach(() => {
-		jest.clearAllMocks();
-		global.fetch = jest.fn();
-		getRuntimePlatformCapabilities.mockReturnValue({
-			playback: {
-				supportsDolbyVision: true,
-				supportsDolbyVisionInMkv: true
-			}
+		resetPlaybackApiTestRuntime({
+			clearMocks: jest.clearAllMocks,
+			createFetchMock: jest.fn,
+			getRuntimePlatformCapabilities
 		});
 	});
 
@@ -212,6 +214,23 @@ describe('playbackApi', () => {
 		expect(getTranscodePlaybackUrl(service, 'session-1', {TranscodingUrl: '/Videos/xyz/master.m3u8'}))
 			.toBe('http://media.local/Videos/xyz/master.m3u8');
 		expect(getTranscodePlaybackUrl(service, 'session-1', {})).toBe(null);
+	});
+
+	it('keeps optional playback diagnostic snapshots dormant by default', async () => {
+		const service = createService();
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [createMediaSource('SDR')]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1');
+
+		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual([]);
+		expect(playbackInfo?.__breezyfin?.decision).toBeNull();
+		expect(playbackInfo?.__breezyfin?.requestDebug).toBeNull();
 	});
 
 	it('reports playback start/progress/stop with merged session metadata', async () => {
@@ -308,7 +327,10 @@ describe('playbackApi', () => {
 			})
 		});
 
-		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {forceDolbyVision: true});
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			forceDolbyVision: true,
+			enableDiagnostics: true
+		});
 		expect(playbackInfo?.MediaSources?.[0]?.MediaStreams?.[0]?.VideoRangeType).toBe('DOVIWithHDR10');
 		expect(playbackInfo?.__breezyfin?.dynamicRange?.id).toBe('DV');
 		expect(playbackInfo?.__breezyfin?.decision).toEqual(expect.objectContaining({
@@ -328,7 +350,10 @@ describe('playbackApi', () => {
 			})
 		});
 
-		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {preferDolbyVisionMp4: true});
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			preferDolbyVisionMp4: true,
+			enableDiagnostics: true
+		});
 		const firstRequestPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
 		expect(global.fetch).toHaveBeenCalledTimes(1);
 		expect(playbackInfo?.__breezyfin?.dynamicRange?.id).toBe('DV');
@@ -365,7 +390,10 @@ describe('playbackApi', () => {
 				})
 			});
 
-		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {preferDolbyVisionMp4: true});
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			preferDolbyVisionMp4: true,
+			enableDiagnostics: true
+		});
 		expect(global.fetch).toHaveBeenCalledTimes(2);
 		const mp4ProbePayload = JSON.parse(global.fetch.mock.calls[1][1].body);
 		expect(
@@ -466,7 +494,8 @@ describe('playbackApi', () => {
 			});
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
-			enableFmp4HlsContainerPreference: true
+			enableFmp4HlsContainerPreference: true,
+			enableDiagnostics: true
 		});
 		const audioProbePayload = JSON.parse(global.fetch.mock.calls[1][1].body);
 		const fmp4ProbePayload = JSON.parse(global.fetch.mock.calls[2][1].body);
@@ -503,7 +532,8 @@ describe('playbackApi', () => {
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
 			enableFmp4HlsContainerPreference: true,
-			forceFmp4HlsContainerPreference: true
+			forceFmp4HlsContainerPreference: true,
+			enableDiagnostics: true
 		});
 
 		expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -563,7 +593,7 @@ describe('playbackApi', () => {
 								supportsDirectStream: false,
 								supportsTranscoding: true
 							}),
-							TranscodingUrl: '/Videos/item-1/master.m3u8',
+							TranscodingUrl: '/Videos/item-1/master.m3u8?SubtitleMethod=Encode&SubtitleStreamIndex=2',
 							TranscodingContainer: 'ts'
 						}, {Codec: 'ass', Index: 2})
 					]
@@ -572,15 +602,31 @@ describe('playbackApi', () => {
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
 			subtitleStreamIndex: 2,
-			assSubtitleRenderer: 'burn-in'
+			assSubtitleRenderer: 'burn-in',
+			enableDiagnostics: true
 		});
 		const transcodePayload = JSON.parse(global.fetch.mock.calls[1][1].body);
 
 		expect(global.fetch).toHaveBeenCalledTimes(2);
 		expect(transcodePayload.EnableDirectPlay).toBe(false);
 		expect(transcodePayload.EnableDirectStream).toBe(false);
+		expect(transcodePayload.AllowVideoStreamCopy).toBe(false);
+		expect(transcodePayload.AllowAudioStreamCopy).toBe(false);
 		expect(transcodePayload.SubtitleStreamIndex).toBe(2);
-		expect(transcodePayload.SubtitleMethod).toBe('Encode');
+		expect(transcodePayload.SubtitleMethod).toBeUndefined();
+		expect(transcodePayload.AlwaysBurnInSubtitleWhenTranscoding).toBe(true);
+		expect(transcodePayload.DeviceProfile.SubtitleProfiles.every((profile) => (
+			profile.Method === 'Encode'
+		))).toBe(true);
+		expect(transcodePayload.DeviceProfile.TranscodingProfiles).toEqual([
+			expect.objectContaining({
+				Container: 'ts',
+				Protocol: 'hls',
+				VideoCodec: 'h264',
+				AudioCodec: 'aac',
+				MaxAudioChannels: '6'
+			})
+		]);
 		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
 			mode: 'smart',
 			reason: 'ass-renderer-burn-in',
@@ -592,6 +638,7 @@ describe('playbackApi', () => {
 			playMethod: 'Transcode',
 			selectedSubtitleStreamIndex: 2,
 			forceSubtitleBurnIn: true,
+			safeSubtitleBurnInProfile: true,
 			subtitleDecision: 'ass-renderer-burn-in'
 		}));
 		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual(expect.arrayContaining([
@@ -600,6 +647,12 @@ describe('playbackApi', () => {
 				stage: 'burn-in-decision',
 				status: 'applied',
 				reason: 'ass-renderer-burn-in'
+			}),
+			expect.objectContaining({
+				scope: 'subtitle-policy',
+				stage: 'burn-in-safe-profile',
+				status: 'applied',
+				reason: 'subtitle-burn-in-safe-transcode'
 			}),
 			expect.objectContaining({
 				scope: 'playback-probe',
@@ -654,7 +707,8 @@ describe('playbackApi', () => {
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
 			forceDolbyVision: true,
-			preferDolbyVisionMp4: true
+			preferDolbyVisionMp4: true,
+			enableDiagnostics: true
 		});
 		expect(playbackInfo?.__breezyfin?.playMethod).toBe('Transcode');
 		expect(playbackInfo?.__breezyfin?.decision).toEqual(expect.objectContaining({
@@ -703,7 +757,8 @@ describe('playbackApi', () => {
 
 		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
 			forceDolbyVision: true,
-			preferDolbyVisionMp4: true
+			preferDolbyVisionMp4: true,
+			enableDiagnostics: true
 		});
 		expect(playbackInfo?.__breezyfin?.playMethod).toBe('DirectPlay');
 		expect(playbackInfo?.__breezyfin?.selectedAudioStreamIndex).toBe(1);

@@ -1,46 +1,53 @@
 # Breezyfin TODOs
 
-Backlog for unfinished/planned work only.
+Backlog for unfinished/planned work only, grouped by estimated implementation scale.
 
-Rule:
-- Keep this file for unfinished / planned tasks only.
-- Move validation/test items to `CHECKS.md` only after the related TODO is completed (if needed).
+Rules:
+- Scale describes expected implementation complexity and regression risk, not priority or release timing.
+- Keep validation/test runbooks in `CHECKS.md` after their related implementation is complete.
+- Move investigation items into a sized section once their constraints and likely implementation are understood.
+- Keep deferred platform-compatibility work in its own section rather than assigning it an active implementation scale.
 
-## Next-release changes (High priority)
+## Small / contained changes
 
-- Fix Media Bar media title placement (teleporting up/down) when the logo is text instead of image. Some text titles seem to be glitching position (for example, Culinary Class Wars), where it jumps up and down. Some images pair poorly with the next, which creates visibility issues and poor contrast. That decreases readability. 
+Expected scope: focused visual or localized fixes, usually isolated to one component or style area.
 
-## Near-term improvements (Medium priority)
+- Complete real-TV performance validation of the optimized shared Sandstone `MediaVirtualGrid` and card-image pipeline using the same datasets before/after. Confirm bounded mounted-card counts and mode-aware overhang, then target at least 25% lower average input latency and 40% fewer slow frames before moving the remaining performance budget into `CHECKS.md`; functional image loading and scrolling are already validated.
+- Validate the offset-based, animation-frame-coalesced Home row focus correction and marquee-free Settings rows on real TVs. Compare the cinematic Home design against `REACT_APP_HOME_DESIGN_VARIANT=current` with the same content and input sequence across three captures; target at least 15% lower median slow-frame count or next-frame delay while preserving first-viewport composition, Hero/row focus transitions, pointer scrolling, complete accessible Settings labels, and stable ellipsis.
+- Validate Breezyfin Lightweight ASS placement on real TVs using synthetic and representative non-committed samples. Confirm PlayRes/LayoutRes aspect handling, letterbox/pillarbox stages, ordinary dialogue/page-sign containment, and preservation of intentionally off-screen authored positions/clips before moving this bounded placement work into `CHECKS.md`.
 
-- Run a post-decomposition style analysis pass to identify remaining hotspots/overlap and prioritize practical style cleanup improvements.
-- Reduce the `audit:style-tokens` raw-color baseline over time. The audit now blocks new/increased raw colors, but existing visual-effect literals still need deliberate tokenization or justified cleanup.
-- Use `npm run audit:hotspots` output and growth ceilings to prioritize practical follow-up splits/tests for the largest current hotspots, especially `subtitleRenderer`, `App`, `playbackApi` / `playbackSelection`, and Media Details focus/interaction hooks.
-- Evaluate moving shared playback policy/diagnostic helpers such as `playbackSelection` and playback diagnostics out of `src/services/jellyfin/` into a neutral runtime utility namespace, so service boundaries distinguish API requests from reusable playback decisions more clearly.
-- Investigate current `npm audit --omit=dev --audit-level=high` findings before adding dependency security audit to the standard gate. Current findings include `@jellyfin/sdk`'s Axios chain and Enact CLI/build-tool transitive dependencies; decide whether safe updates, overrides, or upstream tracking are appropriate.
+## Large / cross-cutting changes
+
+Expected scope: architectural work, a new feature surface, or changes spanning services, settings, UI, persistence, and TV validation.
+
+- Use `npm run audit:hotspots` output and growth ceilings to plan incremental decomposition of the largest current hotspots, especially `subtitleRenderer`, `App`, `playbackApi` / `playbackSelection`, and Media Details focus/interaction hooks.
 - Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
-- Continue ASS/SSA renderer validation after the lightweight renderer expansion. Lightweight now covers source colors, fonts, borders, shadows, blur, simple/complex fades, basic `\k`/`\K`/`\kf`/`\ko` karaoke timing, primary/secondary color states, active `\K`/`\kf` sweep approximation, interpolated numeric/color `\t(...)` transforms, margins, ASS `\an` and legacy SSA `\a` alignment, wrap style, `\pos(x,y)`, `\move(...)`, `\org(x,y)` transform origins for absolute transformed cues, long-running overlapping cue lookup, active-cue ASS layer/source render ordering, direct/inverse rectangular `\clip(x1,y1,x2,y2)` / `\iclip(x1,y1,x2,y2)`, common vector `\clip(...)` / `\iclip(...)` masks for SVG drawing cues, style reset, scale, spacing, rotation/skew, source-authored absolute/relative font size, and common `\p` vector drawing paths including B-spline `s`/`p` conversion and `\pbo` drawing baseline offsets; remaining scope is advanced karaoke collision/outline behavior, libass-equivalent vector drawing edge cases, arbitrary text vector masks, mixed inline `\org` transform-origin cases, full collision handling, vertical text/layout, transform edge cases beyond the supported numeric/color subset, and safe performance limits on LG TVs.
-- Inspect style token usage for potential over-tokenization and simplify cases where indirection adds noise without practical reuse.
+- After the bounded placement slice passes TV validation, define the next Breezyfin Lightweight ASS/SSA compatibility slice. Candidate gaps are advanced collision behavior, arbitrary text vector masks, mixed inline `\org` transforms, vertical text/layout, and transform/vector edge cases; avoid pursuing full libass parity without representative files and real-TV performance evidence.
+- Add VobSub/DVD subtitle delivery and client-rendering support if the Jellyfin raw subtitle endpoints and bitmap renderer libraries provide a reliable path. Keep unsupported image formats on the existing consent-gated burn-in/no-subtitle fallback flow.
 - Expand staged panel loading reveal beyond Media Details (background -> branding -> full UI) with data-ready gating so reveal only starts after panel content is loaded.
-- Add a screensaver (think DVD-like) that would trigger after a minute of inactivity (configurable). The screensaver logo could be the transparent logo in white + text BF (short for Breezyfin).
-- Create new loading animation. 
+- Implement Discovery media rows via Seerr integration, likely through Jellyfin plugin support.
+- Support plugin-provided Home sections as a future extension or replacement for hard-coded Home section descriptors, while keeping built-in sections as fallback behavior.
+- Implement Watchlist support after evaluating Jellyfin Enhanced/KefinTweaks Watchlist compatibility and the integration path.
+- Add a Calendar for Sonarr/Radarr release information, likely through a plugin or API integration. Could be a possible integration using Jellyfin Enhanced/KefinTweaks.
+- Consider integration with JellyWatchParty using their provided API. This would also mean implementing SyncPlay support via Jellyfin.
+- Consider integration with Home Screen Sections, Collection Sections and JS Injector plugins. This means we could use their provided media sections and keep our existing hard-coded structure as a fallback.
+- Set up a GitHub Pages demo backed by a safe, maintainable demo Jellyfin environment.
 
-## Long-term goals
+## Needs investigation before sizing
 
-- Investigate JASSUB's remaining build warning: `Circular dependency between chunks with runtime (jassub-worker, em-pthread, main)`. Determine whether it is harmless for our packaged webOS app, should be documented as acceptable while JASSUB is experimental, or should be addressed by externalizing/patching JASSUB's worker loading path.
-- Implement server discovery for manual login so compatible local servers can be detected and selected without manually entering full server details (SSDP discovery).
-- Run periodic cleanup passes for file size + module boundaries to prevent orchestrator growth regressions.
-- Investigate a stronger shared poster-card skin API (for example `variant="libraryGrid"` plus optional overrides) so Library-like panels do not need CSS-module class mapping helpers long-term.
-- Consider adding SearchPanel-like Library search UX in future.
-- Identify and fix panel loading delay and unintended panel reload behavior when switching between panels. Needs inspection as it might not be caused by the app.
-- Implement Discovery media rows via Seerr integration (likely requires Jellyfin plugin support).
-- Investigate plugin-provided Home sections as a future replacement/extension for hard-coded Home section descriptors, while keeping current built-in sections as fallback behavior.
-- Implement Watchlist support (evaluate Jellyfin Enhanced/KefinTweaks Watchlist compatibility and integration path).
-- Add a Calendar for Sonarr/Radarr release information (likely via plugin/API integration). Consider integration with third-party plugins that provide this functionality.
-- Set up a GitHub Pages demo connected to a demo Jellyfin instance.
-- Investigate Media Details FPS drops during scrolling on real devices; verify whether panel loading delay and heavy image/styling paths are contributing factors.
+Expected scope: unknown until profiling, API research, dependency analysis, or real-device reproduction establishes the cause and constraints.
 
-## Compatibility goals
+- Evaluate Enact 5, Limestone, and React 19 only when Breezyfin can raise its minimum webOS requirement or maintain separate legacy and modern builds. Include Enact CLI/toolchain advisories in that isolated investigation; do not mix it into Enact 4/React 18 release maintenance.
+- Investigate server discovery for manual login, including SSDP/webOS constraints and fallback discovery approaches when multicast is unavailable through VPNs or segmented networks.
+- Identify the cause of panel loading delay and unintended panel reload behavior when switching panels; confirm whether the bottleneck is client-side before planning implementation work.
+- Profile Media Details FPS drops during scrolling on representative real devices and isolate image, layout, focus, and styling costs.
+- Profile memory use, panel responsiveness, and long-playback stability on representative LG TVs, then turn measured hotspots into bounded optimization tasks and resource budgets.
+- After the optimized TV baseline passes, investigate a true navbar/search scroll-under overlay using Enact-supported layout and virtual-list insets. Avoid negative-margin, transform, or duplicated-scroll workarounds.
+
+## Deferred compatibility work
+
+Platform-specific cleanup intentionally reserved for the final compatibility phase, after the main application feature set and architecture are stable.
 
 - Improve webOS 6 login/switch-user backdrop reliability in `src/views/LoginPanel.js` and `src/views/login-panel-styles/_login-panel-compat-webos6.less`.
-- Fix webOS 6 badge spacing/sizing and missing badge visibility issues (Favorites/Search).
-- Fix extra whitespace before the first library option on webOS 6.
+- Fix webOS 6 badge spacing/sizing and missing badge visibility issues in Favorites and Search.
+- Fix extra whitespace before the first Library option on webOS 6.

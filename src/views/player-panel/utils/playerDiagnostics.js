@@ -1,4 +1,4 @@
-import {createPlaybackDiagnostic} from '../../../services/jellyfin/playback-api/diagnostics';
+import {createPlaybackDiagnostic} from '../../../utils/playbackDiagnostics';
 
 export const buildMediaSegmentsLoadDiagnostic = ({segments = [], error = null} = {}) => {
 	if (error) {

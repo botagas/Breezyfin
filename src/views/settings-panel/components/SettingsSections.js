@@ -1,19 +1,22 @@
 import {useCallback, useState} from 'react';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
-import Item from '@enact/sandstone/Item';
-import SwitchItem from '@enact/sandstone/SwitchItem';
 import Button from '../../../components/BreezyButton';
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import {
 	DEFAULT_SETTINGS_TAB_KEY,
 	SETTINGS_TABS,
 	getAssSubtitleRendererControlState,
+	getBitmapSubtitleRendererControlState,
 	getSettingsSectionKeys,
 	getSubtitleBurnInFormatsControlState,
 	isSettingsTabKey,
 	isSmartSubtitleHandlingEnabled
 } from '../utils/settingsViewModel';
+import {
+	SettingsItem as Item,
+	SettingsSwitchItem as SwitchItem
+} from './SettingsStaticItems';
 import css from '../../SettingsPanel.module.less';
 
 const SettingsSections = ({
@@ -41,6 +44,8 @@ const SettingsSections = ({
 	openSubtitleBurnInTextCodecsPopup,
 	assSubtitleRendererLabel,
 	openAssSubtitleRendererPopup,
+	bitmapSubtitleRendererLabel,
+	openBitmapSubtitleRendererPopup,
 	subtitleOverlayFontSizeLabel,
 	subtitleOverlayPositionLabel,
 	subtitleOverlayBackgroundLabel,
@@ -67,6 +72,8 @@ const SettingsSections = ({
 	openBitratePopup,
 	getNavbarThemeLabel,
 	openNavbarThemePopup,
+	screensaverTimeoutLabel,
+	openScreensaverTimeoutPopup,
 	appVersion,
 	webosVersionLabel,
 	capabilityProbeLabel,
@@ -98,6 +105,7 @@ const SettingsSections = ({
 	const userIdLabel = userInfo?.Id ? `${userInfo.Id.substring(0, 8)}...` : 'Unknown';
 	const smartSubtitleTranscodingEnabled = isSmartSubtitleHandlingEnabled(settings);
 	const assSubtitleRendererControl = getAssSubtitleRendererControlState(settings, assSubtitleRendererLabel);
+	const bitmapSubtitleRendererControl = getBitmapSubtitleRendererControlState(settings, bitmapSubtitleRendererLabel);
 	const subtitleBurnInFormatsControl = getSubtitleBurnInFormatsControlState(settings, subtitleBurnInTextCodecsLabel);
 
 	const handleTabClick = useCallback((event) => {
@@ -396,6 +404,13 @@ const SettingsSections = ({
 						slotAfter={assSubtitleRendererControl.label}
 						onClick={assSubtitleRendererControl.enabled ? openAssSubtitleRendererPopup : null}
 					/>
+					<Item
+						className={css.settingItem}
+						label="Bitmap Subtitle Renderer"
+						disabled={!bitmapSubtitleRendererControl.enabled}
+						slotAfter={bitmapSubtitleRendererControl.label}
+						onClick={bitmapSubtitleRendererControl.enabled ? openBitmapSubtitleRendererPopup : null}
+					/>
 					<SwitchItem
 						className={css.switchItem}
 						onToggle={settingToggleHandlers.enableSubtitleBurnIn}
@@ -502,6 +517,12 @@ const SettingsSections = ({
 						slotAfter={getNavbarThemeLabel(settings.navbarTheme)}
 						onClick={openNavbarThemePopup}
 					/>
+					<Item
+						className={css.settingItem}
+						label="Screensaver"
+						slotAfter={screensaverTimeoutLabel}
+						onClick={openScreensaverTimeoutPopup}
+					/>
 					<SwitchItem
 						className={css.switchItem}
 						onToggle={settingToggleHandlers.showBackdrops}
@@ -573,6 +594,17 @@ const SettingsSections = ({
 					<BodyText className={css.sectionTitle}>Diagnostics</BodyText>
 					<SwitchItem
 						className={css.switchItem}
+						onToggle={settingToggleHandlers.enableDiagnostics}
+						selected={settings.enableDiagnostics === true}
+					>
+						Enable Diagnostics
+					</SwitchItem>
+					<BodyText className={css.sectionHint}>
+						Enables runtime metrics and persistent troubleshooting logs. This may affect TV performance.
+					</BodyText>
+					<SwitchItem
+						className={css.switchItem}
+						disabled={settings.enableDiagnostics !== true}
 						onToggle={settingToggleHandlers.showPerformanceOverlay}
 						selected={settings.showPerformanceOverlay === true}
 					>
@@ -580,6 +612,7 @@ const SettingsSections = ({
 					</SwitchItem>
 					<SwitchItem
 						className={css.switchItem}
+						disabled={settings.enableDiagnostics !== true}
 						onToggle={settingToggleHandlers.showExtendedPlayerDebugOverlay}
 						selected={settings.showExtendedPlayerDebugOverlay === true}
 					>
@@ -587,6 +620,7 @@ const SettingsSections = ({
 					</SwitchItem>
 					<SwitchItem
 						className={css.switchItem}
+						disabled={settings.enableDiagnostics !== true}
 						onToggle={settingToggleHandlers.showFocusDebugOverlay}
 						selected={settings.showFocusDebugOverlay === true}
 					>
@@ -594,6 +628,7 @@ const SettingsSections = ({
 					</SwitchItem>
 					<SwitchItem
 						className={css.switchItem}
+						disabled={settings.enableDiagnostics !== true}
 						onToggle={settingToggleHandlers.verboseAppLogs}
 						selected={settings.verboseAppLogs === true}
 					>
@@ -602,6 +637,7 @@ const SettingsSections = ({
 					{isNonStableBuild ? (
 						<SwitchItem
 							className={css.switchItem}
+							disabled={settings.enableDiagnostics !== true}
 							onToggle={settingToggleHandlers.showDebugErrorMenu}
 							selected={settings.showDebugErrorMenu === true}
 						>

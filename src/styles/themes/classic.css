@@ -9,6 +9,10 @@
 	--bf-theme-filter-badge-bg: rgba(63, 184, 255, 0.95);
 	--bf-theme-filter-badge-color: #04111e;
 	--bf-theme-filter-badge-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.35);
+	--bf-theme-hero-title-fg: rgba(250, 252, 255, 0.98);
+	--bf-theme-hero-title-outline: rgba(0, 0, 0, 0.78);
+	--bf-theme-hero-title-outline-width: 1px;
+	--bf-theme-hero-title-shadow: 0 0.16rem 0.3rem rgba(0, 0, 0, 0.95), 0 0.4rem 1rem rgba(0, 0, 0, 0.82);
 
 	--bf-theme-surface-bg: rgba(18, 18, 18, 0.95);
 	--bf-theme-surface-border: rgba(255, 255, 255, 0.2);
@@ -35,6 +39,9 @@
 	--bf-theme-notice-bg: rgba(80, 170, 255, 0.15);
 	--bf-theme-notice-border: rgba(80, 170, 255, 0.45);
 	--bf-theme-notice-color: rgba(217, 236, 255, 0.98);
+	--bf-theme-warning-bg: rgba(120, 86, 22, 0.5);
+	--bf-theme-warning-border: rgba(255, 206, 91, 0.56);
+	--bf-theme-warning-color: rgba(255, 241, 203, 0.98);
 	--bf-theme-error-bg: rgba(90, 30, 40, 0.42);
 	--bf-theme-error-border: rgba(255, 122, 143, 0.45);
 	--bf-theme-error-color: rgba(255, 223, 229, 0.98);

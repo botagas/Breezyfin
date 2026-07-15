@@ -29,6 +29,7 @@ describe('playbackOverride', () => {
 			seekSeconds: 10,
 			extra: {
 				forceSubtitleBurnIn: true,
+				safeSubtitleBurnInProfile: true,
 				avoidDolbyVision: true,
 				dynamicRangeCap: 'hdr10'
 			}
@@ -39,6 +40,7 @@ describe('playbackOverride', () => {
 			seekSeconds: 10,
 			forceNewSession: true,
 			forceSubtitleBurnIn: true,
+			safeSubtitleBurnInProfile: true,
 			avoidDolbyVision: true,
 			dynamicRangeCap: 'hdr10'
 		});

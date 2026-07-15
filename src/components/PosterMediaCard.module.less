@@ -1,0 +1,167 @@
+@import (reference) '../styles/cardStyles.less';
+
+.card {
+	cursor: pointer;
+	position: relative;
+	min-width: 0;
+	width: calc(100% - 2rem);
+	height: 100%;
+	margin-right: 1rem;
+	margin-left: 1rem;
+	box-sizing: border-box;
+	overflow: hidden;
+	.card-shell();
+	.card-focus-expand-reset();
+	transform: none;
+	transition: none;
+
+	&:global(.focusExpand) {
+		margin-right: 1rem !important;
+		margin-left: 1rem !important;
+	}
+
+	&:hover,
+	&:global(.spottable):focus {
+		.image {
+			border-color: var(--bf-theme-card-border-focus);
+		}
+	}
+}
+
+.image {
+	.card-image-overlays();
+	box-shadow: none;
+	transition: none;
+
+	img {
+		transform: none;
+		filter: none;
+		transition: opacity 180ms ease-out;
+	}
+}
+
+.posterGrid .image {
+	.card-image-shell(2/3);
+}
+
+.landscapeGrid .image {
+	.card-image-shell(16/9);
+}
+
+.placeholder {
+	.card-placeholder-surface();
+}
+
+.placeholderInner {
+	.card-placeholder-inner-content();
+	font-size: 1em;
+}
+
+.info {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.posterGrid .info {
+	padding: 0.5rem 0.2rem 0;
+	height: 6.6rem;
+}
+
+.landscapeGrid .info {
+	height: 6.25rem;
+	padding: 0.55rem 0.2rem 0;
+	box-sizing: border-box;
+}
+
+.title {
+	.card-title-text();
+	text-align: left;
+	max-height: 2.7em;
+	overflow-wrap: break-word;
+	word-break: break-word;
+}
+
+.posterGrid .title {
+	margin: 0.58rem 0 0;
+}
+
+.landscapeGrid .title {
+	margin: 0;
+	height: 2.7em;
+}
+
+.subtitle {
+	.card-subtitle-text();
+	text-align: left;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.posterGrid .subtitle {
+	margin-top: 0.28rem;
+}
+
+.landscapeGrid .subtitle {
+	margin-top: 0.18rem;
+	height: 1.35em;
+	line-height: 1.35;
+}
+
+.watchedBadge,
+.progressBadge {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+}
+
+.contextBadgeStack {
+	position: absolute;
+	top: 0.5rem;
+	left: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.45rem;
+	z-index: 6;
+}
+
+.contextBadge {
+	.status-badge-pill();
+	padding: 0.28rem 0.48rem;
+	font-size: 0.72em;
+}
+
+.watchedBadge {
+	.status-badge-success();
+}
+
+.progressBadge {
+	padding: 0.35rem 0.5rem;
+	.status-badge-pill();
+}
+
+.progressBar {
+	.card-progress-bar-surface();
+}
+
+.progress {
+	.card-progress-bar-fill();
+	transition: width 0.3s ease;
+}
+
+:global([data-bf-animations='off']),
+:global([data-bf-all-animations='off']) {
+	.card,
+	.progress {
+		transition: none !important;
+	}
+
+	.card,
+	.card:hover,
+	.card:focus,
+	.card:global(.spottable):focus {
+		transform: none !important;
+		filter: none !important;
+	}
+}

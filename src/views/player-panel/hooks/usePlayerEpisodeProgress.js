@@ -2,6 +2,7 @@ import {useCallback, useEffect, useState} from 'react';
 
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import jellyfinService from '../../../services/jellyfinService';
+import {getRuntimeSuspended} from '../../../hooks/useRuntimeSuspension';
 import {getNextEpisodeForItem, getPreviousEpisodeForItem} from '../utils/episodeNavigation';
 
 export const usePlayerEpisodeProgress = ({
@@ -65,7 +66,7 @@ export const usePlayerEpisodeProgress = ({
 		}
 
 		progressIntervalRef.current = setInterval(async () => {
-			if (videoRef.current && item) {
+			if (videoRef.current && item && !videoRef.current.paused && !getRuntimeSuspended()) {
 				const positionTicks = Math.floor(videoRef.current.currentTime * JELLYFIN_TICKS_PER_SECOND);
 				await jellyfinService.reportPlaybackProgress(item.Id, positionTicks, false, getPlaybackSessionContext());
 			}

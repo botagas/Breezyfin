@@ -7,10 +7,11 @@ import {
 	reorderMediaSources,
 	selectMediaSource,
 	toInteger
-} from '../playbackSelection';
+} from '../../../utils/playbackSelection';
 import {hasNonTranscodingDirectPath, usesMkvContainer} from './dolbyVision';
 import {fetchPlaybackInfo} from './network';
-import {appendPlaybackDiagnostic} from './diagnostics';
+import {appendPlaybackDiagnostic} from '../../../utils/playbackDiagnostics';
+import {resolveAudioTrackIndex} from '../../../utils/trackMatching';
 
 const parseTranscodeReasons = (transcodingUrl) => {
 	if (!transcodingUrl) return [];
@@ -31,6 +32,71 @@ const hasAudioRelatedTranscodeReason = (mediaSource) => {
 	const reasons = parseTranscodeReasons(mediaSource?.TranscodingUrl);
 	if (!reasons.length) return false;
 	return reasons.some((reason) => reason.toLowerCase().startsWith('audio') || reason === 'UnknownAudioStreamInfo');
+};
+
+export const attemptAudioTrackIntentRemap = async ({
+	service,
+	itemId,
+	activePayload,
+	selectedSource,
+	audioTrackIntent,
+	createSourceSelectionOptions,
+	diagnostics
+}) => {
+	if (!audioTrackIntent || !selectedSource) return null;
+	const defaultAudioStreamIndex = getDefaultAudioStreamIndex(selectedSource);
+	const match = resolveAudioTrackIndex({
+		audioStreams: getAudioStreams(selectedSource),
+		intent: audioTrackIntent,
+		fallbackIndex: defaultAudioStreamIndex
+	});
+	const addDiagnostic = (entry) => appendPlaybackDiagnostic(diagnostics, {
+		scope: 'audio-track',
+		stage: 'audio-intent-remap',
+		...entry
+	});
+	addDiagnostic({
+		status: match.method === 'no-match' ? 'no-match' : 'applied',
+		reason: match.method,
+		message: Number.isInteger(match.index)
+			? `Audio intent resolved to stream ${match.index}.`
+			: 'Audio intent could not be resolved; using the source default.'
+	});
+	if (
+		!Number.isInteger(match.index) ||
+		match.method === 'no-match' ||
+		toInteger(activePayload.AudioStreamIndex) === match.index
+	) {
+		return {requestedAudioStreamIndex: Number.isInteger(match.index) ? match.index : defaultAudioStreamIndex};
+	}
+
+	const payload = {
+		...activePayload,
+		MediaSourceId: selectedSource.Id || activePayload.MediaSourceId,
+		AudioStreamIndex: match.index
+	};
+	const data = await fetchPlaybackInfo(service, itemId, payload);
+	if (!data?.MediaSources?.length) {
+		addDiagnostic({
+			status: 'failed',
+			reason: 'empty-playback-info',
+			message: 'Mapped audio request returned no source; retaining the initial source default.'
+		});
+		return {requestedAudioStreamIndex: defaultAudioStreamIndex};
+	}
+	const selection = selectMediaSource(
+		data.MediaSources,
+		createSourceSelectionOptions({preferredMediaSourceId: selectedSource.Id})
+	);
+	if (selection.index > 0) {
+		data.MediaSources = reorderMediaSources(data.MediaSources, selection.index);
+	}
+	return {
+		data,
+		selectedSource: data.MediaSources[0],
+		activePayload: payload,
+		requestedAudioStreamIndex: match.index
+	};
 };
 
 export const attemptDirectAudioCompatibilityProbe = async ({

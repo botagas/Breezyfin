@@ -1,17 +1,18 @@
 # Breezyfin Quality Tooling Notes
 
-Last reviewed: 2026-06-23.
+Last reviewed: 2026-07-12.
 
 This document records the current lint/test/audit posture and the evidence-backed adoption path for external quality tools. It is intentionally practical: only add a tool when it covers a real gap without fighting Enact, React, webOS packaging, or the existing custom audits.
 
 ## Current Source Surface
 
-- App JavaScript/React source is linted through `npm run lint`, which delegates to `enact lint .`.
+- App JavaScript/React source is linted through `npm run lint`, which delegates to the lockfile-controlled Enact CLI and the repository's React 18-aware ESLint configuration.
+- Enact builds use the CLI's supported `--no-linting` option only to avoid CLI 7's embedded React 19 compiler-rule configuration. Standalone lint remains mandatory before builds and is enforced by CI/release workflows.
 - Unit tests run through `npm run test -- --watch=false --runInBand`.
 - Repository-specific checks run through `npm run audit`.
 - Current app-owned style surface is large: `src/` contains 207 CSS/LESS files.
 - Current app-owned JS surface is large: `src/` contains 246 JS/JSX files.
-- Component-rendering tests are not currently a standard pattern in the repo. Prefer extracting pure view-model/helper seams for behavior coverage. Consider adding a renderer dependency such as Testing Library or React Test Renderer.
+- Rendered integration tests use Testing Library through `src/testUtils/renderWithBreezyfin.js`, which installs the Breezyfin Sandstone theme and Spotlight root. Prefer pure view-model/helper seams for isolated policy coverage, then use rendered tests for Popup lifecycle, Spotlight focus, and virtual-grid contracts.
 
 ## Current Custom Audit Coverage
 
@@ -24,6 +25,10 @@ The custom audit suite covers repo-specific invariants that generic tools do not
 - release metadata drift
 - runtime debug statement leaks
 - portability/privacy leaks
+- sensitive runtime logging and raw playback URL logging
+- private references, backup artifacts, and test-media names outside intentional README attribution
+- production Enact/React generation drift
+- generated third-party notice drift
 - Jellyfin service-boundary violations
 - local import cycles
 - hotspot growth ceilings
@@ -38,6 +43,15 @@ The custom audit suite covers repo-specific invariants that generic tools do not
 - cross-file duplicate snippets
 
 Keep these checks even if external tools are added. External tools should supplement these repo-specific tests, not replace them without a measured comparison.
+
+## Runtime Diagnostics Performance Contract
+
+- `Enable Diagnostics` defaults off and is the runtime authority for optional overlays, console capture, playback request/decision snapshots, source summaries, runtime diagnostic state, performance counters, and full subtitle canvas/layout sampling.
+- Build flags only control persistent-logging capability. They must not silently activate diagnostics in stable, develop, CI, or local production bundles.
+- Critical AppCrashBoundary render/global/unhandled-rejection records bypass the runtime master but still respect the absolute persistent-logging disable flag.
+- Correctness paths remain active with Diagnostics off: recovery, HLS classification, subtitle readiness/fallback policy, and the bounded external-renderer empty-output watchdog.
+- Tests that assert optional diagnostic snapshots must pass `enableDiagnostics: true`. Tests for normal production behavior should verify those snapshots remain empty or null by default.
+- Performance measurements are valid only after confirming Diagnostics is off, or when intentionally comparing Diagnostics off/on. The Performance Overlay calibrates 30/60 Hz cadence and reports estimated missed refreshes separately from next-frame input delay.
 
 ## External Tool Evaluation
 
@@ -79,17 +93,26 @@ Maintenance path:
 
 ### Dependency Security Auditing
 
-Useful as an explicit review input, but not ready for the standard `npm run audit` gate.
+Production dependency security is a release gate; build-tool advisories remain a separately documented review input.
 
 Evidence:
 
-- Current findings are not concentrated in the newly added quality tools. They primarily come from the Enact CLI/build-tool chain and the runtime `@jellyfin/sdk` Axios chain (`axios`, `follow-redirects`, and `form-data`).
-- A failing security audit would currently block every normal quality run without a validated remediation path.
+- Axios `^1.18.1` is now an explicit runtime dependency and satisfies the Jellyfin SDK peer dependency. Its required `follow-redirects` and `form-data` chain is also resolved to non-vulnerable versions in the lockfile.
+- `npm audit --omit=dev --audit-level=high` currently passes with no production vulnerabilities.
+- The remaining low/moderate findings in an unscoped `npm audit` are confined to the nested Enact CLI build-tool chain (`elliptic` through browser polyfills and `uuid` through the development server). Those packages are not part of the production dependency closure or packaged application.
 - Running `npm audit fix` blindly is too risky for this app because Enact/webOS packaging, Sandstone behavior, and production minification have all been regression-sensitive.
 
 Recommended adoption path:
 
-1. Triage runtime dependency findings first, especially the Jellyfin SDK / Axios chain, because they ship with the app bundle.
-2. Triage Enact CLI/build-tool findings separately from runtime findings; many are build-time only but still matter for CI and developer machines.
-3. Prefer safe direct upgrades, documented overrides/resolutions, or upstream tracking over broad automatic fixes.
-4. Add a dedicated security-audit gate only after the remaining findings are either resolved, accepted with rationale, or separated into runtime/build-time thresholds.
+1. Keep `npm audit --omit=dev --audit-level=high` in the release gate.
+2. Review CLI-only advisories separately and never apply broad automatic fixes to the Enact toolchain.
+3. Prefer safe direct upgrades, documented overrides/resolutions, or upstream tracking over forced transitive replacements.
+4. Re-evaluate the CLI findings as part of the future Enact 5/Limestone/React 19 compatibility investigation.
+
+## Release Supply-Chain Checks
+
+- `npm run audit:runtime-deps` validates the production closure remains on Enact 4, Sandstone 2, and React 18 without mixed runtime generations.
+- `npm run audit:licenses` validates the generated `THIRD_PARTY_NOTICES.txt`, including copied subtitle-engine and Museo font licenses.
+- `npm run audit:private-refs` rejects external-client implementation references, private test-media names, and backup artifacts outside intentional README attribution.
+- `npm run report:package-size` groups packaged bytes into app bundles, iLib, subtitle engines, fonts, source maps/declarations, and other files.
+- Production packages omit subtitle-engine declarations and source maps; develop packages retain useful source maps for diagnostics.

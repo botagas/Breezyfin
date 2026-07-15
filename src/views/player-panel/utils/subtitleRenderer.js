@@ -178,6 +178,19 @@ export const normalizeSubtitleEvents = (events = []) => {
 			const wrapStyle = parsedText.wrapStyle ?? normalizeAssWrapStyle(event?.WrapStyle);
 			const layer = normalizeAssNumber(event?.Layer);
 			const sourceOrder = normalizeAssNumber(event?.SourceOrder);
+			const scriptGeometry = [
+				['playResX', event?.PlayResX],
+				['playResY', event?.PlayResY],
+				['layoutResX', event?.LayoutResX],
+				['layoutResY', event?.LayoutResY]
+			].reduce((geometry, [key, value]) => {
+				const numberValue = Number(value);
+				if (Number.isFinite(numberValue) && numberValue > 0) geometry[key] = numberValue;
+				return geometry;
+			}, {});
+			if (Object.prototype.hasOwnProperty.call(event || {}, 'ScaledBorderAndShadow')) {
+				scriptGeometry.scaledBorderAndShadow = event.ScaledBorderAndShadow !== false;
+			}
 			return {
 				startTicks: Number(event?.StartPositionTicks),
 				endTicks: Number(event?.EndPositionTicks),
@@ -197,6 +210,7 @@ export const normalizeSubtitleEvents = (events = []) => {
 					getHorizontalAlignFromAlignment(alignment) ||
 					SUBTITLE_ALIGN_CENTER,
 				hasAssOverrides: parsedText.hasAssOverrides,
+				...(Object.keys(scriptGeometry).length > 0 ? {scriptGeometry} : {}),
 				...absolutePosition,
 				...(parsedText.origin ? {origin: parsedText.origin} : {}),
 				...(parsedText.runLines ? {runLines: parsedText.runLines} : {}),

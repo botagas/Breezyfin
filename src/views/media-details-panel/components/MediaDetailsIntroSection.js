@@ -28,7 +28,8 @@ const MediaDetailsIntroSection = ({
 		hasOverviewText,
 		overviewExpanded,
 		hasOverviewOverflow,
-		overviewPlayLabel
+		overviewPlayLabel,
+		showPlaybackControls
 	} = details;
 	const {
 		audioTracks,
@@ -242,7 +243,7 @@ const MediaDetailsIntroSection = ({
 									No description available.
 								</BodyText>
 							)}
-							<div className={css.introControlsRow}>
+							{showPlaybackControls ? <div className={css.introControlsRow}>
 								<MediaTrackSelectorRow
 									audioTracks={audioTracks}
 									subtitleTracks={subtitleTracks}
@@ -266,12 +267,12 @@ const MediaDetailsIntroSection = ({
 									{overviewPlayLabel}
 								</Button>
 								{showSectionHints && (
-									<BodyText className={css.sectionHint}>
+									<div className={css.sectionHint}>
 										More
 										<Icon className={css.sectionHintArrow}>arrowsmalldown</Icon>
-									</BodyText>
+									</div>
 								)}
-							</div>
+							</div> : null}
 						</div>
 					</div>
 				</div>

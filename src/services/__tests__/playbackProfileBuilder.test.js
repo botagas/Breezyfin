@@ -15,6 +15,7 @@ jest.mock('../../utils/platformCapabilities', () => ({
 
 import {
 	buildPlaybackRequestContext,
+	buildSafeSubtitleBurnInTranscodingProfiles,
 	buildSubtitleProfiles,
 	buildTranscodingProfiles
 } from '../jellyfin/playbackProfileBuilder';
@@ -72,6 +73,19 @@ describe('playbackProfileBuilder subtitle profiles', () => {
 		expect(hasProfile(profiles, 'ass', 'Encode')).toBe(false);
 	});
 
+	it('advertises image subtitles as external by default for client rendering', () => {
+		const profiles = buildSubtitleProfiles({
+			relaxedPlaybackProfile: false,
+			forceSubtitleBurnIn: false
+		});
+
+		expect(hasProfile(profiles, 'pgs', 'External')).toBe(true);
+		expect(hasProfile(profiles, 'pgssub', 'External')).toBe(true);
+		expect(hasProfile(profiles, 'dvdsub', 'External')).toBe(true);
+		expect(hasProfile(profiles, 'dvbsub', 'External')).toBe(true);
+		expect(hasProfile(profiles, 'pgs', 'Encode')).toBe(false);
+	});
+
 	it('forces encode-only profiles when subtitle burn-in is requested', () => {
 		const profiles = buildSubtitleProfiles({
 			relaxedPlaybackProfile: false,
@@ -80,6 +94,7 @@ describe('playbackProfileBuilder subtitle profiles', () => {
 
 		expect(hasProfile(profiles, 'ass', 'Encode')).toBe(true);
 		expect(hasProfile(profiles, 'pgs', 'Encode')).toBe(true);
+		expect(hasProfile(profiles, 'pgssub', 'Encode')).toBe(true);
 		expect(profiles.some((profile) => profile.Method !== 'Encode')).toBe(false);
 	});
 
@@ -96,6 +111,34 @@ describe('playbackProfileBuilder subtitle profiles', () => {
 				profile.Format === 'srt' && profile.Method === 'Encode'
 			))
 		).toBe(false);
+	});
+
+	it('sets Jellyfin burn-in payload flags when subtitle burn-in is forced', () => {
+		const context = buildPlaybackRequestContext({
+			subtitleStreamIndex: 4,
+			forceSubtitleBurnIn: true
+		});
+
+		expect(context.payload).toEqual(expect.objectContaining({
+			SubtitleStreamIndex: 4,
+			AlwaysBurnInSubtitleWhenTranscoding: true,
+			EnableDirectPlay: false,
+			EnableDirectStream: false,
+			AllowVideoStreamCopy: false,
+			AllowAudioStreamCopy: false
+		}));
+		expect(context.payload.SubtitleMethod).toBeUndefined();
+		expect(context.payload.DeviceProfile.SubtitleProfiles.every((profile) => (
+			profile.Method === 'Encode'
+		))).toBe(true);
+		expect(context.payload.DeviceProfile.TranscodingProfiles).toEqual([
+			expect.objectContaining({
+				Container: 'ts',
+				VideoCodec: 'h264',
+				AudioCodec: 'aac',
+				MaxAudioChannels: '6'
+			})
+		]);
 	});
 });
 
@@ -119,5 +162,29 @@ describe('playbackProfileBuilder transcoding profiles', () => {
 		const profiles = buildTranscodingProfiles(false, baseCapabilities, {preferFmp4Mp4: false});
 		const hlsProfile = profiles.find((profile) => profile?.Protocol === 'hls' && profile?.Type === 'Video');
 		expect(hlsProfile?.Container).toBe('ts');
+	});
+
+	it('builds a conservative subtitle burn-in HLS profile without changing the general profile', () => {
+		const safeProfiles = buildSafeSubtitleBurnInTranscodingProfiles();
+		const safeHlsProfile = safeProfiles.find((profile) => profile?.Protocol === 'hls' && profile?.Type === 'Video');
+
+		expect(safeHlsProfile).toEqual(expect.objectContaining({
+			Container: 'ts',
+			VideoCodec: 'h264',
+			AudioCodec: 'aac',
+			MaxAudioChannels: '6',
+			MinSegments: '1',
+			BreakOnNonKeyFrames: false
+		}));
+
+		const generalProfiles = buildTranscodingProfiles(false, {
+			...baseCapabilities,
+			maxAudioChannels: 8
+		}, {preferFmp4Mp4: true});
+		const generalHlsProfile = generalProfiles.find((profile) => profile?.Protocol === 'hls' && profile?.Type === 'Video');
+		expect(generalHlsProfile).toEqual(expect.objectContaining({
+			Container: 'mp4',
+			MaxAudioChannels: '8'
+		}));
 	});
 });

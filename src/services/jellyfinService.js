@@ -30,7 +30,8 @@ import {
 	getSeasonEpisodes,
 	getSeriesSeasons,
 	getSystemInfo,
-	searchLibraryItems
+	searchLibraryItems,
+	searchLibraryItemsPage
 } from './jellyfin/libraryApi';
 import {
 	markFavoriteItem,
@@ -51,7 +52,9 @@ import {
 import {getMyRequestItems} from './jellyfin/requestsApi';
 import {
 	buildSubtitleStreamUrl,
+	getBitmapSubtitleDeliveryCandidates,
 	getSubtitleTrackEvents,
+	getSubtitleTrackBinary,
 	getSubtitleTrackText
 } from './jellyfin/subtitleApi';
 
@@ -188,7 +191,10 @@ class JellyfinService {
 			}
 			const errorText = await response.text().catch(() => '');
 			const compactError = String(errorText || '').replace(/\s+/g, ' ').trim().slice(0, 280);
-			throw new Error(`${context} failed with status ${response.status}${compactError ? ` - ${compactError}` : ''}`);
+			const requestError = new Error(`${context} failed with status ${response.status}${compactError ? ` - ${compactError}` : ''}`);
+			requestError.status = response.status;
+			requestError.context = context;
+			throw requestError;
 		}
 
 		if (!expectJson) return response;
@@ -245,7 +251,9 @@ class JellyfinService {
 			`/Items/${itemId}/Images/${imageType}`,
 			{
 				width,
-				tag: options?.tag
+				tag: options?.tag,
+				quality: options?.quality,
+				blur: options?.blur
 			},
 			options
 		);
@@ -257,7 +265,9 @@ class JellyfinService {
 			`/Items/${itemId}/Images/Backdrop/${index}`,
 			{
 				width,
-				tag: options?.tag
+				tag: options?.tag,
+				quality: options?.quality,
+				blur: options?.blur
 			},
 			options
 		);
@@ -347,6 +357,10 @@ class JellyfinService {
 		return searchLibraryItems(this, searchTerm, itemTypes, limit, startIndex);
 	}
 
+	async searchPage(searchTerm, itemTypes = null, limit = 25, startIndex = 0) {
+		return searchLibraryItemsPage(this, searchTerm, itemTypes, limit, startIndex);
+	}
+
 	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '') {
 		return getMyRequestItems(this, {
 			parentId,
@@ -357,8 +371,8 @@ class JellyfinService {
 		});
 	}
 
-	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0) {
-		return getFavoriteMediaItems(this, itemTypes, limit, startIndex);
+	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0, options = {}) {
+		return getFavoriteMediaItems(this, itemTypes, limit, startIndex, options);
 	}
 
 	async toggleFavorite(itemId, isFavorite) {
@@ -403,6 +417,14 @@ class JellyfinService {
 
 	async getSubtitleText(itemId, mediaSourceId, subtitleStreamIndex, format) {
 		return getSubtitleTrackText(this, itemId, mediaSourceId, subtitleStreamIndex, format);
+	}
+
+	async getSubtitleBinary(itemId, mediaSourceId, subtitleStreamIndex, format) {
+		return getSubtitleTrackBinary(this, itemId, mediaSourceId, subtitleStreamIndex, format);
+	}
+
+	getBitmapSubtitleDeliveryCandidates(itemId, mediaSource, subtitleStreamIndex, formats) {
+		return getBitmapSubtitleDeliveryCandidates(this, itemId, mediaSource, subtitleStreamIndex, formats);
 	}
 
 	getSubtitleStreamUrl(itemId, mediaSourceId, subtitleStreamIndex, format) {

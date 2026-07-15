@@ -7,38 +7,37 @@
 	pointer-events: none;
 }
 
-.loadingSpinner {
-	--spinner-size: 5rem;
-	--ring-size: 4rem;
-	--core-size: 1.5rem;
-	position: relative;
-	width: var(--spinner-size);
-	height: var(--spinner-size);
-	border-radius: 50%;
+.loadingGust {
+	width: 5.4rem;
+	height: 3.1rem;
 	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: var(--bf-loading-glass-bg);
-	box-shadow: inset 1px 1px 1px var(--bf-loading-glass-highlight);
+	flex-direction: column;
+	justify-content: space-around;
+	filter: drop-shadow(0 0 0.45rem var(--bf-theme-loading-ring-secondary));
 }
 
-.loadingSpinnerRing {
-	position: absolute;
-	width: var(--ring-size);
-	height: var(--ring-size);
-	border: 2px solid transparent;
-	border-top-color: var(--bf-theme-loading-ring-primary);
-	border-right-color: var(--bf-theme-loading-ring-secondary);
-	border-radius: 50%;
-	animation: breezy-loading-spin 1s linear infinite;
-}
+.loadingStroke {
+	display: block;
+	height: 0.34rem;
+	border-radius: 999px;
+	background: linear-gradient(90deg, transparent, var(--bf-theme-loading-ring-primary));
+	transform-origin: right center;
+	animation: breezy-loading-gust 1.05s ease-in-out infinite alternate;
 
-.loadingSpinnerCore {
-	width: var(--core-size);
-	height: var(--core-size);
-	background: var(--bf-theme-loading-core-bg);
-	border-radius: 50%;
-	animation: breezy-loading-pulse 1s ease-in-out infinite alternate;
+	&:nth-child(1) {
+		width: 72%;
+		animation-delay: -0.24s;
+	}
+
+	&:nth-child(2) {
+		width: 100%;
+		animation-delay: -0.08s;
+	}
+
+	&:nth-child(3) {
+		width: 58%;
+		animation-delay: -0.38s;
+	}
 }
 
 .loadingText {
@@ -49,29 +48,20 @@
 	color: var(--bf-theme-text-primary);
 }
 
-@keyframes breezy-loading-spin {
+@keyframes breezy-loading-gust {
 	from {
-		transform: rotate(0deg);
+		transform: translateX(-0.5rem) scaleX(0.82);
+		opacity: 0.42;
 	}
 
 	to {
-		transform: rotate(360deg);
+		transform: translateX(0.45rem) scaleX(1);
+		opacity: 1;
 	}
 }
 
-@keyframes breezy-loading-pulse {
-	from {
-		transform: scale(0.8);
-		opacity: 0.5;
-	}
-
-	to {
-		transform: scale(1);
-		opacity: 0.8;
-	}
-}
-
-:global([data-bf-all-animations='off']) .loadingSpinnerRing,
-:global([data-bf-all-animations='off']) .loadingSpinnerCore {
+:global([data-bf-all-animations='off']) .loadingStroke {
 	animation: none !important;
+	transform: none;
+	opacity: 0.85;
 }

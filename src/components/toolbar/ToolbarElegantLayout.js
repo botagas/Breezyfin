@@ -10,6 +10,7 @@ import imageLoadCss from '../ImageLoadReveal.module.less';
 const ToolbarElegantLayout = ({
 	SpottableDiv,
 	glassFilterId,
+	glassDistortionScale = 77,
 	shouldRenderElegantDistortion,
 	isHomeSection,
 	elegantPanelTitle,
@@ -25,6 +26,7 @@ const ToolbarElegantLayout = ({
 	libraries,
 	activeLibraryId,
 	handleLibraryPopupSelect,
+	librariesPopupContentRef,
 	userMenuScopeRef,
 	elegantUserContainerProps,
 	handleUserButtonClick,
@@ -62,7 +64,7 @@ const ToolbarElegantLayout = ({
 					<defs>
 						<filter id={glassFilterId}>
 							<feTurbulence type="turbulence" baseFrequency="0.007" numOctaves="2" result="noise" />
-							<feDisplacementMap in="SourceGraphic" in2="noise" scale="77" />
+							<feDisplacementMap in="SourceGraphic" in2="noise" scale={glassDistortionScale} />
 						</filter>
 					</defs>
 				</svg>
@@ -149,6 +151,7 @@ const ToolbarElegantLayout = ({
 											activeSection={activeSection}
 											activeLibraryId={activeLibraryId}
 											onLibrarySelect={handleLibraryPopupSelect}
+											contentRef={librariesPopupContentRef}
 										/>
 									</div>
 								)}

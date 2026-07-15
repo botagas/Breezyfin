@@ -1,68 +1,53 @@
 import PosterMediaCard from './PosterMediaCard';
-import MediaCardStatusOverlay from './MediaCardStatusOverlay';
+import {getMediaCardPresentation} from '../utils/mediaCardPresentation';
 import {
 	getPlaybackProgressPercent,
-	getPosterCardImageUrl,
+	getPosterCardImageUrls,
 	getSeriesUnplayedCount,
 	hasStartedWatching
 } from '../utils/mediaItemUtils';
 
-const getPanelCardTitle = (item) => (
-	item?.Type === 'Episode' ? (item.SeriesName || item.Name) : item?.Name
-);
-
-const getPanelCardSubtitle = (item) => {
-	if (item?.Type === 'Episode') {
-		return `S${item.ParentIndexNumber || 1}:E${item.IndexNumber || 1}`;
-	}
-	return item?.ProductionYear ? String(item.ProductionYear) : '';
-};
-
 const PanelPosterMediaCard = ({
 	item,
 	index,
-	classes,
+	variant = 'landscape-grid',
+	className,
 	imageOptions = {includeBackdrop: true, includeSeriesFallback: false},
 	onClick,
 	onPointerDown,
 	onMouseDown,
 	onFocus,
 	onKeyDown,
-	spotlightDisabled = false
+	spotlightDisabled = false,
+	...rest
 }) => {
+	const presentation = getMediaCardPresentation(item);
 	const unwatchedCount = getSeriesUnplayedCount(item);
 	const showWatchStatus = unwatchedCount !== null && hasStartedWatching(item);
 	const isWatchComplete = showWatchStatus && unwatchedCount === 0;
 
 	return (
 		<PosterMediaCard
+			{...rest}
 			itemId={item.Id}
 			data-item-index={index}
-			className={classes.gridCard}
-			imageClassName={classes.cardImage}
-			placeholderClassName={classes.placeholder}
-			usePlaceholderClassWhenNoImage
-			imageUrl={getPosterCardImageUrl(item, imageOptions) || ''}
-			title={getPanelCardTitle(item)}
-			subtitle={getPanelCardSubtitle(item)}
-			titleClassName={classes.cardTitle}
-			subtitleClassName={classes.cardSubtitle}
+			variant={variant}
+			className={className}
+			imageCandidates={getPosterCardImageUrls(item, imageOptions)}
+			title={presentation.title}
+			subtitle={presentation.subtitle}
+			contextBadge={presentation.contextBadge}
+			ariaLabel={presentation.ariaLabel}
+			showWatched={showWatchStatus}
+			watchedContent={isWatchComplete ? '\u2713' : unwatchedCount}
+			watchedVariant={isWatchComplete ? 'watched' : 'progress'}
+			progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
 			onClick={onClick}
 			onPointerDown={onPointerDown}
 			onMouseDown={onMouseDown}
 			onFocus={onFocus}
 			onKeyDown={onKeyDown}
 			spotlightDisabled={spotlightDisabled}
-			overlayContent={(
-				<MediaCardStatusOverlay
-					showWatched={showWatchStatus}
-					watchedContent={isWatchComplete ? '\u2713' : unwatchedCount}
-					watchedClassName={isWatchComplete ? classes.watchedBadge : classes.progressBadge}
-					progressPercent={item.Type !== 'Series' && hasStartedWatching(item) ? getPlaybackProgressPercent(item) : null}
-					progressBarClassName={classes.progressBar}
-					progressClassName={classes.progress}
-				/>
-			)}
 		/>
 	);
 };

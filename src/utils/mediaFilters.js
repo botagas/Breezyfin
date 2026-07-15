@@ -72,10 +72,12 @@ export const mediaItemMatchesFilters = (item, {
 	requireUnplayed = false,
 	useMyRequestsSource = false,
 	username = ''
+} = {}, {
+	requestMembershipSatisfied = false
 } = {}) => {
 	if (includeFavorites && !isFavoriteMediaItem(item)) return false;
 	if (requirePlayed && !getMediaItemPlayedState(item)) return false;
 	if (requireUnplayed && getMediaItemPlayedState(item)) return false;
-	if (useMyRequestsSource && !itemMatchesUserRequestTag(item, username)) return false;
+	if (useMyRequestsSource && !requestMembershipSatisfied && !itemMatchesUserRequestTag(item, username)) return false;
 	return true;
 };

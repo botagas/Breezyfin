@@ -41,6 +41,7 @@ import MediaSeasonsSection from './media-details-panel/components/MediaSeasonsSe
 import MediaSeriesStickyControls from './media-details-panel/components/MediaSeriesStickyControls';
 import MediaEpisodesSection from './media-details-panel/components/MediaEpisodesSection';
 import MediaDetailsIntroSection from './media-details-panel/components/MediaDetailsIntroSection';
+import {isPlayableMediaItem} from '../utils/mediaItemUtils';
 
 import css from './MediaDetailsPanel.module.less';
 import imageLoadCss from '../components/ImageLoadReveal.module.less';
@@ -574,6 +575,7 @@ const MediaDetailsPanel = ({
 	const isSeriesMode = item.Type === 'Series';
 	const showEpisodeInfoButton = typeof onItemSelect === 'function';
 	const popupEpisodes = isSeriesMode ? episodes : episodeNavList;
+	const showPlaybackControls = isSeriesMode ? Boolean(selectedEpisode) : isPlayableMediaItem(item);
 	const introDetails = {
 		item,
 		pageTitle,
@@ -590,7 +592,8 @@ const MediaDetailsPanel = ({
 		hasOverviewText,
 		overviewExpanded,
 		hasOverviewOverflow,
-		overviewPlayLabel
+		overviewPlayLabel,
+		showPlaybackControls
 	};
 	const introMedia = {
 		audioTracks,

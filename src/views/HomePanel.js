@@ -8,20 +8,30 @@ import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
+import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
 import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getHomeSectionDescriptor} from '../constants/homeSections';
 import {KeyCodes} from '../utils/keyCodes';
-import {getLandscapeCardImageUrl} from '../utils/mediaItemUtils';
+import {getLandscapeCardImageUrls} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
+import {
+	findVerticalScrollableAncestor,
+	getVerticalVisibilityDelta
+} from '../utils/verticalFocusScroll';
 
 import css from './HomePanel.module.less';
 
 const SERIES_UNPLAYED_CACHE_TTL_MS = 5 * 60 * 1000;
 const SERIES_UNPLAYED_CACHE_MAX_ENTRIES = 40;
 const HOME_ROW_PREVIEW_LIMIT = 10;
+const HOME_DESIGN_CURRENT = 'current';
+const HOME_DESIGN_CINEMATIC = 'cinematic';
+const HOME_DESIGN_VARIANT = process.env.REACT_APP_HOME_DESIGN_VARIANT === HOME_DESIGN_CURRENT
+	? HOME_DESIGN_CURRENT
+	: HOME_DESIGN_CINEMATIC;
 
 const pruneSeriesUnplayedCache = (cache, now = Date.now()) => {
 	if (!cache || typeof cache.entries !== 'function') return;
@@ -46,6 +56,7 @@ const HomePanel = ({
 	onExit,
 	registerBackHandler,
 	isActive = false,
+	screensaverActive = false,
 	cachedState = null,
 	onCacheState = null,
 	...rest
@@ -68,7 +79,12 @@ const HomePanel = ({
 	});
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 	const [showMediaBar, setShowMediaBar] = useState(true);
+	const [activatedRowCount, setActivatedRowCount] = useState(2);
 	const homeScrollToRef = useRef(null);
+	const homeVerticalScrollerRef = useRef(null);
+	const homeHeaderBottomRef = useRef(0);
+	const lastFocusedRowRef = useRef(-1);
+	const rowVisibilityFrameRef = useRef(0);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
 	const handleNavigation = useCallback((section, data) => {
@@ -142,6 +158,7 @@ const HomePanel = ({
 		contentLoadRequestIdRef.current += 1;
 		const loadRequestId = contentLoadRequestIdRef.current;
 		setLoading(true);
+		setActivatedRowCount(2);
 		try {
 			const [recently, resume, next, movies, shows] = await Promise.all([
 				jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT).catch(err => {
@@ -249,13 +266,56 @@ const HomePanel = ({
 		handleNavigation('homeSection', descriptor);
 	}, [handleNavigation]);
 
-	const getCardImageUrl = useCallback((item) => {
-		return getLandscapeCardImageUrl(item, {width: 640});
+	const getCardImageCandidates = useCallback((item) => {
+		return getLandscapeCardImageUrls(item, {width: 640, quality: 76});
 	}, []);
 
-	const getMediaRowImageUrl = useCallback((id, mediaItem) => {
-		return getCardImageUrl(mediaItem);
-	}, [getCardImageUrl]);
+	const getMediaRowImageCandidates = useCallback((id, mediaItem) => {
+		return getCardImageCandidates(mediaItem);
+	}, [getCardImageCandidates]);
+
+	const handleRowVisible = useCallback((rowIndex) => {
+		setActivatedRowCount((currentCount) => Math.max(currentCount, rowIndex + 2));
+	}, []);
+
+	const handleRowFocus = useCallback((rowIndex, rowNode) => {
+		if (!rowNode || lastFocusedRowRef.current === rowIndex) return;
+		lastFocusedRowRef.current = rowIndex;
+		window.cancelAnimationFrame(rowVisibilityFrameRef.current);
+		rowVisibilityFrameRef.current = window.requestAnimationFrame(() => {
+			const scroller = homeVerticalScrollerRef.current || findVerticalScrollableAncestor(rowNode);
+			if (!scroller) return;
+			homeVerticalScrollerRef.current = scroller;
+			if (!homeHeaderBottomRef.current) {
+				const toolbar = document.querySelector('[data-bf-navbar="true"]');
+				homeHeaderBottomRef.current = toolbar?.getBoundingClientRect().bottom || 0;
+			}
+			const delta = getVerticalVisibilityDelta({
+				targetRect: rowNode.getBoundingClientRect(),
+				scrollerRect: scroller.getBoundingClientRect(),
+				topBoundary: homeHeaderBottomRef.current,
+				topPadding: 12,
+				bottomPadding: 16
+			});
+			if (delta) scroller.scrollTop = Math.max(0, scroller.scrollTop + delta);
+			rowVisibilityFrameRef.current = 0;
+		});
+	}, []);
+
+	useEffect(() => {
+		if (!isActive) return undefined;
+		const resetCachedGeometry = () => {
+			homeVerticalScrollerRef.current = null;
+			homeHeaderBottomRef.current = 0;
+			lastFocusedRowRef.current = -1;
+		};
+		window.addEventListener('resize', resetCachedGeometry);
+		return () => {
+			window.removeEventListener('resize', resetCachedGeometry);
+			window.cancelAnimationFrame(rowVisibilityFrameRef.current);
+			resetCachedGeometry();
+		};
+	}, [isActive]);
 
 	const captureHomeScrollTo = useCallback((fn) => {
 		homeScrollToRef.current = fn;
@@ -319,31 +379,32 @@ const HomePanel = ({
 	const visibleRows = homeRowOrder
 		.map((key) => ({key, row: rowConfig[key]}))
 		.filter(({key, row}) => row && homeRowSettings[key] && row.items.length > 0);
+	const panelBackdropItem = heroItems[0] || visibleRows[0]?.row?.items?.[0] || null;
+	const handleToolbarNavigateDown = useCallback(() => {
+		if (!showMediaBar || heroItems.length === 0) return false;
+		focusHeroPrimaryAction();
+		return true;
+	}, [focusHeroPrimaryAction, heroItems.length, showMediaBar]);
 	const handleHomePanelKeyDownCapture = useCallback((event) => {
 		const code = event.keyCode || event.which;
 		if (code !== KeyCodes.DOWN) return;
 		const activeElement = document.activeElement;
 		const spotlightId = activeElement?.dataset?.spotlightId || '';
-		if (showMediaBar && heroItems.length > 0 && spotlightId.startsWith('toolbar-')) {
-			event.preventDefault();
-			event.stopPropagation();
-			event.stopImmediatePropagation?.();
-			focusHeroPrimaryAction();
-			return;
-		}
 		if (!spotlightId.startsWith('home-hero-') || visibleRows.length === 0) return;
 		event.preventDefault();
 		event.stopPropagation();
 		event.stopImmediatePropagation?.();
 		Spotlight.focus(`home-row-more-${visibleRows[0].key}`);
-	}, [focusHeroPrimaryAction, heroItems.length, showMediaBar, visibleRows]);
+	}, [visibleRows]);
 	const hasContent = visibleRows.length > 0;
 	const hasHero = showMediaBar && heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
+	const useCinematicHome = HOME_DESIGN_VARIANT === HOME_DESIGN_CINEMATIC;
 	const topToolbar = (
 		<Toolbar
 			activeSection="home"
 			isActive={isActive}
+			onNavigateDown={handleToolbarNavigateDown}
 			{...toolbarActions}
 		/>
 	);
@@ -369,17 +430,21 @@ const HomePanel = ({
 					</div>
 				</div>
 			)}
+			{useCinematicHome ? <MediaPanelBackdrop item={panelBackdropItem} /> : null}
 			<Scroller
-				className={css.scroller}
+				className={`${css.scroller} ${useCinematicHome ? css.scrollerCinematic : ''}`}
 				cbScrollTo={captureHomeScrollTo}
 				onScrollStop={handleHomeScrollMemoryStop}
+				verticalScrollbar={useCinematicHome ? 'hidden' : 'auto'}
 			>
-				<div className={css.content}>
+				<div className={`${css.content} ${useCinematicHome ? css.contentCinematic : ''}`}>
+					{!useCinematicHome ? <MediaPanelBackdrop item={panelBackdropItem} /> : null}
 					{hasHero && (
 						<HeroBanner
 							items={heroItems}
 							onPlayClick={handleItemClick}
-							isActive={isActive}
+							isActive={isActive && !screensaverActive}
+							variant={HOME_DESIGN_VARIANT}
 						/>
 					)}
 
@@ -389,13 +454,17 @@ const HomePanel = ({
 							title={row.title}
 							items={row.items}
 							onItemClick={handleItemClick}
-							getImageUrl={getMediaRowImageUrl}
+							getImageCandidates={getMediaRowImageCandidates}
+							imagesActive={rowIndex < activatedRowCount}
+							onRowVisible={handleRowVisible}
+							onRowFocus={handleRowFocus}
 							showEpisodeProgress={row.showEpisodeProgress}
 							rowIndex={rowIndex}
 							onCardKeyDown={handleHomeCardKeyDown}
 							onMoreClick={handleViewMoreSection}
 							moreSpotlightId={`home-row-more-${key}`}
 							sectionKey={key}
+							variant={HOME_DESIGN_VARIANT}
 						/>
 					))}
 				</div>

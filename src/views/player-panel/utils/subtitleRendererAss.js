@@ -651,6 +651,9 @@ const parseAssMetadata = (text) => {
 	let section = '';
 	let playResX = null;
 	let playResY = null;
+	let layoutResX = null;
+	let layoutResY = null;
+	let scaledBorderAndShadow = true;
 	let wrapStyle = null;
 	let styleFormat = [];
 	const styles = new Map();
@@ -667,6 +670,17 @@ const parseAssMetadata = (text) => {
 			}
 			if (/^PlayResY\s*:/i.test(trimmed)) {
 				playResY = Number(trimmed.replace(/^PlayResY\s*:/i, '').trim());
+			}
+			if (/^LayoutResX\s*:/i.test(trimmed)) {
+				layoutResX = Number(trimmed.replace(/^LayoutResX\s*:/i, '').trim());
+			}
+			if (/^LayoutResY\s*:/i.test(trimmed)) {
+				layoutResY = Number(trimmed.replace(/^LayoutResY\s*:/i, '').trim());
+			}
+			if (/^ScaledBorderAndShadow\s*:/i.test(trimmed)) {
+				scaledBorderAndShadow = !/^no$/i.test(
+					trimmed.replace(/^ScaledBorderAndShadow\s*:/i, '').trim()
+				);
 			}
 			if (/^WrapStyle\s*:/i.test(trimmed)) {
 				wrapStyle = normalizeAssWrapStyle(trimmed.replace(/^WrapStyle\s*:/i, '').trim());
@@ -745,6 +759,9 @@ const parseAssMetadata = (text) => {
 	return {
 		playResX: normalizeAssPlayResValue(playResX, DEFAULT_ASS_PLAY_RES_X),
 		playResY: normalizeAssPlayResValue(playResY, DEFAULT_ASS_PLAY_RES_Y),
+		layoutResX: normalizeAssNumber(layoutResX),
+		layoutResY: normalizeAssNumber(layoutResY),
+		scaledBorderAndShadow,
 		wrapStyle,
 		styles
 	};
@@ -765,7 +782,15 @@ const parseAssTimestampToTicks = (value) => {
 
 export const parseAssDialogueEvents = (text, format) => {
 	const lines = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-	const {playResX, playResY, styles, wrapStyle} = parseAssMetadata(text);
+	const {
+		playResX,
+		playResY,
+		layoutResX,
+		layoutResY,
+		scaledBorderAndShadow,
+		styles,
+		wrapStyle
+	} = parseAssMetadata(text);
 	let eventFormat = [];
 	const events = [];
 	lines.forEach((line) => {
@@ -808,6 +833,9 @@ export const parseAssDialogueEvents = (text, format) => {
 			Format: format,
 			PlayResX: playResX,
 			PlayResY: playResY,
+			LayoutResX: layoutResX,
+			LayoutResY: layoutResY,
+			ScaledBorderAndShadow: scaledBorderAndShadow,
 			StyleFontSize: style?.fontSize,
 			Alignment: style?.alignment,
 			AssStyle: style,

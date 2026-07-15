@@ -93,3 +93,17 @@
 .compat-gap-row-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .elegantContainer", clamp(0.6rem, 1vw, 1rem));
 .compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .libraryNativeInner", 0.7rem);
 .compat-gap-column-fallback(~":global([data-bf-webos-v6-compat='on'][data-bf-flex-gap='off']) .userMenuInner", 0.7rem);
+
+/* Compact Elegant headers keep only the centered tab capsule visible on legacy webOS. */
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill,
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill .glassNav {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+}
+
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill .glassFilter,
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill .glassOverlay,
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill .glassSpecular {
+	display: none !important;
+}

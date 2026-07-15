@@ -34,6 +34,8 @@ requireString('package.json', packageJson, 'name');
 requireString('package.json', packageJson, 'version');
 requireString('package.json', packageJson, 'description');
 requireString('package.json', packageJson, 'main');
+requireString('package.json', packageJson, 'license');
+requireString('package.json', packageJson, 'homepage');
 
 requireString('appinfo.json', appinfo, 'id');
 requireString('appinfo.json', appinfo, 'version');
@@ -64,6 +66,22 @@ if (typeof appinfo.id === 'string' && !APP_ID_RE.test(appinfo.id)) {
 
 if (appinfo.type !== 'web') {
 	failures.push(`appinfo.json type should be "web" for this Enact app, got "${appinfo.type}".`);
+}
+
+if (packageJson.license !== 'GPL-3.0-only') {
+	failures.push(`package.json license must be GPL-3.0-only, got "${packageJson.license || 'missing'}".`);
+}
+
+if (packageJson.repository?.url !== 'git+https://github.com/botagas/Breezyfin.git') {
+	failures.push('package.json repository.url must point to the canonical Breezyfin GitHub repository.');
+}
+
+if (packageJson.bugs?.url !== 'https://github.com/botagas/Breezyfin/issues') {
+	failures.push('package.json bugs.url must point to the canonical Breezyfin issue tracker.');
+}
+
+if (packageJson.enact?.publicUrl !== '.') {
+	failures.push('package.json enact.publicUrl must be "." so packaged webOS assets resolve under file://.');
 }
 
 if (!hasFile(packageJson.main || '')) {

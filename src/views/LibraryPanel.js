@@ -1,28 +1,24 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
-import Spinner from '@enact/sandstone/Spinner';
 import Toolbar from '../components/Toolbar';
 import MediaFilterControls from '../components/MediaFilterControls';
-import PanelPosterMediaCard from '../components/PanelPosterMediaCard';
+import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
+import PanelLandscapeVirtualGrid from '../components/PanelLandscapeVirtualGrid';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
-import Spotlight from '@enact/spotlight';
-import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
+import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
+import BodyText from '@enact/sandstone/BodyText';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import {useMediaFilterState} from '../hooks/useMediaFilterState';
+import {useCollapsibleBrowseSearch} from '../hooks/useCollapsibleBrowseSearch';
 import { useLibraryPagination } from './library-panel/hooks/useLibraryPagination';
-import { useLibraryScrollPersistence } from './library-panel/hooks/useLibraryScrollPersistence';
-import {focusTargetFromRightMostGridItem, shouldLoadMoreFromGridFocus} from '../utils/gridFocus';
-import {getPanelPosterCardClassProps} from '../utils/posterCardClassProps';
+import {focusSpotlightTarget} from '../utils/gridFocus';
 import {MEDIA_FILTER_OPTIONS} from '../utils/mediaFilters';
-import {buildMediaListItemKey} from '../utils/reactKeys';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
+import {buildGridQuerySignature} from '../utils/gridScrollRestore';
 
 import css from './LibraryPanel.module.less';
-
-const FOCUS_PREFETCH_THRESHOLD = 12;
-const LibraryGridSpotlightContainer = createLastFocusedSpotlightContainer('div');
+import browseCss from '../components/MediaBrowseControls.module.less';
 
 const LibraryPanel = ({
 	library,
@@ -38,17 +34,33 @@ const LibraryPanel = ({
 	inputMode = '5way',
 	...rest
 }) => {
-	const scrollerRef = useRef(null);
-	const panelRootRef = useRef(null);
-	const lastFocusedCardIdRef = useRef(null);
-	const commitCurrentScrollNowRef = useRef(null);
-	const setScrollTopRef = useRef(null);
+	const lastFocusedCardIdRef = useRef(cachedState?.focusedItemId || null);
+	const focusResultsAfterFilterRef = useRef(false);
+	const panelCacheSnapshotRef = useRef(cachedState || {});
+	const latestCachedStateRef = useRef(cachedState);
+	latestCachedStateRef.current = cachedState;
 	const activeLibraryId = library?.Id || null;
 	const activeLibraryCollectionType = library?.CollectionType || null;
-	const isPointerInputMode = inputMode === 'pointer';
+	const handleAppliedSearchChange = useCallback(() => {
+		lastFocusedCardIdRef.current = null;
+		focusResultsAfterFilterRef.current = true;
+	}, []);
+	const {
+		searchValue: searchTerm,
+		appliedSearchValue: appliedSearchTerm,
+		searchExpanded,
+		restoreSearchState,
+		handleSearchReveal,
+		handleSearchChange,
+		handleSearchBlur
+	} = useCollapsibleBrowseSearch({
+		initialValue: cachedState?.searchTerm,
+		spotlightId: 'library-search-input',
+		onApplySearch: handleAppliedSearchChange
+	});
 	const handleFilterApply = useCallback(() => {
-		commitCurrentScrollNowRef.current?.();
-		setScrollTopRef.current?.(0);
+		lastFocusedCardIdRef.current = null;
+		focusResultsAfterFilterRef.current = true;
 	}, []);
 	const {
 		activeFilterIds,
@@ -56,12 +68,12 @@ const LibraryPanel = ({
 		filterPopupOpen,
 		filterPopupContentRef,
 		activeFilterCount,
-		cacheStateWithFilters,
 		openFilterPopup,
 		closeFilterPopup,
 		resetDraftFilters,
 		selectDraftFilter,
-		applyDraftFilters
+		applyDraftFilters,
+		handleFilterPopupHide
 	} = useMediaFilterState({
 		cachedState,
 		resetKey: activeLibraryId,
@@ -69,16 +81,17 @@ const LibraryPanel = ({
 		triggerSpotlightId: 'library-filter-trigger',
 		onApplyFilters: handleFilterApply
 	});
-	const {
-		scrollTop,
-		setScrollTop
-	} = usePanelScrollState({
-		cachedState,
-		isActive,
-		onCacheState: cacheStateWithFilters,
-		cacheKey: activeLibraryId,
-		requireCacheKey: true
-	});
+	const cacheBrowseState = useCallback((cacheKey, nextState) => {
+		if (typeof onCacheState !== 'function' || !cacheKey) return;
+		const mergedState = {
+			...panelCacheSnapshotRef.current,
+			...(nextState || {}),
+			activeFilterIds,
+			searchTerm: appliedSearchTerm
+		};
+		panelCacheSnapshotRef.current = mergedState;
+		onCacheState(cacheKey, mergedState);
+	}, [activeFilterIds, appliedSearchTerm, onCacheState]);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -99,143 +112,78 @@ const LibraryPanel = ({
 		if (collectionType === 'tvshows') return ['Series'];
 		return undefined;
 	}, []);
+	const handlePaginationStateChange = useCallback((nextPaginationState) => {
+		cacheBrowseState(activeLibraryId, nextPaginationState);
+	}, [activeLibraryId, cacheBrowseState]);
 	const {
 		loading,
 		loadingMore,
 		hasMore,
 		items,
-		loadNextPage,
-		loadingMoreRef
+		loadNextPage
 	} = useLibraryPagination({
 		activeLibraryId,
 		activeLibraryCollectionType,
 		getItemTypesForLibrary,
 		pageSize: MEDIA_GRID_PAGE_SIZE,
-		activeFilterIds
+		activeFilterIds,
+		searchTerm: appliedSearchTerm,
+		cachedState,
+		onStateChange: handlePaginationStateChange
 	});
+	useEffect(() => {
+		const restoredState = latestCachedStateRef.current;
+		const restoredSearchTerm = String(restoredState?.searchTerm || '');
+		panelCacheSnapshotRef.current = restoredState || {};
+		restoreSearchState(restoredSearchTerm);
+	}, [activeLibraryId, cachedState?.searchTerm, restoreSearchState]);
+	useEffect(() => {
+		lastFocusedCardIdRef.current = cachedState?.focusedItemId || null;
+	}, [activeLibraryId, cachedState?.focusedItemId]);
 	const filteredOptions = useMemo(() => {
 		if (library?.CollectionType === 'movies') {
 			return MEDIA_FILTER_OPTIONS.filter((entry) => entry.id !== 'played');
 		}
 		return MEDIA_FILTER_OPTIONS;
 	}, [library?.CollectionType]);
-	const panelCardClasses = getPanelPosterCardClassProps(css);
 	const itemsById = useMapById(items);
-	const {handleScrollerScroll, commitCurrentScrollNow} = useLibraryScrollPersistence({
-		scrollerRef,
-		isActive,
-		activeLibraryId,
-		loading,
-		hasMore,
-		loadNextPage,
-		scrollTop,
-		setScrollTop
-	});
-	commitCurrentScrollNowRef.current = commitCurrentScrollNow;
-	setScrollTopRef.current = setScrollTop;
-
 	const handleGridCardClick = useCallback((event) => {
-		commitCurrentScrollNow();
 		const itemId = event.currentTarget.dataset.itemId;
+		lastFocusedCardIdRef.current = itemId || null;
+		cacheBrowseState(activeLibraryId, {focusedItemId: lastFocusedCardIdRef.current});
 		const selectedItem = itemsById.get(itemId);
 		if (!selectedItem) return;
 		onItemSelect(selectedItem);
-	}, [commitCurrentScrollNow, itemsById, onItemSelect]);
+	}, [activeLibraryId, cacheBrowseState, itemsById, onItemSelect]);
 
-	const handleGridCardPointerDown = useCallback((event) => {
-		if (!isPointerInputMode) return;
-		event.stopPropagation();
-	}, [isPointerInputMode]);
-
-	const handleGridCardFocus = useCallback((event) => {
-		lastFocusedCardIdRef.current = event.currentTarget?.dataset?.itemId || null;
-		if (shouldLoadMoreFromGridFocus({
-			event,
-			isPointerInputMode,
-			hasMore,
-			isLoadingMore: loadingMoreRef.current,
-			itemCount: items.length,
-			threshold: FOCUS_PREFETCH_THRESHOLD
-		})) {
-			loadNextPage();
-		}
-	}, [hasMore, isPointerInputMode, items.length, loadNextPage, loadingMoreRef]);
-
-	const focusLibraryFilterTrigger = useCallback(() => {
-		Spotlight.focus('library-filter-trigger');
-	}, []);
-
-	const focusLastCard = useCallback(() => {
-		if (!lastFocusedCardIdRef.current) return false;
-		const cards = Array.from(panelRootRef.current?.querySelectorAll(`.${css.gridCard}`) || []);
-		const target = cards.find((card) => card.dataset?.itemId === lastFocusedCardIdRef.current);
-		if (!target) return false;
-		target.focus?.();
-		return true;
-	}, []);
-
-	const handlePanelKeyDownCapture = useCallback((event) => {
-		const code = event.keyCode || event.which;
-		const activeElement = document.activeElement;
-		const spotlightId = activeElement?.dataset?.spotlightId || '';
-		if (code === 40 && (spotlightId === 'toolbar-user' || spotlightId === 'toolbar-library')) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusLibraryFilterTrigger();
-			return;
-		}
-		if (code === 37 && spotlightId === 'library-filter-trigger') {
-			event.preventDefault();
-			event.stopPropagation();
-			if (!focusLastCard()) {
-				Spotlight.focus('library-grid');
-			}
-		}
-	}, [focusLastCard, focusLibraryFilterTrigger]);
-
-	const handleGridCardKeyDown = useCallback((event) => {
-		focusTargetFromRightMostGridItem({
-			event,
-			panelRoot: panelRootRef.current,
-			gridCardClassName: css.gridCard,
-			focusTarget: focusLibraryFilterTrigger
-		});
-	}, [focusLibraryFilterTrigger]);
+	const gridItemRendererProps = useMemo(() => ({
+		onItemClick: handleGridCardClick,
+		cardClassName: css.gridCard,
+		imageOptions: {includeBackdrop: true, includeSeriesFallback: false}
+	}), [handleGridCardClick]);
+	const handleToolbarNavigateDown = useCallback(() => focusSpotlightTarget('library-search-input'), []);
+	const querySignature = buildGridQuerySignature(activeLibraryId, [appliedSearchTerm, ...activeFilterIds]);
 
 	const topToolbar = (
 		<Toolbar
 			activeSection="library"
 			activeLibraryId={library?.Id}
 			isActive={isActive}
+			onNavigateDown={handleToolbarNavigateDown}
 			{...toolbarActions}
 		/>
 	);
-
-	if (loading) {
-		return (
-			<Panel {...rest}>
-				<Header title={library?.Name || 'Library'} />
-				{topToolbar}
-				<div className={css.loading}>
-					<BreezyLoadingOverlay />
-				</div>
-			</Panel>
-		);
-	}
 
 	return (
 		<Panel {...rest}>
 			<Header title={library?.Name || 'Library'} />
 			{topToolbar}
-			<div className={css.libraryContainer} ref={panelRootRef} onKeyDownCapture={handlePanelKeyDownCapture}>
-				<div
-					ref={scrollerRef}
-					className={css.nativeScroller}
-					onScroll={handleScrollerScroll}
-				>
-					<div className={css.contentFrame}>
-						<div className={css.filterOverlay}>
-							<div className={css.filterOverlayControls}>
+			<div
+				className={`${css.libraryContainer} ${browseCss.panelLayout}`}
+				data-input-mode={inputMode}
+			>
+				<MediaPanelBackdrop item={items[0] || null} />
+				<MediaBrowseOverlay compact expanded={searchExpanded} actionCount={2}>
 								<MediaFilterControls
 									title="Library"
 									triggerSpotlightId="library-filter-trigger"
@@ -244,37 +192,39 @@ const LibraryPanel = ({
 									filterPopupContentRef={filterPopupContentRef}
 									draftFilterIds={draftFilterIds}
 									filterOptions={filteredOptions}
+									searchVisible
+									searchExpanded={searchExpanded}
+									searchValue={searchTerm}
+									searchPlaceholder={`Search ${library?.Name || 'library'}...`}
+									searchSpotlightId="library-search-input"
+									onSearchReveal={handleSearchReveal}
+									onSearchChange={handleSearchChange}
+									onSearchBlur={handleSearchBlur}
 									onTrigger={openFilterPopup}
 									onClose={closeFilterPopup}
+									onHide={handleFilterPopupHide}
 									onReset={resetDraftFilters}
 									onApply={applyDraftFilters}
 									onDraftSelect={selectDraftFilter}
 								/>
-							</div>
-						</div>
-						<LibraryGridSpotlightContainer className={css.gridContainer} spotlightId="library-grid">
-							{items.map((item, index) => (
-								<PanelPosterMediaCard
-									key={buildMediaListItemKey(`library-${activeLibraryId || 'unknown'}`, item, index)}
-									item={item}
-									index={index}
-									classes={panelCardClasses}
-									imageOptions={{includeBackdrop: true, includeSeriesFallback: false}}
-									onClick={handleGridCardClick}
-									onPointerDown={handleGridCardPointerDown}
-									onMouseDown={handleGridCardPointerDown}
-									onFocus={handleGridCardFocus}
-									onKeyDown={handleGridCardKeyDown}
-									spotlightDisabled={isPointerInputMode}
-								/>
-							))}
-							{loadingMore && (
-								<div className={css.loadingMore}>
-									<Spinner size="small" />
-								</div>
-							)}
-						</LibraryGridSpotlightContainer>
-					</div>
+				</MediaBrowseOverlay>
+				<div className={`${css.virtualGridViewport} ${browseCss.panelResultsOffset}`}>
+					{loading ? <div className={css.loading}><BreezyLoadingOverlay /></div> : null}
+					{!loading && items.length === 0 ? <div className={css.emptyState}><BodyText>No items found.</BodyText></div> : null}
+					{!loading && items.length > 0 ? <PanelLandscapeVirtualGrid
+						id="library-grid"
+						className={css.virtualGrid}
+						items={items}
+						itemRendererProps={gridItemRendererProps}
+						isActive={isActive}
+						queryKey={querySignature}
+							hasMore={hasMore}
+						loadingMore={loadingMore}
+						onLoadMore={loadNextPage}
+						disableFocusScale
+						focusedItemIdRef={lastFocusedCardIdRef}
+						focusFirstItemRef={focusResultsAfterFilterRef}
+					/> : null}
 				</div>
 			</div>
 		</Panel>

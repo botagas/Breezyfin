@@ -11,7 +11,7 @@ import {
 	selectAvailableBackdropServers
 } from '../utils/loginBackdropSources';
 
-export const useLoginBackdrops = ({isActive, savedServers}) => {
+export const useLoginBackdrops = ({isActive, deferLoading = false, savedServers}) => {
 	const [loginBackdropUrls, setLoginBackdropUrls] = useState([]);
 	const [activeBackdropIndex, setActiveBackdropIndex] = useState(0);
 	const [previousBackdropIndex, setPreviousBackdropIndex] = useState(null);
@@ -41,7 +41,7 @@ export const useLoginBackdrops = ({isActive, savedServers}) => {
 	}, []);
 
 	useEffect(() => {
-		if (!isActive) {
+		if (!isActive || deferLoading) {
 			setLoginBackdropUrls([]);
 			setBackdropImageErrors({});
 			return undefined;
@@ -84,7 +84,7 @@ export const useLoginBackdrops = ({isActive, savedServers}) => {
 			isCancelled = true;
 			controller.abort();
 		};
-	}, [isActive, savedServers]);
+	}, [deferLoading, isActive, savedServers]);
 
 	useEffect(() => {
 		setActiveBackdropIndex(0);

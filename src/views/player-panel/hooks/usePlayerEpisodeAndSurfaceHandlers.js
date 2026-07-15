@@ -32,7 +32,7 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 		try {
 			const nextEpisode = nextEpisodeData || await getNextEpisode(item);
 			if (nextEpisode) {
-				const opts = buildPlaybackOptions();
+				const opts = buildPlaybackOptions({remapTrackIntents: true});
 				playbackOverrideRef.current = { ...opts, forceNewSession: true };
 				await handleStop();
 				onPlay(nextEpisode, opts);
@@ -56,7 +56,7 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 		try {
 			const previousEpisode = await getPreviousEpisode(item);
 			if (previousEpisode) {
-				const opts = buildPlaybackOptions();
+				const opts = buildPlaybackOptions({remapTrackIntents: true});
 				playbackOverrideRef.current = { ...opts, forceNewSession: true };
 				await handleStop();
 				onPlay(previousEpisode, opts);

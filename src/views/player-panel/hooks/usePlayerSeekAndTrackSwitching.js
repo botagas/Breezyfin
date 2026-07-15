@@ -4,7 +4,7 @@ import jellyfinService from '../../../services/jellyfinService';
 import {
 	getSubtitleTranscodePolicy,
 	shouldTranscodeForSubtitleSelection
-} from '../../../services/jellyfin/playbackSelection';
+} from '../../../utils/playbackSelection';
 import {
 	applyNativeAudioTrackSelection,
 	resolveRuntimeTrackIndex
@@ -183,6 +183,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		return shouldTranscodeForSubtitleSelection(mediaSourceData, trackIndex, {
 			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
 			assSubtitleRenderer: settings.assSubtitleRenderer,
+			bitmapSubtitleRenderer: settings.bitmapSubtitleRenderer,
 			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
 			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
@@ -195,6 +196,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		const policy = getSubtitleTranscodePolicy(mediaSourceData, trackIndex, {
 			smartSubtitleTranscoding: settings.smartSubtitleTranscoding,
 			assSubtitleRenderer: settings.assSubtitleRenderer,
+			bitmapSubtitleRenderer: settings.bitmapSubtitleRenderer,
 			enableSubtitleBurnIn: settings.enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr: settings.forceSubtitleBurnInOnHdr === true || settings.forceSubtitleBurnIn === true,
 			subtitleBurnInTextCodecs: settings.subtitleBurnInTextCodecs
@@ -268,7 +270,10 @@ export const usePlayerSeekAndTrackSwitching = ({
 		saveSubtitleSelection(trackIndex, subtitleTracks);
 
 		if (shouldForceSubtitleReload(trackIndex)) {
-			setToastMessage('Subtitle burn-in requires stream reload.');
+			setToastMessage({
+				message: 'Subtitle burn-in requires stream reload.',
+				severity: 'warning'
+			});
 			reloadWithTrackSelection(currentAudioTrack, trackIndex);
 			return;
 		}
@@ -290,7 +295,10 @@ export const usePlayerSeekAndTrackSwitching = ({
 					return;
 				}
 			}
-			setToastMessage('Subtitle change may require retry/reload on this stream');
+			setToastMessage({
+				message: 'Subtitle change may require retry/reload on this stream',
+				severity: 'warning'
+			});
 		}
 
 		reloadWithTrackSelection(currentAudioTrack, trackIndex);

@@ -19,6 +19,9 @@ body,
 	--bf-home-content-offset: 0rem;
 	--bf-search-panel-offset-adjust: -3.25rem;
 	--bf-panel-scroller-offset-nudge: 0rem;
+	--bf-browse-controls-top-offset: calc(var(--bf-panel-top-offset) - 0.75rem);
+	--bf-browse-controls-horizontal-inset: 4rem;
+	--bf-browse-controls-bottom-gap: 0.95rem;
 	--bf-home-hero-nudge: 0rem;
 	--bf-panel-content-bottom-padding-classic: 7rem;
 	--bf-panel-content-bottom-padding-elegant: 3.75rem;
@@ -102,6 +105,30 @@ body,
 	--bf-theme-loading-ring-secondary: var(--bf-theme-player-loading-ring-secondary);
 	--bf-theme-loading-core-bg: var(--bf-theme-player-loading-core-bg);
 	--bf-theme-loading-text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+	--bf-theme-loading-wind-primary: var(--bf-theme-loading-ring-primary);
+	--bf-theme-loading-wind-secondary: var(--bf-theme-loading-ring-secondary);
+	--bf-theme-loading-wind-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.32);
+	--bf-theme-card-placeholder-label-color: rgba(233, 238, 244, 0.65);
+	--bf-theme-card-placeholder-inner-color: rgba(233, 238, 244, 0.6);
+	--bf-theme-glass-white-rgb: 255, 255, 255;
+	--bf-theme-glass-cool-rgb: 232, 245, 255;
+	--bf-theme-glass-dark-strong-rgb: 16, 22, 31;
+	--bf-theme-glass-dark-medium-rgb: 12, 18, 28;
+	--bf-theme-glass-dark-soft-rgb: 10, 16, 24;
+	--bf-theme-glass-specular-bg:
+		radial-gradient(170% 130% at 15% -60%, rgba(var(--bf-theme-glass-white-rgb), 0.4), rgba(var(--bf-theme-glass-white-rgb), 0.03) 58%),
+		radial-gradient(130% 120% at 88% -50%, rgba(var(--bf-theme-glass-cool-rgb), 0.2), rgba(var(--bf-theme-glass-cool-rgb), 0) 54%),
+		linear-gradient(180deg, rgba(var(--bf-theme-glass-dark-strong-rgb), 0.16), rgba(var(--bf-theme-glass-dark-medium-rgb), 0.23));
+	--bf-theme-glass-specular-shadow:
+		inset 0 1px 0 rgba(var(--bf-theme-glass-white-rgb), 0.34),
+		inset 0 -1px 0 rgba(var(--bf-theme-glass-white-rgb), 0.12);
+	--bf-theme-liquid-specular-bg:
+		radial-gradient(170% 130% at 15% -65%, rgba(var(--bf-theme-glass-white-rgb), 0.26), rgba(var(--bf-theme-glass-white-rgb), 0.03) 58%),
+		radial-gradient(130% 120% at 88% -55%, rgba(var(--bf-theme-glass-cool-rgb), 0.14), rgba(var(--bf-theme-glass-cool-rgb), 0) 54%),
+		linear-gradient(180deg, rgba(var(--bf-theme-glass-dark-medium-rgb), 0.24), rgba(var(--bf-theme-glass-dark-soft-rgb), 0.34));
+	--bf-theme-liquid-specular-shadow:
+		inset 0 1px 0 rgba(var(--bf-theme-glass-white-rgb), 0.2),
+		inset 0 -1px 0 rgba(var(--bf-theme-glass-white-rgb), 0.06);
 	--bf-theme-image-loading-surface: linear-gradient(160deg, rgba(40, 52, 70, 0.42) 0%, rgba(18, 27, 42, 0.42) 100%);
 	--bf-theme-player-bg: #000;
 	--bf-theme-player-error-grad-start: rgba(0, 0, 0, 0.55);
@@ -170,16 +197,35 @@ body,
 		--bf-theme-player-skip-close-border: rgba(255, 255, 255, 0.24);
 		--bf-theme-player-skip-close-hover-bg: rgba(255, 128, 146, 0.22);
 		--bf-theme-player-skip-close-hover-border: rgba(255, 180, 196, 0.72);
-		--bf-theme-backdrop-loading-primary-rgb: 32, 148, 255;
-		--bf-theme-backdrop-loading-secondary-rgb: 0, 216, 195;
-		--bf-theme-backdrop-loading-base-start-rgb: 19, 23, 34;
-		--bf-theme-backdrop-loading-base-mid-rgb: 15, 18, 26;
-		--bf-theme-backdrop-loading-base-end-rgb: 16, 16, 16;
-		--bf-theme-backdrop-fallback:
-			radial-gradient(120% 90% at 18% 12%, rgba(32, 148, 255, 0.35) 0%, rgba(32, 148, 255, 0) 62%),
-			radial-gradient(95% 80% at 82% 18%, rgba(0, 216, 195, 0.3) 0%, rgba(0, 216, 195, 0) 60%),
-		radial-gradient(120% 100% at 50% 100%, rgba(255, 126, 95, 0.2) 0%, rgba(255, 126, 95, 0) 55%),
-		linear-gradient(160deg, #131722 0%, #0f121a 45%, #101010 100%);
+	--bf-theme-backdrop-loading-primary-rgb: 32, 148, 255;
+	--bf-theme-backdrop-loading-secondary-rgb: 0, 216, 195;
+	--bf-theme-backdrop-loading-base-start-rgb: 19, 23, 34;
+	--bf-theme-backdrop-loading-base-mid-rgb: 15, 18, 26;
+	--bf-theme-backdrop-loading-base-end-rgb: 16, 16, 16;
+	--bf-theme-backdrop-warm-rgb: 255, 126, 95;
+	--bf-theme-backdrop-shadow-rgb: 0, 0, 0;
+	--bf-theme-backdrop-panel-rgb: 18, 18, 18;
+	--bf-theme-backdrop-loading-bg:
+		radial-gradient(120% 90% at 18% 12%, rgba(var(--bf-theme-backdrop-loading-primary-rgb), 0.16) 0%, rgba(var(--bf-theme-backdrop-loading-primary-rgb), 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(var(--bf-theme-backdrop-loading-secondary-rgb), 0.14) 0%, rgba(var(--bf-theme-backdrop-loading-secondary-rgb), 0) 60%),
+		linear-gradient(160deg, rgba(var(--bf-theme-backdrop-loading-base-start-rgb), 0.52) 0%, rgba(var(--bf-theme-backdrop-loading-base-mid-rgb), 0.52) 45%, rgba(var(--bf-theme-backdrop-loading-base-end-rgb), 0.52) 100%);
+	--bf-theme-backdrop-fallback:
+		radial-gradient(120% 90% at 18% 12%, rgba(var(--bf-theme-backdrop-loading-primary-rgb), 0.35) 0%, rgba(var(--bf-theme-backdrop-loading-primary-rgb), 0) 62%),
+		radial-gradient(95% 80% at 82% 18%, rgba(var(--bf-theme-backdrop-loading-secondary-rgb), 0.3) 0%, rgba(var(--bf-theme-backdrop-loading-secondary-rgb), 0) 60%),
+		radial-gradient(120% 100% at 50% 100%, rgba(var(--bf-theme-backdrop-warm-rgb), 0.2) 0%, rgba(var(--bf-theme-backdrop-warm-rgb), 0) 55%),
+		linear-gradient(160deg, rgb(var(--bf-theme-backdrop-loading-base-start-rgb)) 0%, rgb(var(--bf-theme-backdrop-loading-base-mid-rgb)) 45%, rgb(var(--bf-theme-backdrop-loading-base-end-rgb)) 100%);
+	--bf-theme-hero-backdrop-gradient:
+		linear-gradient(
+			to bottom,
+			rgba(var(--bf-theme-backdrop-shadow-rgb), 0.2) 0%,
+			rgba(var(--bf-theme-backdrop-shadow-rgb), 0.45) 34%,
+			rgba(var(--bf-theme-backdrop-shadow-rgb), 0.62) 56%,
+			rgba(var(--bf-theme-backdrop-panel-rgb), 0.76) 72%,
+			rgba(var(--bf-theme-backdrop-panel-rgb), 0.9) 86%,
+			var(--bf-theme-panel-bg) 100%
+		);
+	--bf-theme-hero-logo-shadow: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.7));
+	--bf-theme-hero-copy-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
 	--bf-theme-error-surface-max-width: 64rem;
 	--bf-theme-error-surface-padding: 1.85rem 1.6rem 1.3rem;
 	--bf-theme-error-surface-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
@@ -196,6 +242,10 @@ body,
 	--bf-theme-debug-overlay-inset: 1rem;
 	--bf-theme-debug-overlay-z-index: 2147483647;
 	--bf-theme-debug-overlay-secondary-z-index: 2147483646;
+	--bf-theme-screensaver-z-index: 2147483647;
+	--bf-theme-screensaver-bg: #000;
+	--bf-theme-screensaver-fg: #fff;
+	--bf-theme-screensaver-shadow: 0 0.3rem 1rem rgba(0, 0, 0, 0.5);
 	--bf-theme-debug-border-width: 1px;
 	--bf-theme-debug-radius: 0.8rem;
 	--bf-theme-debug-pill-radius: 999px;

@@ -18,6 +18,7 @@ import ToolbarElegantLayout from './toolbar/ToolbarElegantLayout';
 import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
 
 import css from './Toolbar.module.less';
+import {useRuntimeSuspended} from '../hooks/useRuntimeSuspension';
 import {popupShellCss} from '../styles/popupStyles';
 
 const SpottableDiv = Spottable('div');
@@ -39,8 +40,10 @@ const Toolbar = ({
 	onNavigate,
 	onSwitchUser,
 	onLogout,
-	onExit
+	onExit,
+	onNavigateDown
 }) => {
+	const runtimeSuspended = useRuntimeSuspended();
 	const [libraries, setLibraries] = useState([]);
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [userName, setUserName] = useState('User');
@@ -62,6 +65,8 @@ const Toolbar = ({
 	const librariesById = useMapById(libraries);
 	const isElegantTheme = toolbarTheme === TOOLBAR_THEME_ELEGANT;
 	const isHomeSection = activeSection === 'home';
+	const usePillLayout = isElegantTheme;
+	const useCompactPillHeader = isElegantTheme;
 	const primaryToolbarNavSelector = useMemo(() => ([
 		`.${css.iconButton}`,
 		`.${css.toolbarButton}`,
@@ -112,19 +117,24 @@ const Toolbar = ({
 	useEffect(() => {
 		loadLibraries();
 		loadUserInfo();
+	}, [loadLibraries, loadUserInfo]);
+
+	useEffect(() => {
+		if (runtimeSuspended) return undefined;
+		setCurrentTime(new Date());
 
 		const timer = setInterval(() => {
 			setCurrentTime(new Date());
 		}, 60000);
 
 		return () => clearInterval(timer);
-	}, [loadLibraries, loadUserInfo]);
+	}, [runtimeSuspended]);
 
 	useEffect(() => {
-		if (!isElegantTheme && showLibrariesPopup) {
+		if (!usePillLayout && showLibrariesPopup) {
 			closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		}
-	}, [closeDisclosure, isElegantTheme, showLibrariesPopup]);
+	}, [closeDisclosure, showLibrariesPopup, usePillLayout]);
 
 	useEffect(() => {
 		return () => {
@@ -250,11 +260,31 @@ const Toolbar = ({
 	const handleOpenLibrariesPopup = useCallback(() => {
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 		setDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP, !showLibrariesPopup);
+		if (showLibrariesPopup) {
+			setTimeout(() => {
+				const trigger = toolbarRootRef.current?.querySelector?.('[data-spotlight-id="toolbar-libraries"]');
+				trigger?.focus?.();
+			}, 0);
+		}
 	}, [closeDisclosure, setDisclosure, showLibrariesPopup]);
 
 	const handleCloseLibrariesPopup = useCallback(() => {
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 	}, [closeDisclosure]);
+	const focusLibrariesTrigger = useCallback(() => {
+		const trigger = toolbarRootRef.current?.querySelector?.('[data-spotlight-id="toolbar-libraries"]');
+		if (!trigger) return false;
+		try {
+			trigger.focus({preventScroll: true});
+		} catch (error) {
+			trigger.focus();
+		}
+		return document.activeElement === trigger || trigger.contains(document.activeElement);
+	}, []);
+	const closeLibrariesPopupAndRestoreFocus = useCallback(() => {
+		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
+		setTimeout(focusLibrariesTrigger, 0);
+	}, [closeDisclosure, focusLibrariesTrigger]);
 
 	useDismissOnOutsideInteraction({
 		enabled: showUserMenu,
@@ -263,7 +293,7 @@ const Toolbar = ({
 	});
 
 	useDismissOnOutsideInteraction({
-		enabled: isElegantTheme && showLibrariesPopup,
+		enabled: usePillLayout && showLibrariesPopup,
 		scopeRef: libraryMenuScopeRef,
 		onDismiss: handleCloseLibrariesPopup
 	});
@@ -276,15 +306,51 @@ const Toolbar = ({
 		onNavigate('library', library);
 	}, [closeDisclosure, librariesById, onNavigate]);
 
+	const focusFirstLibraryPopupItem = useCallback(() => {
+		const scope = libraryMenuScopeRef.current || librariesPopupContentRef.current;
+		const firstLibraryButton = scope?.querySelector?.(`.${css.libraryNativeButton}`);
+		if (!firstLibraryButton) return false;
+		try {
+			firstLibraryButton.focus({preventScroll: true});
+		} catch (_) {
+			firstLibraryButton.focus();
+		}
+		return document.activeElement === firstLibraryButton || firstLibraryButton.contains(document.activeElement);
+	}, []);
+
 	const handleToolbarKeyDownCapture = useCallback((event) => {
 		const code = event.keyCode || event.which;
+		const currentControl = event.target?.closest?.(primaryToolbarNavSelector);
+		const spotlightId = currentControl?.dataset?.spotlightId ||
+			event.target?.closest?.('[data-spotlight-id]')?.dataset?.spotlightId ||
+			event.target?.dataset?.spotlightId ||
+			'';
+		const isLibrariesTrigger =
+			spotlightId === 'toolbar-libraries' ||
+			currentControl?.getAttribute?.('aria-label') === 'Libraries';
+		if (showLibrariesPopup && code === KeyCodes.DOWN && isLibrariesTrigger) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+			focusFirstLibraryPopupItem();
+			return;
+		}
+		if (event.target?.closest?.(`.${css.libraryNativeContent}`)) return;
+		if (code === KeyCodes.DOWN && currentControl && typeof onNavigateDown === 'function') {
+			const moved = onNavigateDown({event, spotlightId, control: currentControl}) === true;
+			if (moved) {
+				event.preventDefault();
+				event.stopPropagation();
+				event.stopImmediatePropagation?.();
+			}
+			return;
+		}
 		const isDirectionalLockKey =
 			code === KeyCodes.LEFT ||
 			code === KeyCodes.RIGHT ||
 			code === KeyCodes.UP;
 		if (!isDirectionalLockKey) return;
 
-		const currentControl = event.target?.closest?.(primaryToolbarNavSelector);
 		if (!currentControl) return;
 
 		if (code === KeyCodes.UP) {
@@ -327,7 +393,7 @@ const Toolbar = ({
 		} catch (_) {
 			nextControl.focus();
 		}
-	}, [primaryToolbarNavSelector]);
+	}, [focusFirstLibraryPopupItem, onNavigateDown, primaryToolbarNavSelector, showLibrariesPopup]);
 
 	const runUserMenuAction = useCallback((primaryAction, fallbackAction = null) => {
 		suppressUserMenuUntilRef.current = Date.now() + 500;
@@ -359,7 +425,7 @@ const Toolbar = ({
 
 	const handleInternalBack = useCallback(() => {
 		if (showLibrariesPopup) {
-			closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
+			closeLibrariesPopupAndRestoreFocus();
 			return true;
 		}
 		if (showUserMenu) {
@@ -371,7 +437,7 @@ const Toolbar = ({
 			return true;
 		}
 		return false;
-	}, [closeDisclosure, showLibrariesPopup, showUserMenu]);
+	}, [closeDisclosure, closeLibrariesPopupAndRestoreFocus, showLibrariesPopup, showUserMenu]);
 
 	usePanelBackHandler(registerBackHandler, handleInternalBack);
 
@@ -388,24 +454,26 @@ const Toolbar = ({
 	const shouldRenderElegantDistortion =
 		!isWebOS6Compat &&
 		runtimeCapabilities.supportsBackdropFilter;
-	const toolbarStyle = isElegantTheme
+	const toolbarStyle = usePillLayout
 		? {'--bf-glass-distortion-filter': shouldRenderElegantDistortion ? `url(#${glassFilterId})` : 'none'}
 		: undefined;
 
 	return (
 		<div
 			ref={toolbarRootRef}
-			className={`${css.toolbar} ${isElegantTheme ? css.toolbarElegant : ''}`}
+			className={`${css.toolbar} ${usePillLayout ? css.toolbarElegant : ''} ${useCompactPillHeader ? css.toolbarCompactPill : ''}`}
 			data-bf-navbar="true"
 			data-bf-navbar-theme={toolbarTheme}
+			data-bf-header-layout={useCompactPillHeader ? 'compact-pill' : 'classic'}
 			data-bf-navbar-legacy={isWebOS6Compat ? 'on' : 'off'}
 			style={toolbarStyle}
 			onKeyDownCapture={handleToolbarKeyDownCapture}
 		>
-			{isElegantTheme ? (
+			{usePillLayout ? (
 				<ToolbarElegantLayout
 					SpottableDiv={SpottableDiv}
 					glassFilterId={glassFilterId}
+					glassDistortionScale={14}
 					shouldRenderElegantDistortion={shouldRenderElegantDistortion}
 					isHomeSection={isHomeSection}
 					elegantPanelTitle={elegantPanelTitle}
@@ -421,6 +489,7 @@ const Toolbar = ({
 					libraries={libraries}
 					activeLibraryId={activeLibraryId}
 					handleLibraryPopupSelect={handleLibraryPopupSelect}
+					librariesPopupContentRef={librariesPopupContentRef}
 					userMenuScopeRef={userMenuScopeRef}
 					elegantUserContainerProps={elegantUserContainerProps}
 					handleUserButtonClick={handleUserButtonClick}
@@ -458,15 +527,16 @@ const Toolbar = ({
 				/>
 			)}
 
-			{!isElegantTheme && (
+			{!usePillLayout && (
 				<Popup open={showLibrariesPopup} onClose={handleCloseLibrariesPopup} style={toolbarStyle} css={popupShellCss}>
-					<div ref={librariesPopupContentRef}>
+					<div>
 						<ToolbarLibraryPicker
 							useElegantGlass={false}
 							libraries={libraries}
 							activeSection={activeSection}
 							activeLibraryId={activeLibraryId}
 							onLibrarySelect={handleLibraryPopupSelect}
+							contentRef={librariesPopupContentRef}
 						/>
 					</div>
 				</Popup>

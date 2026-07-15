@@ -1,5 +1,6 @@
 import {useCallback, useEffect} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
+import {isPlayableMediaItem} from '../../../utils/mediaItemUtils';
 
 const DETAILS_REQUEST_CACHE_TTL_MS = 2 * 60 * 1000;
 
@@ -126,7 +127,7 @@ export const useMediaDetailsDataLoader = ({
 
 	const loadPlaybackInfo = useCallback(async () => {
 		if (!item) return;
-		if (item.Type === 'Series') {
+		if (item.Type === 'Series' || !isPlayableMediaItem(item)) {
 			const playbackRequestToken = createPlaybackRequestToken();
 			if (isPlaybackRequestCurrent(playbackRequestToken)) {
 				setPlaybackInfo(null);

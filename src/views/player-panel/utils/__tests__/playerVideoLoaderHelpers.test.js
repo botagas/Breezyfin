@@ -18,6 +18,8 @@ describe('playerVideoLoaderHelpers', () => {
 				smartSubtitleTranscoding: false,
 				enableSubtitleBurnIn: true,
 				forceTranscodingWithSubtitles: true,
+				enableDiagnostics: true,
+				bitmapSubtitleRenderer: 'libpgs',
 				subtitleBurnInTextCodecs: ['ASS', '']
 			},
 			playbackOptions: {dynamicRangeCap: 'auto'},
@@ -38,6 +40,8 @@ describe('playerVideoLoaderHelpers', () => {
 			disableDirectPlay: true,
 			forceSubtitleBurnInOnHdr: true,
 			forceSubtitleBurnIn: true,
+			enableDiagnostics: true,
+			bitmapSubtitleRenderer: 'libpgs',
 			subtitleBurnInTextCodecs: ['ass'],
 			dynamicRangeCap: 'hdr10'
 		}));
@@ -58,6 +62,31 @@ describe('playerVideoLoaderHelpers', () => {
 		expect(selection).toEqual({
 			selectedAudio: 7,
 			selectedSubtitle: -1
+		});
+	});
+
+	it('remaps subtitle intent before preference-picked subtitle tracks', () => {
+		const selection = resolveInitialTrackSelection({
+			audioStreams: [{Index: 1}],
+			subtitleStreams: [
+				{Index: 2, Type: 'Subtitle', Language: 'eng', Codec: 'pgssub', IsForced: true, DisplayTitle: 'Signs'},
+				{Index: 3, Type: 'Subtitle', Language: 'eng', Codec: 'pgssub', DisplayTitle: 'Full Dialogue'}
+			],
+			playbackOptions: {
+				subtitleTrackIntent: {
+					language: 'eng',
+					codec: 'pgssub',
+					isForced: false,
+					languageCodecOrdinal: 1
+				}
+			},
+			pickPreferredAudio: () => 1,
+			pickPreferredSubtitle: (streams, providedSubtitle) => providedSubtitle
+		});
+
+		expect(selection).toEqual({
+			selectedAudio: 1,
+			selectedSubtitle: 3
 		});
 	});
 
@@ -93,6 +122,7 @@ describe('playerVideoLoaderHelpers', () => {
 			dynamicRangeLabel: 'Dolby Vision',
 			requestedDynamicRangeCap: 'auto',
 			playbackRequestDebug: {directPlay: true},
+			diagnosticsEnabled: true,
 			videoStream: {
 				Codec: 'hevc',
 				VideoRangeType: 'DOVIWithHDR10',
@@ -110,6 +140,8 @@ describe('playerVideoLoaderHelpers', () => {
 			__debugVideoCodec: 'hevc',
 			__debugRequest: {directPlay: true},
 			__debugDecision: {playMethod: 'DirectPlay'},
+			__safeSubtitleBurnInProfile: false,
+			__requiredDecision: null,
 			__debugSubtitlePolicy: {decision: 'client-render'},
 			__debugDiagnostics: [{scope: 'playback', status: 'applied'}],
 			__debugAvailableSources: [
@@ -127,6 +159,34 @@ describe('playerVideoLoaderHelpers', () => {
 			],
 			__debugSelectedSourceId: 'source-1'
 		});
+	});
+
+	it('retains operational playback metadata without optional diagnostics', () => {
+		const result = buildMediaSourceDebugData({
+			mediaSource: {Id: 'source-1'},
+			playbackInfo: {MediaSources: [{Id: 'source-1'}]},
+			playbackMeta: {
+				subtitlePolicy: {decision: 'client-render'},
+				requiredDecision: {type: 'subtitle-consent'},
+				safeSubtitleBurnInProfile: true,
+				decision: {payload: 'large'},
+				diagnostics: [{scope: 'playback'}]
+			},
+			resolvedPlayMethod: 'Transcode',
+			dynamicRangeInfo: {id: 'SDR'},
+			dynamicRangeLabel: 'SDR',
+			diagnosticsEnabled: false
+		});
+
+		expect(result).toEqual(expect.objectContaining({
+			__selectedPlayMethod: 'Transcode',
+			__requiredDecision: {type: 'subtitle-consent'},
+			__debugSubtitlePolicy: {decision: 'client-render'},
+			__safeSubtitleBurnInProfile: true,
+			__debugDecision: null,
+			__debugDiagnostics: [],
+			__debugAvailableSources: []
+		}));
 	});
 
 	it('resolves direct playback URLs through the Jellyfin service helper', () => {

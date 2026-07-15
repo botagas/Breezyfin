@@ -1,35 +1,32 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Panel, Header} from '../components/BreezyPanels';
-import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Toolbar from '../components/Toolbar';
 import MediaFilterControls from '../components/MediaFilterControls';
-import PanelPosterMediaCard from '../components/PanelPosterMediaCard';
+import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
+import PanelLandscapeVirtualGrid from '../components/PanelLandscapeVirtualGrid';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
-import Spotlight from '@enact/spotlight';
+import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
 import jellyfinService from '../services/jellyfinService';
 import {useMapById} from '../hooks/useMapById';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
-import {usePanelScrollState} from '../hooks/usePanelScrollState';
 import {useMediaFilterState} from '../hooks/useMediaFilterState';
-import {useLibraryScrollPersistence} from './library-panel/hooks/useLibraryScrollPersistence';
 import {HOME_SECTION_IDS, getHomeSectionDescriptor} from '../constants/homeSections';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
-import {focusTargetFromRightMostGridItem, shouldLoadMoreFromGridFocus} from '../utils/gridFocus';
-import {getPanelPosterCardClassProps} from '../utils/posterCardClassProps';
 import {getJellyfinUsername} from '../utils/jellyfinUser';
 import {
 	MEDIA_FILTER_OPTIONS,
 	mediaItemMatchesFilters
 } from '../utils/mediaFilters';
-import {buildMediaListItemKey} from '../utils/reactKeys';
+import {buildGridQuerySignature} from '../utils/gridScrollRestore';
+import {focusSpotlightTarget} from '../utils/gridFocus';
 
 import css from './LibraryPanel.module.less';
+import browseCss from '../components/MediaBrowseControls.module.less';
 
 const PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
-const FOCUS_PREFETCH_THRESHOLD = 12;
-const FILTERED_PAGE_SCAN_MULTIPLIER = 4;
 const FILTERED_PAGE_SCAN_LIMIT = 6;
+const HOME_SECTION_IMAGE_OPTIONS = Object.freeze({includeBackdrop: true, includeSeriesFallback: true});
 
 const fetchHomeSectionPage = async (sectionId, {
 	limit = PAGE_SIZE,
@@ -71,25 +68,22 @@ const HomeSectionPanel = ({
 }) => {
 	const activeSection = getHomeSectionDescriptor(section?.id || section);
 	const activeSectionId = activeSection?.id || null;
-	const isPointerInputMode = inputMode === 'pointer';
-	const scrollerRef = useRef(null);
-	const panelRootRef = useRef(null);
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
-	const commitCurrentScrollNowRef = useRef(null);
-	const setScrollTopRef = useRef(null);
-	const [loading, setLoading] = useState(true);
-	const [loadingMore, setLoadingMore] = useState(false);
-	const [hasMore, setHasMore] = useState(false);
-	const [items, setItems] = useState([]);
-	const [error, setError] = useState('');
-	const nextStartIndexRef = useRef(0);
+	const focusResultsAfterFilterRef = useRef(false);
+	const lastFocusedCardIdRef = useRef(cachedState?.focusedItemId || null);
+	const nextStartIndexRef = useRef(
+		Number.isFinite(Number(cachedState?.nextStartIndex))
+			? Math.max(0, Math.trunc(Number(cachedState.nextStartIndex)))
+			: 0
+	);
 	const handleFilterApply = useCallback(() => {
-		commitCurrentScrollNowRef.current?.();
-		setScrollTopRef.current?.(0);
 		nextStartIndexRef.current = 0;
+		lastFocusedCardIdRef.current = null;
+		focusResultsAfterFilterRef.current = true;
 	}, []);
 	const {
+		activeFilterIds,
 		draftFilterIds,
 		filterPopupOpen,
 		filterPopupContentRef,
@@ -100,7 +94,8 @@ const HomeSectionPanel = ({
 		closeFilterPopup,
 		resetDraftFilters,
 		selectDraftFilter,
-		applyDraftFilters
+		applyDraftFilters,
+		handleFilterPopupHide
 	} = useMediaFilterState({
 		cachedState,
 		resetKey: activeSectionId,
@@ -108,16 +103,20 @@ const HomeSectionPanel = ({
 		triggerSpotlightId: 'home-section-filter-trigger',
 		onApplyFilters: handleFilterApply
 	});
-	const {
-		scrollTop,
-		setScrollTop
-	} = usePanelScrollState({
-		cachedState,
-		isActive,
-		onCacheState: cacheStateWithFilters,
-		cacheKey: activeSectionId,
-		requireCacheKey: true
-	});
+	const querySignature = buildGridQuerySignature(activeSectionId, activeFilterIds);
+	const cachedQueryMatches = cachedState?.querySignature === querySignature;
+	const cachedItems = cachedQueryMatches && Array.isArray(cachedState?.items) ? cachedState.items : [];
+	const skipInitialCachedLoadRef = useRef(cachedQueryMatches && cachedState?.loaded === true);
+	const [loading, setLoading] = useState(() => !skipInitialCachedLoadRef.current);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasMore, setHasMore] = useState(() => cachedQueryMatches && cachedState?.hasMore === true);
+	const [items, setItems] = useState(() => cachedItems);
+	const [error, setError] = useState('');
+	if (!cachedQueryMatches && skipInitialCachedLoadRef.current) {
+		skipInitialCachedLoadRef.current = false;
+		nextStartIndexRef.current = cachedItems.length;
+		lastFocusedCardIdRef.current = null;
+	}
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -131,7 +130,6 @@ const HomeSectionPanel = ({
 			return true;
 		}
 	});
-	const panelCardClasses = getPanelPosterCardClassProps(css);
 	const itemsById = useMapById(items);
 	const hasActiveFilters = activeFilterCount > 0;
 
@@ -189,10 +187,10 @@ const HomeSectionPanel = ({
 		let collected = [];
 		let scans = 0;
 		let sourceHasMore = true;
-		const rawLimit = PAGE_SIZE * FILTERED_PAGE_SCAN_MULTIPLIER;
 		const userName = currentFilterState.useMyRequestsSource ? await getJellyfinUsername(jellyfinService) : '';
 
 		while (collected.length < PAGE_SIZE && scans < FILTERED_PAGE_SCAN_LIMIT && sourceHasMore) {
+			const rawLimit = PAGE_SIZE - collected.length;
 			const rawPage = await fetchHomeSectionPage(activeSectionId, {
 				limit: rawLimit,
 				startIndex: cursor
@@ -218,7 +216,7 @@ const HomeSectionPanel = ({
 		}
 
 		return {
-			items: collected.slice(0, PAGE_SIZE),
+			items: collected,
 			nextStartIndex: cursor,
 			hasMore: sourceHasMore
 		};
@@ -290,111 +288,66 @@ const HomeSectionPanel = ({
 		});
 	}, [activeSectionId, hasMore, loadPage, loading]);
 
-	const {handleScrollerScroll, commitCurrentScrollNow} = useLibraryScrollPersistence({
-		scrollerRef,
-		isActive,
-		activeLibraryId: activeSectionId,
-		loading,
-		hasMore,
-		loadNextPage,
-		scrollTop,
-		setScrollTop
-	});
-	commitCurrentScrollNowRef.current = commitCurrentScrollNow;
-	setScrollTopRef.current = setScrollTop;
-
 	useEffect(() => {
+		if (skipInitialCachedLoadRef.current) {
+			skipInitialCachedLoadRef.current = false;
+			return undefined;
+		}
 		loadPage({startIndex: 0, append: false});
 		return () => {
 			requestIdRef.current += 1;
 		};
-	}, [loadPage]);
+	}, [loadPage, querySignature]);
+
+	useEffect(() => {
+		if (!activeSectionId) return;
+		cacheStateWithFilters(activeSectionId, {
+			items,
+			hasMore,
+			nextStartIndex: nextStartIndexRef.current,
+			loaded: !loading,
+			querySignature,
+			focusedItemId: lastFocusedCardIdRef.current
+		});
+	}, [activeSectionId, cacheStateWithFilters, hasMore, items, loading, querySignature]);
 
 	const handleGridCardClick = useCallback((event) => {
-		commitCurrentScrollNow();
 		const itemId = event.currentTarget.dataset.itemId;
+		lastFocusedCardIdRef.current = itemId || null;
+		cacheStateWithFilters(activeSectionId, {focusedItemId: lastFocusedCardIdRef.current});
 		const selectedItem = itemsById.get(itemId);
 		if (!selectedItem) return;
 		onItemSelect(selectedItem);
-	}, [commitCurrentScrollNow, itemsById, onItemSelect]);
+	}, [activeSectionId, cacheStateWithFilters, itemsById, onItemSelect]);
 
-	const handleGridCardFocus = useCallback((event) => {
-		if (shouldLoadMoreFromGridFocus({
-			event,
-			isPointerInputMode,
-			hasMore,
-			isLoadingMore: loadingMoreRef.current,
-			itemCount: items.length,
-			threshold: FOCUS_PREFETCH_THRESHOLD
-		})) {
-			loadNextPage();
-		}
-	}, [hasMore, isPointerInputMode, items.length, loadNextPage]);
-
-	const handleGridCardPointerDown = useCallback((event) => {
-		if (!isPointerInputMode) return;
-		event.stopPropagation();
-	}, [isPointerInputMode]);
-
-	const focusFilterTrigger = useCallback(() => {
-		Spotlight.focus('home-section-filter-trigger');
-	}, []);
-
-	const handlePanelKeyDownCapture = useCallback((event) => {
-		const code = event.keyCode || event.which;
-		const activeElement = document.activeElement;
-		const spotlightId = activeElement?.dataset?.spotlightId || '';
-		if (code === 40 && (spotlightId === 'toolbar-home' || spotlightId === 'toolbar-user')) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusFilterTrigger();
-		}
-	}, [focusFilterTrigger]);
-
-	const handleGridCardKeyDown = useCallback((event) => {
-		focusTargetFromRightMostGridItem({
-			event,
-			panelRoot: panelRootRef.current,
-			gridCardClassName: css.gridCard,
-			focusTarget: focusFilterTrigger
-		});
-	}, [focusFilterTrigger]);
+	const gridItemRendererProps = useMemo(() => ({
+		onItemClick: handleGridCardClick,
+		cardClassName: css.gridCard,
+		imageOptions: HOME_SECTION_IMAGE_OPTIONS
+	}), [handleGridCardClick]);
+	const handleToolbarNavigateDown = useCallback(() => focusSpotlightTarget('home-section-filter-trigger'), []);
 
 	const topToolbar = (
 		<Toolbar
 			activeSection="home"
 			isActive={isActive}
+			onNavigateDown={handleToolbarNavigateDown}
 			{...toolbarActions}
 		/>
 	);
 	const title = activeSection?.title || 'Home Section';
 	const showEmpty = !loading && !error && items.length === 0;
 
-	if (loading) {
-		return (
-			<Panel {...rest}>
-				<Header title={title} />
-				{topToolbar}
-				<div className={css.loading}>
-					<BreezyLoadingOverlay />
-				</div>
-			</Panel>
-		);
-	}
-
 	return (
 		<Panel {...rest}>
 			<Header title={title} />
 			{topToolbar}
-			<div className={css.libraryContainer} ref={panelRootRef} onKeyDownCapture={handlePanelKeyDownCapture}>
-				<div
-					ref={scrollerRef}
-					className={`${css.nativeScroller} ${css.homeSectionScroller}`}
-					onScroll={handleScrollerScroll}
-				>
-					<div className={css.contentFrame}>
-						<div className={css.filterOverlay}>
-							<div className={css.filterOverlayControls}>
+			<div
+				className={`${css.libraryContainer} ${browseCss.panelLayout}`}
+				data-input-mode={inputMode}
+			>
+				<MediaPanelBackdrop item={items[0] || null} />
+				<MediaBrowseOverlay compact>
 								<MediaFilterControls
 									title={title}
 									triggerSpotlightId="home-section-filter-trigger"
@@ -405,12 +358,14 @@ const HomeSectionPanel = ({
 									filterOptions={MEDIA_FILTER_OPTIONS}
 									onTrigger={openFilterPopup}
 									onClose={closeFilterPopup}
+									onHide={handleFilterPopupHide}
 									onReset={resetDraftFilters}
 									onApply={applyDraftFilters}
 									onDraftSelect={selectDraftFilter}
 								/>
-							</div>
-						</div>
+				</MediaBrowseOverlay>
+				<div className={`${css.virtualGridViewport} ${browseCss.panelResultsOffset}`}>
+					{loading ? <div className={css.loading}><BreezyLoadingOverlay /></div> : null}
 						{error ? (
 							<div className={css.emptyState}>
 								<BodyText>{error}</BodyText>
@@ -421,29 +376,19 @@ const HomeSectionPanel = ({
 								<BodyText>No items found.</BodyText>
 							</div>
 						) : null}
-						<div className={css.gridContainer}>
-							{items.map((item, index) => (
-								<PanelPosterMediaCard
-									key={buildMediaListItemKey(`home-section-${activeSectionId || 'unknown'}`, item, index)}
-									item={item}
-									index={index}
-									classes={panelCardClasses}
-									imageOptions={{includeBackdrop: true, includeSeriesFallback: true}}
-									onClick={handleGridCardClick}
-									onPointerDown={handleGridCardPointerDown}
-									onMouseDown={handleGridCardPointerDown}
-									onFocus={handleGridCardFocus}
-									onKeyDown={handleGridCardKeyDown}
-									spotlightDisabled={inputMode === 'pointer'}
-								/>
-							))}
-							{loadingMore && (
-								<div className={css.loadingMore}>
-									<Spinner size="small" />
-								</div>
-							)}
-						</div>
-					</div>
+						{!loading && !error && items.length > 0 ? <PanelLandscapeVirtualGrid
+							id="home-section-grid"
+							className={css.virtualGrid}
+							items={items}
+							itemRendererProps={gridItemRendererProps}
+							isActive={isActive}
+							queryKey={querySignature}
+							hasMore={hasMore}
+							loadingMore={loadingMore}
+							onLoadMore={loadNextPage}
+							focusedItemIdRef={lastFocusedCardIdRef}
+							focusFirstItemRef={focusResultsAfterFilterRef}
+						/> : null}
 				</div>
 			</div>
 		</Panel>

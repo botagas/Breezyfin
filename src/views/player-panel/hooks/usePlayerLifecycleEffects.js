@@ -86,7 +86,7 @@ export const usePlayerLifecycleEffects = ({
 	}, [lastInteractionRef, playing, setShowControls, showAudioPopup, showControls, showSubtitlePopup]);
 
 	useEffect(() => {
-		if (!mediaSourceData || isCurrentTranscoding) return undefined;
+		if (!mediaSourceData || isCurrentTranscoding || !playing) return undefined;
 		const interval = setInterval(() => {
 			const now = Date.now();
 			const last = lastProgressRef.current;

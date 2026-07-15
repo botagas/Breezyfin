@@ -28,7 +28,9 @@ export const usePlayerPlaybackCommands = ({
 	subtitleCompatibilityFallbackAttemptedRef,
 	loadVideo,
 	attemptTranscodeFallback,
-	isCurrentTranscoding
+	isCurrentTranscoding,
+	exitInProgressRef,
+	loadRequestIdRef
 }) => {
 	const handleEnded = useCallback(async () => {
 		await handleStop();
@@ -37,7 +39,7 @@ export const usePlayerPlaybackCommands = ({
 			try {
 				const nextEpisode = hasNextEpisode ? await getNextEpisode(item) : null;
 				if (nextEpisode) {
-					onPlay(nextEpisode, buildPlaybackOptions());
+					onPlay(nextEpisode, buildPlaybackOptions({remapTrackIntents: true}));
 					return;
 				}
 			} catch (err) {
@@ -114,6 +116,9 @@ export const usePlayerPlaybackCommands = ({
 	]);
 
 	const handleBackButton = useCallback(() => {
+		if (exitInProgressRef.current) return;
+		exitInProgressRef.current = true;
+		loadRequestIdRef.current += 1;
 		let didNavigate = false;
 		const navigateBack = () => {
 			if (didNavigate) return;
@@ -133,7 +138,7 @@ export const usePlayerPlaybackCommands = ({
 				clearTimeout(navigationTimeout);
 				navigateBack();
 			});
-	}, [handleStop, onBack]);
+	}, [exitInProgressRef, handleStop, loadRequestIdRef, onBack]);
 
 	const tryPlaybackFallbackOnCanPlayError = useCallback(async (errorMessage) => {
 		if (!isCurrentTranscoding) {

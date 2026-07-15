@@ -64,7 +64,7 @@ const preloadHeroBackdrop = (url) => {
 	image.src = url;
 };
 
-const HeroBanner = ({ items, onPlayClick, isActive = false }) => {
+const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' }) => {
 	const itemCount = items?.length || 0;
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [previousIndex, setPreviousIndex] = useState(null);
@@ -75,6 +75,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false }) => {
 	const [heroVisible, setHeroVisible] = useState(true);
 	const heroRootRef = useRef(null);
 	const reducedMotionMode = performanceModeEnabled;
+	const useCinematicLayout = variant === 'cinematic';
 	const backdropWidth = reducedMotionMode ? 1280 : 1920;
 	const preloadAdjacentCount = reducedMotionMode ? 1 : HERO_PRELOAD_ADJACENT;
 	const shouldAutoRotate = itemCount > 1 && heroVisible;
@@ -281,7 +282,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false }) => {
 	return (
 		<div
 			ref={heroRootRef}
-			className={css.heroBanner}
+			className={`${css.heroBanner} ${useCinematicLayout ? css.heroBannerCinematic : ''}`}
 			data-bf-media-bar="true"
 		>
 			<div className={css.backdrop}>
@@ -354,7 +355,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false }) => {
 							/>
 						) : (
 							<Heading size="large" className={`${css.title} ${css.textTransition}`}>
-								<Marquee marqueeOn={reducedMotionMode ? 'focus' : 'render'}>
+								<Marquee marqueeOn={reducedMotionMode || useCinematicLayout ? 'focus' : 'render'}>
 									{currentItem.Name}
 								</Marquee>
 							</Heading>

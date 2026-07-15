@@ -39,8 +39,16 @@ const focusNodeWithoutScroll = (node) => {
 	}
 };
 
+export const isPopupFocusContainer = (container) => (
+	Boolean(
+		container &&
+		typeof container.querySelectorAll === 'function' &&
+		typeof container.contains === 'function'
+	)
+);
+
 const focusFirstPopupNode = (container, selector) => {
-	if (!container?.querySelectorAll) return false;
+	if (!isPopupFocusContainer(container)) return false;
 	const candidates = Array.from(container.querySelectorAll(selector));
 	const target = candidates.find(isVisibleFocusableNode);
 	if (!target) return false;
@@ -49,7 +57,7 @@ const focusFirstPopupNode = (container, selector) => {
 };
 
 const hasFocusInsidePopup = (container) => (
-	Boolean(container && container.contains(document.activeElement))
+	Boolean(isPopupFocusContainer(container) && container.contains(document.activeElement))
 );
 
 const isActivationKeyEvent = (event) => {

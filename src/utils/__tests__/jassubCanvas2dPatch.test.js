@@ -1,8 +1,11 @@
 const {
 	JASSUB_CANVAS2D_PATCH_MARKER,
+	JASSUB_STATIC_ASSET_PATCH_MARKER,
 	forceJassubCanvas2dRendererInSource,
+	requireExplicitJassubStaticAssetUrlsInSource,
 	validateMinifiedJassubCanvas2dWorkerSource,
-	validateJassubCanvas2dWorkerSource
+	validateJassubCanvas2dWorkerSource,
+	validateJassubStaticAssetEntrySource
 } = require('../../../scripts/subtitle-assets/jassubCanvas2dPatch.cjs');
 
 const JASSUB_VERSION = '2.5.6';
@@ -17,6 +20,17 @@ const ORIGINAL_RENDERER_SELECTION = `        try {
         }
         catch {
             this._gpurender = new Canvas2DRenderer();
+        }`;
+const ORIGINAL_ENTRY_STATIC_FALLBACKS = `        // yes this is awful, but bundlers check for new Worker(new URL()) patterns, so can't use new Worker(workerUrl ?? new URL(...)) ... bruh
+        this._worker = opts.workerUrl
+            ? new Worker(opts.workerUrl, { name: 'jassub-worker', type: 'module' })
+            : new Worker(new URL('./worker/worker.js', import.meta.url), { name: 'jassub-worker', type: 'module' });
+        const Renderer = wrap(this._worker);
+        const modern = opts.modernWasmUrl ?? new URL('./wasm/jassub-worker-modern.wasm', import.meta.url).href;
+        const normal = opts.wasmUrl ?? new URL('./wasm/jassub-worker.wasm', import.meta.url).href;
+        const availableFonts = opts.availableFonts ?? {};
+        if (!availableFonts['liberation sans'] && !opts.defaultFont) {
+            availableFonts['liberation sans'] = new URL('./default.woff2', import.meta.url).href;
         }`;
 
 describe('JASSUB Canvas2D packaging patch', () => {
@@ -50,6 +64,45 @@ describe('JASSUB Canvas2D packaging patch', () => {
 		expect(() => forceJassubCanvas2dRendererInSource('no renderer block here', {
 			version: JASSUB_VERSION
 		})).toThrow(/Unable to locate JASSUB worker/u);
+	});
+
+	it('patches JASSUB entry to require explicit static asset URLs', () => {
+		const {patched, source} = requireExplicitJassubStaticAssetUrlsInSource(
+			`before\n${ORIGINAL_ENTRY_STATIC_FALLBACKS}\nafter`,
+			{version: JASSUB_VERSION}
+		);
+
+		expect(patched).toBe(true);
+		expect(source).toContain(JASSUB_STATIC_ASSET_PATCH_MARKER);
+		expect(source).toContain('Breezyfin JASSUB static asset URLs are required.');
+		expect(source).toContain('this._worker = new Worker(opts.workerUrl');
+		expect(source).not.toContain("new Worker(new URL('./worker/worker.js'");
+		expect(source).not.toContain("new URL('./wasm/jassub-worker");
+		expect(source).not.toContain("new URL('./default.woff2'");
+		expect(validateJassubStaticAssetEntrySource(source)).toBe(true);
+	});
+
+	it('is idempotent once the static asset marker is present', () => {
+		const patched = `// ${JASSUB_STATIC_ASSET_PATCH_MARKER}\nconst modern = opts.modernWasmUrl;`;
+		const {source, patched: wasPatched} = requireExplicitJassubStaticAssetUrlsInSource(patched, {
+			version: JASSUB_VERSION
+		});
+
+		expect(source).toBe(patched);
+		expect(wasPatched).toBe(false);
+	});
+
+	it('fails loudly when the JASSUB entry static fallback block drifts', () => {
+		expect(() => requireExplicitJassubStaticAssetUrlsInSource(ORIGINAL_ENTRY_STATIC_FALLBACKS, {
+			version: '3.0.0'
+		})).toThrow(/Unsupported JASSUB version/u);
+
+		expect(() => requireExplicitJassubStaticAssetUrlsInSource('no entry fallback block here', {
+			version: JASSUB_VERSION
+		})).toThrow(/Unable to locate JASSUB entry/u);
+		expect(() => validateJassubStaticAssetEntrySource(ORIGINAL_ENTRY_STATIC_FALLBACKS, {
+			fileName: 'jassub.js'
+		})).toThrow(/jassub\.js/u);
 	});
 
 	it('validates package source by Canvas2D marker', () => {

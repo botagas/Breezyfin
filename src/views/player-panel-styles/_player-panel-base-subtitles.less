@@ -52,12 +52,10 @@
 
 .subtitleOverlay {
 	position: absolute;
-	top: 0;
-	left: var(--bf-theme-player-subtitle-inset-inline);
-	right: var(--bf-theme-player-subtitle-inset-inline);
-	bottom: 0;
+	inset: 0;
 	z-index: var(--bf-theme-player-subtitle-z-index);
 	pointer-events: none;
+	overflow: hidden;
 	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-white);
 	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-black);
 	--bf-player-subtitle-current-font-size: var(--bf-theme-player-subtitle-font-size);
@@ -94,15 +92,19 @@
 	--bf-player-subtitle-current-box-border-width: var(--bf-theme-player-subtitle-box-border-width);
 }
 
+.subtitleStage {
+	position: absolute;
+	pointer-events: none;
+	overflow: hidden;
+}
+
 .subtitleRegion {
 	position: absolute;
-	left: 0;
-	right: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--bf-theme-player-subtitle-gap);
-	align-items: center;
-	justify-content: center;
+	left: var(--bf-theme-player-subtitle-inset-inline);
+	right: var(--bf-theme-player-subtitle-inset-inline);
+	display: grid;
+	max-height: 100%;
+	overflow: visible;
 }
 
 .subtitleRegion[data-region='top'] {
@@ -119,18 +121,24 @@
 }
 
 .subtitleAlignGroup {
+	grid-area: 1 / 1;
 	width: 100%;
+	display: grid;
+}
+
+.subtitleCollisionLayer {
+	grid-area: 1 / 1;
 	display: flex;
 	flex-direction: column;
 	gap: var(--bf-theme-player-subtitle-gap);
 	align-items: center;
 }
 
-.subtitleAlignGroup[data-align='left'] {
+.subtitleAlignGroup[data-align='left'] .subtitleCollisionLayer {
 	align-items: flex-start;
 }
 
-.subtitleAlignGroup[data-align='right'] {
+.subtitleAlignGroup[data-align='right'] .subtitleCollisionLayer {
 	align-items: flex-end;
 }
 
@@ -145,7 +153,9 @@
 			var(--bf-player-subtitle-absolute-translate-x),
 			var(--bf-player-subtitle-absolute-translate-y)
 		);
-	max-width: var(--bf-theme-player-subtitle-max-width);
+	max-width: var(--bf-player-subtitle-absolute-max-width);
+	max-height: var(--bf-player-subtitle-absolute-max-height);
+	overflow: visible;
 	display: flex;
 	justify-content: center;
 }
@@ -170,7 +180,7 @@
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
-	overflow: hidden;
+	overflow: visible;
 }
 
 .subtitleTransformLayer {

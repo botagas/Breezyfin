@@ -1,6 +1,7 @@
 import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
 import {normalizeDynamicRangeCap} from '../../utils/playbackDynamicRange';
 import {normalizeAssSubtitleRenderer as normalizeAssSubtitleRendererValue} from '../../utils/assSubtitleRenderers';
+import {normalizeBitmapSubtitleRenderer as normalizeBitmapSubtitleRendererValue} from '../../utils/bitmapSubtitleRenderers';
 
 const VIDEO_RANGE_TYPES = {
 	DV_FALLBACKS: [
@@ -81,7 +82,7 @@ export const buildPlaybackInfoBasePayload = (
 	if (options.subtitleStreamIndex !== undefined && options.subtitleStreamIndex !== null) {
 		payload.SubtitleStreamIndex = options.subtitleStreamIndex;
 		if (!relaxedPlaybackProfile && forceSubtitleBurnIn && options.subtitleStreamIndex >= 0) {
-			payload.SubtitleMethod = 'Encode';
+			payload.AlwaysBurnInSubtitleWhenTranscoding = true;
 		}
 	}
 	if (options.startTimeTicks !== undefined) {
@@ -239,6 +240,20 @@ export const buildTranscodingProfiles = (
 	return transcodingProfiles;
 };
 
+export const buildSafeSubtitleBurnInTranscodingProfiles = () => ([
+	{
+		Container: 'ts',
+		Type: 'Video',
+		AudioCodec: 'aac',
+		VideoCodec: 'h264',
+		Context: 'Streaming',
+		Protocol: 'hls',
+		MaxAudioChannels: '6',
+		MinSegments: '1',
+		BreakOnNonKeyFrames: false
+	}
+]);
+
 export const buildSubtitleProfiles = ({
 	relaxedPlaybackProfile,
 	forceSubtitleBurnIn,
@@ -273,10 +288,19 @@ export const buildSubtitleProfiles = ({
 		});
 	}
 	imageFormats.forEach((format) => {
-		addUniqueProfile(profiles, format, 'Encode');
+		addUniqueProfile(profiles, format, 'External');
 	});
 	return profiles;
 };
+
+export const buildSafeSubtitleBurnInDeviceProfile = (deviceProfile) => ({
+	...(deviceProfile || {}),
+	TranscodingProfiles: buildSafeSubtitleBurnInTranscodingProfiles(),
+	SubtitleProfiles: buildSubtitleProfiles({
+		relaxedPlaybackProfile: false,
+		forceSubtitleBurnIn: true
+	})
+});
 
 export const buildPlaybackDeviceProfile = ({
 	relaxedPlaybackProfile,
@@ -386,6 +410,7 @@ export const resolveFmp4HlsContainerPreference = (options = {}) => {
 };
 
 const normalizeAssSubtitleRenderer = (value) => normalizeAssSubtitleRendererValue(value);
+const normalizeBitmapSubtitleRenderer = (value) => normalizeBitmapSubtitleRendererValue(value);
 
 export const buildPlaybackRequestContext = (options = {}) => {
 	const playbackCapabilities = getPlaybackCapabilities();
@@ -401,8 +426,11 @@ export const buildPlaybackRequestContext = (options = {}) => {
 	// Keep base payload conservative for HDR/DV. Non-forced preference is applied later as a source probe.
 	const preferFmp4Mp4 = forceFmp4HlsContainerPreference || (!hasEnableFmp4Preference && legacyPreferFmp4Preference === true);
 	const forceSubtitleBurnIn = options.forceSubtitleBurnIn === true;
+	const confirmedBitmapBurnIn = options.confirmedBitmapBurnIn === true;
+	const subtitleFallbackConsent = options.subtitleFallbackConsent || null;
 	const smartSubtitleTranscoding = options.smartSubtitleTranscoding !== false;
 	const assSubtitleRenderer = normalizeAssSubtitleRenderer(options.assSubtitleRenderer);
+	const bitmapSubtitleRenderer = normalizeBitmapSubtitleRenderer(options.bitmapSubtitleRenderer);
 	const enableSubtitleBurnIn = options.enableSubtitleBurnIn !== false;
 	const allowSubtitleBurnInOnHdr = options.forceSubtitleBurnInOnHdr === true;
 	const subtitleBurnInTextCodecs = !smartSubtitleTranscoding && Array.isArray(options.subtitleBurnInTextCodecs)
@@ -412,7 +440,10 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		: [];
 	const dynamicRangeCap = normalizeDynamicRangeCap(options.dynamicRangeCap);
 	const allowStreamCopyOnTranscode = options.allowStreamCopyOnTranscode !== false;
-	const allowStreamCopy = enableTranscoding && (!forceTranscoding || allowStreamCopyOnTranscode);
+	const forceBurnInTranscoding = forceSubtitleBurnIn;
+	const allowStreamCopy = enableTranscoding &&
+		!forceBurnInTranscoding &&
+		(!forceTranscoding || allowStreamCopyOnTranscode);
 	const maxBitrateSetting = options.maxBitrate ? parseInt(options.maxBitrate, 10) : null;
 	const requestedAudioStreamIndex = Number.isInteger(options.audioStreamIndex) ? options.audioStreamIndex : null;
 	const payload = buildPlaybackInfoBasePayload(options, {
@@ -420,23 +451,25 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		forceSubtitleBurnIn
 	});
 	const directPlayProfiles = buildDirectPlayProfiles(
-		forceTranscoding || disableDirectPlay,
+		forceTranscoding || forceBurnInTranscoding || disableDirectPlay,
 		relaxedPlaybackProfile,
 		playbackCapabilities
 	);
-	const transcodingProfiles = buildTranscodingProfiles(
-		relaxedPlaybackProfile,
-		playbackCapabilities,
-		{preferFmp4Mp4}
-	);
+	const transcodingProfiles = forceBurnInTranscoding
+		? buildSafeSubtitleBurnInTranscodingProfiles()
+		: buildTranscodingProfiles(
+			relaxedPlaybackProfile,
+			playbackCapabilities,
+			{preferFmp4Mp4}
+		);
 	const subtitleProfiles = buildSubtitleProfiles({
 		relaxedPlaybackProfile,
 		forceSubtitleBurnIn,
 		subtitleBurnInTextCodecs
 	});
 
-	payload.EnableDirectPlay = !forceTranscoding && !disableDirectPlay;
-	payload.EnableDirectStream = !forceTranscoding;
+	payload.EnableDirectPlay = !forceTranscoding && !forceBurnInTranscoding && !disableDirectPlay;
+	payload.EnableDirectStream = !forceTranscoding && !forceBurnInTranscoding;
 	payload.EnableTranscoding = enableTranscoding;
 	payload.AllowVideoStreamCopy = allowStreamCopy;
 	payload.AllowAudioStreamCopy = allowStreamCopy;
@@ -461,8 +494,11 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		enableTranscoding,
 		requestedAudioStreamIndex,
 		forceSubtitleBurnIn,
+		confirmedBitmapBurnIn,
+		subtitleFallbackConsent,
 		smartSubtitleTranscoding,
 		assSubtitleRenderer,
+		bitmapSubtitleRenderer,
 		enableSubtitleBurnIn,
 		allowSubtitleBurnInOnHdr,
 		subtitleBurnInTextCodecs,

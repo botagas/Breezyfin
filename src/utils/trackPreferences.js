@@ -1,4 +1,7 @@
-import {createAudioTrackIdentity} from './trackMatching';
+import {
+	createAudioTrackIdentity,
+	createSubtitleTrackIdentity
+} from './trackMatching';
 
 export const BREEZYFIN_TRACK_PREFERENCES_KEY = 'breezyfinTrackPrefs';
 
@@ -44,14 +47,10 @@ export const createAudioPreference = (index, stream, streams = []) => ({
 	index
 });
 
-export const createSubtitlePreference = (index, stream) => {
+export const createSubtitlePreference = (index, stream, streams = []) => {
 	if (index === -1) return {off: true};
 	return {
-		index,
-		language: stream?.Language || null,
-		isForced: !!stream?.IsForced,
-		isDefault: !!stream?.IsDefault,
-		title: stream?.DisplayTitle || stream?.Title || null,
-		codec: stream?.Codec || null
+		...createSubtitleTrackIdentity(stream, streams),
+		index
 	};
 };

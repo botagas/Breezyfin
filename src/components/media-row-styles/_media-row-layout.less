@@ -73,9 +73,8 @@
 	padding: 1rem 60px 1.25rem;
 	overflow-x: auto;
 	overflow-y: visible;
-	scroll-behavior: smooth;
+	scroll-behavior: auto;
 	transform: translateZ(0);
-	will-change: scroll-position;
 	contain: layout style;
 
 	/* Hide scrollbar */
@@ -85,4 +84,26 @@
 	&::-webkit-scrollbar {
 		display: none;
 	}
+}
+
+.rowCinematic {
+	position: relative;
+	z-index: 20;
+	margin-top: 0;
+	margin-bottom: 2.4rem;
+	content-visibility: auto;
+}
+
+.rowCinematicFirst {
+	margin-top: 0;
+}
+
+.rowCinematic .rowHeader {
+	margin-bottom: 0.65rem;
+}
+
+.rowCinematic .cardContainer {
+	padding-top: 0.55rem;
+	padding-bottom: 0.8rem;
+	scroll-behavior: auto;
 }

@@ -91,6 +91,8 @@ Examples:
 - `src/components/toolbar-styles/_toolbar-compat-webos6.less`
 - `src/components/HeroBanner.module.less`
 - `src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
+- `src/components/BreezyLoadingOverlay.module.less`
+- `src/components/PosterMediaCard.module.less`
 - `src/components/MediaRow.module.less`
 - `src/components/media-row-styles/_media-row-compat-webos6.less`
 
@@ -104,7 +106,7 @@ Examples:
 
 ### Elegant
 
-- Uses liquid/glass layers for navbar, popups, and selected surfaces.
+- Uses the compact pill header across shared-toolbar panels, plus liquid/glass layers for popups and selected surfaces.
 - Stronger tokenized gradients and blur/saturation behavior.
 - Elegant toolbar can use SVG distortion when supported.
 
@@ -113,6 +115,10 @@ Examples:
 - Reduces expensive transforms/animations.
 - Keeps readability and key visual structure.
 - Selective blur reductions happen in global and panel-specific shared tails.
+- The compact Elegant header keeps its backdrop blur but disables SVG distortion; Performance+ and webOS 6 use the static non-blurred fallback.
+- The shared Breezyfin wind loading mark remains animated; only Performance+ makes it static.
+
+Shared Hero backdrop, media-panel atmosphere, text-fallback contrast, Elegant liquid-glass specular, card-placeholder, and loading colors are defined as semantic tokens in `src/styles/global-styles/_global-root.css` and the Classic/Elegant token packs rather than repeated in component styles. Media-panel backdrops use low-resolution Jellyfin-preblurred representative artwork with darkening in Normal mode, a smaller/lighter pre-blurred image in Performance mode, and a lower-opacity unblurred image in Performance+; full-screen CSS blur is intentionally avoided.
 
 ### Performance+ Mode (`data-bf-all-animations='off'`)
 
@@ -150,7 +156,6 @@ Key files:
 
 - `src/views/search-panel-styles/_search-panel-compat-webos22.less`
 - `src/views/favorites-panel-styles/_favorites-panel-compat-webos22.less`
-- `src/views/library-panel-styles/_library-panel-compat-webos22.less`
 
 ## 7) Settings storage
 

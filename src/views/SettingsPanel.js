@@ -16,10 +16,12 @@ import {isNonStableBuild} from '../utils/featureFlags';
 import BreezyToast from '../components/BreezyToast';
 import {
 	BITRATE_OPTIONS,
+	BITMAP_SUBTITLE_RENDERER_OPTIONS,
 	CAPABILITY_PROBE_REFRESH_OPTIONS,
 	DEFAULT_SETTINGS,
 	LANGUAGE_OPTIONS,
 	NAVBAR_THEME_OPTIONS,
+	SCREENSAVER_TIMEOUT_OPTIONS,
 	getAssSubtitleRendererOptions,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
@@ -85,6 +87,7 @@ const SettingsPanel = ({
 	const [cacheWipeError, setCacheWipeError] = useState('');
 	const {
 		toastMessage,
+		toastSeverity,
 		toastVisible,
 		setToastMessage
 	} = useToastMessage(PANEL_TOAST_CONFIG);
@@ -98,6 +101,7 @@ const SettingsPanel = ({
 		subtitleLangPopupOpen,
 		subtitleBurnInTextCodecsPopupOpen,
 		assSubtitleRendererPopupOpen,
+		bitmapSubtitleRendererPopupOpen,
 		subtitleOverlaySizePopupOpen,
 		subtitleOverlayPositionPopupOpen,
 		subtitleOverlayBackgroundPopupOpen,
@@ -110,6 +114,7 @@ const SettingsPanel = ({
 		subtitleOverlayShadowDistancePopupOpen,
 		subtitleOverlayShadowAnglePopupOpen,
 		navbarThemePopupOpen,
+		screensaverTimeoutPopupOpen,
 		playNextPromptModePopupOpen,
 		logoutConfirmOpen,
 		logsPopupOpen,
@@ -126,6 +131,8 @@ const SettingsPanel = ({
 		closeSubtitleBurnInTextCodecsPopup,
 		openAssSubtitleRendererPopup,
 		closeAssSubtitleRendererPopup,
+		openBitmapSubtitleRendererPopup,
+		closeBitmapSubtitleRendererPopup,
 		openSubtitleOverlaySizePopup,
 		closeSubtitleOverlaySizePopup,
 		openSubtitleOverlayPositionPopup,
@@ -150,6 +157,8 @@ const SettingsPanel = ({
 		closeSubtitleOverlayShadowAnglePopup,
 		openNavbarThemePopup,
 		closeNavbarThemePopup,
+		openScreensaverTimeoutPopup,
+		closeScreensaverTimeoutPopup,
 		openLogoutConfirm,
 		closeLogoutConfirm,
 		closePlayNextPromptModePopup,
@@ -237,46 +246,7 @@ const SettingsPanel = ({
 		setCacheWipeError
 	});
 
-	const {
-		openPlayNextPromptModePopup,
-		handleNavbarThemeSelect,
-		handleBitrateSelect,
-		handleCapabilityProbeRefreshSelect,
-		handleAudioLanguageSelect,
-		handleSubtitleLanguageSelect,
-		handleAssSubtitleRendererSelect,
-		handleSubtitleBurnInTextCodecToggle,
-		handleSubtitleOverlayFontSizeDecrease,
-		handleSubtitleOverlayFontSizeIncrease,
-		handleSubtitleOverlayFontSizeReset,
-		handleSubtitleOverlayPositionSelect,
-		handleSubtitleOverlayBackgroundSelect,
-		handleSubtitleOverlayWeightSelect,
-		handleSubtitleOverlayTextColorSelect,
-		handleSubtitleOverlayBorderStyleSelect,
-		handleSubtitleOverlayBorderColorSelect,
-		handleSubtitleOverlayBorderStrengthSelect,
-		handleSubtitleOverlayOutlineSizeDecrease,
-		handleSubtitleOverlayOutlineSizeIncrease,
-		handleSubtitleOverlayOutlineSizeReset,
-		handleSubtitleOverlayShadowDistanceSelect,
-		handleSubtitleOverlayShadowAngleSelect,
-		setSegmentsOnlyPromptMode,
-		setSegmentsOrLast60PromptMode,
-		subtitleBurnInTextCodecsLabel,
-		assSubtitleRendererLabel,
-		subtitleOverlayFontSizeLabel,
-		subtitleOverlayPositionLabel,
-		subtitleOverlayBackgroundLabel,
-		subtitleOverlayWeightLabel,
-		subtitleOverlayTextColorLabel,
-		subtitleOverlayBorderStyleLabel,
-		subtitleOverlayBorderColorLabel,
-		subtitleOverlayBorderStrengthLabel,
-		subtitleOverlayOutlineSizeLabel,
-		subtitleOverlayShadowDistanceLabel,
-		subtitleOverlayShadowAngleLabel
-	} = useSettingsOptionHandlers({
+	const optionHandlers = useSettingsOptionHandlers({
 		settings,
 		setSettings,
 		handleSettingChange,
@@ -286,6 +256,7 @@ const SettingsPanel = ({
 		closeAudioLangPopup,
 		closeSubtitleLangPopup,
 		closeAssSubtitleRendererPopup,
+		closeBitmapSubtitleRendererPopup,
 		closeSubtitleOverlaySizePopup,
 		closeSubtitleOverlayPositionPopup,
 		closeSubtitleOverlayBackgroundPopup,
@@ -298,14 +269,76 @@ const SettingsPanel = ({
 		closeSubtitleOverlayShadowDistancePopup,
 		closeSubtitleOverlayShadowAnglePopup,
 		closeNavbarThemePopup,
+		closeScreensaverTimeoutPopup,
 		closePlayNextPromptModePopup,
 		normalizeCapabilityProbeRefreshDaysSetting,
 		setRuntimeCapabilityProbeRefreshDays,
 		setToastMessage,
 		bumpCapabilitySnapshotVersion,
 		getCapabilityProbeRefreshLabel,
-		assSubtitleRendererOptions
+		assSubtitleRendererOptions,
+		bitmapSubtitleRendererOptions: BITMAP_SUBTITLE_RENDERER_OPTIONS
 	});
+	const {
+		openPlayNextPromptModePopup,
+		setSegmentsOnlyPromptMode,
+		setSegmentsOrLast60PromptMode
+	} = optionHandlers;
+	const {
+		handleNavbarThemeSelect,
+		handleScreensaverTimeoutSelect,
+		handleBitrateSelect,
+		handleCapabilityProbeRefreshSelect,
+		handleAudioLanguageSelect,
+		handleSubtitleLanguageSelect
+	} = optionHandlers;
+	const {
+		handleAssSubtitleRendererSelect,
+		handleBitmapSubtitleRendererSelect,
+		handleSubtitleBurnInTextCodecToggle
+	} = optionHandlers;
+	const {
+		handleSubtitleOverlayFontSizeDecrease,
+		handleSubtitleOverlayFontSizeIncrease,
+		handleSubtitleOverlayFontSizeReset,
+		handleSubtitleOverlayPositionSelect,
+		handleSubtitleOverlayBackgroundSelect,
+		handleSubtitleOverlayWeightSelect
+	} = optionHandlers;
+	const {
+		handleSubtitleOverlayTextColorSelect,
+		handleSubtitleOverlayBorderStyleSelect,
+		handleSubtitleOverlayBorderColorSelect,
+		handleSubtitleOverlayBorderStrengthSelect
+	} = optionHandlers;
+	const {
+		handleSubtitleOverlayOutlineSizeDecrease,
+		handleSubtitleOverlayOutlineSizeIncrease,
+		handleSubtitleOverlayOutlineSizeReset,
+		handleSubtitleOverlayShadowDistanceSelect,
+		handleSubtitleOverlayShadowAngleSelect
+	} = optionHandlers;
+	const {
+		subtitleBurnInTextCodecsLabel,
+		assSubtitleRendererLabel,
+		bitmapSubtitleRendererLabel
+	} = optionHandlers;
+	const {
+		subtitleOverlayFontSizeLabel,
+		subtitleOverlayPositionLabel,
+		subtitleOverlayBackgroundLabel,
+		subtitleOverlayWeightLabel,
+		subtitleOverlayTextColorLabel,
+		subtitleOverlayBorderStyleLabel
+	} = optionHandlers;
+	const {
+		subtitleOverlayBorderColorLabel,
+		subtitleOverlayBorderStrengthLabel,
+		subtitleOverlayOutlineSizeLabel,
+		subtitleOverlayShadowDistanceLabel,
+		subtitleOverlayShadowAngleLabel
+	} = optionHandlers;
+	const {screensaverTimeoutLabel} = optionHandlers;
 	const {
 		getBitrateLabel,
 		getLanguageLabel,
@@ -340,7 +373,7 @@ const SettingsPanel = ({
 					isActive={isActive}
 					{...toolbarActions}
 				/>
-				<BreezyToast message={toastMessage} visible={toastVisible} />
+				<BreezyToast message={toastMessage} severity={toastSeverity} visible={toastVisible} />
 				<Scroller
 					className={css.settingsContainer}
 					cbScrollTo={captureSettingsScrollRestore}
@@ -371,6 +404,8 @@ const SettingsPanel = ({
 						openSubtitleBurnInTextCodecsPopup={openSubtitleBurnInTextCodecsPopup}
 						assSubtitleRendererLabel={assSubtitleRendererLabel}
 						openAssSubtitleRendererPopup={openAssSubtitleRendererPopup}
+						bitmapSubtitleRendererLabel={bitmapSubtitleRendererLabel}
+						openBitmapSubtitleRendererPopup={openBitmapSubtitleRendererPopup}
 						subtitleOverlayFontSizeLabel={subtitleOverlayFontSizeLabel}
 						subtitleOverlayPositionLabel={subtitleOverlayPositionLabel}
 						subtitleOverlayBackgroundLabel={subtitleOverlayBackgroundLabel}
@@ -397,6 +432,8 @@ const SettingsPanel = ({
 						openBitratePopup={openBitratePopup}
 						getNavbarThemeLabel={getNavbarThemeLabel}
 						openNavbarThemePopup={openNavbarThemePopup}
+						screensaverTimeoutLabel={screensaverTimeoutLabel}
+						openScreensaverTimeoutPopup={openScreensaverTimeoutPopup}
 						appVersion={appVersion}
 						webosVersionLabel={webosVersionLabel}
 						capabilityProbeLabel={capabilityProbeLabel}
@@ -446,6 +483,10 @@ const SettingsPanel = ({
 					closeAssSubtitleRendererPopup={closeAssSubtitleRendererPopup}
 					assSubtitleRendererOptions={assSubtitleRendererOptions}
 					handleAssSubtitleRendererSelect={handleAssSubtitleRendererSelect}
+					bitmapSubtitleRendererPopupOpen={bitmapSubtitleRendererPopupOpen}
+					closeBitmapSubtitleRendererPopup={closeBitmapSubtitleRendererPopup}
+					bitmapSubtitleRendererOptions={BITMAP_SUBTITLE_RENDERER_OPTIONS}
+					handleBitmapSubtitleRendererSelect={handleBitmapSubtitleRendererSelect}
 					subtitleOverlaySizePopupOpen={subtitleOverlaySizePopupOpen}
 					closeSubtitleOverlaySizePopup={closeSubtitleOverlaySizePopup}
 					subtitleOverlayFontSizeLabel={subtitleOverlayFontSizeLabel}
@@ -498,6 +539,10 @@ const SettingsPanel = ({
 					closeNavbarThemePopup={closeNavbarThemePopup}
 					navbarThemeOptions={NAVBAR_THEME_OPTIONS}
 					handleNavbarThemeSelect={handleNavbarThemeSelect}
+					screensaverTimeoutPopupOpen={screensaverTimeoutPopupOpen}
+					closeScreensaverTimeoutPopup={closeScreensaverTimeoutPopup}
+					screensaverTimeoutOptions={SCREENSAVER_TIMEOUT_OPTIONS}
+					handleScreensaverTimeoutSelect={handleScreensaverTimeoutSelect}
 					playNextPromptModePopupOpen={playNextPromptModePopupOpen}
 					closePlayNextPromptModePopup={closePlayNextPromptModePopup}
 					setSegmentsOnlyPromptMode={setSegmentsOnlyPromptMode}

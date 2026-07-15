@@ -1,4 +1,15 @@
 /* Performance mode for lower-end TVs: reduce expensive motion but keep nav/header blur. */
+[data-bf-runtime-suspended='true'] *:not([data-bf-screensaver]),
+[data-bf-runtime-suspended='true'] *:not([data-bf-screensaver])::before,
+[data-bf-runtime-suspended='true'] *:not([data-bf-screensaver])::after {
+	animation-play-state: paused !important;
+}
+
+[data-bf-runtime-suspended='true'] [data-bf-screensaver],
+[data-bf-runtime-suspended='true'] [data-bf-screensaver] * {
+	animation-play-state: running !important;
+}
+
 [data-bf-animations='off'] .focusExpand,
 [data-bf-animations='off'] .spottable:focus,
 [data-bf-animations='off'] [data-webos-voice-focused='true'] {
@@ -92,4 +103,14 @@
 [data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-navbar-theme='elegant'] [data-bf-glass-layer='specular'] {
 	background: transparent !important;
 	box-shadow: none !important;
+}
+
+/* Compact Elegant headers use a local tab capsule, not a full-width toolbar surface. */
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-header-layout='compact-pill'] {
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+[data-bf-all-animations='off'] [data-bf-navbar='true'][data-bf-header-layout='compact-pill'] [data-bf-glass-layer] {
+	display: none !important;
 }

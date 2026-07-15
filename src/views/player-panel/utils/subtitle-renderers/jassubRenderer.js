@@ -10,27 +10,30 @@ import {
 	readVideoTime,
 	setManualSubtitleCanvasRect
 } from './manualCanvasLayout';
+import {buildAppAssetUrl} from './assetUrls';
+import {attachSuspendableRendererInterval} from './rendererRuntimeSuspension';
 
 const JASSUB_OPTIONS = Object.freeze({
 	prescaleFactor: 1,
 	prescaleHeightLimit: 1080,
 	maxRenderHeight: 0
 });
+const JASSUB_STATIC_ASSET_BASE = 'node_modules/breezyfin-subtitle-assets';
 const JASSUB_FALLBACK_FONT_NAME = 'breezyfin subtitle fallback';
-const JASSUB_FALLBACK_FONT_URL = 'breezyfin-subtitle-fallback.ttf';
-const JASSUB_AVAILABLE_FONTS = Object.freeze({
-	[JASSUB_FALLBACK_FONT_NAME]: JASSUB_FALLBACK_FONT_URL,
-	arial: JASSUB_FALLBACK_FONT_URL,
-	'arial regular': JASSUB_FALLBACK_FONT_URL,
-	roboto: JASSUB_FALLBACK_FONT_URL,
-	'roboto medium': JASSUB_FALLBACK_FONT_URL,
-	'sans-serif': JASSUB_FALLBACK_FONT_URL,
-	'museo sans': JASSUB_FALLBACK_FONT_URL
-});
 const JASSUB_READY_TIMEOUT_MS = 10000;
 const JASSUB_MANUAL_SYNC_INTERVAL_MS = 100;
 const JASSUB_MANUAL_SYNC_MIN_DELTA_SECONDS = 0.04;
 const JASSUB_MANUAL_RENDER_TIMEOUT_MS = 2500;
+
+const getJassubStaticAssetUrls = () => {
+	const buildJassubAssetUrl = (assetPath) => buildAppAssetUrl(`${JASSUB_STATIC_ASSET_BASE}/${assetPath}`);
+	return {
+		workerUrl: buildJassubAssetUrl('worker/worker.js'),
+		wasmUrl: buildJassubAssetUrl('wasm/jassub-worker.wasm'),
+		modernWasmUrl: buildJassubAssetUrl('wasm/jassub-worker-modern.wasm'),
+		fontUrl: buildJassubAssetUrl('default.woff2')
+	};
+};
 
 const truncateDiagnosticText = (value, maxLength = 80) => {
 	const text = String(value || '').trim();
@@ -264,11 +267,22 @@ const startJassubTrackDiagnostics = ({
 	return renderer.__breezyfinJassubTrackDiagnostics;
 };
 
-const getJassubFontOptions = () => ({
-	fonts: [JASSUB_FALLBACK_FONT_URL],
-	availableFonts: JASSUB_AVAILABLE_FONTS,
-	defaultFont: JASSUB_FALLBACK_FONT_NAME
-});
+const getJassubFontOptions = () => {
+	const {fontUrl} = getJassubStaticAssetUrls();
+	return {
+		fonts: [fontUrl],
+		availableFonts: {
+			[JASSUB_FALLBACK_FONT_NAME]: fontUrl,
+			arial: fontUrl,
+			'arial regular': fontUrl,
+			roboto: fontUrl,
+			'roboto medium': fontUrl,
+			'sans-serif': fontUrl,
+			'museo sans': fontUrl
+		},
+		defaultFont: JASSUB_FALLBACK_FONT_NAME
+	};
+};
 
 const getJassubRendererOptions = (mode) => ({
 	queryFonts: false,
@@ -289,6 +303,7 @@ const buildJassubConstructorOptions = ({
 	...(videoElement ? {video: videoElement} : {}),
 	...(canvas ? {canvas} : {}),
 	subContent: subtitleContent,
+	...getJassubStaticAssetUrls(),
 	...getJassubFontOptions(),
 	queryFonts: false,
 	prescaleFactor: JASSUB_OPTIONS.prescaleFactor,
@@ -307,24 +322,25 @@ const buildJassubDebug = ({
 	mode,
 	readyResult,
 	renderer,
-	videoElement
+	videoElement,
+	diagnosticsEnabled = false
 }) => ({
 	mode,
 	engine: 'jassub',
 	readyStatus: readyResult.status,
 	readyWaitMs: readyResult.waitedMs,
 	...(readyResult.error ? {readyError: readyResult.error.message || ''} : {}),
-	workerUrl: 'bundled',
-	wasmUrl: 'bundled',
-	modernWasmUrl: 'bundled',
-	defaultFont: 'bundled',
+	workerUrl: 'static',
+	wasmUrl: 'static',
+	modernWasmUrl: 'static',
+	defaultFont: 'static',
 	...getJassubRendererOptions(mode),
 	...extra,
-	...collectExternalRendererDiagnostics({
+	...(diagnosticsEnabled ? collectExternalRendererDiagnostics({
 		containerElement,
 		renderer,
 		videoElement
-	})
+	}) : {})
 });
 
 const forceDisposeJassubRenderer = (renderer, canvas) => {
@@ -409,17 +425,18 @@ const startManualJassubCanvasSync = ({
 }) => {
 	if (!renderer || !videoElement || !canvas || !containerElement) return () => {};
 	let disposed = false;
-	let intervalId = null;
 	let renderInFlight = false;
 	let runtimeFailed = false;
+	let runtimeSuspended = false;
 	let lastSyncedTime = null;
+	let detachRuntimeSuspension = () => {};
 	const failRuntime = (reason, error = null) => {
 		if (runtimeFailed || disposed) return;
 		runtimeFailed = true;
 		renderer.__breezyfinManualRenderStatus = reason;
 		renderer.__breezyfinManualRenderError = error?.message || reason;
 		renderer.__breezyfinManualRenderFinishedAtMs = Date.now();
-		if (intervalId) clearInterval(intervalId);
+		detachRuntimeSuspension();
 		if (typeof onError === 'function') {
 			onError(error || new Error(reason));
 		}
@@ -429,7 +446,7 @@ const startManualJassubCanvasSync = ({
 		applyManualSubtitleCanvasStyle(canvas, rect);
 	};
 	const syncRender = (force = false) => {
-		if (disposed || runtimeFailed || typeof renderer.manualRender !== 'function' || renderInFlight) return;
+		if (disposed || runtimeFailed || runtimeSuspended || typeof renderer.manualRender !== 'function' || renderInFlight) return;
 		const shouldForce = force === true;
 		const currentTime = readVideoTime(videoElement);
 		if (
@@ -501,22 +518,38 @@ const startManualJassubCanvasSync = ({
 		renderer.__breezyfinResizeObserver.observe(videoElement);
 	}
 	syncRender(true);
-	intervalId = setInterval(() => syncRender(false), JASSUB_MANUAL_SYNC_INTERVAL_MS);
-	return () => cleanupManualSubtitleRenderer({
+	detachRuntimeSuspension = attachSuspendableRendererInterval({
 		renderer,
-		videoElement,
-		eventHandlers,
-		intervalId,
-		markDisposed: () => {
-			disposed = true;
-		}
+		intervalMs: JASSUB_MANUAL_SYNC_INTERVAL_MS,
+		onInterval: () => syncRender(false),
+		onSuspensionChange: (suspended) => {
+			runtimeSuspended = suspended;
+		},
+		onResume: () => {
+			syncSize();
+			syncRender(true);
+		},
+		shouldRun: () => !disposed && !runtimeFailed
 	});
+	return () => {
+		detachRuntimeSuspension();
+		cleanupManualSubtitleRenderer({
+			renderer,
+			videoElement,
+			eventHandlers,
+			intervalId: null,
+			markDisposed: () => {
+				disposed = true;
+			}
+		});
+	};
 };
 
 export const initJassubRenderer = async ({
 	videoElement,
 	containerElement,
 	subtitleContent,
+	diagnosticsEnabled = false,
 	readyTimeoutMs = JASSUB_READY_TIMEOUT_MS
 }) => {
 	if (!containerElement) return {instance: null, debug: {engine: 'jassub', status: 'missing-container'}};
@@ -549,6 +582,7 @@ export const initJassubRenderer = async ({
 					readyResult,
 					renderer,
 					videoElement,
+					diagnosticsEnabled,
 					extra: {externalStatus: `ready-${readyResult.status}`}
 				})
 			};
@@ -563,6 +597,7 @@ export const initJassubRenderer = async ({
 				readyResult,
 				renderer,
 				videoElement,
+				diagnosticsEnabled,
 				extra: {
 					videoFrameCallback: typeof videoElement?.requestVideoFrameCallback === 'function' ? 'yes' : 'no'
 				}
@@ -579,6 +614,7 @@ export const initJassubManualRenderer = async ({
 	containerElement,
 	subtitleContent,
 	onError,
+	diagnosticsEnabled = false,
 	readyTimeoutMs = JASSUB_READY_TIMEOUT_MS
 }) => {
 	if (!containerElement) return {instance: null, debug: {engine: 'jassub', status: 'missing-container'}};
@@ -609,6 +645,7 @@ export const initJassubManualRenderer = async ({
 					readyResult,
 					renderer,
 					videoElement,
+					diagnosticsEnabled,
 					extra: {externalStatus: `ready-${readyResult.status}`}
 				})
 			};
@@ -630,6 +667,7 @@ export const initJassubManualRenderer = async ({
 				readyResult,
 				renderer,
 				videoElement,
+				diagnosticsEnabled,
 				extra: {
 					videoFrameCallback: 'not-used',
 					manualSyncIntervalMs: JASSUB_MANUAL_SYNC_INTERVAL_MS,
