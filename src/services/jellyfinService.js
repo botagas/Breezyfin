@@ -173,6 +173,7 @@ class JellyfinService {
 			method = 'GET',
 			headers = {},
 			body,
+			signal,
 			includeAuth = true,
 			expectJson = true,
 			context = 'request',
@@ -182,7 +183,8 @@ class JellyfinService {
 		const response = await fetch(url, {
 			method,
 			headers: includeAuth ? this._getAuthHeaders(headers) : headers,
-			body
+			body,
+			...(signal ? {signal} : {})
 		});
 
 		if (!response.ok) {

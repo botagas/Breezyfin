@@ -95,8 +95,8 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
-1. In the My Requests Home row, verify plugin-first behavior falls back to tag matching when the plugin endpoint is unavailable, expected plugin-missing failures are not repeatedly retried in the same app session, and production builds load Home without `p is not a function`.
-2. In the My Requests View More section, verify pagination/load-more requests subsequent service pages without duplicates or production-only crashes.
+1. In the My Requests Home row, verify capabilities are requested once per authenticated server session; plugin `404`, `5xx`, timeout, disabled/missing feature, and malformed responses use tag fallback without repeated missing-plugin probes; valid empty plugin results remain empty; and plugin `400`, `401`, and `403` do not fall back.
+2. In the My Requests View More section, verify pagination/load-more requests subsequent service pages without duplicates or production-only crashes, and that changing server, user, or access token triggers fresh capability discovery.
 3. In Favorites with more than one page, verify the first page loads about 30 items, scrolling/focusing near the end loads more items, keyword search composes with the selected type filter across pages, and returning from item details preserves the query, filter, loaded page, and scroll position.
 4. Verify HeroBanner image logos and text fallback titles use a stable branding slot and do not jump vertically when rotating between items.
 5. Verify text-only HeroBanner branding remains readable on bright and dark backdrops in Classic and Elegant, while image logos remain visually unchanged.

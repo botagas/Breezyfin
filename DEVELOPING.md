@@ -242,7 +242,8 @@ Jellyfin service paths:
 - `src/utils/playbackDiagnostics.js` (generic playback diagnostic construction/appending)
 - `src/services/jellyfin/playbackProfileBuilder.js` (playback profile request context)
 - `src/services/jellyfin/subtitleApi.js` (subtitle event/raw text fetch helpers for client-side rendering)
-- `src/services/jellyfin/requestsApi.js` (plugin-first My Requests paging with bounded tag fallback)
+- `src/services/jellyfin/requestsApi.js` (session-cached plugin capability discovery,
+  plugin-first My Requests paging, strict plugin error handling, and bounded tag fallback)
 
 Service rule:
 - Keep `jellyfinService` as a thin orchestrator; move domain-specific behavior to `src/services/jellyfin/*` modules.
