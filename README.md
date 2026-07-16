@@ -18,7 +18,7 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 ## Current capabilities
 
 > [!NOTE]
-> The app has undergone major refactoring efforts. If you upgrade from an older build, run **Wipe Cache and Reload (Keep Login)** once, and report issues you encounter.
+> If you face difficulties after major updates, it is advised to run **Wipe Cache and Reload (Keep Login)** once and then report the issues if they persist.
 
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
@@ -93,9 +93,7 @@ For implementation and workflow details, use:
 
 ## Diagnostics and debug
 
-Optional diagnostics are controlled by **Settings > Diagnostics > Enable Diagnostics** and default off in every release channel. The Performance Overlay, Extended Player Debug Metrics, Focus Debug Overlay, Verbose App Logs, and non-stable Debug Error Menu retain their saved values but stay inactive while the master switch is off. Logs remain accessible so critical or previously captured entries can still be reviewed and cleared.
-
-With Diagnostics off, normal console traffic is not patched or persisted and optional playback/source/canvas metrics are not collected. App crashes, global errors, and unhandled rejections still use a bounded critical-log path when persistent logging capability is present. Playback recovery and the bounded subtitle-renderer health watchdog remain active because they are correctness features. Force DV, Relaxed Playback Profile, and other explicit playback behavior settings are independent of the diagnostics master switch.
+Optional diagnostics are controlled by **Settings > Diagnostics > Enable Diagnostics** and default off in every release channel. Debug options retain their saved values but stay inactive while diagnostics are disabled. Logs remain accessible so critical or previously captured entries can still be reviewed and cleared.
 
 Build-time log capture flags:
 
@@ -175,7 +173,7 @@ No. As of now, webOS has too many quirks that will not be applicable to other pl
 <b>Is the app vibecoded?</b>
 </summary>
 I would say the current state of it is. While the initial versions where mostly me speeding up the workflow, my current circumstances lack the time and mental capacity to do manual labor on the app.
-My current workflow consists of making sure the app is not monolithic so I could edit and track changes more easily. I've established strict guidelines for myself and any agents that may interact with the repository, because I know how I want the app to work, what the structure has to be, and what kind of code and design decisions should be made (if possible) within webOS constraints. This is my first and only webOS project and let me tell you, it is nothing like working on a simple webapp. Even some simple CSS options often simply break depending on the webOS version.
+My current workflow consists of making sure the app is not monolithic so I could edit and track changes more easily. I've established strict guidelines for myself and anyone else (including agents) that may interact with the repository, because I know how I want the app to work, what the structure should be, and what kind of code and design decisions should be made (if possible) within webOS constraints. This is my first and only webOS project. Based on the amount of experience I've gained while working on this I can tell that webOS has many situations that need to be accounted for. Sometimes, it is a tad bit too much and I am glad I focus only on webOS releases in this project without broadening the scope.
 </details>
 
 <details>

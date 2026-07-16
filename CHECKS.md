@@ -73,7 +73,7 @@ Run these before packaging a release candidate:
 25. Validate forced/confirmed subtitle burn-in PlaybackInfo requests include `SubtitleStreamIndex`, `AlwaysBurnInSubtitleWhenTranscoding=true`, encode-only subtitle profiles, and debug diagnostics confirming the returned transcode URL preserves `SubtitleMethod=Encode`.
 26. Validate encoded image-subtitle fragment 4xx/5xx failures stop restart loops and show a no-subtitle fallback consent prompt with a warning toast instead of silently continuing without subtitles.
 27. Validate HLS.js runtime diagnostics classify fragment-load, buffer-pressure, append-buffer, gap, and stall failures separately from subtitle-renderer fallback failures.
-28. Validate Breezyfin-rendered ASS subtitles use a centered, uniformly scaled `PlayRes` plane and stay inside the visible video stage for 16:9, ultrawide/letterboxed, and 4:3/pillarboxed media. Cover `PlayRes`/`LayoutRes`, top/bottom/absolute `\pos` and `\move` cues, rectangular/inverse/vector clips, long page-style signs, and overlapping cues on the same and different ASS layers.
+28. On real TVs, validate Breezyfin-rendered ASS subtitles with synthetic and representative non-committed samples. Confirm a centered, uniformly scaled `PlayRes` plane and correct `LayoutRes` aspect handling for 16:9, ultrawide/letterboxed, and 4:3/pillarboxed media; cover ordinary dialogue/page-sign containment, top/bottom/absolute `\pos` and `\move` cues, rectangular/inverse/vector clips, overlapping layers, and preservation of intentionally off-screen authored positions/clips.
 29. Validate nonfatal `bufferSeekOverHole`/nudge events remain diagnostic-only recovered events, do not trigger media recovery, and never log unredacted API tokens.
 30. Validate bitmap burn-in fragility consent appears before source assignment/HLS attachment and starts playback only after confirmation.
 31. During Next/Previous Episode transitions, verify successful playback does not show the stale `Playback failed to start` toast when the previous media element's play promise is interrupted during source replacement.
@@ -108,6 +108,12 @@ Run these before packaging a release candidate:
 ### Media Details validation
 
 1. On a fully watched season, use the season-card watched action to mark it unwatched, then activate it again. Verify the button state, toast, season state, and episode states transition back to watched rather than repeating the unwatched action.
+
+### TV performance validation
+
+1. Using the same Search/Library datasets and input sequence, compare the optimized Sandstone `MediaVirtualGrid` and card-image pipeline across three captures. Confirm mounted-card counts remain bounded, overhang is mode-appropriate, average input latency is at least 25% lower, and slow frames are at least 40% lower than the recorded baseline without image, focus, scrolling, pagination, or restoration regressions.
+2. Compare cinematic Home against `REACT_APP_HOME_DESIGN_VARIANT=current` on the same TV, content, and input sequence across three captures. Confirm offset-based row correction does not queue scrolling, first-viewport/Hero/row focus and pointer behavior remain intact, and median slow-frame count or next-frame delay improves by at least 15%.
+3. Repeatedly move focus through Settings rows and confirm labels remain stable with ellipsis, full accessible labels and popup values remain available, no marquee starts, and focus performance does not regress.
 
 ### Loading and screensaver validation
 

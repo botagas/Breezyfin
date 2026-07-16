@@ -8,14 +8,6 @@ Rules:
 - Move investigation items into a sized section once their constraints and likely implementation are understood.
 - Keep deferred platform-compatibility work in its own section rather than assigning it an active implementation scale.
 
-## Small / contained changes
-
-Expected scope: focused visual or localized fixes, usually isolated to one component or style area.
-
-- Complete real-TV performance validation of the optimized shared Sandstone `MediaVirtualGrid` and card-image pipeline using the same datasets before/after. Confirm bounded mounted-card counts and mode-aware overhang, then target at least 25% lower average input latency and 40% fewer slow frames before moving the remaining performance budget into `CHECKS.md`; functional image loading and scrolling are already validated.
-- Validate the offset-based, animation-frame-coalesced Home row focus correction and marquee-free Settings rows on real TVs. Compare the cinematic Home design against `REACT_APP_HOME_DESIGN_VARIANT=current` with the same content and input sequence across three captures; target at least 15% lower median slow-frame count or next-frame delay while preserving first-viewport composition, Hero/row focus transitions, pointer scrolling, complete accessible Settings labels, and stable ellipsis.
-- Validate Breezyfin Lightweight ASS placement on real TVs using synthetic and representative non-committed samples. Confirm PlayRes/LayoutRes aspect handling, letterbox/pillarbox stages, ordinary dialogue/page-sign containment, and preservation of intentionally off-screen authored positions/clips before moving this bounded placement work into `CHECKS.md`.
-
 ## Large / cross-cutting changes
 
 Expected scope: architectural work, a new feature surface, or changes spanning services, settings, UI, persistence, and TV validation.
@@ -40,9 +32,7 @@ Expected scope: unknown until profiling, API research, dependency analysis, or r
 - Evaluate Enact 5, Limestone, and React 19 only when Breezyfin can raise its minimum webOS requirement or maintain separate legacy and modern builds. Include Enact CLI/toolchain advisories in that isolated investigation; do not mix it into Enact 4/React 18 release maintenance.
 - Investigate server discovery for manual login, including SSDP/webOS constraints and fallback discovery approaches when multicast is unavailable through VPNs or segmented networks.
 - Identify the cause of panel loading delay and unintended panel reload behavior when switching panels; confirm whether the bottleneck is client-side before planning implementation work.
-- Profile Media Details FPS drops during scrolling on representative real devices and isolate image, layout, focus, and styling costs.
-- Profile memory use, panel responsiveness, and long-playback stability on representative LG TVs, then turn measured hotspots into bounded optimization tasks and resource budgets.
-- After the optimized TV baseline passes, investigate a true navbar/search scroll-under overlay using Enact-supported layout and virtual-list insets. Avoid negative-margin, transform, or duplicated-scroll workarounds.
+- Investigate a proper navbar/search scroll-under overlay using Enact-supported layout and virtual-list insets. Avoid negative-margin, transform, or duplicated-scroll workarounds.
 
 ## Deferred compatibility work
 
