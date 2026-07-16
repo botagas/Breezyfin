@@ -261,7 +261,9 @@ const MediaDetailsPanel = ({
 		selectedEpisode,
 		setIsFavorite,
 		setIsWatched,
+		setSeasons,
 		setEpisodes,
+		setSelectedSeason,
 		setSelectedEpisode,
 		setToastMessage
 	});

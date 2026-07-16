@@ -87,4 +87,27 @@ describe('MediaVirtualGrid integration', () => {
 		act(() => mockVirtualGridProps.onScrollStop({moreInfo: {lastVisibleIndex: 1}}));
 		expect(onLoadMore).toHaveBeenCalledTimes(2);
 	});
+
+	it('keeps the virtual scroller mounted when its results are temporarily cleared', () => {
+		const {rerender} = renderWithBreezyfin(
+			<MediaVirtualGrid
+				id="results"
+				items={[{Id: 'a', Name: 'Alpha'}]}
+				itemRenderer={ItemRenderer}
+			/>
+		);
+		const initialGrid = screen.getByTestId('virtual-grid');
+
+		rerender(
+			<MediaVirtualGrid
+				id="results"
+				items={[]}
+				itemRenderer={ItemRenderer}
+				data-spotlight-container-disabled
+			/>
+		);
+
+		expect(screen.getByTestId('virtual-grid')).toBe(initialGrid);
+		expect(mockVirtualGridProps.dataSize).toBe(0);
+	});
 });

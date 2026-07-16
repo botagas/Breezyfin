@@ -376,19 +376,20 @@ const HomeSectionPanel = ({
 								<BodyText>No items found.</BodyText>
 							</div>
 						) : null}
-						{!loading && !error && items.length > 0 ? <PanelLandscapeVirtualGrid
+						<PanelLandscapeVirtualGrid
 							id="home-section-grid"
 							className={css.virtualGrid}
-							items={items}
+							items={loading || error ? [] : items}
 							itemRendererProps={gridItemRendererProps}
-							isActive={isActive}
+							isActive={isActive && !loading && !error}
 							queryKey={querySignature}
-							hasMore={hasMore}
+							hasMore={!loading && !error && hasMore}
 							loadingMore={loadingMore}
 							onLoadMore={loadNextPage}
 							focusedItemIdRef={lastFocusedCardIdRef}
 							focusFirstItemRef={focusResultsAfterFilterRef}
-						/> : null}
+							data-spotlight-container-disabled={loading || Boolean(error) || items.length === 0}
+						/>
 				</div>
 			</div>
 		</Panel>

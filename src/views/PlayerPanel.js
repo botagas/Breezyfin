@@ -99,6 +99,7 @@ const PlayerPanel = ({
 	const skipOverlayRef = useRef(null);
 	const controlsRef = useRef(null);
 	const lastInteractionRef = useRef(0);
+	const pausedScreensaverActiveRef = useRef(false);
 	const startWatchTimerRef = useRef(null);
 	const failStartTimerRef = useRef(null);
 	const pendingOverrideClearRef = useRef(false);
@@ -212,7 +213,8 @@ const PlayerPanel = ({
 		disabled: loading || Boolean(error),
 		showControls,
 		setShowControls,
-		lastInteractionRef
+		lastInteractionRef,
+		blockedRef: pausedScreensaverActiveRef
 	});
 
 	const {
@@ -747,6 +749,7 @@ const PlayerPanel = ({
 		onWake: handlePausedScreensaverWake,
 		onResume: handlePausedScreensaverResume
 	});
+	pausedScreensaverActiveRef.current = pausedScreensaverActive;
 
 	const {
 		handleInternalBack
@@ -842,7 +845,8 @@ const PlayerPanel = ({
 		controlsRef,
 		skipOverlayRef,
 		focusSkipOverlayAction,
-		isProgressSliderTarget
+		isProgressSliderTarget,
+		screensaverActive: pausedScreensaverActive
 	});
 	const playerContentProps = {
 		startupStatus: playbackStartupStatus,

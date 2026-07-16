@@ -458,22 +458,22 @@ const FavoritesPanel = ({
 										: 'Mark items as favorites from the detail view to see them here'}
 									</BodyText>
 								</div>
-							) : (
-									<MediaVirtualGrid
-										id="favorites-grid"
-										spotlightId="favorites-grid"
-										className={css.favoritesGrid}
-										items={favorites}
-										itemRenderer={renderFavorite}
-										isActive={isActive}
-										queryKey={`${activeFilter}:${appliedSearchTerm}`}
-										restoreItemId={lastFocusedCardIdRef.current}
-										hasMore={hasMore}
-										loadingMore={loadingMore}
-										onLoadMore={loadNextPage}
-										focusedItemIdRef={lastFocusedCardIdRef}
-									/>
-							)}
+							) : null}
+							<MediaVirtualGrid
+								id="favorites-grid"
+								spotlightId="favorites-grid"
+								className={css.favoritesGrid}
+								items={loading ? [] : favorites}
+								itemRenderer={renderFavorite}
+								isActive={isActive && !loading}
+								queryKey={`${activeFilter}:${appliedSearchTerm}`}
+								restoreItemId={lastFocusedCardIdRef.current}
+								hasMore={!loading && hasMore}
+								loadingMore={loadingMore}
+								onLoadMore={loadNextPage}
+								focusedItemIdRef={lastFocusedCardIdRef}
+								data-spotlight-container-disabled={loading || favorites.length === 0}
+							/>
 						</div>
 					</div>
 			</div>

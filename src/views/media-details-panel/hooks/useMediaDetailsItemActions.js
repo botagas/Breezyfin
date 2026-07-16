@@ -1,5 +1,9 @@
 import {useCallback} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
+import {
+	updateItemsPlayedState,
+	withItemPlayedState
+} from '../utils/mediaDetailsHelpers';
 
 export const useMediaDetailsItemActions = ({
 	item,
@@ -9,7 +13,9 @@ export const useMediaDetailsItemActions = ({
 	selectedEpisode,
 	setIsFavorite,
 	setIsWatched,
+	setSeasons,
 	setEpisodes,
+	setSelectedSeason,
 	setSelectedEpisode,
 	setToastMessage
 }) => {
@@ -72,13 +78,23 @@ export const useMediaDetailsItemActions = ({
 
 		if (!targetId) return;
 		try {
-			await jellyfinService.toggleWatched(targetId, targetWatchedState);
+			const nextWatchedState = await jellyfinService.toggleWatched(targetId, targetWatchedState);
 
 			if (!itemId || itemId === item?.Id) {
-				setIsWatched(!targetWatchedState);
+				setIsWatched(nextWatchedState);
 			}
 
 			if (itemId && item?.Type === 'Series' && selectedSeason?.Id) {
+				setSeasons((currentSeasons) => updateItemsPlayedState(
+					currentSeasons,
+					targetId,
+					nextWatchedState
+				));
+				setSelectedSeason((currentSeason) => withItemPlayedState(
+					currentSeason,
+					targetId,
+					nextWatchedState
+				));
 				await refreshSeriesEpisodes();
 			} else {
 				const refreshed = await jellyfinService.getItem(targetId);
@@ -86,7 +102,7 @@ export const useMediaDetailsItemActions = ({
 					setIsWatched(refreshed.UserData.Played || false);
 				}
 			}
-			setToastMessage(!targetWatchedState ? 'Marked as watched' : 'Marked as unwatched');
+			setToastMessage(nextWatchedState ? 'Marked as watched' : 'Marked as unwatched');
 		} catch (error) {
 			console.error('Error toggling watched status:', error);
 			setToastMessage('Failed to update watched status');
@@ -97,6 +113,8 @@ export const useMediaDetailsItemActions = ({
 		refreshSeriesEpisodes,
 		selectedSeason?.Id,
 		setIsWatched,
+		setSeasons,
+		setSelectedSeason,
 		setToastMessage
 	]);
 

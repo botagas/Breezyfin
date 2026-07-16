@@ -32,12 +32,16 @@ export const usePlayerKeyboardShortcuts = ({
 	controlsRef,
 	skipOverlayRef,
 	focusSkipOverlayAction,
-	isProgressSliderTarget
+	isProgressSliderTarget,
+	screensaverActive = false
 }) => {
 	useEffect(() => {
 		if (!isActive) return undefined;
 
 		const handleKeyDown = (event) => {
+			// The screensaver capture listener owns the wake input and decides whether ENTER resumes.
+			if (screensaverActive) return;
+
 			const consumeEvent = () => {
 				event.preventDefault?.();
 				event.stopPropagation?.();
@@ -156,6 +160,7 @@ export const usePlayerKeyboardShortcuts = ({
 		isSeekContext,
 		onUserInteraction,
 		playing,
+		screensaverActive,
 		isProgressSliderTarget,
 		seekBySeconds,
 		setShowControls,

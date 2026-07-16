@@ -211,20 +211,21 @@ const LibraryPanel = ({
 				<div className={`${css.virtualGridViewport} ${browseCss.panelResultsOffset}`}>
 					{loading ? <div className={css.loading}><BreezyLoadingOverlay /></div> : null}
 					{!loading && items.length === 0 ? <div className={css.emptyState}><BodyText>No items found.</BodyText></div> : null}
-					{!loading && items.length > 0 ? <PanelLandscapeVirtualGrid
+					<PanelLandscapeVirtualGrid
 						id="library-grid"
 						className={css.virtualGrid}
-						items={items}
+						items={loading ? [] : items}
 						itemRendererProps={gridItemRendererProps}
-						isActive={isActive}
+						isActive={isActive && !loading}
 						queryKey={querySignature}
-							hasMore={hasMore}
+						hasMore={!loading && hasMore}
 						loadingMore={loadingMore}
 						onLoadMore={loadNextPage}
 						disableFocusScale
 						focusedItemIdRef={lastFocusedCardIdRef}
 						focusFirstItemRef={focusResultsAfterFilterRef}
-					/> : null}
+						data-spotlight-container-disabled={loading || items.length === 0}
+					/>
 				</div>
 			</div>
 		</Panel>

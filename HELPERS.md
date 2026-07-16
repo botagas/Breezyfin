@@ -274,7 +274,7 @@ usePanelToolbarActions({
 - File: `src/views/player-panel/hooks/usePlayerPausedScreensaver.js`
 - Purpose: own the separate paused-playback inactivity flow:
   - activates only after playback has started and remains paused for the configured screensaver timeout.
-  - consumes the first wake input so controls underneath are not activated.
+  - consumes the first wake input so controls underneath are not activated; Player keyboard and interaction-reveal hooks must defer while it is active.
   - resumes playback only for ENTER/OK/Space; pointer, wheel, directional, and Back inputs wake to paused controls.
   - remains disabled while loading, errors, track popups, subtitle decisions, skip prompts, or debug overlays are active.
 - Reuses `ScreensaverOverlay` for presentation but intentionally does not share App-shell Spotlight/session behavior.
@@ -379,7 +379,8 @@ usePlayerKeyboardShortcuts({
   controlsRef,
   skipOverlayRef,
   focusSkipOverlayAction,
-  isProgressSliderTarget
+  isProgressSliderTarget,
+  screensaverActive
 })
 ```
 
@@ -403,6 +404,7 @@ usePlayerVisibilitySync({
 - Purpose: reveal PlayerPanel controls from non-keyboard interaction without changing focus or playback state:
   - wheel/scroll-wheel always reveals controls
   - pointer/mouse movement reveals controls only near the top or bottom screen edge
+  - an optional `blockedRef` prevents covered surfaces such as the paused-player screensaver from leaking wake input into control visibility
   - passive listeners and `requestAnimationFrame` throttling keep the handler low-risk during playback
 - Signature:
 ```js

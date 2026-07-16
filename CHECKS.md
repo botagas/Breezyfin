@@ -83,7 +83,7 @@ Run these before packaging a release candidate:
 1. In the Error panel, verify 5-way ENTER/OK/Space activates the focused Back or Return Home action, pointer click still works, and Back key still follows crash recovery.
 2. In Library, Home View More, and Favorites filter popups, verify 5-way navigation stays inside the popup while it is open, applying filters restores focus predictably, and closing returns to the filter trigger or grid without breaking navigation. In Library, verify the compact Search/Filter bar expands while search is focused, retains the query, and retracts after focus leaves it.
 3. In Library, Home View More, Favorites, and Search grids with more than 30 results, verify pointer scrolling near the end and 5-way navigation near/beyond the bottom row both load the next page without skipped or duplicate items. Also verify DOWN from toolbar/filter controls enters the expected grid and RIGHT from the right-most Library item reaches Search before Filter.
-4. Apply and clear Library/Home View More filters, then navigate across Home/Search/Favorites to verify Spotlight is not left paused and no stale popup key handler captures directional keys.
+4. Apply and clear Library/Home View More/Favorites filters repeatedly, including rapid changes while results reload, then navigate across Home/Search/Favorites. Verify Spotlight is not left paused, no stale popup key handler captures directional keys, and no Sandstone `scrollHeight`/scroller exception is raised.
 5. Open the Elegant Libraries picker and verify the first entry is focused, immediate DOWN/LEFT/RIGHT stays in the picker, Back/toggle close restores the Libraries trigger, and selection/outside dismissal does not steal focus.
 6. In Library, reveal search, combine a parent-scoped search term with filters, load another page, open details, and verify Back restores the term, filters, loaded results, and scroll position.
 7. In Search, restore results after opening Media Details using both pointer and 5-way input. Verify Sandstone `VirtualGridList` restores the last scroll/focus state, pointer-only scrolling is not pulled back to an older focused tile, UP/DOWN moves through adjacent visual rows including a one-item final row, and visible-index pagination stops once Jellyfin reports no next page.
@@ -105,6 +105,10 @@ Run these before packaging a release candidate:
 8. Search for Episodes and verify their cards show the parent Series title and `SxxExx`; opening an Episode must expose its Series/Season/Episode breadcrumbs. Search must not return unfiltered Season containers, and stale Season results must open their parent Series instead of requesting playback for the Season item.
 9. In Elegant, verify the compact pill header preserves centered tab focus, panel back/title visibility, Libraries/User popup placement, and right-side action navigation across Home, Library, Home View More, Search, Favorites, and Settings. Verify Classic retains its existing toolbar layout.
 
+### Media Details validation
+
+1. On a fully watched season, use the season-card watched action to mark it unwatched, then activate it again. Verify the button state, toast, season state, and episode states transition back to watched rather than repeating the unwatched action.
+
 ### Loading and screensaver validation
 
 1. Verify the shared Breezyfin three-stroke gust loading indicator appears in Home, Search, Favorites, Media Details, Library/Home View More, and Player loading states.
@@ -114,5 +118,5 @@ Run these before packaging a release candidate:
 5. Verify the pre-sized white Breezyfin wind mark remains within the black viewport, points along its movement direction with smooth heading changes, reflects at resize boundaries, and advances smoothly on every delivered frame at both 30 Hz and 60 Hz, including Performance+ mode.
 6. Verify activation pauses Home Hero/CSS animation, Toolbar clock updates, optional diagnostics, paused playback progress/stall work, and manual subtitle synchronization. On wake, verify one immediate subtitle synchronization occurs, Home resumes, and Spotlight is restored only when the screensaver paused it.
 7. Verify logout, switch user, session expiry, view changes, and app unmount clean up inactivity timers, animation frames, listeners, and stored focus.
-8. Pause established playback for the configured timeout and verify the separate Player screensaver fades `Press the scroll wheel button to resume playback` between random, fully visible positions; ENTER/OK/Space resumes, while pointer, wheel, directional, or Back wakes to paused controls without activating or navigating underneath.
+8. Pause established playback for the configured timeout and verify the separate Player screensaver fades `Press the scroll wheel button to resume playback` between random, fully visible positions; ENTER/OK/Space resumes, while pointer, wheel, directional, or Back wakes to paused controls without activating or navigating underneath. Verify each wake input dismisses once without rapidly hiding/revealing the Player controls.
 9. Verify Player loading, playback errors, track popups, subtitle decisions, skip/next prompts, and the extended debug overlay suppress the paused-player screensaver.

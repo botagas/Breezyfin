@@ -6,10 +6,13 @@
 }
 
 .loading {
+	position: absolute;
+	inset: 0;
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	height: 80vh;
+	z-index: 2;
+	pointer-events: none;
 }
 
 .emptyState {
@@ -22,6 +25,8 @@
 	padding: var(--bf-media-browse-overlay-height) 4rem 2rem;
 	text-align: center;
 	color: var(--bf-theme-muted-text);
+	z-index: 2;
+	pointer-events: none;
 }
 
 .emptyState :global(.BodyText) {

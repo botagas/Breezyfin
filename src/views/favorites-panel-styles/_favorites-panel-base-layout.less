@@ -26,6 +26,7 @@
 }
 
 .favoritesBody {
+	position: relative;
 	flex: 1;
 	min-height: 0;
 	display: flex;
@@ -33,25 +34,29 @@
 }
 
 .loadingState {
+	position: absolute;
+	inset: 0;
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	flex: 1;
-	min-height: 0;
+	z-index: 2;
+	pointer-events: none;
 }
 
 .emptyState {
+	position: absolute;
+	inset: 0;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
-	flex: 1;
-	min-height: 0;
 	text-align: center;
 	padding: 2rem 4rem;
 	width: 100%;
 	max-width: none;
 	box-sizing: border-box;
+	z-index: 2;
+	pointer-events: none;
 }
 
 .emptyTitle {
