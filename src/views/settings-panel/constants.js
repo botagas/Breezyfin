@@ -332,5 +332,6 @@ export const HOME_ROW_LABELS = {
 	nextUp: 'Next Up',
 	latestMovies: 'Latest Movies',
 	latestShows: 'Latest TV Shows',
-	myRequests: 'My Requests'
+	myRequests: 'My Requests',
+	watchlist: 'Watchlist'
 };

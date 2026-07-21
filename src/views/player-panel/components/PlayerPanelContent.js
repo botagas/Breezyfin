@@ -7,6 +7,8 @@ import PlayerSubtitleBurnInPrompt from './PlayerSubtitleBurnInPrompt';
 import PlayerToast from './PlayerToast';
 import PlayerTrackPopups from './PlayerTrackPopups';
 import ScreensaverOverlay from '../../../components/ScreensaverOverlay';
+import PlayerSyncPlayPopup from './PlayerSyncPlayPopup';
+import PlayerWatchPartyPopup from './PlayerWatchPartyPopup';
 
 import css from '../../PlayerPanel.module.less';
 
@@ -20,7 +22,9 @@ const PlayerPanelContent = ({
 	startupStatus,
 	subtitlePrompt,
 	toast,
-	trackPopups
+	trackPopups,
+	syncPlay,
+	watchParty
 }) => (
 	<div className={css.playerContainer} data-playback-startup-status={startupStatus}>
 		<PlayerMediaSurface {...mediaSurface} />
@@ -31,6 +35,8 @@ const PlayerPanelContent = ({
 		<PlayerDebugOverlay {...debugOverlay} />
 		<PlayerControlsOverlay {...controls} />
 		<PlayerTrackPopups {...trackPopups} />
+		<PlayerSyncPlayPopup {...syncPlay} />
+		<PlayerWatchPartyPopup {...watchParty} />
 		<ScreensaverOverlay {...pausedScreensaver} />
 	</div>
 );

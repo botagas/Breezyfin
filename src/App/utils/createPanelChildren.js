@@ -7,6 +7,10 @@ import FavoritesPanel from '../../views/FavoritesPanel';
 import SettingsPanel from '../../views/SettingsPanel';
 import PlayerPanel from '../../views/PlayerPanel';
 import MediaDetailsPanel from '../../views/MediaDetailsPanel';
+import DiscoveryPanel from '../../views/DiscoveryPanel';
+import CalendarPanel from '../../views/CalendarPanel';
+import SyncPlayPanel from '../../views/SyncPlayPanel';
+import WatchPartyPanel from '../../views/WatchPartyPanel';
 
 export const createPanelChildren = ({
 	currentView,
@@ -39,6 +43,10 @@ export const createPanelChildren = ({
 		search: searchPanelState,
 		favorites: favoritesPanelState,
 		settings: settingsPanelState,
+		discovery: discoveryPanelState,
+		calendar: calendarPanelState,
+		syncPlay: syncPlayPanelState,
+		watchParty: watchPartyPanelState,
 		detailsByItemId
 	} = cacheState;
 	const {
@@ -60,6 +68,10 @@ export const createPanelChildren = ({
 		search: handleSearchPanelStateChange,
 		favorites: handleFavoritesPanelStateChange,
 		settings: handleSettingsPanelStateChange,
+		discovery: handleDiscoveryPanelStateChange,
+		calendar: handleCalendarPanelStateChange,
+		syncPlay: handleSyncPlayPanelStateChange,
+		watchParty: handleWatchPartyPanelStateChange,
 		details: handleDetailsPanelStateChange
 	} = cacheActions;
 	const {
@@ -69,6 +81,10 @@ export const createPanelChildren = ({
 		search: registerSearchBackHandler,
 		favorites: registerFavoritesBackHandler,
 		settings: registerSettingsBackHandler,
+		discovery: registerDiscoveryBackHandler,
+		calendar: registerCalendarBackHandler,
+		syncPlay: registerSyncPlayBackHandler,
+		watchParty: registerWatchPartyBackHandler,
 		details: registerDetailsBackHandler,
 		player: registerPlayerBackHandler
 	} = backHandlers;
@@ -168,6 +184,57 @@ export const createPanelChildren = ({
 			cachedState={settingsPanelState}
 			onCacheState={handleSettingsPanelStateChange}
 			registerBackHandler={registerSettingsBackHandler}
+			noCloseButton
+		/>,
+		<DiscoveryPanel
+			key="discovery"
+			isActive={currentView === 'discovery'}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={discoveryPanelState}
+			onCacheState={handleDiscoveryPanelStateChange}
+			registerBackHandler={registerDiscoveryBackHandler}
+			noCloseButton
+		/>,
+		<CalendarPanel
+			key="calendar"
+			isActive={currentView === 'calendar'}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={calendarPanelState}
+			onCacheState={handleCalendarPanelStateChange}
+			registerBackHandler={registerCalendarBackHandler}
+			noCloseButton
+		/>,
+		<SyncPlayPanel
+			key="syncPlay"
+			isActive={currentView === 'syncPlay'}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={syncPlayPanelState}
+			onCacheState={handleSyncPlayPanelStateChange}
+			registerBackHandler={registerSyncPlayBackHandler}
+			noCloseButton
+		/>,
+		<WatchPartyPanel
+			key="watchParty"
+			isActive={currentView === 'watchParty'}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			onPlay={handlePlay}
+			cachedState={watchPartyPanelState}
+			onCacheState={handleWatchPartyPanelStateChange}
+			registerBackHandler={registerWatchPartyBackHandler}
 			noCloseButton
 		/>
 	];

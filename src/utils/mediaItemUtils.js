@@ -60,10 +60,19 @@ export const isPlayableMediaItem = (item) => (
 	)
 );
 
+export const getEpisodeLocator = (item, {separator = ':'} = {}) => {
+	const season = item?.ParentIndexNumber;
+	const episode = item?.IndexNumber;
+	if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) return '';
+	return `S${season}${separator}E${episode}`;
+};
+
 export const getMediaItemSubtitle = (item, {includePersonRole = false} = {}) => {
 	switch (item?.Type) {
-		case 'Episode':
-			return `${item.SeriesName || ''} - S${item.ParentIndexNumber || 0}:E${item.IndexNumber || 0}`;
+		case 'Episode': {
+			const parts = [item.SeriesName || '', getEpisodeLocator(item)].filter(Boolean);
+			return parts.join(' - ');
+		}
 		case 'Movie':
 		case 'Series':
 			return item?.ProductionYear ? `${item.ProductionYear}` : '';

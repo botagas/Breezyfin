@@ -34,10 +34,13 @@ import {buildRuntimeDataAttributes} from './utils/runtimeDataAttributes';
 import {usePanelHistory} from './hooks/usePanelHistory';
 import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import {useAppScreensaver} from './hooks/useAppScreensaver';
+import {useIntegrationPanelCache} from './hooks/useIntegrationPanelCache';
 
 import css from './App.module.less';
 
-const DETAIL_RETURN_VIEWS = new Set(['home', 'homeSection', 'library', 'search', 'favorites', 'settings']);
+const DETAIL_RETURN_VIEWS = new Set([
+	'home', 'homeSection', 'library', 'search', 'favorites', 'settings', 'discovery', 'calendar', 'syncPlay', 'watchParty'
+]);
 const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
 
 const emitAppDebugEvent = (name, detail) => {
@@ -107,6 +110,19 @@ const App = (props) => {
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
+	const handleUserDataInvalidated = useCallback(() => {
+		setHomePanelState(null);
+		setHomeSectionPanelStateById({});
+		setLibraryPanelStateById({});
+		setFavoritesPanelState(null);
+		setDetailsPanelStateByItemId({});
+	}, []);
+	const {
+		cacheState: integrationPanelState,
+		cacheActions: integrationPanelActions,
+		reset: resetIntegrationPanelState,
+		clear: clearIntegrationPanelState
+	} = useIntegrationPanelCache({onUserDataInvalidated: handleUserDataInvalidated});
 	const {
 		active: screensaverActive,
 		dismiss: dismissScreensaver
@@ -127,7 +143,11 @@ const App = (props) => {
 			libraryBackHandlerRef,
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
-			settingsBackHandlerRef
+			settingsBackHandlerRef,
+			discoveryBackHandlerRef,
+			calendarBackHandlerRef,
+			syncPlayBackHandlerRef,
+			watchPartyBackHandlerRef
 		},
 		runPanelBackHandler,
 		registerDetailsBackHandler,
@@ -137,7 +157,11 @@ const App = (props) => {
 		registerLibraryBackHandler,
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
-		registerSettingsBackHandler
+		registerSettingsBackHandler,
+		registerDiscoveryBackHandler,
+		registerCalendarBackHandler,
+		registerSyncPlayBackHandler,
+		registerWatchPartyBackHandler
 	} = usePanelBackHandlerRegistry();
 	const {
 		pushPanelHistory,
@@ -177,12 +201,13 @@ const App = (props) => {
 		setSearchPanelState(null);
 		setFavoritesPanelState(null);
 		setSettingsPanelState(null);
+		resetIntegrationPanelState();
 		setDetailsPanelStateByItemId({});
 		setDetailsReturnView('home');
 		setPlayerControlsVisible(true);
 		clearPanelHistory();
 		clearCrashPlaybackContext();
-	}, [clearPanelHistory]);
+	}, [clearPanelHistory, resetIntegrationPanelState]);
 
 	const clearPanelSelection = useCallback((options = {}) => {
 		const {clearLibrary = true, clearHomeSection = true} = options;
@@ -463,6 +488,14 @@ const App = (props) => {
 				return handleSectionBack(favoritesBackHandlerRef, 'home');
 			case 'settings':
 				return handleSectionBack(settingsBackHandlerRef, 'home');
+			case 'discovery':
+				return handleSectionBack(discoveryBackHandlerRef, 'home');
+			case 'calendar':
+				return handleSectionBack(calendarBackHandlerRef, 'home');
+			case 'syncPlay':
+				return handleSectionBack(syncPlayBackHandlerRef, 'home');
+			case 'watchParty':
+				return handleSectionBack(watchPartyBackHandlerRef, 'home');
 			case 'details':
 				if (runPanelBackHandler(detailsBackHandlerRef)) return true;
 				return navigateBackFromDetails();
@@ -501,7 +534,11 @@ const App = (props) => {
 			screensaverActive,
 			syncPlayerBackTargetDetailsItem,
 			runPanelBackHandler,
-			settingsBackHandlerRef
+			settingsBackHandlerRef,
+			discoveryBackHandlerRef,
+			calendarBackHandlerRef,
+			syncPlayBackHandlerRef,
+			watchPartyBackHandlerRef
 		]);
 
 	useEffect(() => {
@@ -654,12 +691,17 @@ const App = (props) => {
 			targetView === 'library' ||
 			targetView === 'search' ||
 			targetView === 'favorites' ||
-			targetView === 'settings'
+			targetView === 'settings' ||
+			targetView === 'discovery' ||
+			targetView === 'calendar' ||
+			targetView === 'syncPlay' ||
+			targetView === 'watchParty'
 				? (targetView !== currentView || nextLibraryId !== currentLibraryId || nextHomeSectionId !== currentHomeSectionId)
 				: false;
 		if (shouldTrackHistory) {
 			pushPanelHistory();
 		}
+		clearIntegrationPanelState(section);
 		switch (section) {
 			case 'home':
 				setHomePanelState(null);
@@ -715,6 +757,10 @@ const App = (props) => {
 			case 'search':
 			case 'favorites':
 			case 'settings':
+			case 'discovery':
+			case 'calendar':
+			case 'syncPlay':
+			case 'watchParty':
 				setCurrentView(section);
 				setSelectedItem(null);
 				setSelectedHomeSection(null);
@@ -724,7 +770,7 @@ const App = (props) => {
 			default:
 				break;
 		}
-	}, [currentView, pushPanelHistory, selectedHomeSection?.id, selectedLibrary?.Id]);
+	}, [clearIntegrationPanelState, currentView, pushPanelHistory, selectedHomeSection?.id, selectedLibrary?.Id]);
 
 	const handlePlay = useCallback((item, options = null) => {
 		if (currentView !== 'player') {
@@ -860,6 +906,7 @@ const App = (props) => {
 			search: searchPanelState,
 			favorites: favoritesPanelState,
 			settings: settingsPanelState,
+			...integrationPanelState,
 			detailsByItemId: detailsPanelStateByItemId
 		},
 		actions: {
@@ -881,6 +928,7 @@ const App = (props) => {
 			search: handleSearchPanelStateChange,
 			favorites: handleFavoritesPanelStateChange,
 			settings: handleSettingsPanelStateChange,
+			...integrationPanelActions,
 			details: handleDetailsPanelStateChange
 		},
 		backHandlers: {
@@ -890,6 +938,10 @@ const App = (props) => {
 			search: registerSearchBackHandler,
 			favorites: registerFavoritesBackHandler,
 			settings: registerSettingsBackHandler,
+			discovery: registerDiscoveryBackHandler,
+			calendar: registerCalendarBackHandler,
+			syncPlay: registerSyncPlayBackHandler,
+			watchParty: registerWatchPartyBackHandler,
 			details: registerDetailsBackHandler,
 			player: registerPlayerBackHandler
 		},

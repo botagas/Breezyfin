@@ -25,6 +25,14 @@ const ToolbarClassicLayout = ({
 	activeLibraryId,
 	handleLibraryNavigate,
 	handleNavigateSettings,
+	handleNavigateDiscovery,
+	handleNavigateCalendar,
+	handleNavigateSyncPlay,
+	handleNavigateWatchParty,
+	showDiscovery,
+	showCalendar,
+	showSyncPlay,
+	showWatchParty,
 	formatTime
 }) => {
 	return (
@@ -88,6 +96,39 @@ const ToolbarClassicLayout = ({
 					</SpottableDiv>
 				</div>
 				<div className={css.centerScroller} ref={centerRef} onFocus={handleCenterFocus}>
+					{showDiscovery ? (
+						<Button
+							size="small"
+							onClick={handleNavigateDiscovery}
+							selected={activeSection === 'discovery'}
+							className={css.toolbarButton}
+							spotlightId="toolbar-discovery"
+						>
+							Discovery
+						</Button>
+					) : null}
+					{showCalendar ? (
+						<Button
+							size="small"
+							onClick={handleNavigateCalendar}
+							selected={activeSection === 'calendar'}
+							className={css.toolbarButton}
+							spotlightId="toolbar-calendar"
+						>
+							Calendar
+						</Button>
+					) : null}
+					{showWatchParty ? (
+						<Button
+							size="small"
+							onClick={handleNavigateWatchParty}
+							selected={activeSection === 'watchParty'}
+							className={css.toolbarButton}
+							spotlightId="toolbar-watch-party"
+						>
+							Watch Party
+						</Button>
+					) : null}
 					{libraries.map((library) => (
 						<Button
 							key={library.Id}
@@ -107,6 +148,16 @@ const ToolbarClassicLayout = ({
 			</div>
 
 			<div className={css.end}>
+				{showSyncPlay ? (
+					<SpottableDiv
+						onClick={handleNavigateSyncPlay}
+						className={`${css.iconButton} ${activeSection === 'syncPlay' ? css.selected : ''}`}
+						aria-label="SyncPlay"
+						spotlightId="toolbar-sync-play"
+					>
+						<Icon size="small">dlna</Icon>
+					</SpottableDiv>
+				) : null}
 				<SpottableDiv
 					onClick={handleNavigateSettings}
 					className={css.iconButton}

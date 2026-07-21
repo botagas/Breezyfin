@@ -8,7 +8,8 @@ import {
 	isScreensaverEligibleView,
 	normalizeScreensaverTimeoutMinutes,
 	pauseSpotlightForScreensaver,
-	resumeSpotlightAfterScreensaver
+	resumeSpotlightAfterScreensaver,
+	setScreensaverWakeSuppression
 } from '../../utils/screensaver';
 
 const WAKE_EVENT_SUPPRESSION_MS = 260;
@@ -28,7 +29,7 @@ export const useAppScreensaver = ({
 } = {}) => {
 	const [active, setActive] = useState(false);
 	const activeRef = useRef(false);
-	const idleActivityRef = useRef({lastPointerMoveAt: 0, suppressUntil: 0});
+	const idleActivityRef = useRef({lastPointerMoveAt: 0, suppressUntil: 0, suppressedEventType: ''});
 	const focusRestoreRef = useRef(null);
 	const spotlightPausedByScreensaverRef = useRef(false);
 	const normalizedTimeout = normalizeScreensaverTimeoutMinutes(timeoutMinutes);
@@ -55,13 +56,15 @@ export const useAppScreensaver = ({
 		});
 	}, [spotlight]);
 
-	const dismiss = useCallback(({consumeUntil = 0} = {}) => {
+	const dismiss = useCallback(({consumeUntil = 0, wakeEvent = null} = {}) => {
 		if (!activeRef.current) return false;
 		activeRef.current = false;
 		setActive(false);
-		if (consumeUntil > 0) {
-			idleActivityRef.current.suppressUntil = Date.now() + consumeUntil;
-		}
+		setScreensaverWakeSuppression({
+			idleState: idleActivityRef.current,
+			event: wakeEvent,
+			durationMs: consumeUntil
+		});
 		restoreSpotlight();
 		return true;
 	}, [restoreSpotlight]);
@@ -103,7 +106,7 @@ export const useAppScreensaver = ({
 			activeRef,
 			onWake: (event) => {
 				consumeWakeEvent(event);
-				dismiss({consumeUntil: WAKE_EVENT_SUPPRESSION_MS});
+				dismiss({consumeUntil: WAKE_EVENT_SUPPRESSION_MS, wakeEvent: event});
 				markActivity();
 			},
 			idleActivityRef,

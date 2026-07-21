@@ -18,6 +18,19 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 ## Current panel-local decompositions
 
 - `src/views/HomeSectionPanel.js` expands Home rows into paged section-result grids using shared panel scroll/cache behavior.
+- `src/views/DiscoveryPanel.js` renders five capability-gated read-only provider feeds
+  progressively (Trending first, then two bounded workers), retaining successful rows
+  and exposing per-row retry/paging failures. Interrupted cached loads resume unfinished
+  rows instead of preserving a stale loading state. Linked Jellyfin artwork feeds the
+  shared media backdrop before authenticated provider artwork is used as fallback.
+- `src/views/CalendarPanel.js` groups capability-gated Movie/Episode events by the
+  client-local date and opts into provider-partial results while surfacing warnings.
+  Filter replacement clears old-query results before loading the new query. Event cards
+  preserve real episode numbering and prefer authenticated Arr artwork with linked
+  Jellyfin Movie/Series artwork as fallback. The active implementation is an Agenda;
+  Day/Week/Month Calendar views remain planned work.
+- `src/views/SyncPlayPanel.js` browses, creates, joins, and leaves native Jellyfin groups before playback, using the active queue item for the shared media backdrop when available.
+- `src/views/WatchPartyPanel.js` browses, creates, and password-joins authenticated rooms before playback.
 - `src/views/library-panel/` (`hooks/`)
 - `src/views/login-panel/` (`components/`, `hooks/`, `utils/`)
 - `src/views/player-panel/`
@@ -33,6 +46,10 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - Keep callbacks event-driven (`data-*` payloads) and avoid ad-hoc DOM querying unless focus orchestration requires it.
 - Prefer shared badge primitives from `src/styles/cardStyles.less` for watched/favorite/count overlays across panels.
 - Keep comments minimal and only for non-obvious constraints.
+- Keep provider failure states retryable and separate from authoritative empty results;
+  never replace Calendar failures with unfiltered data or infer server visibility mode.
+- In-flight provider and group requests must use a panel/session generation guard so
+  stale completions cannot repopulate inactive panels.
 
 ## Related docs
 

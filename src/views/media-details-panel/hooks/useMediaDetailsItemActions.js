@@ -9,10 +9,12 @@ export const useMediaDetailsItemActions = ({
 	item,
 	isFavorite,
 	isWatched,
+	isWatchlisted,
 	selectedSeason,
 	selectedEpisode,
 	setIsFavorite,
 	setIsWatched,
+	setIsWatchlisted,
 	setSeasons,
 	setEpisodes,
 	setSelectedSeason,
@@ -118,9 +120,28 @@ export const useMediaDetailsItemActions = ({
 		setToastMessage
 	]);
 
+	const handleToggleWatchlist = useCallback(async () => {
+		if (!item?.Id || !['Movie', 'Series'].includes(item.Type)) return;
+		try {
+			if (isWatchlisted) {
+				await jellyfinService.removeFromLikesWatchlist(item.Id);
+				setIsWatchlisted(false);
+				setToastMessage('Removed from watchlist');
+			} else {
+				await jellyfinService.addToLikesWatchlist(item.Id);
+				setIsWatchlisted(true);
+				setToastMessage('Added to watchlist');
+			}
+		} catch (error) {
+			console.error('Failed to update watchlist:', error);
+			setToastMessage('Failed to update watchlist');
+		}
+	}, [isWatchlisted, item, setIsWatchlisted, setToastMessage]);
+
 	return {
 		handleToggleFavorite,
 		handleToggleFavoriteById,
-		handleToggleWatched
+		handleToggleWatched,
+		handleToggleWatchlist
 	};
 };

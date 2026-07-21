@@ -49,7 +49,18 @@ import {
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
-import {getMyRequestItems} from './jellyfin/requestsApi';
+import {getBreezyfinCapabilities, getMyRequestItems} from './jellyfin/requestsApi';
+import {getHomeSectionDescriptors, getHomeSectionItems} from './jellyfin/homeSectionsApi';
+import {getDiscoveryFeed} from './jellyfin/discoveryApi';
+import {getCalendarEvents} from './jellyfin/calendarApi';
+import {
+	addItemToLikesWatchlist,
+	getLikesWatchlist,
+	removeItemFromLikesWatchlist
+} from './jellyfin/watchlistApi';
+import {startJellyfinWebSocket, stopJellyfinWebSocket} from './jellyfin/websocketApi';
+import * as syncPlayApi from './jellyfin/syncPlayApi';
+import * as watchPartyApi from './jellyfin/watchPartyApi';
 import {
 	buildSubtitleStreamUrl,
 	getBitmapSubtitleDeliveryCandidates,
@@ -57,6 +68,7 @@ import {
 	getSubtitleTrackBinary,
 	getSubtitleTrackText
 } from './jellyfin/subtitleApi';
+import {createJellyfinRequestError} from './jellyfin/requestErrors';
 
 class JellyfinService {
 	constructor() {
@@ -71,6 +83,7 @@ class JellyfinService {
 		this.serverName = null;
 		this.username = null;
 		this.sessionExpiredNotified = false;
+		this.webSocketSession = null;
 		void this.resolveClientVersion();
 	}
 
@@ -192,11 +205,11 @@ class JellyfinService {
 				this._handleAuthFailureStatus(response.status);
 			}
 			const errorText = await response.text().catch(() => '');
-			const compactError = String(errorText || '').replace(/\s+/g, ' ').trim().slice(0, 280);
-			const requestError = new Error(`${context} failed with status ${response.status}${compactError ? ` - ${compactError}` : ''}`);
-			requestError.status = response.status;
-			requestError.context = context;
-			throw requestError;
+			throw createJellyfinRequestError({
+				status: response.status,
+				context,
+				bodyText: errorText
+			});
 		}
 
 		if (!expectJson) return response;
@@ -212,31 +225,50 @@ class JellyfinService {
 	}
 
 	async connect(serverUrl) {
+		watchPartyApi.stopJellyWatchParty(this);
+		stopJellyfinWebSocket(this);
 		return connectToServer(this, serverUrl);
 	}
 
 	async authenticate(username, password) {
-		return authenticateWithServer(this, username, password);
+		watchPartyApi.stopJellyWatchParty(this);
+		const user = await authenticateWithServer(this, username, password);
+		if (this.accessToken) startJellyfinWebSocket(this);
+		return user;
 	}
 
 	_applySessionFromStore(entry) {
-		return applySessionFromStore(this, entry);
+		watchPartyApi.stopJellyWatchParty(this);
+		const applied = applySessionFromStore(this, entry);
+		if (applied) startJellyfinWebSocket(this);
+		return applied;
 	}
 
 	restoreSession(serverId = null, userId = null) {
-		return restoreServiceSession(this, serverId, userId);
+		watchPartyApi.stopJellyWatchParty(this);
+		const restored = restoreServiceSession(this, serverId, userId);
+		if (restored) startJellyfinWebSocket(this);
+		return restored;
 	}
 
 	logout() {
+		watchPartyApi.stopJellyWatchParty(this);
+		stopJellyfinWebSocket(this);
 		logoutSession(this);
 	}
 
 	switchUser() {
+		watchPartyApi.stopJellyWatchParty(this);
+		stopJellyfinWebSocket(this);
 		switchUserSession(this);
 	}
 
 	setActiveServer(serverId, userId) {
-		return setActiveServiceServer(this, serverId, userId);
+		watchPartyApi.stopJellyWatchParty(this);
+		stopJellyfinWebSocket(this);
+		const applied = setActiveServiceServer(this, serverId, userId);
+		if (applied) startJellyfinWebSocket(this);
+		return applied;
 	}
 
 	getSavedServers() {
@@ -372,6 +404,99 @@ class JellyfinService {
 			username
 		});
 	}
+
+	async getBreezyfinCapabilities() {
+		return getBreezyfinCapabilities(this);
+	}
+
+	async getBreezyfinHomeSections(limit = 20, startIndex = 0) {
+		return getHomeSectionDescriptors(this, limit, startIndex);
+	}
+
+	async getBreezyfinHomeSectionItems(sectionId, limit = 60, startIndex = 0) {
+		return getHomeSectionItems(this, sectionId, limit, startIndex);
+	}
+
+	async getDiscoveryFeed(feed, options = {}) {
+		return getDiscoveryFeed(this, feed, options);
+	}
+
+	async getCalendarEvents(options = {}) {
+		return getCalendarEvents(this, options);
+	}
+
+	async getLikesWatchlist(limit = 60, startIndex = 0) {
+		return getLikesWatchlist(this, limit, startIndex);
+	}
+
+	async addToLikesWatchlist(itemId) {
+		return addItemToLikesWatchlist(this, itemId);
+	}
+
+	async removeFromLikesWatchlist(itemId) {
+		return removeItemFromLikesWatchlist(this, itemId);
+	}
+
+	onWebSocketMessage(messageType, handler) {
+		if (!this.webSocketSession && this.accessToken) startJellyfinWebSocket(this);
+		return this.webSocketSession?.on(messageType, handler) || (() => {});
+	}
+
+	async getSyncPlayGroups() { return syncPlayApi.listSyncPlayGroups(this); }
+	async getSyncPlayGroup(groupId) { return syncPlayApi.getSyncPlayGroup(this, groupId); }
+	async createSyncPlayGroup(groupName) {
+		if (watchPartyApi.getWatchPartyState(this).room) throw new Error('Leave JellyWatchParty before starting SyncPlay');
+		return syncPlayApi.createSyncPlayGroup(this, groupName);
+	}
+	async joinSyncPlayGroup(groupId) {
+		if (watchPartyApi.getWatchPartyState(this).room) throw new Error('Leave JellyWatchParty before joining SyncPlay');
+		return syncPlayApi.joinSyncPlayGroup(this, groupId);
+	}
+	async leaveSyncPlayGroup() { return syncPlayApi.leaveSyncPlayGroup(this); }
+	async syncPlayQueue(request) { return syncPlayApi.syncPlayQueue(this, request); }
+	async syncPlaySetQueue(request) { return syncPlayApi.syncPlaySetQueue(this, request); }
+	async syncPlayMoveQueueItem(request) { return syncPlayApi.syncPlayMoveQueueItem(this, request); }
+	async syncPlayRemoveQueueItems(request) { return syncPlayApi.syncPlayRemoveQueueItems(this, request); }
+	async syncPlaySetQueueItem(request) { return syncPlayApi.syncPlaySetQueueItem(this, request); }
+	async syncPlayNext(request) { return syncPlayApi.syncPlayNext(this, request); }
+	async syncPlayPrevious(request) { return syncPlayApi.syncPlayPrevious(this, request); }
+	async syncPlayPlay() { return syncPlayApi.syncPlayPlay(this); }
+	async syncPlayPause() { return syncPlayApi.syncPlayPause(this); }
+	async syncPlayStop() { return syncPlayApi.syncPlayStop(this); }
+	async syncPlaySeek(request) { return syncPlayApi.syncPlaySeek(this, request); }
+	async syncPlayBuffering(request) { return syncPlayApi.syncPlayBuffering(this, request); }
+	async syncPlayReady(request) { return syncPlayApi.syncPlayReady(this, request); }
+	async syncPlaySetRepeatMode(request) { return syncPlayApi.syncPlaySetRepeatMode(this, request); }
+	async syncPlaySetShuffleMode(request) { return syncPlayApi.syncPlaySetShuffleMode(this, request); }
+	async syncPlayPing(request) { return syncPlayApi.syncPlayPing(this, request); }
+	async sampleSyncPlayClock() { return syncPlayApi.sampleSyncPlayClock(this); }
+	getSyncPlayState() { return syncPlayApi.getSyncPlayState(this); }
+	setSyncPlayGroup(group) { return syncPlayApi.setSyncPlayGroup(this, group); }
+	subscribeSyncPlayState(listener) { return syncPlayApi.subscribeSyncPlayState(this, listener); }
+
+	async detectJellyWatchParty() { return watchPartyApi.detectJellyWatchParty(this); }
+	getWatchPartyState() { return watchPartyApi.getWatchPartyState(this); }
+	subscribeWatchPartyState(listener) { return watchPartyApi.subscribeWatchPartyState(this, listener); }
+	onWatchPartyMessage(type, listener) { return watchPartyApi.onWatchPartyMessage(this, type, listener); }
+	listWatchPartyRooms() { return watchPartyApi.listWatchPartyRooms(this); }
+	createWatchPartyRoom(options) {
+		if (syncPlayApi.getSyncPlayState(this)) throw new Error('Leave SyncPlay before creating a watch party');
+		return watchPartyApi.createWatchPartyRoom(this, options);
+	}
+	joinWatchPartyRoom(roomId, password) {
+		if (syncPlayApi.getSyncPlayState(this)) throw new Error('Leave SyncPlay before joining a watch party');
+		return watchPartyApi.joinWatchPartyRoom(this, roomId, password);
+	}
+	leaveWatchPartyRoom() { return watchPartyApi.leaveWatchPartyRoom(this); }
+	sendWatchPartyReady(mediaId) { return watchPartyApi.sendWatchPartyReady(this, mediaId); }
+	sendWatchPartyPlayerEvent(action, position) {
+		return watchPartyApi.sendWatchPartyPlayerEvent(this, action, position);
+	}
+	sendWatchPartyStateUpdate(position, playing) {
+		return watchPartyApi.sendWatchPartyStateUpdate(this, position, playing);
+	}
+	sendWatchPartyChat(text) { return watchPartyApi.sendWatchPartyChat(this, text); }
+	getWatchPartyServerNow() { return watchPartyApi.getWatchPartyServerNow(this); }
 
 	async getFavorites(itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0, options = {}) {
 		return getFavoriteMediaItems(this, itemTypes, limit, startIndex, options);

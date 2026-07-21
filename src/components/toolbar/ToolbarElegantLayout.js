@@ -19,6 +19,14 @@ const ToolbarElegantLayout = ({
 	handleNavigateFavorites,
 	handleNavigateSearch,
 	handleNavigateSettings,
+	handleNavigateDiscovery,
+	handleNavigateCalendar,
+	handleNavigateSyncPlay,
+	handleNavigateWatchParty,
+	showDiscovery,
+	showCalendar,
+	showSyncPlay,
+	showWatchParty,
 	activeSection,
 	libraryMenuScopeRef,
 	handleOpenLibrariesPopup,
@@ -115,17 +123,58 @@ const ToolbarElegantLayout = ({
 							>
 								Search
 							</Button>
+							{showDiscovery ? (
+								<Button
+									size="small"
+									onClick={handleNavigateDiscovery}
+									className={`${css.tabButton} ${activeSection === 'discovery' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-discovery"
+								>
+									Discovery
+								</Button>
+							) : null}
+							{showCalendar ? (
+								<Button
+									size="small"
+									onClick={handleNavigateCalendar}
+									className={`${css.tabButton} ${activeSection === 'calendar' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-calendar"
+								>
+									Calendar
+								</Button>
+							) : null}
+							{showWatchParty ? (
+								<Button
+									size="small"
+									onClick={handleNavigateWatchParty}
+									className={`${css.tabButton} ${activeSection === 'watchParty' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-watch-party"
+								>
+									Watch Party
+								</Button>
+							) : null}
 						</div>
 
 						<div className={css.elegantActions}>
-							<SpottableDiv
-								onClick={handleNavigateSearch}
-								className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
-								aria-label="Search"
-								spotlightId="toolbar-search-icon"
-							>
-								<Icon size="small">search</Icon>
-							</SpottableDiv>
+							{showSyncPlay ? (
+								<SpottableDiv
+									onClick={handleNavigateSyncPlay}
+									className={`${css.iconButton} ${activeSection === 'syncPlay' ? css.selected : ''}`}
+									aria-label="SyncPlay"
+									spotlightId="toolbar-sync-play"
+								>
+									<Icon size="small">dlna</Icon>
+								</SpottableDiv>
+							) : (
+								<SpottableDiv
+									onClick={handleNavigateSearch}
+									className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
+									aria-label="Search"
+									spotlightId="toolbar-search-icon"
+								>
+									<Icon size="small">search</Icon>
+								</SpottableDiv>
+							)}
 							<SpottableDiv
 								onClick={handleNavigateSettings}
 								className={`${css.iconButton} ${activeSection === 'settings' ? css.selected : ''}`}

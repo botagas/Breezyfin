@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
@@ -16,11 +16,23 @@ import {getLandscapeCardImageUrls} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import {useRuntimeDiagnosticsEnabled} from '../hooks/useRuntimeDiagnostics';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import {
 	findVerticalScrollableAncestor,
 	getVerticalVisibilityDelta
 } from '../utils/verticalFocusScroll';
+import {
+	INTEGRATION_PREFERENCES_CHANGED_EVENT,
+	readIntegrationPreferences
+} from '../utils/integrationPreferences';
+import {
+	getServerHomeRowsStatus,
+	loadServerHomeRowsProgressively,
+	selectDisplayableServerHomeRows,
+	selectHomeRowsForSource,
+	selectServerHomeRowsToLoad
+} from '../utils/serverHomeRows';
 
 import css from './HomePanel.module.less';
 
@@ -69,6 +81,15 @@ const HomePanel = ({
 	const [latestMovies, setLatestMovies] = useState([]);
 	const [latestShows, setLatestShows] = useState([]);
 	const [myRequests, setMyRequests] = useState([]);
+	const [watchlist, setWatchlist] = useState([]);
+	const [serverHomeRows, setServerHomeRows] = useState([]);
+	const [serverHomeActive, setServerHomeActive] = useState(false);
+	const [integrationPreferences, setIntegrationPreferences] = useState(() => (
+		readIntegrationPreferences(jellyfinService)
+	));
+	const diagnosticsEnabled = useRuntimeDiagnosticsEnabled();
+	const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
+	diagnosticsEnabledRef.current = diagnosticsEnabled;
 	const [homeRowSettings, setHomeRowSettings] = useState({
 		recentlyAdded: true,
 		continueWatching: true,
@@ -87,6 +108,13 @@ const HomePanel = ({
 	const rowVisibilityFrameRef = useRef(0);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
+	const serverHomeFallbackRef = useRef(false);
+	const serverHomeLoadInFlightRef = useRef(false);
+	const serverHomeLoadBatchIdRef = useRef(0);
+	const reportHomeSectionsDiagnostic = useCallback((stage, details = {}) => {
+		if (!diagnosticsEnabledRef.current) return;
+		console.warn(`[Home Sections] Provider diagnostic ${JSON.stringify({stage, ...details})}`);
+	}, []);
 	const handleNavigation = useCallback((section, data) => {
 		if (onNavigate) {
 			onNavigate(section, data);
@@ -160,45 +188,75 @@ const HomePanel = ({
 		setLoading(true);
 		setActivatedRowCount(2);
 		try {
-			const [recently, resume, next, movies, shows] = await Promise.all([
-				jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT).catch(err => {
-					console.error('Failed to load recently added:', err);
-					return [];
-				}),
-				jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT).catch(err => {
-					console.error('Failed to load resume items:', err);
-					return [];
-				}),
-				jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT).catch(err => {
-					console.error('Failed to load next up:', err);
-					return [];
-				}),
-				jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT).catch(err => {
-					console.error('Failed to load latest movies:', err);
-					return [];
-				}),
-				jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT).catch(err => {
-					console.error('Failed to load latest shows:', err);
-					return [];
-				})
-			]);
-
-			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-			let requestItems = [];
-			try {
-				const myRequestsResult = await jellyfinService.getMyRequests(
-					null,
-					['Movie', 'Series'],
-					HOME_ROW_PREVIEW_LIMIT,
-					0,
-					userName
-				);
-				if (Array.isArray(myRequestsResult?.items)) {
-					requestItems = myRequestsResult.items;
+			const preferences = integrationPreferences;
+			reportHomeSectionsDiagnostic('source-selection', {
+				configuredSource: preferences.homeSource,
+				fallbackLatched: serverHomeFallbackRef.current
+			});
+			const recently = await jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT);
+			let resume = [];
+			let next = [];
+			let movies = [];
+			let shows = [];
+			let myRequestsResult = {items: []};
+			let watchlistResult = {items: []};
+			let resolvedServerRows = [];
+			let useServerHome = preferences.homeSource === 'server' && !serverHomeFallbackRef.current;
+			if (useServerHome) {
+				const sectionsResponse = await jellyfinService.getBreezyfinHomeSections(500, 0);
+				if (sectionsResponse?.available === true) {
+					const descriptors = sectionsResponse.result.items;
+					reportHomeSectionsDiagnostic('descriptor-load', {
+						available: true,
+						descriptorCount: descriptors.length,
+						totalRecordCount: sectionsResponse.result.totalRecordCount,
+						emptyReason: sectionsResponse.result.emptyReason || null,
+						configuredSectionCount: sectionsResponse.result.configuredSectionCount ?? null
+					});
+					resolvedServerRows = descriptors.map((descriptor) => ({
+						key: `server:${descriptor.Id}`,
+						descriptor: {
+							id: `server:${descriptor.Id}`,
+							pluginSectionId: descriptor.Id,
+							title: descriptor.Title,
+							viewMode: descriptor.ViewMode,
+							supportsPaging: descriptor.SupportsPaging,
+							source: 'plugin'
+						},
+						items: null,
+						loading: false
+					}));
+				} else {
+					reportHomeSectionsDiagnostic('descriptor-load', {
+						available: false,
+						diagnosticReason: sectionsResponse?.diagnosticReason || 'unavailable',
+						status: sectionsResponse?.status ?? null,
+						retryable: sectionsResponse?.retryable === true
+					});
+					useServerHome = false;
 				}
-			} catch (_) {
-				requestItems = [];
 			}
+
+			if (!useServerHome) {
+				const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
+				[resume, next, movies, shows, myRequestsResult, watchlistResult] = await Promise.all([
+					jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT),
+					jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT),
+					jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT),
+					jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT),
+					jellyfinService.getMyRequests(
+						null,
+						['Movie', 'Series'],
+						HOME_ROW_PREVIEW_LIMIT,
+						0,
+						userName
+					).catch(() => ({items: []})),
+					preferences.watchlistEnabled
+						? jellyfinService.getLikesWatchlist(HOME_ROW_PREVIEW_LIMIT).catch(() => ({items: []}))
+						: Promise.resolve({items: []})
+				]);
+			}
+
 			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 			const heroContent = recently.filter(item =>
@@ -212,7 +270,12 @@ const HomePanel = ({
 			setNextUp(enhancedNext || []);
 			setLatestMovies(movies || []);
 			setLatestShows(shows || []);
-			setMyRequests((requestItems || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			setMyRequests((myRequestsResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			setWatchlist((watchlistResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			serverHomeLoadBatchIdRef.current += 1;
+			serverHomeLoadInFlightRef.current = false;
+			setServerHomeRows(resolvedServerRows);
+			setServerHomeActive(useServerHome);
 		} catch (error) {
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 			console.error('Failed to load content:', error);
@@ -221,7 +284,7 @@ const HomePanel = ({
 				setLoading(false);
 			}
 		}
-	}, [hydrateEpisodeSeriesProgress]);
+	}, [hydrateEpisodeSeriesProgress, integrationPreferences, reportHomeSectionsDiagnostic]);
 
 	const applyHomeSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -249,10 +312,96 @@ const HomePanel = ({
 	useBreezyfinSettingsSync(applyHomeSettings, {enabled: isActive});
 
 	useEffect(() => {
+		const handleIntegrationPreferencesChanged = () => {
+			serverHomeFallbackRef.current = false;
+			serverHomeLoadBatchIdRef.current += 1;
+			serverHomeLoadInFlightRef.current = false;
+			setIntegrationPreferences(readIntegrationPreferences(jellyfinService));
+		};
+		window.addEventListener(INTEGRATION_PREFERENCES_CHANGED_EVENT, handleIntegrationPreferencesChanged);
+		return () => {
+			window.removeEventListener(INTEGRATION_PREFERENCES_CHANGED_EVENT, handleIntegrationPreferencesChanged);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!isActive || !serverHomeActive || serverHomeLoadInFlightRef.current) return;
+		const pendingRows = selectServerHomeRowsToLoad(serverHomeRows, activatedRowCount);
+		if (pendingRows.length === 0) return;
+		serverHomeLoadInFlightRef.current = true;
+		const batchId = serverHomeLoadBatchIdRef.current + 1;
+		serverHomeLoadBatchIdRef.current = batchId;
+		const pendingKeys = new Set(pendingRows.map((row) => row.key));
+		setServerHomeRows((rows) => rows.map((row) => (
+			pendingKeys.has(row.key) ? {...row, loading: true} : row
+		)));
+		loadServerHomeRowsProgressively(pendingRows, (row) => (
+			jellyfinService.getBreezyfinHomeSectionItems(
+				row.descriptor.pluginSectionId,
+				HOME_ROW_PREVIEW_LIMIT,
+				0
+			)
+		), {
+			onSettled: ({key, row, response, error, latencyMs}) => {
+				if (batchId !== serverHomeLoadBatchIdRef.current) return;
+				const available = response?.available === true;
+				const items = available && Array.isArray(response?.result?.items)
+					? response.result.items
+					: [];
+				setServerHomeRows((rows) => rows.map((entry) => (
+					entry.key === key
+						? {...entry, items, loading: false}
+						: entry
+				)));
+				reportHomeSectionsDiagnostic('lazy-row-settled', {
+					sectionId: row?.descriptor?.pluginSectionId || null,
+					title: row?.descriptor?.title || '',
+					available,
+					itemCount: available ? items.length : null,
+					latencyMs,
+					diagnosticReason: available
+						? null
+						: (response?.diagnosticReason || error?.name || 'request-failed')
+				});
+			}
+		}).then((loadedRows) => {
+			if (batchId !== serverHomeLoadBatchIdRef.current) return;
+			serverHomeLoadInFlightRef.current = false;
+			reportHomeSectionsDiagnostic('lazy-row-load', {
+				requestedRowCount: loadedRows.length,
+				availableRowCount: loadedRows.filter(({response, error}) => !error && response?.available === true).length,
+				rowItemCounts: loadedRows.map(({response}) => (
+					response?.available === true ? response.result.items.length : null
+				)),
+				rowLatenciesMs: loadedRows.map(({latencyMs}) => latencyMs),
+				failureReasons: loadedRows
+					.filter(({response, error}) => error || response?.available !== true)
+					.map(({response, error}) => response?.diagnosticReason || error?.name || 'unavailable')
+			});
+			if (loadedRows.some(({response, error}) => error || response?.available !== true)) {
+				serverHomeFallbackRef.current = true;
+				setIntegrationPreferences((current) => ({...current}));
+			}
+		}).catch((error) => {
+			if (batchId !== serverHomeLoadBatchIdRef.current) return;
+			serverHomeLoadInFlightRef.current = false;
+			reportHomeSectionsDiagnostic('lazy-row-load', {
+				available: false,
+				errorName: error?.name || 'Error',
+				message: String(error?.message || 'Home section row request failed').slice(0, 240)
+			});
+			serverHomeFallbackRef.current = true;
+			setIntegrationPreferences((current) => ({...current}));
+		});
+	}, [activatedRowCount, isActive, reportHomeSectionsDiagnostic, serverHomeActive, serverHomeRows]);
+
+	useEffect(() => {
 		if (!isActive) return undefined;
 		loadContent();
 		return () => {
 			contentLoadRequestIdRef.current += 1;
+			serverHomeLoadBatchIdRef.current += 1;
+			serverHomeLoadInFlightRef.current = false;
 		};
 	}, [isActive, loadContent]);
 
@@ -261,10 +410,11 @@ const HomePanel = ({
 	}, [onItemSelect]);
 
 	const handleViewMoreSection = useCallback((sectionKey) => {
-		const descriptor = getHomeSectionDescriptor(sectionKey);
+		const descriptor = serverHomeRows.find((row) => row.key === sectionKey)?.descriptor ||
+			getHomeSectionDescriptor(sectionKey);
 		if (!descriptor) return;
 		handleNavigation('homeSection', descriptor);
-	}, [handleNavigation]);
+	}, [handleNavigation, serverHomeRows]);
 
 	const getCardImageCandidates = useCallback((item) => {
 		return getLandscapeCardImageUrls(item, {width: 640, quality: 76});
@@ -343,43 +493,48 @@ const HomePanel = ({
 		focusTopToolbarAction();
 	}, [focusTopToolbarAction]);
 
-	const rowConfig = {
-		recentlyAdded: {
-			title: 'Recently Added',
-			items: recentlyAdded,
-			showEpisodeProgress: false
-		},
-		continueWatching: {
-			title: 'Continue Watching',
-			items: continueWatching,
-			showEpisodeProgress: false
-		},
-		nextUp: {
-			title: 'Next Up',
-			items: nextUp,
-			showEpisodeProgress: false
-		},
-		latestMovies: {
-			title: 'Latest Movies',
-			items: latestMovies,
-			showEpisodeProgress: false
-		},
-		latestShows: {
-			title: 'Latest TV Shows',
-			items: latestShows,
-			showEpisodeProgress: false
-		},
-		myRequests: {
-			title: 'My Requests',
-			items: myRequests,
-			showEpisodeProgress: true
-		}
-	};
-
-	const visibleRows = homeRowOrder
-		.map((key) => ({key, row: rowConfig[key]}))
-		.filter(({key, row}) => row && homeRowSettings[key] && row.items.length > 0);
-	const panelBackdropItem = heroItems[0] || visibleRows[0]?.row?.items?.[0] || null;
+	const visibleRows = useMemo(() => {
+		const rowConfig = {
+			recentlyAdded: {title: 'Recently Added', items: recentlyAdded, showEpisodeProgress: false},
+			continueWatching: {title: 'Continue Watching', items: continueWatching, showEpisodeProgress: false},
+			nextUp: {title: 'Next Up', items: nextUp, showEpisodeProgress: false},
+			latestMovies: {title: 'Latest Movies', items: latestMovies, showEpisodeProgress: false},
+			latestShows: {title: 'Latest TV Shows', items: latestShows, showEpisodeProgress: false},
+			myRequests: {title: 'My Requests', items: myRequests, showEpisodeProgress: true},
+			watchlist: {title: 'Watchlist', items: watchlist, showEpisodeProgress: false}
+		};
+		const rowIsEnabled = (key) => (
+			key === 'watchlist' ? integrationPreferences.watchlistEnabled : homeRowSettings[key]
+		);
+		const pluginRows = selectDisplayableServerHomeRows(serverHomeRows).map((entry) => ({
+			key: entry.key,
+			row: {
+				title: entry.descriptor.title,
+				items: Array.isArray(entry.items) ? entry.items : [],
+				loading: entry.loading === true,
+				showEpisodeProgress: true,
+				descriptor: entry.descriptor
+			}
+		}));
+		const builtInRows = homeRowOrder
+			.map((key) => ({key, row: rowConfig[key]}))
+			.filter(({key, row}) => row && row.items.length > 0 && rowIsEnabled(key));
+		return selectHomeRowsForSource({serverHomeActive, serverRows: pluginRows, builtInRows});
+	}, [
+		continueWatching,
+		homeRowOrder,
+		homeRowSettings,
+		integrationPreferences,
+		latestMovies,
+		latestShows,
+		myRequests,
+		nextUp,
+		recentlyAdded,
+		serverHomeActive,
+		serverHomeRows,
+		watchlist
+	]);
+	const panelBackdropItem = heroItems[0] || visibleRows.find(({row}) => row.items?.length > 0)?.row.items[0] || null;
 	const handleToolbarNavigateDown = useCallback(() => {
 		if (!showMediaBar || heroItems.length === 0) return false;
 		focusHeroPrimaryAction();
@@ -399,6 +554,8 @@ const HomePanel = ({
 	const hasContent = visibleRows.length > 0;
 	const hasHero = showMediaBar && heroItems.length > 0;
 	const showEmptyState = !hasContent && !hasHero;
+	const serverHomeStatus = getServerHomeRowsStatus(serverHomeRows);
+	const serverHomeIsEmpty = serverHomeActive && !serverHomeStatus.pending && !serverHomeStatus.hasDisplayableItems;
 	const useCinematicHome = HOME_DESIGN_VARIANT === HOME_DESIGN_CINEMATIC;
 	const topToolbar = (
 		<Toolbar
@@ -426,7 +583,11 @@ const HomePanel = ({
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>
 					<div className={css.emptyState}>
-						<BodyText>No content found. Check browser console (F12) for API errors.</BodyText>
+						<BodyText>
+							{serverHomeIsEmpty
+								? 'The server returned no Home rows. Configure the server Home provider or disable server-configured Home rows in Settings.'
+								: 'No content found. Check browser console (F12) for API errors.'}
+						</BodyText>
 					</div>
 				</div>
 			)}
@@ -453,6 +614,7 @@ const HomePanel = ({
 							key={key}
 							title={row.title}
 							items={row.items}
+							loading={row.loading}
 							onItemClick={handleItemClick}
 							getImageCandidates={getMediaRowImageCandidates}
 							imagesActive={rowIndex < activatedRowCount}

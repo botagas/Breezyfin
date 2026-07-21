@@ -6,7 +6,8 @@ import {
 	addManagedScreensaverActivityListeners,
 	getScreensaverTimeoutMs,
 	isPausedPlayerScreensaverEligible,
-	normalizeScreensaverTimeoutMinutes
+	normalizeScreensaverTimeoutMinutes,
+	setScreensaverWakeSuppression
 } from '../../../utils/screensaver';
 
 const RESUME_KEYS = new Set([KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE]);
@@ -23,6 +24,10 @@ export const isPausedScreensaverResumeEvent = (event) => (
 	event?.type === 'keydown' && RESUME_KEYS.has(event.keyCode || event.which)
 );
 
+export const shouldRestorePlayerFocusAfterScreensaverWake = (event) => (
+	!event || event.type === 'keydown'
+);
+
 export const usePlayerPausedScreensaver = ({
 	isActive = false,
 	playing = false,
@@ -31,19 +36,29 @@ export const usePlayerPausedScreensaver = ({
 	playbackStarted = false,
 	blocked = false,
 	timeoutMinutes = '1',
+	lastInteractionRef,
+	setControlsVisible,
+	focusWakeAction,
+	preferSkipFocus = false,
+	activeStateRef,
 	onWake,
 	onResume
 } = {}) => {
 	const [active, setActive] = useState(false);
 	const activeRef = useRef(false);
-	const idleActivityRef = useRef({lastPointerMoveAt: 0, suppressUntil: 0});
+	const idleActivityRef = useRef({lastPointerMoveAt: 0, suppressUntil: 0, suppressedEventType: ''});
 	const onWakeRef = useRef(onWake);
 	const onResumeRef = useRef(onResume);
+	const wakeUiRef = useRef({lastInteractionRef, setControlsVisible, focusWakeAction, preferSkipFocus});
+	if (activeStateRef) activeStateRef.current = active;
 
 	useEffect(() => {
 		onWakeRef.current = onWake;
 		onResumeRef.current = onResume;
 	}, [onResume, onWake]);
+	useEffect(() => {
+		wakeUiRef.current = {lastInteractionRef, setControlsVisible, focusWakeAction, preferSkipFocus};
+	}, [focusWakeAction, lastInteractionRef, preferSkipFocus, setControlsVisible]);
 
 	const dismiss = useCallback(() => {
 		if (!activeRef.current) return false;
@@ -51,6 +66,17 @@ export const usePlayerPausedScreensaver = ({
 		setActive(false);
 		return true;
 	}, []);
+	const wake = useCallback((event) => {
+		if (!dismiss()) return false;
+		const wakeUi = wakeUiRef.current;
+		if (wakeUi.lastInteractionRef) wakeUi.lastInteractionRef.current = Date.now();
+		wakeUi.setControlsVisible?.(true);
+		if (shouldRestorePlayerFocusAfterScreensaverWake(event)) {
+			wakeUi.focusWakeAction?.({preferSkip: wakeUi.preferSkipFocus});
+		}
+		onWakeRef.current?.(event);
+		return true;
+	}, [dismiss]);
 
 	const activate = useCallback(() => {
 		if (activeRef.current) return;
@@ -93,9 +119,12 @@ export const usePlayerPausedScreensaver = ({
 			onWake: (event) => {
 				const shouldResume = isPausedScreensaverResumeEvent(event);
 				consumeWakeEvent(event);
-				idleActivityRef.current.suppressUntil = Date.now() + WAKE_EVENT_SUPPRESSION_MS;
-				dismiss();
-				onWakeRef.current?.();
+				setScreensaverWakeSuppression({
+					idleState: idleActivityRef.current,
+					event,
+					durationMs: WAKE_EVENT_SUPPRESSION_MS
+				});
+				wake(event);
 				if (shouldResume) {
 					Promise.resolve(onResumeRef.current?.()).catch((resumeError) => {
 						console.warn('Failed to resume playback from paused screensaver:', resumeError);
@@ -109,12 +138,12 @@ export const usePlayerPausedScreensaver = ({
 			consumeEvent: consumeWakeEvent
 		});
 		return removeActivityListeners;
-	}, [active, dismiss, markActivity]);
+	}, [active, markActivity, wake]);
 
 	useEffect(() => () => {
 		clearInactivityDeadline();
 		activeRef.current = false;
 	}, [clearInactivityDeadline]);
 
-	return {active, dismiss};
+	return {active, dismiss: wake};
 };

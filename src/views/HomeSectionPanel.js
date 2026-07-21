@@ -28,10 +28,20 @@ const PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
 const FILTERED_PAGE_SCAN_LIMIT = 6;
 const HOME_SECTION_IMAGE_OPTIONS = Object.freeze({includeBackdrop: true, includeSeriesFallback: true});
 
-const fetchHomeSectionPage = async (sectionId, {
+const fetchHomeSectionPage = async (section, {
 	limit = PAGE_SIZE,
 	startIndex = 0
 } = {}) => {
+	const sectionId = section?.id || section;
+	if (section?.source === 'plugin' && section?.pluginSectionId) {
+		const response = await jellyfinService.getBreezyfinHomeSectionItems(
+			section.pluginSectionId,
+			limit,
+			startIndex
+		);
+		if (response?.available !== true) throw new Error('Server Home section is unavailable');
+		return response.result;
+	}
 	switch (sectionId) {
 		case HOME_SECTION_IDS.RECENTLY_ADDED:
 			return jellyfinService.getRecentlyAdded(limit, startIndex);
@@ -47,6 +57,8 @@ const fetchHomeSectionPage = async (sectionId, {
 			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
 			return jellyfinService.getMyRequests(null, ['Movie', 'Series'], limit, startIndex, userName);
 		}
+		case HOME_SECTION_IDS.WATCHLIST:
+			return jellyfinService.getLikesWatchlist(limit, startIndex);
 		default:
 			return [];
 	}
@@ -66,7 +78,9 @@ const HomeSectionPanel = ({
 	inputMode = '5way',
 	...rest
 }) => {
-	const activeSection = getHomeSectionDescriptor(section?.id || section);
+	const activeSection = section?.source === 'plugin'
+		? section
+		: getHomeSectionDescriptor(section?.id || section);
 	const activeSectionId = activeSection?.id || null;
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
@@ -191,7 +205,7 @@ const HomeSectionPanel = ({
 
 		while (collected.length < PAGE_SIZE && scans < FILTERED_PAGE_SCAN_LIMIT && sourceHasMore) {
 			const rawLimit = PAGE_SIZE - collected.length;
-			const rawPage = await fetchHomeSectionPage(activeSectionId, {
+			const rawPage = await fetchHomeSectionPage(activeSection, {
 				limit: rawLimit,
 				startIndex: cursor
 			});
@@ -220,7 +234,7 @@ const HomeSectionPanel = ({
 			nextStartIndex: cursor,
 			hasMore: sourceHasMore
 		};
-	}, [activeSectionId]);
+	}, [activeSection, activeSectionId]);
 
 	const loadPage = useCallback(async ({
 		startIndex = 0,
@@ -242,7 +256,7 @@ const HomeSectionPanel = ({
 					requestId,
 					currentFilterState: filterState
 				})
-				: await fetchHomeSectionPage(activeSectionId, {
+				: await fetchHomeSectionPage(activeSection, {
 					limit: PAGE_SIZE,
 					startIndex
 				});
@@ -276,7 +290,7 @@ const HomeSectionPanel = ({
 				loadingMoreRef.current = false;
 			}
 		}
-	}, [activeSectionId, fetchFilteredHomeSectionPage, filterState, hasActiveFilters]);
+	}, [activeSection, activeSectionId, fetchFilteredHomeSectionPage, filterState, hasActiveFilters]);
 
 	const loadNextPage = useCallback(async () => {
 		if (!activeSectionId || loading || !hasMore || loadingMoreRef.current) return;

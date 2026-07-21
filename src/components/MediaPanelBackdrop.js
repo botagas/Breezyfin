@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
-import {getMediaPanelBackdropUrls} from '../utils/mediaItemUtils';
+import {getMediaPanelBackdropUrls, uniqueImageCandidates} from '../utils/mediaItemUtils';
+import {buildExternalImageVariantUrl} from '../utils/externalImageUrls';
 import {usePerformanceMode} from '../hooks/usePerformanceMode';
 import {getMediaBackdropProfile} from '../utils/performanceMode';
 import css from './MediaPanelBackdrop.module.less';
@@ -11,9 +12,10 @@ const MediaPanelBackdrop = ({item = null, imageUrl = '', className = ''}) => {
 		() => getMediaBackdropProfile(performanceMode),
 		[performanceMode]
 	);
-	const imageCandidates = useMemo(() => (
-		imageUrl ? [imageUrl] : getMediaPanelBackdropUrls(item, backdropProfile)
-	), [backdropProfile, imageUrl, item]);
+	const imageCandidates = useMemo(() => uniqueImageCandidates([
+		...getMediaPanelBackdropUrls(item, backdropProfile),
+		buildExternalImageVariantUrl(imageUrl, backdropProfile)
+	]), [backdropProfile, imageUrl, item]);
 	const candidateSignature = imageCandidates.join('|');
 	const [candidateIndex, setCandidateIndex] = useState(0);
 	const resolvedImageUrl = imageCandidates[candidateIndex] || '';

@@ -13,6 +13,7 @@ import {
 	normalizeScreensaverTimeoutMinutes,
 	pauseSpotlightForScreensaver,
 	resumeSpotlightAfterScreensaver,
+	setScreensaverWakeSuppression,
 	SCREENSAVER_INITIAL_VELOCITY
 } from '../screensaver';
 
@@ -180,19 +181,37 @@ describe('screensaver utilities', () => {
 		);
 	});
 
-	it('shares wake suppression and pointer-move throttling for idle screensavers', () => {
+	it('suppresses only the duplicate click from pointer wake and keeps keyboard input available', () => {
 		const markActivity = jest.fn();
 		const consumeEvent = jest.fn();
-		const idleState = {lastPointerMoveAt: 1000, suppressUntil: 2000};
+		const idleState = {lastPointerMoveAt: 1000, suppressUntil: 0, suppressedEventType: ''};
+		expect(setScreensaverWakeSuppression({
+			idleState,
+			event: {type: 'pointerdown'},
+			durationMs: 260,
+			now: 1000
+		})).toBe(true);
 		expect(handleScreensaverIdleActivity({
 			event: {type: 'click'},
-			now: 1500,
+			now: 1100,
 			idleState,
 			markActivity,
 			consumeEvent
 		})).toBe('suppressed');
 		expect(consumeEvent).toHaveBeenCalledWith({type: 'click'}, {preventDefault: false});
-		idleState.suppressUntil = 0;
+		expect(handleScreensaverIdleActivity({
+			event: {type: 'keydown'},
+			now: 1100,
+			idleState,
+			markActivity,
+			consumeEvent
+		})).toBe('activity');
+		expect(markActivity).toHaveBeenCalledTimes(1);
+	});
+
+	it('throttles pointer-move activity without suppressing unrelated events', () => {
+		const markActivity = jest.fn();
+		const idleState = {lastPointerMoveAt: 1000, suppressUntil: 0, suppressedEventType: ''};
 		expect(handleScreensaverIdleActivity({
 			event: {type: 'pointermove'},
 			now: 1100,

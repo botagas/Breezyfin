@@ -32,6 +32,7 @@ import {usePlayerInteractionReveal} from './player-panel/hooks/usePlayerInteract
 import {usePlayerSubtitleBurnInConsent} from './player-panel/hooks/usePlayerSubtitleBurnInConsent';
 import {usePlayerPausedScreensaver} from './player-panel/hooks/usePlayerPausedScreensaver';
 import {usePlayerRuntimeDiagnostics} from './player-panel/hooks/usePlayerRuntimeDiagnostics';
+import {usePlayerGroupSessions} from './player-panel/hooks/usePlayerGroupSessions';
 import {
 	buildPlaybackOverride,
 	resolveVideoSeekSeconds
@@ -247,6 +248,7 @@ const PlayerPanel = ({
 
 	const {
 		clearStartWatch,
+		focusPlayerWakeAction,
 		focusSkipOverlayAction,
 		handleStop
 	} = usePlayerCoreControls({
@@ -262,6 +264,7 @@ const PlayerPanel = ({
 		skipFocusRetryTimerRef,
 		skipButtonRef,
 		skipOverlayRef,
+		playPauseButtonRef,
 		getPlaybackSessionContext
 	});
 	const {
@@ -664,6 +667,17 @@ const PlayerPanel = ({
 		handleAudioTrackChange,
 		handleSubtitleTrackChange
 	});
+	const groupSessions = usePlayerGroupSessions({
+		isActive,
+		item,
+		videoRef,
+		playing,
+		handleLocalPause: handlePause,
+		handleLocalPlay: handlePlay,
+		handleLocalSeek: handleSeek,
+		handleLocalSurfaceClick: handleVideoSurfaceClick,
+		setToastMessage
+	});
 
 	const handleToggleDebugOverlay = useCallback(() => {
 		if (!playerDiagnosticsEnabled) return;
@@ -721,13 +735,9 @@ const PlayerPanel = ({
 		};
 	}, [handleDebugErrorTrigger, isActive]);
 
-	const handlePausedScreensaverWake = useCallback(() => {
-		lastInteractionRef.current = Date.now();
-		setShowControls(true);
-	}, []);
 	const handlePausedScreensaverResume = useCallback(() => {
-		return handlePlay({keepHidden: false});
-	}, [handlePlay]);
+		return groupSessions.handlePlay({keepHidden: false});
+	}, [groupSessions]);
 	const {
 		active: pausedScreensaverActive,
 		dismiss: dismissPausedScreensaver
@@ -743,16 +753,20 @@ const PlayerPanel = ({
 			showSubtitlePopup ||
 			skipOverlayVisible ||
 			showNextEpisodePrompt ||
-			playerDebugOverlayActive
+			playerDebugOverlayActive ||
+				groupSessions.popupOpen
 		),
 		timeoutMinutes: pausedScreensaverTimeoutMinutes,
-		onWake: handlePausedScreensaverWake,
+		lastInteractionRef,
+		setControlsVisible: setShowControls,
+		focusWakeAction: focusPlayerWakeAction,
+		preferSkipFocus: skipOverlayVisible,
+		activeStateRef: pausedScreensaverActiveRef,
 		onResume: handlePausedScreensaverResume
 	});
-	pausedScreensaverActiveRef.current = pausedScreensaverActive;
 
 	const {
-		handleInternalBack
+		handleInternalBack: handlePlayerInternalBack
 	} = usePlayerBackNavigation({
 		hasPlaybackError: Boolean(error),
 		handleBackButton,
@@ -763,23 +777,12 @@ const PlayerPanel = ({
 		skipOverlayVisible,
 		handleDismissSkipOverlay,
 		showControls,
-		setShowControls
-	});
-	const handlePlayerInternalBack = useCallback(() => {
-		if (pausedScreensaverActive) {
-			dismissPausedScreensaver();
-			handlePausedScreensaverWake();
-			return true;
-		}
-		if (handleSubtitleBurnInPromptBack()) return true;
-		return handleInternalBack();
-	}, [
+		setShowControls,
+		pausedScreensaverActive,
 		dismissPausedScreensaver,
-		handleInternalBack,
-		handlePausedScreensaverWake,
-		handleSubtitleBurnInPromptBack,
-		pausedScreensaverActive
-	]);
+		handleSubtitlePromptBack: handleSubtitleBurnInPromptBack,
+		handleGroupSessionBack: groupSessions.handleBack
+	});
 	const getMediaSegmentsForItem = useCallback((itemId, options = {}) => {
 		return jellyfinService.getMediaSegments(itemId, options);
 	}, []);
@@ -839,8 +842,8 @@ const PlayerPanel = ({
 		seekBySeconds,
 		handleInternalBack: handlePlayerInternalBack,
 		handleBackButton,
-		handlePause,
-		handlePlay,
+		handlePause: groupSessions.handlePause,
+		handlePlay: groupSessions.handlePlay,
 		playing,
 		controlsRef,
 		skipOverlayRef,
@@ -861,7 +864,7 @@ const PlayerPanel = ({
 			onError: handleVideoError,
 			onPlaying: handleVideoPlaying,
 			onPause: handleVideoPause,
-			onClick: handleVideoSurfaceClick,
+			onClick: groupSessions.handleSurfaceClick,
 			error,
 			loading,
 			loadingStatusMessage,
@@ -946,20 +949,22 @@ const PlayerPanel = ({
 				muted,
 				volume,
 				debugOverlayEnabled: playerDiagnosticsEnabled,
-				debugOverlayVisible
+				debugOverlayVisible,
+				...groupSessions.controlsState
 			},
 			actions: {
 				handleBackButton,
-				handleSeek,
+				handleSeek: groupSessions.handleSeek,
 				handlePlayPreviousEpisode,
-				handlePause,
-				handlePlay,
+				handlePause: groupSessions.handlePause,
+				handlePlay: groupSessions.handlePlay,
 				handlePlayNextEpisode,
 				openAudioPopup,
 				openSubtitlePopup,
 				toggleMute,
 				handleVolumeChange,
-				handleToggleDebugOverlay
+				handleToggleDebugOverlay,
+				...groupSessions.controlActions
 			},
 			refs: {controlsRef, playPauseButtonRef}
 		},
@@ -976,6 +981,8 @@ const PlayerPanel = ({
 			onSubtitleTrackClick: handleSubtitleTrackItemClick,
 			getTrackLabel: getPlayerTrackLabel
 		},
+		syncPlay: groupSessions.syncPlayPopup,
+		watchParty: groupSessions.watchPartyPopup,
 		pausedScreensaver: {
 			active: pausedScreensaverActive,
 			message: 'Press the scroll wheel button to resume playback'

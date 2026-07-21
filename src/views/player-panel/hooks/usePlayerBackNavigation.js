@@ -10,9 +10,19 @@ export const usePlayerBackNavigation = ({
 	skipOverlayVisible,
 	handleDismissSkipOverlay,
 	showControls,
-	setShowControls
+	setShowControls,
+	pausedScreensaverActive = false,
+	dismissPausedScreensaver,
+	handleSubtitlePromptBack,
+	handleGroupSessionBack
 }) => {
 	const handleInternalBack = useCallback(() => {
+		if (pausedScreensaverActive) {
+			dismissPausedScreensaver?.();
+			return true;
+		}
+		if (handleSubtitlePromptBack?.()) return true;
+		if (handleGroupSessionBack?.()) return true;
 		if (hasPlaybackError) {
 			handleBackButton();
 			return true;
@@ -37,9 +47,13 @@ export const usePlayerBackNavigation = ({
 	}, [
 		closeAudioPopup,
 		closeSubtitlePopup,
+		dismissPausedScreensaver,
 		handleBackButton,
 		handleDismissSkipOverlay,
+		handleGroupSessionBack,
+		handleSubtitlePromptBack,
 		hasPlaybackError,
+		pausedScreensaverActive,
 		setShowControls,
 		showAudioPopup,
 		showControls,

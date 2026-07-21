@@ -15,7 +15,11 @@ This guide covers shared UI components in `src/components/`.
 - Reuse `MediaFilterControls` for Library-like filter trigger/popup UI instead of duplicating filter popup markup in each panel.
 - Reuse `MediaBrowseControls` for browse input and filter-trigger surfaces, and wrap it in `MediaBrowseOverlay` so Search, Library, Home View More, and Favorites share the same overlay placement and reserved-results spacing.
 - Reuse `MediaVirtualGrid` for uniform Search, Favorites, Library, and Home View More result grids. Panels own server paging and cached query state; the wrapper owns Enact item metrics, mode-aware overhang, visible-index/focus prefetch, virtualization, stable item-ID restoration, no overscroll, and the shared non-scaling focus treatment.
-- Reuse `MediaPanelBackdrop` for media-driven panel atmosphere. Feed it a representative item or explicit image URL; it owns ordered backdrop/parent/primary fallback plus low-resolution Jellyfin-preblurred artwork in Normal and Performance modes. Performance+ uses an unblurred lower-opacity image.
+- Reuse `MediaPanelBackdrop` for media-driven panel atmosphere. Feed it a representative item and, where available, an explicit provider image URL; it tries low-resolution Jellyfin-preblurred backdrop/parent/primary candidates before the provider image fallback. Authenticated Breezyfin-plugin image URLs receive the same mode-aware width, quality, and server-blur contract. Normal and Performance retain preblurred artwork, while Performance+ uses an unblurred lower-opacity image.
+- Reuse `IntegrationPanelLayout` for plugin/provider panels. It owns Toolbar-safe content
+  insets, backdrop, loading/empty/error states, retry placement, and Toolbar DOWN entry;
+  provider details should use `ProviderItemPopup` so Popup close and Spotlight cleanup
+  complete before the item state is cleared.
 - Use `MediaCardImage` for shared grid/Home artwork. It owns opacity-only reveal, ordered source fallback through `useImageErrorFallback`, explicit dimensions, eager loading for already-virtualized cards, and opt-in performance metrics without parent-card state updates. Source changes reset visual state in a layout effect so recycled virtual items cannot hide an already-loaded cached image.
 
 ## Styling
@@ -44,6 +48,10 @@ This guide covers shared UI components in `src/components/`.
 - For Home rows, `MediaRow` may expose an optional icon-only section action via `onMoreClick` / `sectionKey`; keep this action generic and route destination behavior through the owning panel. Home activates artwork by row, with the first viewport loaded immediately and later rows activated by row visibility/focus rather than per-image observers.
 - Settings rows use `src/views/settings-panel/components/SettingsStaticItems.js`. These are panel-local Sandstone base compositions that deliberately omit the marquee controller and content measurement path while retaining Enact touch, Spotlight, skin, switch, and accessibility behavior; keep their visible labels constrained with ellipsis rather than reintroducing focus marquees.
 - `src/views/player-panel/components/PlayerPanelContent.js` owns the Player's presentational surface/overlay composition. Keep playback state machines and side effects in `PlayerPanel` hooks, and add new visual layers to this component instead of regrowing the panel orchestrator's return tree.
+- `PlayerSyncPlayPopup` and `PlayerWatchPartyPopup` are panel-local participant/status
+  surfaces. Keep native and room protocols isolated, preserve layered Back behavior,
+  and expose controls only when the active group/host state permits them.
+- Native SyncPlay is a Toolbar utility action, not a primary navigation tab. In Elegant it replaces the duplicate right-side Search icon with a Cast action when available while Search remains in the central pill; Classic keeps Search and places the Cast action with the right-side utilities.
 
 ## Related docs
 

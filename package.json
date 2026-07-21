@@ -1,6 +1,6 @@
 {
 	"name": "breezyfin",
-	"version": "0.1.9",
+	"version": "0.2.0",
 	"description": "Jellyfin client for LG webOS TVs, built with Enact Sandstone.",
 	"author": "",
 	"main": "src/index.js",
@@ -97,6 +97,8 @@
 	},
 	"jest": {
 		"moduleNameMapper": {
+			"^@jellyfin/sdk/lib/utils/api/sync-play-api$": "<rootDir>/src/test/mocks/jellyfinSyncPlayApi.js",
+			"^@jellyfin/sdk/lib/utils/api/time-sync-api$": "<rootDir>/src/test/mocks/jellyfinSyncPlayApi.js",
 			"^react$": "<rootDir>/node_modules/react",
 			"^react/jsx-runtime$": "<rootDir>/node_modules/react/jsx-runtime.js",
 			"^react/jsx-dev-runtime$": "<rootDir>/node_modules/react/jsx-dev-runtime.js",

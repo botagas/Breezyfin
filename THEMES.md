@@ -118,7 +118,7 @@ Examples:
 - The compact Elegant header keeps its backdrop blur but disables SVG distortion; Performance+ and webOS 6 use the static non-blurred fallback.
 - The shared Breezyfin wind loading mark remains animated; only Performance+ makes it static.
 
-Shared Hero backdrop, media-panel atmosphere, text-fallback contrast, Elegant liquid-glass specular, card-placeholder, and loading colors are defined as semantic tokens in `src/styles/global-styles/_global-root.css` and the Classic/Elegant token packs rather than repeated in component styles. Media-panel backdrops use low-resolution Jellyfin-preblurred representative artwork with darkening in Normal mode, a smaller/lighter pre-blurred image in Performance mode, and a lower-opacity unblurred image in Performance+; full-screen CSS blur is intentionally avoided.
+Shared Hero backdrop, media-panel atmosphere, text-fallback contrast, Elegant liquid-glass specular, card-placeholder, and loading colors are defined as semantic tokens in `src/styles/global-styles/_global-root.css` and the Classic/Elegant token packs rather than repeated in component styles. Media-panel backdrops use low-resolution Jellyfin-preblurred representative artwork with darkening in Normal mode, a smaller/lighter pre-blurred image in Performance mode, and a lower-opacity unblurred image in Performance+; authenticated plugin artwork requests the equivalent width/quality/blur variant from the plugin. Full-screen CSS blur is intentionally avoided.
 
 ### Performance+ Mode (`data-bf-all-animations='off'`)
 

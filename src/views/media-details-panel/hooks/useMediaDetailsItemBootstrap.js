@@ -14,7 +14,8 @@ export const useMediaDetailsItemBootstrap = ({
 	setSelectedSeason,
 	setSelectedEpisode,
 	setIsFavorite,
-	setIsWatched
+	setIsWatched,
+	setIsWatchlisted
 }) => {
 	useEffect(() => {
 		playbackInfoRequestRef.current += 1;
@@ -33,6 +34,7 @@ export const useMediaDetailsItemBootstrap = ({
 		}
 		setIsFavorite(Boolean(item?.UserData?.IsFavorite));
 		setIsWatched(Boolean(item?.UserData?.Played));
+		setIsWatchlisted(item?.UserData?.Likes === true);
 	}, [
 		applyDefaultTracks,
 		episodesRequestRef,
@@ -44,6 +46,7 @@ export const useMediaDetailsItemBootstrap = ({
 		setEpisodes,
 		setIsFavorite,
 		setIsWatched,
+		setIsWatchlisted,
 		setPlaybackInfo,
 		setSeasons,
 		setSelectedEpisode,

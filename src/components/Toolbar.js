@@ -48,6 +48,14 @@ const Toolbar = ({
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [userName, setUserName] = useState('User');
 	const [userAvatarUrl, setUserAvatarUrl] = useState('');
+	const [pluginFeatures, setPluginFeatures] = useState({
+		discovery: false,
+		calendar: false,
+		syncPlay: false,
+		watchParty: false,
+		hideNativeSyncButton: false
+	});
+	const serviceSessionKey = `${jellyfinService.serverUrl || ''}|${jellyfinService.userId || ''}|${jellyfinService.accessToken || ''}`;
 	const {disclosures, openDisclosure, closeDisclosure, setDisclosure} = useDisclosureMap(INITIAL_TOOLBAR_DISCLOSURES);
 	const showUserMenu = disclosures[TOOLBAR_DISCLOSURE_KEYS.USER_MENU] === true;
 	const showLibrariesPopup = disclosures[TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP] === true;
@@ -81,6 +89,10 @@ const Toolbar = ({
 		}
 		if (activeSection === 'favorites') return 'Favorites';
 		if (activeSection === 'search') return 'Search';
+		if (activeSection === 'discovery') return 'Discovery';
+		if (activeSection === 'calendar') return 'Calendar';
+		if (activeSection === 'syncPlay') return 'SyncPlay';
+		if (activeSection === 'watchParty') return 'Watch Party';
 		if (activeSection === 'settings') return 'Settings';
 		return activeSection ? activeSection.charAt(0).toUpperCase() + activeSection.slice(1) : '';
 	}, [activeLibraryId, activeSection, isHomeSection, librariesById]);
@@ -111,13 +123,64 @@ const Toolbar = ({
 		if (user && user.Name) {
 			setUserName(user.Name);
 		}
+		setPluginFeatures((current) => ({
+			...current,
+			syncPlay: !current.hideNativeSyncButton && Boolean(user) && user?.Policy?.SyncPlayAccess !== 'None'
+		}));
 		setUserAvatarUrl(buildUserAvatarUrl(user));
 	}, [buildUserAvatarUrl]);
 
 	useEffect(() => {
 		loadLibraries();
 		loadUserInfo();
-	}, [loadLibraries, loadUserInfo]);
+	}, [loadLibraries, loadUserInfo, serviceSessionKey]);
+
+	useEffect(() => {
+		let cancelled = false;
+		let retryTimer = null;
+		setPluginFeatures((current) => ({...current, discovery: false, calendar: false}));
+		const loadCapabilities = () => {
+			jellyfinService.getBreezyfinCapabilities().then((capabilities) => {
+				if (cancelled) return;
+				if (capabilities?.available !== true) {
+					if (capabilities?.retryable === true) {
+						retryTimer = setTimeout(loadCapabilities, 15000);
+					}
+					return;
+				}
+				setPluginFeatures((current) => ({
+					...current,
+					discovery: capabilities.features?.['discovery.v1'] === true,
+					calendar: capabilities.features?.['calendar.v1'] === true
+				}));
+			}).catch(() => null);
+		};
+		loadCapabilities();
+		return () => {
+			cancelled = true;
+			if (retryTimer) clearTimeout(retryTimer);
+		};
+	}, [serviceSessionKey]);
+
+	useEffect(() => {
+		let cancelled = false;
+		jellyfinService.detectJellyWatchParty().then((availability) => {
+			if (cancelled) return;
+			setPluginFeatures((current) => ({
+				...current,
+				watchParty: availability.available === true,
+				hideNativeSyncButton: availability.hideNativeSyncButton === true,
+				syncPlay: availability.hideNativeSyncButton === true ? false : current.syncPlay
+			}));
+		}).catch(() => {
+			if (!cancelled) {
+				setPluginFeatures((current) => ({...current, watchParty: false}));
+			}
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [serviceSessionKey]);
 
 	useEffect(() => {
 		if (runtimeSuspended) return undefined;
@@ -241,6 +304,22 @@ const Toolbar = ({
 
 	const handleNavigateSettings = useCallback(() => {
 		onNavigate('settings');
+	}, [onNavigate]);
+
+	const handleNavigateDiscovery = useCallback(() => {
+		onNavigate('discovery');
+	}, [onNavigate]);
+
+	const handleNavigateCalendar = useCallback(() => {
+		onNavigate('calendar');
+	}, [onNavigate]);
+
+	const handleNavigateSyncPlay = useCallback(() => {
+		onNavigate('syncPlay');
+	}, [onNavigate]);
+
+	const handleNavigateWatchParty = useCallback(() => {
+		onNavigate('watchParty');
 	}, [onNavigate]);
 
 	const handleElegantBack = useCallback(() => {
@@ -482,6 +561,14 @@ const Toolbar = ({
 					handleNavigateFavorites={handleNavigateFavorites}
 					handleNavigateSearch={handleNavigateSearch}
 					handleNavigateSettings={handleNavigateSettings}
+					handleNavigateDiscovery={handleNavigateDiscovery}
+					handleNavigateCalendar={handleNavigateCalendar}
+					handleNavigateSyncPlay={handleNavigateSyncPlay}
+					handleNavigateWatchParty={handleNavigateWatchParty}
+					showDiscovery={pluginFeatures.discovery}
+					showCalendar={pluginFeatures.calendar}
+					showSyncPlay={pluginFeatures.syncPlay}
+					showWatchParty={pluginFeatures.watchParty}
 					activeSection={activeSection}
 					libraryMenuScopeRef={libraryMenuScopeRef}
 					handleOpenLibrariesPopup={handleOpenLibrariesPopup}
@@ -523,6 +610,14 @@ const Toolbar = ({
 					activeLibraryId={activeLibraryId}
 					handleLibraryNavigate={handleLibraryNavigate}
 					handleNavigateSettings={handleNavigateSettings}
+					handleNavigateDiscovery={handleNavigateDiscovery}
+					handleNavigateCalendar={handleNavigateCalendar}
+					handleNavigateSyncPlay={handleNavigateSyncPlay}
+					handleNavigateWatchParty={handleNavigateWatchParty}
+					showDiscovery={pluginFeatures.discovery}
+					showCalendar={pluginFeatures.calendar}
+					showSyncPlay={pluginFeatures.syncPlay}
+					showWatchParty={pluginFeatures.watchParty}
 					formatTime={formatTime}
 				/>
 			)}

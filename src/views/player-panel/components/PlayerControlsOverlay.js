@@ -24,7 +24,10 @@ const PlayerControlsOverlay = ({
 		muted,
 		volume,
 		debugOverlayEnabled,
-		debugOverlayVisible
+		debugOverlayVisible,
+		syncPlayGroup,
+		watchPartyAvailable,
+		watchPartyRoom
 	} = state;
 	const {
 		handleBackButton,
@@ -37,7 +40,9 @@ const PlayerControlsOverlay = ({
 		openSubtitlePopup,
 		toggleMute,
 		handleVolumeChange,
-		handleToggleDebugOverlay
+		handleToggleDebugOverlay,
+		openSyncPlayPopup,
+		openWatchPartyPopup
 	} = actions;
 	const {controlsRef, playPauseButtonRef} = refs;
 
@@ -97,6 +102,7 @@ const PlayerControlsOverlay = ({
 
 					{playing ? (
 						<Button
+							spotlightId="player-primary-playback-action"
 							onClick={handlePause}
 							size="large"
 							icon="pause"
@@ -105,6 +111,7 @@ const PlayerControlsOverlay = ({
 						/>
 					) : (
 						<Button
+							spotlightId="player-primary-playback-action"
 							onClick={handlePlay}
 							size="large"
 							icon="play"
@@ -124,6 +131,24 @@ const PlayerControlsOverlay = ({
 					)}
 
 					<div className={css.trackButtons}>
+						{watchPartyAvailable ? (
+							<Button
+								size="small"
+								onClick={openWatchPartyPopup}
+								className={css.playerControlButton}
+							>
+								{watchPartyRoom ? 'Watch Party' : 'Parties'}
+							</Button>
+						) : null}
+						{syncPlayGroup ? (
+							<Button
+								size="small"
+								icon="dlna"
+								aria-label="SyncPlay"
+								onClick={openSyncPlayPopup}
+								className={css.playerControlButton}
+							/>
+						) : null}
 						{audioTracks.length > 1 && (
 							<Button
 								size="small"

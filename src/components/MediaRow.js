@@ -7,6 +7,7 @@ import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
+import {getEpisodeLocator} from '../utils/mediaItemUtils';
 import {buildMediaListItemKey} from '../utils/reactKeys';
 import MediaCardImage from './MediaCardImage';
 
@@ -43,9 +44,7 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 
 	const getSubtitle = () => {
 		if (item.Type === 'Episode') {
-			const season = item.ParentIndexNumber || 1;
-			const episode = item.IndexNumber || 1;
-			return `S${season}:E${episode}`;
+			return getEpisodeLocator(item) || null;
 		}
 		return null;
 	};

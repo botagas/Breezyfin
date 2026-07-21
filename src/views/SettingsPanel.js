@@ -53,6 +53,7 @@ import { useSettingsDisplayHandlers } from './settings-panel/hooks/useSettingsDi
 
 import css from './SettingsPanel.module.less';
 import {popupShellCss} from '../styles/popupStyles';
+import {readIntegrationPreferences, writeIntegrationPreferences} from '../utils/integrationPreferences';
 import SettingsSections from './settings-panel/components/SettingsSections';
 import SettingsPopups from './settings-panel/components/SettingsPopups';
 
@@ -77,6 +78,9 @@ const SettingsPanel = ({
 	const [, bumpCapabilitySnapshotVersion] = useState(0);
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+	const [integrationPreferences, setIntegrationPreferences] = useState(() => (
+		readIntegrationPreferences(jellyfinService)
+	));
 	const assSubtitleRendererOptions = useMemo(
 		() => getAssSubtitleRendererOptions(),
 		[]
@@ -218,6 +222,20 @@ const SettingsPanel = ({
 		moveHomeRowUp,
 		moveHomeRowDown
 	} = useSettingsHomeRows({setSettings});
+	const handleToggleServerHome = useCallback(() => {
+		setIntegrationPreferences((current) => {
+			const next = {...current, homeSource: current.homeSource === 'server' ? 'builtin' : 'server'};
+			writeIntegrationPreferences(jellyfinService, next);
+			return next;
+		});
+	}, []);
+	const handleToggleWatchlist = useCallback(() => {
+		setIntegrationPreferences((current) => {
+			const next = {...current, watchlistEnabled: current.watchlistEnabled !== true};
+			writeIntegrationPreferences(jellyfinService, next);
+			return next;
+		});
+	}, []);
 
 	const {
 		handleSwitchServerClick,
@@ -388,6 +406,9 @@ const SettingsPanel = ({
 						handleSwitchServerClick={handleSwitchServerClick}
 						handleForgetServerClick={handleForgetServerClick}
 						settings={settings}
+						integrationPreferences={integrationPreferences}
+						handleToggleServerHome={handleToggleServerHome}
+						handleToggleWatchlist={handleToggleWatchlist}
 						homeRowToggleHandlers={homeRowToggleHandlers}
 						moveHomeRowUp={moveHomeRowUp}
 						moveHomeRowDown={moveHomeRowDown}

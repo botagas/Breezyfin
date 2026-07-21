@@ -34,6 +34,59 @@ Run these before packaging a release candidate:
 
 ## Focused regression checks
 
+### Plugin and realtime integration validation
+
+1. Verify capabilities are fetched once per authenticated server/user/token session
+   and invalidated on login, logout, user/server switch, and token replacement.
+2. Select Server Home and verify descriptors load first, initial displayable rows load
+   through bounded batches, each requested row shows its loading surface and appears as
+   soon as it settles, later rows load lazily, View More pages deterministically,
+   valid empty rows remain empty, and server descriptors remain authoritative without
+   client-prepended My Requests or Watchlist duplicates. Verify plugin/HSS `404`, `5xx`,
+   timeout, malformed, or disabled states restore
+   built-in Home without affecting Hero, My Requests, or Watchlist.
+3. Enable Likes watchlist and verify unset -> liked -> unset and disliked -> liked ->
+   unset transitions for Movie/Series. Confirm mutation and `UserDataChanged` refresh
+   Home, View More, Library, and item state without crossing server/user scopes.
+4. Verify Discovery and Calendar navigation appears only for enabled capabilities.
+   Test complete empty responses, retryable provider failures, linked-item Play,
+   external details, authenticated images, deterministic paging, local-date grouping,
+   and Movie/Series filters. Confirm Trending renders before later Discovery rows,
+   one failed feed does not remove successful feeds, transient capability failures retry,
+   permanent missing/unsupported capability results do not poll repeatedly, interrupted
+   Discovery loads resume unfinished rows, Calendar filter failures do not show results
+   from the previous filter, paging cursors always advance, accumulated partial warnings
+   remain visible,
+   Calendar partial-provider warnings are visible, and Calendar never infers or displays
+   server visibility mode. With Diagnostics enabled, confirm empty Calendar results
+   report the configured date range and provider/type/visibility counts, and an empty
+   server Home response reports source selection, descriptor count, and bounded lazy-row
+   item counts. Valid empty leading HSS rows must not prevent later configured rows from
+   loading. Verify Calendar artwork loads through authenticated Arr
+   image URLs, including `/MediaCover/` paths containing `lastWrite` query parameters,
+   then falls back to linked Movie/Series artwork without treating a synthetic Calendar
+   event ID as a Jellyfin item ID. A future Sonarr episode with no Jellyfin Episode must
+   use its uniquely matched Series image while remaining non-playable; ambiguous provider
+   matches must stay unlinked. Normal and Performance plugin backdrops must request bounded
+   server-blurred variants, while Performance+ requests an unblurred lower-opacity variant.
+   Missing season/episode values must not render
+   placeholder `S1:E1` labels. Verify Discovery and Calendar use the same media-aware
+   preblurred backdrop fallback as Home, and joined SyncPlay uses its active queue item
+   as the backdrop without retaining stale artwork after leaving.
+5. With two Jellyfin sessions, verify native SyncPlay create/join/leave, participants,
+   connection/group status, and refresh behavior. Switch
+   server/user/token while joined and verify the previous account's group is not shown;
+   verify a failed Leave request retains the joined state and shows an error.
+6. Verify JellyWatchParty is hidden for `404`, malformed, disabled, or
+   `auth_enabled=false` token responses. Test room create/password join/leave,
+   reconnect, host transfer, ready/buffering, play/pause/seek, 500-character input,
+   50-message history, and `hide_native_sync_button` without persisting JWTs,
+   passwords, or chat. Verify token-refresh failure returns to an unavailable Retry state,
+   and Back during a pending room-item lookup cannot navigate into Player afterward.
+7. On target webOS hardware, repeat Home, View More, Watchlist, Discovery, Calendar,
+   SyncPlay, WatchParty, pointer/5-way focus, layered Back, reconnect, and
+   plugin-unavailable checks in Classic/Elegant and all performance modes.
+
 ### Diagnostics/logging validation
 
 1. Verify `Enable Diagnostics` defaults off in stable, develop, and local production builds; all child diagnostic choices retain their saved state but are disabled and perform no work.
@@ -104,6 +157,7 @@ Run these before packaging a release candidate:
 7. Verify Library/Home View More retain the intended three-column landscape density on TV, empty-result messages are centered, applied filter counts remain visible, and Favorites stacks `SxxExx`, favorite, and watched pills without overlap or inset drift.
 8. Search for Episodes and verify their cards show the parent Series title and `SxxExx`; opening an Episode must expose its Series/Season/Episode breadcrumbs. Search must not return unfiltered Season containers, and stale Season results must open their parent Series instead of requesting playback for the Season item.
 9. In Elegant, verify the compact pill header preserves centered tab focus, panel back/title visibility, Libraries/User popup placement, and right-side action navigation across Home, Library, Home View More, Search, Favorites, and Settings. Verify Classic retains its existing toolbar layout.
+10. With native SyncPlay available, verify it does not appear as a navbar tab. Elegant should retain the central Search tab and replace the duplicate right-side Search icon with a Cast action; Classic should retain Search and expose Cast with the right-side utilities. Activating Cast must open SyncPlay and show its selected state while that panel is active.
 
 ### Media Details validation
 
@@ -124,5 +178,5 @@ Run these before packaging a release candidate:
 5. Verify the pre-sized white Breezyfin wind mark remains within the black viewport, points along its movement direction with smooth heading changes, reflects at resize boundaries, and advances smoothly on every delivered frame at both 30 Hz and 60 Hz, including Performance+ mode.
 6. Verify activation pauses Home Hero/CSS animation, Toolbar clock updates, optional diagnostics, paused playback progress/stall work, and manual subtitle synchronization. On wake, verify one immediate subtitle synchronization occurs, Home resumes, and Spotlight is restored only when the screensaver paused it.
 7. Verify logout, switch user, session expiry, view changes, and app unmount clean up inactivity timers, animation frames, listeners, and stored focus.
-8. Pause established playback for the configured timeout and verify the separate Player screensaver fades `Press the scroll wheel button to resume playback` between random, fully visible positions; ENTER/OK/Space resumes, while pointer, wheel, directional, or Back wakes to paused controls without activating or navigating underneath. Verify each wake input dismisses once without rapidly hiding/revealing the Player controls.
+8. Pause established playback for the configured timeout and verify the separate Player screensaver fades `Press the scroll wheel button to resume playback` between random, fully visible positions; ENTER/OK/Space resumes, while pointer, wheel, directional, or Back wakes to paused controls without activating or navigating underneath. Verify each wake input dismisses once without rapidly hiding/revealing the Player controls. After a keyboard wake, Back, seek, and Skip Intro must work immediately without an extra UP/DOWN reveal; pointer-down/click duplicates must still activate at most once.
 9. Verify Player loading, playback errors, track popups, subtitle decisions, skip/next prompts, and the extended debug overlay suppress the paused-player screensaver.

@@ -17,6 +17,7 @@ export const usePlayerCoreControls = ({
 	skipFocusRetryTimerRef,
 	skipButtonRef,
 	skipOverlayRef,
+	playPauseButtonRef,
 	getPlaybackSessionContext
 }) => {
 	const clearStartWatch = useCallback(() => {
@@ -55,6 +56,35 @@ export const usePlayerCoreControls = ({
 		};
 		tryFocus();
 	}, [skipButtonRef, skipFocusRetryTimerRef, skipOverlayRef]);
+
+	const focusPlayerWakeAction = useCallback(({preferSkip = false} = {}) => {
+		if (preferSkip) {
+			focusSkipOverlayAction();
+			return;
+		}
+		if (skipFocusRetryTimerRef.current) {
+			clearTimeout(skipFocusRetryTimerRef.current);
+			skipFocusRetryTimerRef.current = null;
+		}
+
+		let attempts = 0;
+		const maxAttempts = 10;
+		const tryFocus = () => {
+			Spotlight.focus('player-primary-playback-action');
+			const target = playPauseButtonRef.current?.nodeRef?.current || playPauseButtonRef.current;
+			target?.focus?.({preventScroll: true});
+			const focused = target && (
+				document.activeElement === target || target.contains?.(document.activeElement)
+			);
+			if (!focused && attempts < maxAttempts) {
+				attempts += 1;
+				skipFocusRetryTimerRef.current = setTimeout(tryFocus, 40);
+			} else {
+				skipFocusRetryTimerRef.current = null;
+			}
+		};
+		tryFocus();
+	}, [focusSkipOverlayAction, playPauseButtonRef, skipFocusRetryTimerRef]);
 
 	const handleStop = useCallback(async () => {
 		const video = videoRef.current;
@@ -115,6 +145,7 @@ export const usePlayerCoreControls = ({
 
 	return {
 		clearStartWatch,
+		focusPlayerWakeAction,
 		focusSkipOverlayAction,
 		handleStop
 	};

@@ -65,6 +65,7 @@ describe('jellyfinService', () => {
 	});
 
 	afterEach(() => {
+		jellyfinService.webSocketSession?.stop();
 		errorSpy.mockRestore();
 		warnSpy.mockRestore();
 	});

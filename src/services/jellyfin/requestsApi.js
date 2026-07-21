@@ -3,11 +3,26 @@ import {normalizeOptionalQueryValue} from './queryParams';
 
 const REQUESTS_PLUGIN_ENDPOINT = '/Breezyfin/MyRequests';
 const CAPABILITIES_PLUGIN_ENDPOINT = '/Breezyfin/Capabilities';
-const MY_REQUESTS_FEATURE_ID = 'myRequests.v1';
+export const BREEZYFIN_FEATURE_IDS = Object.freeze({
+	MY_REQUESTS: 'myRequests.v1',
+	HOME_SECTIONS: 'homeSections.v1',
+	DISCOVERY: 'discovery.v1',
+	CALENDAR: 'calendar.v1'
+});
+const MY_REQUESTS_FEATURE_ID = BREEZYFIN_FEATURE_IDS.MY_REQUESTS;
 const SUPPORTED_CONTRACT_VERSION = '1.0';
 const PLUGIN_REQUEST_TIMEOUT_MS = 65000;
+const CAPABILITIES_FAILURE_TTL_MS = 15000;
 const FALLBACK_SCAN_MULTIPLIER = 4;
 const FALLBACK_SCAN_PAGE_LIMIT = 8;
+const PLUGIN_EMPTY_REASONS = new Set([
+	'no-provider-events',
+	'item-type-filter',
+	'requested-only-filter',
+	'no-enabled-sections',
+	'upstream-empty',
+	'upstream-empty-with-enabled-sections'
+]);
 const pluginSessionCache = new WeakMap();
 
 const normalizePositiveInteger = (value, fallback) => {
@@ -39,13 +54,14 @@ const getPluginSessionEntry = (service) => {
 	const next = {
 		key,
 		capabilitiesPromise: null,
+		capabilitiesExpiresAt: 0,
 		myRequestsMissing: false
 	};
 	pluginSessionCache.set(service, next);
 	return next;
 };
 
-const getErrorStatus = (error) => {
+export const getPluginErrorStatus = (error) => {
 	const directStatus = Number(error?.status);
 	if (Number.isInteger(directStatus) && directStatus >= 100 && directStatus <= 599) {
 		return directStatus;
@@ -54,13 +70,15 @@ const getErrorStatus = (error) => {
 	return match ? Number(match[1]) : null;
 };
 
-const shouldPropagatePluginError = (error) => {
-	const status = getErrorStatus(error);
+export const shouldPropagatePluginError = (error) => {
+	const status = getPluginErrorStatus(error);
 	return status != null && status >= 400 && status < 500 && status !== 404;
 };
 
-const getPluginFailureReason = (error, prefix) => {
-	const status = getErrorStatus(error);
+export const getPluginFailureReason = (error, prefix) => {
+	const providerReason = String(error?.problemDetails?.reason || '').trim();
+	if (providerReason) return `${prefix}-${providerReason}`;
+	const status = getPluginErrorStatus(error);
 	if (status === 404) return `${prefix}-missing`;
 	if (status != null && status >= 500) return `${prefix}-server-error`;
 	if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return `${prefix}-timeout`;
@@ -68,7 +86,24 @@ const getPluginFailureReason = (error, prefix) => {
 	return `${prefix}-unavailable`;
 };
 
-const requestPluginJson = async (service, path, context) => {
+const isPluginFailureRetryable = (error) => {
+	if (typeof error?.problemDetails?.retryable === 'boolean') {
+		return error.problemDetails.retryable;
+	}
+	const status = getPluginErrorStatus(error);
+	if (status != null) return status >= 500;
+	if (error instanceof SyntaxError) return false;
+	return true;
+};
+
+export const getPluginFailureDetails = (error, prefix = 'plugin') => ({
+	diagnosticReason: getPluginFailureReason(error, prefix),
+	status: getPluginErrorStatus(error),
+	problemDetails: error?.problemDetails || null,
+	retryable: isPluginFailureRetryable(error)
+});
+
+export const requestBreezyfinPluginJson = async (service, path, context) => {
 	const controller = typeof AbortController === 'function' ? new AbortController() : null;
 	let timeoutId = null;
 	const timeoutPromise = new Promise((_, reject) => {
@@ -108,59 +143,147 @@ const normalizeCapabilitiesResponse = (data) => {
 	) {
 		return null;
 	}
+	const features = {};
+	data.Features.forEach((feature) => {
+		features[feature.Id] = feature.Enabled === true;
+	});
 	return {
+		pluginVersion: data.PluginVersion,
 		contractVersion: data.ContractVersion,
-		myRequestsEnabled: data.Features.some((feature) => (
-			feature.Id === MY_REQUESTS_FEATURE_ID && feature.Enabled === true
-		))
+		serverAbi: data.ServerAbi,
+		features: Object.freeze(features)
 	};
 };
 
 const loadPluginCapabilities = async (service) => {
 	let data;
 	try {
-		data = await requestPluginJson(
+		data = await requestBreezyfinPluginJson(
 			service,
 			CAPABILITIES_PLUGIN_ENDPOINT,
 			'getBreezyfinCapabilities plugin'
 		);
 	} catch (error) {
 		if (shouldPropagatePluginError(error)) throw error;
+		const failure = getPluginFailureDetails(error, 'plugin-capabilities');
 		return {
 			available: false,
-			diagnosticReason: getPluginFailureReason(error, 'plugin-capabilities')
+			...failure
 		};
 	}
 	const capabilities = normalizeCapabilitiesResponse(data);
 	if (!capabilities) {
 		return {
 			available: false,
-			diagnosticReason: 'plugin-capabilities-malformed'
+			diagnosticReason: 'plugin-capabilities-malformed',
+			retryable: false
 		};
 	}
 	if (capabilities.contractVersion !== SUPPORTED_CONTRACT_VERSION) {
 		return {
 			available: false,
-			diagnosticReason: 'plugin-contract-unsupported'
-		};
-	}
-	if (!capabilities.myRequestsEnabled) {
-		return {
-			available: false,
-			diagnosticReason: 'plugin-feature-disabled'
+			diagnosticReason: 'plugin-contract-unsupported',
+			retryable: false
 		};
 	}
 	return {
 		available: true,
-		diagnosticReason: 'plugin-capabilities'
+		diagnosticReason: 'plugin-capabilities',
+		...capabilities
 	};
 };
 
 const getPluginCapabilities = (service, sessionEntry) => {
-	if (!sessionEntry.capabilitiesPromise) {
-		sessionEntry.capabilitiesPromise = loadPluginCapabilities(service);
+	const now = Date.now();
+	if (!sessionEntry.capabilitiesPromise || now >= sessionEntry.capabilitiesExpiresAt) {
+		const request = loadPluginCapabilities(service);
+		sessionEntry.capabilitiesPromise = request;
+		sessionEntry.capabilitiesExpiresAt = Number.POSITIVE_INFINITY;
+		request.then((result) => {
+			if (sessionEntry.capabilitiesPromise !== request) return;
+			if (result?.available !== true && result?.retryable === true) {
+				sessionEntry.capabilitiesExpiresAt = Date.now() + CAPABILITIES_FAILURE_TTL_MS;
+			}
+		}).catch(() => {
+			if (sessionEntry.capabilitiesPromise === request) {
+				sessionEntry.capabilitiesPromise = null;
+				sessionEntry.capabilitiesExpiresAt = 0;
+			}
+		});
 	}
 	return sessionEntry.capabilitiesPromise;
+};
+
+export const getBreezyfinCapabilities = async (service) => {
+	const sessionEntry = getPluginSessionEntry(service);
+	if (!sessionEntry) {
+		return {
+			available: false,
+			diagnosticReason: 'missing-user-id',
+			features: Object.freeze({})
+		};
+	}
+	return getPluginCapabilities(service, sessionEntry);
+};
+
+export const normalizePluginPage = (data, {startIndex = 0, validateItem} = {}) => {
+	if (!data || typeof data !== 'object' || !Array.isArray(data.Items)) return null;
+	if (typeof validateItem === 'function' && !data.Items.every(validateItem)) return null;
+	if (!Number.isInteger(data.TotalRecordCount) || data.TotalRecordCount < 0) return null;
+	const safeStartIndex = normalizeStartIndex(startIndex);
+	const explicitNextStartIndex = Number(data.NextStartIndex);
+	const nextStartIndex = Number.isInteger(explicitNextStartIndex) && explicitNextStartIndex > safeStartIndex
+		? explicitNextStartIndex
+		: safeStartIndex + data.Items.length;
+	const cursorAdvanced = nextStartIndex > safeStartIndex;
+	const warnings = Array.isArray(data.Warnings) ? data.Warnings.filter((warning) => (
+		warning && typeof warning === 'object' && typeof warning.Code === 'string'
+	)).map((warning) => ({
+		code: String(warning.Code).slice(0, 120),
+		provider: typeof warning.Provider === 'string' ? warning.Provider.slice(0, 120) : '',
+		operation: typeof warning.Operation === 'string' ? warning.Operation.slice(0, 120) : '',
+		reason: typeof warning.Reason === 'string' ? warning.Reason.slice(0, 120) : '',
+		retryable: warning.Retryable !== false,
+		upstreamStatus: Number.isInteger(warning.UpstreamStatus) && warning.UpstreamStatus >= 100 && warning.UpstreamStatus <= 599
+			? warning.UpstreamStatus
+			: null,
+		failedPage: Number.isInteger(warning.FailedPage) && warning.FailedPage >= 1
+			? warning.FailedPage
+			: null
+	})) : [];
+	const result = {
+		items: data.Items,
+		totalRecordCount: data.TotalRecordCount,
+		nextStartIndex,
+		hasMore: cursorAdvanced && (typeof data.HasMore === 'boolean' ? data.HasMore : nextStartIndex < data.TotalRecordCount),
+		warnings
+	};
+	if (Object.prototype.hasOwnProperty.call(data, 'EmptyReason')) {
+		result.emptyReason = PLUGIN_EMPTY_REASONS.has(data.EmptyReason) ? data.EmptyReason : null;
+	}
+	if (Number.isInteger(data.ConfiguredSectionCount) && data.ConfiguredSectionCount >= 0) {
+		result.configuredSectionCount = data.ConfiguredSectionCount;
+	}
+	if (data.Diagnostics && typeof data.Diagnostics === 'object') {
+		const diagnostics = data.Diagnostics;
+		result.providerDiagnostics = {
+			configuredProviderCount: Number.isInteger(diagnostics.ConfiguredProviderCount)
+				? diagnostics.ConfiguredProviderCount : null,
+			successfulProviderCount: Number.isInteger(diagnostics.SuccessfulProviderCount)
+				? diagnostics.SuccessfulProviderCount : null,
+			providerEventCount: Number.isInteger(diagnostics.ProviderEventCount)
+				? diagnostics.ProviderEventCount : null,
+			typeMatchedCount: Number.isInteger(diagnostics.TypeMatchedCount)
+				? diagnostics.TypeMatchedCount : null,
+			visibilityMatchedCount: Number.isInteger(diagnostics.VisibilityMatchedCount)
+				? diagnostics.VisibilityMatchedCount : null,
+			visibilityMode: typeof diagnostics.VisibilityMode === 'string'
+				? diagnostics.VisibilityMode.slice(0, 80) : '',
+			start: typeof diagnostics.Start === 'string' ? diagnostics.Start.slice(0, 20) : '',
+			end: typeof diagnostics.End === 'string' ? diagnostics.End.slice(0, 20) : ''
+		};
+	}
+	return result;
 };
 
 const normalizePluginResponse = (data, {startIndex}) => {
@@ -208,6 +331,12 @@ const getMyRequestsFromPlugin = async (service, {
 	}
 	const capabilities = await getPluginCapabilities(service, sessionEntry);
 	if (capabilities.available !== true) return capabilities;
+	if (capabilities.features?.[MY_REQUESTS_FEATURE_ID] !== true) {
+		return {
+			available: false,
+			diagnosticReason: 'plugin-feature-disabled'
+		};
+	}
 	try {
 		const safeLimit = normalizePositiveInteger(limit, 60);
 		const safeStartIndex = normalizeStartIndex(startIndex);
@@ -222,7 +351,7 @@ const getMyRequestsFromPlugin = async (service, {
 		} else if (typeof itemTypes === 'string' && itemTypes.trim()) {
 			params.set('includeItemTypes', itemTypes.trim());
 		}
-		const data = await requestPluginJson(
+		const data = await requestBreezyfinPluginJson(
 			service,
 			`${REQUESTS_PLUGIN_ENDPOINT}?${params.toString()}`,
 			'getMyRequests plugin'
@@ -242,7 +371,7 @@ const getMyRequestsFromPlugin = async (service, {
 		};
 	} catch (error) {
 		if (shouldPropagatePluginError(error)) throw error;
-		if (getErrorStatus(error) === 404) {
+		if (getPluginErrorStatus(error) === 404) {
 			sessionEntry.myRequestsMissing = true;
 		}
 		return {

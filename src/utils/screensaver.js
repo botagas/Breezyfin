@@ -75,9 +75,15 @@ export const handleScreensaverIdleActivity = ({
 	now = Date.now()
 } = {}) => {
 	const state = idleState || {};
-	if (now <= (Number(state.suppressUntil) || 0)) {
+	const suppressUntil = Number(state.suppressUntil) || 0;
+	const suppressedEventType = String(state.suppressedEventType || '');
+	if (now <= suppressUntil && suppressedEventType && event?.type === suppressedEventType) {
 		consumeEvent?.(event, {preventDefault: false});
 		return 'suppressed';
+	}
+	if (now > suppressUntil) {
+		state.suppressUntil = 0;
+		state.suppressedEventType = '';
 	}
 	if (event?.type === 'pointermove' || event?.type === 'mousemove') {
 		const lastPointerMoveAt = Number(state.lastPointerMoveAt) || 0;
@@ -86,6 +92,22 @@ export const handleScreensaverIdleActivity = ({
 	}
 	markActivity?.();
 	return 'activity';
+};
+
+export const setScreensaverWakeSuppression = ({
+	idleState,
+	event,
+	durationMs = 0,
+	now = Date.now()
+} = {}) => {
+	if (!idleState) return false;
+	const eventType = event?.type;
+	const shouldSuppressClick = eventType === 'pointerdown' || eventType === 'mousedown';
+	idleState.suppressedEventType = shouldSuppressClick ? 'click' : '';
+	idleState.suppressUntil = shouldSuppressClick
+		? now + Math.max(0, Number(durationMs) || 0)
+		: 0;
+	return shouldSuppressClick;
 };
 
 export const addManagedScreensaverActivityListeners = ({

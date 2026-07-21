@@ -10,6 +10,7 @@ jest.mock('../../services/jellyfinService', () => ({
 
 import jellyfinService from '../../services/jellyfinService';
 import {
+	getEpisodeLocator,
 	getLandscapeCardImageUrl,
 	getLandscapeCardImageUrls,
 	getMediaPanelBackdropUrls,
@@ -35,6 +36,18 @@ describe('mediaItemUtils playback eligibility', () => {
 		expect(isPlayableMediaItem({Type: 'Series'})).toBe(false);
 		expect(isPlayableMediaItem({Type: 'Season'})).toBe(false);
 		expect(isPlayableMediaItem(null)).toBe(false);
+	});
+});
+
+describe('mediaItemUtils episode labels', () => {
+	it('formats only real season and episode values', () => {
+		expect(getEpisodeLocator({ParentIndexNumber: 2, IndexNumber: 7})).toBe('S2:E7');
+		expect(getEpisodeLocator({ParentIndexNumber: 0, IndexNumber: 1}, {separator: ''})).toBe('S0E1');
+	});
+
+	it('does not invent episode numbers when metadata is missing', () => {
+		expect(getEpisodeLocator({})).toBe('');
+		expect(getEpisodeLocator({ParentIndexNumber: 1})).toBe('');
 	});
 });
 

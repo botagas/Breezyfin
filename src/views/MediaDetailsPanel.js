@@ -33,6 +33,8 @@ import { useMediaDetailsOverviewState } from './media-details-panel/hooks/useMed
 import { useMediaDetailsPanelSync } from './media-details-panel/hooks/useMediaDetailsPanelSync';
 import { useMediaDetailsItemBootstrap } from './media-details-panel/hooks/useMediaDetailsItemBootstrap';
 import { useMediaDetailsStagedReveal } from './media-details-panel/hooks/useMediaDetailsStagedReveal';
+import {readIntegrationPreferences} from '../utils/integrationPreferences';
+import jellyfinService from '../services/jellyfinService';
 import MediaDetailsToast from './media-details-panel/components/MediaDetailsToast';
 import MediaTrackPickerPopup from './media-details-panel/components/MediaTrackPickerPopup';
 import MediaEpisodePickerPopup from './media-details-panel/components/MediaEpisodePickerPopup';
@@ -79,6 +81,7 @@ const MediaDetailsPanel = ({
 	const [episodeNavList, setEpisodeNavList] = useState([]);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
+	const [isWatchlisted, setIsWatchlisted] = useState(false);
 	const [navbarTheme, setNavbarTheme] = useState('elegant');
 	const [showSeasonImages, setShowSeasonImages] = useState(false);
 	const [useSidewaysEpisodeList, setUseSidewaysEpisodeList] = useState(true);
@@ -246,21 +249,25 @@ const MediaDetailsPanel = ({
 		setSelectedSeason,
 		setSelectedEpisode,
 		setIsFavorite,
-		setIsWatched
+		setIsWatched,
+		setIsWatchlisted
 	});
 
 	const {
 		handleToggleFavorite,
 		handleToggleFavoriteById,
-		handleToggleWatched
+		handleToggleWatched,
+		handleToggleWatchlist
 	} = useMediaDetailsItemActions({
 		item,
 		isFavorite,
 		isWatched,
+		isWatchlisted,
 		selectedSeason,
 		selectedEpisode,
 		setIsFavorite,
 		setIsWatched,
+		setIsWatchlisted,
 		setSeasons,
 		setEpisodes,
 		setSelectedSeason,
@@ -578,6 +585,8 @@ const MediaDetailsPanel = ({
 	const showEpisodeInfoButton = typeof onItemSelect === 'function';
 	const popupEpisodes = isSeriesMode ? episodes : episodeNavList;
 	const showPlaybackControls = isSeriesMode ? Boolean(selectedEpisode) : isPlayableMediaItem(item);
+	const showWatchlistAction = ['Movie', 'Series'].includes(item.Type) &&
+		readIntegrationPreferences(jellyfinService).watchlistEnabled;
 	const introDetails = {
 		item,
 		pageTitle,
@@ -591,6 +600,8 @@ const MediaDetailsPanel = ({
 		writerNames,
 		isFavorite,
 		isWatched,
+		isWatchlisted,
+		showWatchlistAction,
 		hasOverviewText,
 		overviewExpanded,
 		hasOverviewOverflow,
@@ -611,6 +622,7 @@ const MediaDetailsPanel = ({
 		onHeaderLogoLoad: handleHeaderLogoLoad,
 		renderCreditNames,
 		onToggleFavorite: handleToggleFavorite,
+		onToggleWatchlist: handleToggleWatchlist,
 		onToggleWatchedMain: handleToggleWatchedMain,
 		onOverviewActivate: handleOverviewActivate,
 		onOpenAudioPicker: openAudioPicker,

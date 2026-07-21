@@ -69,6 +69,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Suspend covered App/Player runtime work with shared reason ownership | `useRuntimeSuspended` / `setRuntimeSuspension` |
 | Build shared Jellyfin image URLs without panel/service coupling | `buildItemImageUrl` / `buildUserPrimaryImageUrl` |
 | Resolve ordered card and panel artwork fallbacks | `getPosterCardImageUrls` / `getLandscapeCardImageUrls` / `getMediaPanelBackdropUrls` |
+| Apply mode-aware width, quality, and server blur to authenticated plugin image URLs | `buildExternalImageVariantUrl` |
 | Build duplicate-safe media list React keys | `buildMediaListItemKey` |
 | Centralize LoginPanel rotating backdrop state, startup-restore deferral, and load/error handling | `useLoginBackdrops` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
@@ -248,6 +249,14 @@ usePanelToolbarActions({
 - Use when:
   - adding a new top-level panel with local layered back behavior.
   - changing App back-routing behavior.
+
+### `useIntegrationPanelCache`
+
+- File: `src/App/hooks/useIntegrationPanelCache.js`
+- Purpose: own Discovery, Calendar, SyncPlay, and WatchParty panel snapshots,
+  normalized cache actions, explicit section clears, session resets, and shared
+  `UserDataChanged` invalidation without regrowing `App.js`. Provider panels may cache
+  bounded result pages, cursors, warnings, and scroll state, but never provider secrets.
 
 ### `useAppScreensaver`
 - File: `src/App/hooks/useAppScreensaver.js`
@@ -715,6 +724,29 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - `setToastMessage`
   - `clearToast`
 
+### `usePluginMediaItemActivation`
+
+- File: `src/hooks/usePluginMediaItemActivation.js`
+- Purpose: share linked Jellyfin-item navigation and external provider-details
+  activation between Discovery and Calendar without weakening the service facade.
+  Pass panel `isActive`; the hook invalidates pending lookups on deactivation/unmount
+  and lets only the latest activation navigate.
+
+### `useProviderPanelShell`
+
+- File: `src/hooks/useProviderPanelShell.js`
+- Purpose: share provider-panel external-details state, generation guard, scroll
+  restoration, merge-safe cache writes, toolbar actions, and Popup-first Back handling.
+  Keep the Popup mounted until `onHide` clears its item so Sandstone can release
+  Spotlight ownership normally.
+- `reportProviderFailure(scope, failure)` records only bounded structured provider
+  fields (`provider`, `operation`, `reason`, `upstreamStatus`, and `failedPage`) and
+  is dormant unless the runtime Diagnostics master setting is enabled. Do not log
+  raw provider responses or authenticated upstream URLs from panel code.
+- `reportProviderDiagnostic(scope, diagnostic)` records bounded successful-empty and
+  filtering summaries only while Diagnostics is enabled. Use it to distinguish an
+  empty provider result from transport failure without logging payloads or URLs.
+
 ### `useTrackPreferences`
 - File: `src/hooks/useTrackPreferences.js`
 - Purpose: pick/apply/save audio/subtitle track preferences consistently.
@@ -754,6 +786,10 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer. `getHorizontalScrollAdjustment()` is the pure offset-based decision helper; Home rows cache row-level viewport metrics, invalidate them on resize/layout changes, and coalesce immediate focus corrections through one animation frame rather than measuring rectangles or queuing smooth scrolls for every focus event.
 
 ### Player and media detail helpers
+
+- `src/utils/syncTiming.js`
+  - median bounded server-clock offset sampling and shared 250 ms/two-second drift
+    correction policy for native SyncPlay and JellyWatchParty.
 - `src/utils/imageUrls.js`
   - shared image URL builders for item/user image URLs with preferred image format handling.
 - `src/utils/reactKeys.js`
@@ -852,8 +888,15 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - lightweight player toast shell.
 - `src/views/player-panel/components/PlayerControlsOverlay.js`
   - top/bottom player controls shell (back, progress, transport, tracks, volume).
+- `src/views/player-panel/components/PlayerSyncPlayPopup.js`
+  - native SyncPlay participants, connection, and group status surface.
+- `src/views/player-panel/components/PlayerWatchPartyPopup.js`
+  - authenticated room participants, ready state, and bounded chat surface.
 
 ### Player panel local hooks
+- `src/views/player-panel/hooks/usePlayerGroupSessions.js`
+  - composes native SyncPlay and JellyWatchParty hooks, their mutual player-command
+    precedence, layered popup Back handling, controls state, and popup props.
 - `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
   - centralizes player keyboard/media key handling with seek/context guards.
 - `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
@@ -892,6 +935,12 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - centralizes playback recovery/session rebuild + fallback/transcode/HLS fatal recovery logic.
 - `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
   - centralizes player lifecycle effects (item bootstrap, control hide timers, stall watchdog, focus/cleanup timers).
+- `src/views/player-panel/hooks/useNativeSyncPlay.js`
+  - maps native group updates/commands to the player, reports ready/buffering state,
+    and applies the shared 250 ms correction and two-second hard-seek thresholds.
+- `src/views/player-panel/hooks/useJellyWatchParty.js`
+  - maps isolated room events to host/guest player control, readiness, reconnect,
+    clock-offset, drift-correction, and chat behavior.
 
 ### Media details panel local hooks
 - `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`

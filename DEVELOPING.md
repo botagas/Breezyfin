@@ -82,11 +82,18 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Map lookups by id/key: `src/hooks/useMapById.js`
 - Item metadata fetch/state: `src/hooks/useItemMetadata.js`
 - Toast lifecycle: `src/hooks/useToastMessage.js`
+- Linked/external plugin item activation: `src/hooks/usePluginMediaItemActivation.js`
+- Provider panel popup/request/scroll/toolbar shell: `src/hooks/useProviderPanelShell.js`
+- Provider failures: pass structured request/problem results to
+  `useProviderPanelShell().reportProviderFailure`; it is diagnostics-gated and strips
+  arbitrary provider payload fields before logging. User-facing empty/error states
+  must remain functional while Diagnostics is disabled.
 - Shared toast UI primitive (Player/Media Details/Settings): `src/components/BreezyToast.js`
 - Track preference persistence: `src/hooks/useTrackPreferences.js`
 - Image fallback handling: `src/hooks/useImageErrorFallback.js`
 - App panel history snapshots: `src/App/hooks/usePanelHistory.js`
 - App panel back handler registry: `src/App/hooks/usePanelBackHandlerRegistry.js`
+- App capability-panel cache/invalidation: `src/App/hooks/useIntegrationPanelCache.js`
 - App authenticated inactivity/screensaver lifecycle: `src/App/hooks/useAppScreensaver.js` with pure timing/bounce/Spotlight ownership helpers in `src/utils/screensaver.js`
 - Paused-player inactivity/wake lifecycle: `src/views/player-panel/hooks/usePlayerPausedScreensaver.js`; keep it separate because ENTER resumes playback while other wake inputs preserve pause.
 - Login rotating backdrop orchestration: `src/views/login-panel/hooks/useLoginBackdrops.js`
@@ -112,6 +119,7 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Player episode/surface interaction handlers: `src/views/player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers.js`
 - Player recovery/fallback handlers: `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
 - Player lifecycle effects: `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
+- Player native SyncPlay/WatchParty composition: `src/views/player-panel/hooks/usePlayerGroupSessions.js`
 - Smart/manual subtitle burn-in policy: `src/utils/playbackSelection.js` (`getSubtitleTranscodePolicy`)
 - Player client-side subtitle renderer/cue cache: `src/views/player-panel/hooks/usePlayerSubtitleRenderer.js`
 - ASS/SSA renderer lifecycle: `src/views/player-panel/utils/subtitle-renderers/`; Breezyfin lightweight parsing is centered in `src/views/player-panel/utils/subtitleRendererAss.js` with focused helpers for alignment, colors, font size, origin/position, karaoke, clipping, common vector drawing paths, and `\t(...)` transform interpolation, including B-spline `s`/`p` conversion to SVG cubic paths and `\pbo` drawing baseline offsets. The lightweight overlay must map ASS coordinates and source dimensions onto the visible `object-fit: contain` video stage rather than the full TV viewport. `PlayResX/Y` remains the authored coordinate plane; valid `LayoutResX/Y` contributes source-layout/pixel-aspect scaling and must not replace PlayRes positioning. Preserve explicit authored positions, moves, origins, rotations, drawings, and clips, including intentional off-screen clipping. Unpositioned dialogue and page-style cues may use the bounded two-pass measured fit, and the stage itself clips all output to the visible video surface. Breezyfin lightweight remains Auto, while libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in are explicit experimental/manual renderer options available in every release channel for troubleshooting. The manual-canvas libass and JASSUB modes are diagnostic paths for separating video-attached timing issues from native-video canvas compositor issues. JASSUB's packaged default font, sourcemap source, version-guarded webOS Canvas2D worker patch, and version-guarded static-asset entry patch are prepared by `scripts/prepare-subtitle-package-assets.cjs` and `scripts/subtitle-assets/jassubCanvas2dPatch.cjs`; the Canvas2D patch is required because JASSUB's WebGL path is unreliable on webOS, and the static-asset entry patch prevents Webpack from bundling JASSUB worker/WASM fallback chunks. libass workers, Breezyfin's fallback subtitle font, JASSUB static worker/WASM/font assets, libbitsub/libpgs bitmap subtitle assets, and external renderer chunks are copied into `dist/` by `scripts/copy-subtitle-assets.cjs` after `npm run pack` / `npm run pack-p`. Stable and develop builds preserve external renderer chunks, transpile ASS.js/JASSUB/libbitsub/libpgs renderer chunks for webOS packaging, validate copied JASSUB static assets, and fail if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` runtime chunks reappear.
@@ -124,6 +132,13 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Runtime suspension: App and paused-Player screensavers publish suspension reasons through `src/hooks/useRuntimeSuspension.js`. Covered animation, clock, optional diagnostic, progress, stall, and manual subtitle-sync work must subscribe to that shared signal rather than adding screen-specific global flags.
 - Inactivity handling: App and paused-Player screensavers share deadline scheduling through `src/hooks/useInactivityDeadline.js`; activity extends one deadline instead of rebuilding a timer per input event. Prefer pointer events, use mouse fallback only when Pointer Events are unavailable, and keep idle listeners passive.
 - Jellyfin subtitle fetch contract: `src/services/jellyfin/subtitleApi.js` returns structured event and raw text results for client-side rendering.
+- Plugin integration preferences: `src/utils/integrationPreferences.js` persists only
+  server/user-scoped Home source and Likes-watchlist choices. Capabilities remain
+  session memory and provider secrets/URLs never enter client storage.
+- Realtime integration rule: one authenticated Jellyfin socket is owned by
+  `src/services/jellyfin/websocketApi.js`; native SyncPlay and JellyWatchParty keep
+  separate protocol state while sharing player timing/drift policy from
+  `src/utils/syncTiming.js`.
 - Sandstone Popup lifecycle: keep the Popup and its owning controls mounted through close, commit reload-causing state from `onHide`, and let Sandstone restore Spotlight before replacing result content.
 - Shared Sandstone virtual grids: Search, Favorites, Home View More, and Library use `src/components/MediaVirtualGrid.js`. Do not add panel-specific DOM row calculations, manual pointer/5-way Spotlight disabling, app-owned coordinate navigation, or load-more sentinels. Panels own query/results paging and cache loaded pages plus focused item ID; Enact owns rendered-item virtualization and directional grid navigation. Keep the same grid mounted and Spotlight-disabled with empty items during query/filter reloads so pending Sandstone scroll updates cannot target an unmounted scroller. Keep overhang mode-aware and treat mounted virtual items as the image-loading window rather than layering native lazy loading on top.
 - Shared media-card images: use `src/components/MediaCardImage.js` with ordered candidates from `src/utils/mediaItemUtils.js`. Keep card reveal opacity-only and advance through tagged/item/parent/untagged candidates before showing a placeholder.
@@ -244,9 +259,25 @@ Jellyfin service paths:
 - `src/services/jellyfin/subtitleApi.js` (subtitle event/raw text fetch helpers for client-side rendering)
 - `src/services/jellyfin/requestsApi.js` (session-cached plugin capability discovery,
   plugin-first My Requests paging, strict plugin error handling, and bounded tag fallback)
+- `src/services/jellyfin/pluginFeaturesApi.js` (shared capability-gated paging and
+  authenticated plugin image URL construction)
+- `src/services/jellyfin/requestErrors.js` (bounded Problem Details parsing and safe
+  Jellyfin request errors; raw provider bodies must not be embedded in errors/logs)
+- `src/services/jellyfin/homeSectionsApi.js` (opaque Home descriptors/items)
+- `src/services/jellyfin/discoveryApi.js` and `calendarApi.js` (read-only provider views)
+- `src/services/jellyfin/watchlistApi.js` (native Likes read/mutation and scoped cache)
+- `src/services/jellyfin/websocketApi.js` (single authenticated socket lifecycle and typed dispatch)
+- `src/services/jellyfin/syncPlayApi.js` (native Jellyfin SyncPlay state and commands)
+- `src/services/jellyfin/watchPartyApi.js` (isolated authenticated room protocol and in-memory JWT)
 
 Service rule:
 - Keep `jellyfinService` as a thin orchestrator; move domain-specific behavior to `src/services/jellyfin/*` modules.
+- Reset capabilities, provider state, sockets, and scoped caches on login, logout,
+  server/user switch, and access-token replacement. Never log access tokens, complete
+  socket URLs, room passwords, or chat content.
+- Cache successful plugin capabilities for the authenticated session, but cache
+  transient capability failures only briefly so a plugin that finishes starting after
+  the client can recover without logout/restart.
 
 ## Styling and theme references
 

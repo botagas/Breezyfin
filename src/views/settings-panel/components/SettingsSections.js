@@ -28,6 +28,9 @@ const SettingsSections = ({
 	handleSwitchServerClick,
 	handleForgetServerClick,
 	settings,
+	integrationPreferences,
+	handleToggleServerHome,
+	handleToggleWatchlist,
 	homeRowToggleHandlers,
 	moveHomeRowUp,
 	moveHomeRowDown,
@@ -235,6 +238,20 @@ const SettingsSections = ({
 			{shouldRenderSection('homeRows') ? (
 				<section className={css.section}>
 					<BodyText className={css.sectionTitle}>Home Rows</BodyText>
+					<SwitchItem
+						className={css.switchItem}
+						selected={integrationPreferences?.homeSource === 'server'}
+						onToggle={handleToggleServerHome}
+					>
+						Use server-configured Home rows
+					</SwitchItem>
+					<SwitchItem
+						className={css.switchItem}
+						selected={integrationPreferences?.watchlistEnabled === true}
+						onToggle={handleToggleWatchlist}
+					>
+						Likes watchlist
+					</SwitchItem>
 					<SwitchItem
 						className={css.switchItem}
 						selected={settings.homeRows?.recentlyAdded !== false}
