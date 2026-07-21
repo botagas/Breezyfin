@@ -144,9 +144,9 @@ and packaged assets remain under their respective licenses, listed in
 
 <a href="https://www.star-history.com/?repos=botagas%2FBreezyfin&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=botagas/Breezyfin&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=botagas/Breezyfin&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=botagas/Breezyfin&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=botagas/Breezyfin&type=date&theme=dark&legend=top-left&sealed_token=xcU9n3SiewHcJ2Dmz1ieEhUtSRGj1hAR6dVKNA__s0yOF_DgnKZ5OkE2CPyIDNjuWE-DvW2JnbzYwrxZ93XFEJOQDARQxEW4afczii5uokEZ1e7EgzqVJths_RSe9HX7RRu0yMbgTnszST-9q92scy2XeHmtkhwRV65Sm2H57eMA7NJlO7mhjel5KBmb" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=botagas/Breezyfin&type=date&legend=top-left&sealed_token=xcU9n3SiewHcJ2Dmz1ieEhUtSRGj1hAR6dVKNA__s0yOF_DgnKZ5OkE2CPyIDNjuWE-DvW2JnbzYwrxZ93XFEJOQDARQxEW4afczii5uokEZ1e7EgzqVJths_RSe9HX7RRu0yMbgTnszST-9q92scy2XeHmtkhwRV65Sm2H57eMA7NJlO7mhjel5KBmb" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=botagas/Breezyfin&type=date&legend=top-left&sealed_token=xcU9n3SiewHcJ2Dmz1ieEhUtSRGj1hAR6dVKNA__s0yOF_DgnKZ5OkE2CPyIDNjuWE-DvW2JnbzYwrxZ93XFEJOQDARQxEW4afczii5uokEZ1e7EgzqVJths_RSe9HX7RRu0yMbgTnszST-9q92scy2XeHmtkhwRV65Sm2H57eMA7NJlO7mhjel5KBmb" />
  </picture>
 </a>
 
