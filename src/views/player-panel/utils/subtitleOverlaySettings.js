@@ -117,6 +117,7 @@ export const getSubtitleAbsolutePositionStyle = (cue = {}, stageGeometry = {}) =
 };
 
 const getCueMarginStyle = (cue = {}, stageGeometry = {}) => {
+	if (cue.absolutePosition || cue.move) return {};
 	const sourceMargins = cue.sourceMargins || {};
 	const leftPx = getAssStageLengthPx(sourceMargins.left, 'x', cue, stageGeometry);
 	const rightPx = getAssStageLengthPx(sourceMargins.right, 'x', cue, stageGeometry);
@@ -249,9 +250,40 @@ export const getSubtitleCueTextStyle = (baseTextStyle = {}, cue = {}, stageGeome
 	};
 };
 
-export const getSubtitleCueRunStyle = (run = {}, stageGeometry = {}, cue = {}) => (
-	run?.style ? convertStageRelativeStyle(run.style, stageGeometry, cue) : {}
-);
+export const getSubtitleCueRunStyle = (run = {}, stageGeometry = {}, cue = {}) => {
+	if (!run?.style) return {};
+	return convertStageRelativeStyle(run.style, stageGeometry, cue);
+};
+
+const hasPositiveRunLength = (style = {}, property) => {
+	const value = Number.parseFloat(style[property]);
+	return Number.isFinite(value) && Math.abs(value) > 0.0001;
+};
+
+export const getSubtitleCueRunEffects = (run = {}) => {
+	const style = run?.style || {};
+	const borderStyle = Number(style['--bf-player-subtitle-source-border-style']);
+	const usesOutlineBorder = !Number.isFinite(borderStyle) || borderStyle === 1;
+	const authored = [
+		'--bf-player-subtitle-source-border-style',
+		'--bf-player-subtitle-current-outline-size',
+		'--bf-player-subtitle-current-shadow-distance',
+		'--bf-player-subtitle-current-shadow-x',
+		'--bf-player-subtitle-current-shadow-y'
+	].some((property) => Object.prototype.hasOwnProperty.call(style, property));
+	return {
+		authored,
+		outline: usesOutlineBorder && hasPositiveRunLength(
+			style,
+			'--bf-player-subtitle-current-outline-size'
+		),
+		shadow: usesOutlineBorder && [
+			'--bf-player-subtitle-current-shadow-distance',
+			'--bf-player-subtitle-current-shadow-x',
+			'--bf-player-subtitle-current-shadow-y'
+		].some((property) => hasPositiveRunLength(style, property))
+	};
+};
 
 export const isDrawingSubtitleCue = (cue) => (
 	Array.isArray(cue?.drawing?.paths) &&

@@ -38,13 +38,17 @@ Run these before packaging a release candidate:
 
 1. Verify capabilities are fetched once per authenticated server/user/token session
    and invalidated on login, logout, user/server switch, and token replacement.
-2. Select Server Home and verify descriptors load first, initial displayable rows load
-   through bounded batches, each requested row shows its loading surface and appears as
-   soon as it settles, later rows load lazily, View More pages deterministically,
-   valid empty rows remain empty, and server descriptors remain authoritative without
-   client-prepended My Requests or Watchlist duplicates. Verify plugin/HSS `404`, `5xx`,
-   timeout, malformed, or disabled states restore
-   built-in Home without affecting Hero, My Requests, or Watchlist.
+2. Select Server Home and verify descriptors load first, named pending/loading rows appear
+   before item data, no more than two row requests run concurrently, each row appears as
+   soon as it settles, later rows load near the viewport, distant artwork is deferred,
+   View More pages deterministically, valid empty rows stop loading, and server descriptors
+   remain authoritative without client-prepended My Requests or Watchlist duplicates.
+   Only HSS sections enabled for the authenticated user may receive item requests; rows
+   that resolve empty must disappear without preventing later enabled descriptors from
+   loading.
+   Individual row `404`, `5xx`, timeout, or malformed responses must stay local and expose
+   Retry without reloading Home. Descriptor/capability failure may restore built-in Home
+   without affecting Hero, My Requests, or Watchlist.
 3. Enable Likes watchlist and verify unset -> liked -> unset and disliked -> liked ->
    unset transitions for Movie/Series. Confirm mutation and `UserDataChanged` refresh
    Home, View More, Library, and item state without crossing server/user scopes.
@@ -102,7 +106,7 @@ Run these before packaging a release candidate:
 1. Validate direct play/direct stream/transcode paths on representative media.
 2. Validate Smart Subtitle Handling is enabled by default and the extended player debug overlay reports subtitle policy `mode`, `burn`, `renderer`, `codec`, and `reason`.
 3. Validate client-rendered SRT/SubRip/WebVTT subtitles show through the PlayerPanel subtitle overlay without subtitle-driven transcoding.
-4. Validate embedded text subtitles first try Jellyfin `Stream.js` events, then raw/converted endpoints such as `Stream.vtt`, `Stream.srt`, `Stream.ass`, or `Stream.ssa`, and that the debug overlay reports `raw`, `tried`, `rawPath`, fallback reason, and `error` when applicable.
+4. Validate embedded SRT/VTT first tries Jellyfin `Stream.js` events and then raw/converted endpoints. Breezyfin Lightweight ASS/SSA must instead prefer `Stream.ass` / `Stream.ssa` so PlayRes and style metadata are retained, then use `Stream.js` only as a degraded fallback. Confirm the debug overlay reports source priority, `raw`, `tried`, `rawPath`, fallback reason, and `error` when applicable.
 5. Validate Breezyfin Lightweight ASS renders common `\p` vector drawing payloads as subtitle SVG paths, converts B-spline `s`/`p` commands into cubic SVG segments, applies `\pbo` drawing baseline offsets, applies common vector `\clip(...)` / `\iclip(...)` masks to drawing cues, does not leak path text into subtitles, and still preserves visible text after drawing mode ends.
 6. Validate Breezyfin Lightweight ASS honors source-authored placement/alignment, including ASS `\an` alignment, legacy SSA `\a` alignment, absolute `\pos(x,y)` anchors for top/middle/bottom alignments, and `\org(x,y)` origins for absolute transformed cues.
 7. Validate Breezyfin Lightweight ASS applies rectangular `\clip(x1,y1,x2,y2)` and `\iclip(x1,y1,x2,y2)` bounds without rendering the clipped cue a second time through normal region grouping.
@@ -120,13 +124,13 @@ Run these before packaging a release candidate:
 19. With `Force DV (Debug)` enabled, verify playback fails fast when no compatible DV path exists and succeeds only on direct path or audio-only transcode compatible DV sources.
 20. Validate the extended player debug overlay `Decision` row reports selected source, play method, dynamic range, container, requested/selected audio and subtitle indices, dynamic-range cap, fMP4 state, Force DV, Avoid DV, and subtitle burn-in flags.
 21. Validate HLS engine diagnostics report native HLS selection for HDR/DV paths, HLS.js selection where applicable, and native-HLS fallback attempts/errors on non-HDR paths without noisy toasts.
-22. When Skip Intro / Skip Credits / Play Next overlay appears, verify 5-way LEFT/RIGHT can move focus between the primary action and X dismiss button, ENTER activates the focused button, and BACK dismisses through the normal player back flow.
+22. When Skip Intro / Skip Credits / Play Next overlay appears, verify 5-way LEFT/RIGHT can move focus between the primary action and X dismiss button, ENTER activates the focused button, and BACK dismisses through the normal player back flow. After activation, dismissal, or automatic expiry, verify visible Player controls regain a valid Spotlight focus target and directional navigation works immediately.
 23. Validate SRT/VTT subtitles preserve safe inline formatting (`<i>`, `<b>`, `<u>`, safe color-only `<font>`/`<span>`) and decode escaped safe tags such as `&lt;i&gt;` without rendering unsafe HTML/script content.
 24. Validate selected PGSSUB/image subtitle continuity across Next Episode / Previous Episode / autoplay. The next item should remap the previous episode subtitle intent to the new episode’s real stream index instead of reusing the old raw index.
 25. Validate forced/confirmed subtitle burn-in PlaybackInfo requests include `SubtitleStreamIndex`, `AlwaysBurnInSubtitleWhenTranscoding=true`, encode-only subtitle profiles, and debug diagnostics confirming the returned transcode URL preserves `SubtitleMethod=Encode`.
 26. Validate encoded image-subtitle fragment 4xx/5xx failures stop restart loops and show a no-subtitle fallback consent prompt with a warning toast instead of silently continuing without subtitles.
 27. Validate HLS.js runtime diagnostics classify fragment-load, buffer-pressure, append-buffer, gap, and stall failures separately from subtitle-renderer fallback failures.
-28. On real TVs, validate Breezyfin-rendered ASS subtitles with synthetic and representative non-committed samples. Confirm a centered, uniformly scaled `PlayRes` plane and correct `LayoutRes` aspect handling for 16:9, ultrawide/letterboxed, and 4:3/pillarboxed media; cover ordinary dialogue/page-sign containment, top/bottom/absolute `\pos` and `\move` cues, rectangular/inverse/vector clips, overlapping layers, and preservation of intentionally off-screen authored positions/clips.
+28. On real TVs, validate Breezyfin-rendered ASS subtitles with synthetic and representative non-committed samples. Confirm raw ASS/SSA preserves the authored PlayRes/style table, a centered uniformly scaled coordinate plane, and correct `LayoutRes` aspect handling for 16:9, ultrawide/letterboxed, and 4:3/pillarboxed media. Cover ordinary dialogue containment, exact multiline `\pos` placement/size, `@font` vertical writing, `\move` cues, rectangular/inverse/vector clips, overlapping layers, per-run outline colors, and preservation of intentionally off-screen authored positions/clips.
 29. Validate nonfatal `bufferSeekOverHole`/nudge events remain diagnostic-only recovered events, do not trigger media recovery, and never log unredacted API tokens.
 30. Validate bitmap burn-in fragility consent appears before source assignment/HLS attachment and starts playback only after confirmation.
 31. During Next/Previous Episode transitions, verify successful playback does not show the stale `Playback failed to start` toast when the previous media element's play promise is interrupted during source replacement.
@@ -158,6 +162,7 @@ Run these before packaging a release candidate:
 8. Search for Episodes and verify their cards show the parent Series title and `SxxExx`; opening an Episode must expose its Series/Season/Episode breadcrumbs. Search must not return unfiltered Season containers, and stale Season results must open their parent Series instead of requesting playback for the Season item.
 9. In Elegant, verify the compact pill header preserves centered tab focus, panel back/title visibility, Libraries/User popup placement, and right-side action navigation across Home, Library, Home View More, Search, Favorites, and Settings. Verify Classic retains its existing toolbar layout.
 10. With native SyncPlay available, verify it does not appear as a navbar tab. Elegant should retain the central Search tab and replace the duplicate right-side Search icon with a Cast action; Classic should retain Search and expose Cast with the right-side utilities. Activating Cast must open SyncPlay and show its selected state while that panel is active.
+11. Switch repeatedly between Home and another panel within two minutes and verify Home retains its loaded rows, Hero, and scroll position without showing the initial loading surface or repeating section requests. User-data changes, integration preference changes, and stale data must still trigger refresh.
 
 ### Media Details validation
 

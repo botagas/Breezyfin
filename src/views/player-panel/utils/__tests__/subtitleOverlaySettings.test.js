@@ -1,6 +1,8 @@
 import {
 	getSubtitleAbsolutePositionStyle,
 	getSubtitleClipLayerStyle,
+	getSubtitleCueRunEffects,
+	getSubtitleCueRunStyle,
 	getSubtitleCueTextStyle,
 	getSubtitleCueTransformLayerStyle,
 	getSubtitleDrawingSvgStyle,
@@ -187,6 +189,50 @@ describe('subtitleOverlaySettings utilities', () => {
 			maxWidth: 'calc(100% - 18.750%)',
 			whiteSpace: 'pre-wrap',
 			overflowWrap: 'anywhere'
+		});
+	});
+
+	it('does not apply style margins to explicitly positioned ASS cues', () => {
+		const style = getSubtitleCueTextStyle({}, {
+			absolutePosition: {x: 279, y: 119, xPercent: 43.59375, yPercent: 33.05556},
+			placement: 'bottom',
+			sourceMargins: {
+				left: 10,
+				right: 10,
+				vertical: 10
+			}
+		}, {
+			height: 1080,
+			width: 1920
+		});
+
+		expect(style).not.toHaveProperty('marginLeft');
+		expect(style).not.toHaveProperty('marginRight');
+		expect(style).not.toHaveProperty('marginBottom');
+	});
+
+	it('preserves inline ASS effect variables and classifies the authored outline', () => {
+		const run = {
+			style: {
+				color: 'rgb(5, 1, 33)',
+				'--bf-player-subtitle-current-border-color': 'rgb(242, 234, 225)',
+				'--bf-player-subtitle-current-outline-size': '0.556vh',
+				'--bf-player-subtitle-current-shadow-distance': '0.000vh',
+				'--bf-player-subtitle-source-border-style': 1
+			}
+		};
+
+		expect(getSubtitleCueRunStyle(run)).toEqual({
+			color: 'rgb(5, 1, 33)',
+			'--bf-player-subtitle-current-border-color': 'rgb(242, 234, 225)',
+			'--bf-player-subtitle-current-outline-size': '6.005px',
+			'--bf-player-subtitle-current-shadow-distance': '0.000px',
+			'--bf-player-subtitle-source-border-style': 1
+		});
+		expect(getSubtitleCueRunEffects(run)).toEqual({
+			authored: true,
+			outline: true,
+			shadow: false
 		});
 	});
 

@@ -821,6 +821,7 @@ const PlayerPanel = ({
 		skipOverlayVisible,
 		wasSkipOverlayVisibleRef,
 		focusSkipOverlayAction,
+		focusPlayerWakeAction,
 		playPauseButtonRef,
 		loadRequestIdRef,
 		playbackStartedRef

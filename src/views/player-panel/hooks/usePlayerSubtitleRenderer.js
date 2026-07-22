@@ -6,7 +6,6 @@ import {getSubtitleTranscodePolicy} from '../../../utils/playbackSelection';
 import {toInteger} from '../../../utils/numberParsing';
 import {
 	findActiveSubtitleCues,
-	normalizeSubtitleEvents,
 	normalizeSubtitleText
 } from '../utils/subtitleRenderer';
 import {normalizeSubtitleRendererFailureReason} from '../utils/subtitleRendererStatus';
@@ -33,7 +32,11 @@ import {
 	buildBitmapDeliveryFetchDebug,
 	getBitmapRendererSequence
 } from '../utils/bitmapSubtitleDeliveryDebug';
-import {getRawSubtitleFormats} from '../utils/subtitleRawFormats';
+import {
+	getRawSubtitleFormats,
+	shouldPreferRawSubtitleDocument
+} from '../utils/subtitleRawFormats';
+import {loadClientSubtitleEvents} from '../utils/subtitleTextLoader';
 
 const SUBTITLE_EVENT_CACHE_LIMIT = 8;
 const EXTERNAL_RENDERER_DIAGNOSTIC_REFRESH_MS = 1500;
@@ -757,6 +760,10 @@ export const usePlayerSubtitleRenderer = ({
 		}
 
 		let cancelled = false;
+		const preferRawDocument = shouldPreferRawSubtitleDocument({
+			codec: subtitlePolicy?.codec,
+			renderer: domRendererName
+		});
 		setEvents([]);
 		setState({
 			renderer: domRendererName,
@@ -772,62 +779,28 @@ export const usePlayerSubtitleRenderer = ({
 			}
 		});
 
-		const fetchStartedAt = Date.now();
 		(async () => {
-			const result = await jellyfinService.getSubtitleEvents(item.Id, mediaSourceData.Id, currentSubtitleTrack);
-			if (cancelled || requestId !== requestIdRef.current) return;
-			const eventFetchMs = Date.now() - fetchStartedAt;
-			const eventDebug = {
+			const loaded = await loadClientSubtitleEvents({
 				cacheKey: subtitleKey,
-				cacheHit: false,
-				path: result?.path || '',
-				rawShape: result?.rawShape || 'unknown',
-				fetchMs: eventFetchMs
-			};
-			let normalizedEvents = [];
-			let fallbackReason = '';
-			if (result?.ok === true) {
-				normalizedEvents = normalizeSubtitleEvents(result.events);
-				if (normalizedEvents.length === 0) {
-					fallbackReason = 'empty-events';
-				}
-			} else {
-				fallbackReason = normalizeSubtitleRendererFailureReason(result?.error);
-			}
-
-			let debug = eventDebug;
-			if (normalizedEvents.length === 0) {
-				const rawFormats = getRawSubtitleFormats(subtitlePolicy?.codec);
-				for (const rawFormat of rawFormats) {
-					const rawResult = await jellyfinService.getSubtitleText(
-						item.Id,
-						mediaSourceData.Id,
-						currentSubtitleTrack,
-						rawFormat
-					);
-					if (cancelled || requestId !== requestIdRef.current) return;
-					debug = {
-						...eventDebug,
-						rawPath: rawResult?.path || '',
-						rawUrl: rawResult?.url || '',
-						rawShape: rawResult?.rawShape || 'text',
-						rawFormat,
-						rawTried: rawFormats.join(','),
-						rawContentType: rawResult?.contentType || '',
-						fetchMs: Date.now() - fetchStartedAt
-					};
-					if (rawResult?.ok === true) {
-						normalizedEvents = normalizeSubtitleText(rawResult.text, rawFormat);
-						if (normalizedEvents.length > 0) {
-							fallbackReason = '';
-							break;
-						}
-						fallbackReason = 'empty-raw-subtitle-text';
-					} else {
-						fallbackReason = normalizeSubtitleRendererFailureReason(rawResult?.error, 'raw-fetch-failed');
-					}
-				}
-			}
+				codec: subtitlePolicy?.codec,
+				fetchEvents: () => jellyfinService.getSubtitleEvents(
+					item.Id,
+					mediaSourceData.Id,
+					currentSubtitleTrack
+				),
+				fetchText: (rawFormat) => jellyfinService.getSubtitleText(
+					item.Id,
+					mediaSourceData.Id,
+					currentSubtitleTrack,
+					rawFormat
+				),
+				isCancelled: () => cancelled || requestId !== requestIdRef.current,
+				preferRawDocument
+			});
+			if (loaded.cancelled) return;
+			const normalizedEvents = loaded.events;
+			const fallbackReason = loaded.fallbackReason;
+			const debug = loaded.debug;
 
 			if (normalizedEvents.length === 0) {
 				const fallbackStatus = fallbackToBurnIn(fallbackReason || 'empty-events');
@@ -844,10 +817,12 @@ export const usePlayerSubtitleRenderer = ({
 				});
 				return;
 			}
-			writeSubtitleEventCache(subtitleKey, {
-				events: normalizedEvents,
-				debug
-			});
+			if (!preferRawDocument || debug.source === 'raw-document') {
+				writeSubtitleEventCache(subtitleKey, {
+					events: normalizedEvents,
+					debug
+				});
+			}
 			setEvents(normalizedEvents);
 			setState({
 				renderer: domRendererName,
@@ -872,11 +847,10 @@ export const usePlayerSubtitleRenderer = ({
 					eventCount: 0,
 					cueCount: 0,
 					activeCueCount: 0,
-					debug: {
-						cacheKey: subtitleKey,
-						cacheHit: false,
-						fetchMs: Date.now() - fetchStartedAt
-					}
+				debug: {
+					cacheKey: subtitleKey,
+					cacheHit: false
+				}
 				});
 			});
 

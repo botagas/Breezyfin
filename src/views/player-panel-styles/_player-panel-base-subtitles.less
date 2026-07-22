@@ -50,25 +50,13 @@
 	opacity: 0 !important;
 }
 
-.subtitleOverlay {
-	position: absolute;
-	inset: 0;
-	z-index: var(--bf-theme-player-subtitle-z-index);
-	pointer-events: none;
-	overflow: hidden;
-	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-white);
-	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-black);
-	--bf-player-subtitle-current-font-size: var(--bf-theme-player-subtitle-font-size);
-	--bf-player-subtitle-current-font-weight: var(--bf-theme-player-subtitle-font-weight);
-	--bf-player-subtitle-current-outline-size: 2px;
-	--bf-player-subtitle-current-shadow-distance: 2px;
-	--bf-player-subtitle-current-shadow-blur: 8px;
+.bfSubtitleTextEffectVariables() {
 	--bf-player-subtitle-current-shadow-x: 0;
 	--bf-player-subtitle-current-shadow-y: var(--bf-player-subtitle-current-shadow-distance);
 	--bf-player-subtitle-current-shadow: var(--bf-player-subtitle-current-shadow-x)
 		var(--bf-player-subtitle-current-shadow-y)
 		var(--bf-player-subtitle-current-shadow-blur)
-		var(--bf-player-subtitle-current-border-color);
+		var(--bf-player-subtitle-current-shadow-color);
 	--bf-player-subtitle-current-outline: calc(0px - var(--bf-player-subtitle-current-outline-size))
 		calc(0px - var(--bf-player-subtitle-current-outline-size))
 		0 var(--bf-player-subtitle-current-border-color),
@@ -89,6 +77,23 @@
 		var(--bf-player-subtitle-current-outline-size)
 		var(--bf-player-subtitle-current-outline-size)
 		0 var(--bf-player-subtitle-current-border-color);
+}
+
+.subtitleOverlay {
+	position: absolute;
+	inset: 0;
+	z-index: var(--bf-theme-player-subtitle-z-index);
+	pointer-events: none;
+	overflow: hidden;
+	--bf-player-subtitle-current-text-color: var(--bf-theme-player-subtitle-color-white);
+	--bf-player-subtitle-current-border-color: var(--bf-theme-player-subtitle-border-color-black);
+	--bf-player-subtitle-current-shadow-color: var(--bf-player-subtitle-current-border-color);
+	--bf-player-subtitle-current-font-size: var(--bf-theme-player-subtitle-font-size);
+	--bf-player-subtitle-current-font-weight: var(--bf-theme-player-subtitle-font-weight);
+	--bf-player-subtitle-current-outline-size: 2px;
+	--bf-player-subtitle-current-shadow-distance: 2px;
+	--bf-player-subtitle-current-shadow-blur: 8px;
+	.bfSubtitleTextEffectVariables();
 	--bf-player-subtitle-current-box-border-width: var(--bf-theme-player-subtitle-box-border-width);
 }
 

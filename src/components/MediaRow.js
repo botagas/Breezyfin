@@ -1,7 +1,6 @@
 import {memo, useRef, useCallback, useEffect} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
-import Spinner from '@enact/sandstone/Spinner';
 import Icon from '@enact/sandstone/Icon';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
@@ -10,6 +9,7 @@ import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {getEpisodeLocator} from '../utils/mediaItemUtils';
 import {buildMediaListItemKey} from '../utils/reactKeys';
 import MediaCardImage from './MediaCardImage';
+import BreezyLoadingOverlay from './BreezyLoadingOverlay';
 
 import css from './MediaRow.module.less';
 
@@ -146,6 +146,9 @@ const MediaRow = ({
 	title,
 	items,
 	loading,
+	status,
+	errorMessage,
+	onRetry,
 	onItemClick,
 	getImageUrl,
 	getImageCandidates,
@@ -230,15 +233,48 @@ const MediaRow = ({
 			onMoreClick(sectionKey);
 		}
 	}, [onMoreClick, sectionKey]);
+	const handleRetryClick = useCallback(() => {
+		onRetry?.(sectionKey);
+	}, [onRetry, sectionKey]);
+	const resolvedStatus = status || (loading ? 'loading' : 'ready');
 
-	if (loading) {
+	if (['pending', 'loading', 'empty', 'error'].includes(resolvedStatus)) {
 		return (
-			<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
+			<div
+				className={`${css.row} ${css.stateRow} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`}
+				data-bf-home-row-status={resolvedStatus}
+				onFocus={handleFocus}
+				ref={rowRef}
+				{...rest}
+			>
 				<div className={css.rowHeader}>
 					<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
 				</div>
-				<div className={css.loading}>
-					<Spinner />
+				<div className={css.rowStateContent}>
+					{['pending', 'loading'].includes(resolvedStatus) ? (
+						<BreezyLoadingOverlay label={`Loading ${title}...`} />
+					) : null}
+					{resolvedStatus === 'empty' ? (
+						<BodyText className={css.rowStateMessage}>No items are available in this section.</BodyText>
+					) : null}
+					{resolvedStatus === 'error' ? (
+						<>
+							<BodyText className={css.rowStateMessage}>
+								{errorMessage || 'This Home section could not be loaded.'}
+							</BodyText>
+							{typeof onRetry === 'function' ? (
+								<SpottableDiv
+									aria-label={`Retry ${title}`}
+									className={css.rowRetryButton}
+									onClick={handleRetryClick}
+									role="button"
+									spotlightId={`home-row-retry-${sectionKey}`}
+								>
+									Retry
+								</SpottableDiv>
+							) : null}
+						</>
+					) : null}
 				</div>
 			</div>
 		);

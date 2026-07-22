@@ -1,6 +1,7 @@
 import {
 	getAssCoordinatePlane,
 	getAssCueContainment,
+	getAssCueContainmentPolicy,
 	getAssStageLengthPx,
 	getAssStagePercent,
 	getSubtitleVideoStageGeometry
@@ -97,7 +98,7 @@ describe('subtitleRendererAssStage', () => {
 		expect(plane.pixelAspectScale).toBe(1);
 	});
 
-	it('fits and contains only non-authored cue boxes', () => {
+	it('fits and contains managed cue boxes', () => {
 		const fitted = getAssCueContainment({
 			cueRect: {left: 0, top: 0, width: 2000, height: 1200},
 			stageRect: {left: 0, top: 0, width: 1920, height: 1080}
@@ -116,13 +117,43 @@ describe('subtitleRendererAssStage', () => {
 		expect(getAssCueContainment({
 			cueRect: {left: -20, top: 1200, width: 400, height: 100},
 			stageRect: {left: 0, top: 0, width: 1920, height: 1080},
+			preserveOverflow: true,
 			sourceAuthored: true
 		})).toEqual({
 			sourceAuthored: true,
 			scale: 1,
 			offsetX: 0,
 			offsetY: 0,
-			reason: 'source-authored'
+			reason: 'preserve-authored-overflow'
 		});
+	});
+
+	it('preserves authored positions and other protected geometry', () => {
+		expect(getAssCueContainmentPolicy({
+			absolutePosition: {xPercent: 50, yPercent: 2}
+		})).toEqual({
+			contain: false,
+			sourceAuthored: true,
+			reason: 'authored-position'
+		});
+		expect(getAssCueContainmentPolicy({
+			absolutePosition: {xPercent: 50, yPercent: -5}
+		})).toEqual(expect.objectContaining({
+			contain: false,
+			reason: 'authored-offscreen'
+		}));
+		expect(getAssCueContainmentPolicy({
+			absolutePosition: {xPercent: 50, yPercent: 5},
+			clip: {leftPercent: 0, topPercent: 0, rightPercent: 50, bottomPercent: 50}
+		})).toEqual(expect.objectContaining({
+			contain: false,
+			reason: 'authored-clip'
+		}));
+		expect(getAssCueContainmentPolicy({
+			move: {startPosition: {xPercent: 10, yPercent: 10}}
+		})).toEqual(expect.objectContaining({
+			contain: false,
+			reason: 'authored-motion'
+		}));
 	});
 });

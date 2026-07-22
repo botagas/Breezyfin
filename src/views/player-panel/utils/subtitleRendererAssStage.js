@@ -133,6 +133,49 @@ export const isSourceAuthoredAssCue = (cue = {}) => Boolean(
 	cue.activeSourceStyle?.transform
 );
 
+const isAssPositionOutsidePlane = (position = {}) => {
+	const xPercent = Number(position.xPercent);
+	const yPercent = Number(position.yPercent);
+	return (
+		Number.isFinite(xPercent) && (xPercent < 0 || xPercent > 100)
+	) || (
+		Number.isFinite(yPercent) && (yPercent < 0 || yPercent > 100)
+	);
+};
+
+export const getAssCueContainmentPolicy = (cue = {}) => {
+	const sourceAuthored = isSourceAuthoredAssCue(cue);
+	if (cue.clip) {
+		return {contain: false, sourceAuthored, reason: 'authored-clip'};
+	}
+	if (cue.drawing) {
+		return {contain: false, sourceAuthored, reason: 'authored-drawing'};
+	}
+	if (cue.move) {
+		return {contain: false, sourceAuthored, reason: 'authored-motion'};
+	}
+	if (cue.origin) {
+		return {contain: false, sourceAuthored, reason: 'authored-transform-origin'};
+	}
+	if (cue.sourceStyle?.transform || cue.activeSourceStyle?.transform) {
+		return {contain: false, sourceAuthored, reason: 'authored-transform'};
+	}
+	if (cue.absolutePosition) {
+		return {
+			contain: false,
+			sourceAuthored,
+			reason: isAssPositionOutsidePlane(cue.absolutePosition)
+				? 'authored-offscreen'
+				: 'authored-position'
+		};
+	}
+	return {
+		contain: true,
+		sourceAuthored,
+		reason: 'managed-text-box'
+	};
+};
+
 const normalizeRect = (rect = {}) => {
 	const left = Number(rect.left);
 	const top = Number(rect.top);
@@ -152,6 +195,7 @@ const normalizeRect = (rect = {}) => {
 export const getAssCueContainment = ({
 	cueRect,
 	stageRect,
+	preserveOverflow = false,
 	sourceAuthored = false,
 	safeInlineRatio = ASS_CUE_SAFE_INLINE_RATIO,
 	safeBlockRatio = ASS_CUE_SAFE_BLOCK_RATIO
@@ -167,13 +211,13 @@ export const getAssCueContainment = ({
 			reason: 'unavailable'
 		};
 	}
-	if (sourceAuthored) {
+	if (preserveOverflow) {
 		return {
-			sourceAuthored: true,
+			sourceAuthored: Boolean(sourceAuthored),
 			scale: 1,
 			offsetX: 0,
 			offsetY: 0,
-			reason: 'source-authored'
+			reason: 'preserve-authored-overflow'
 		};
 	}
 
@@ -212,7 +256,7 @@ export const getAssCueContainment = ({
 	}
 	const shifted = Math.abs(offsetX) > 0.01 || Math.abs(offsetY) > 0.01;
 	return {
-		sourceAuthored: false,
+		sourceAuthored: Boolean(sourceAuthored),
 		scale,
 		offsetX,
 		offsetY,

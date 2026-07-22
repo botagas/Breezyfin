@@ -109,16 +109,27 @@ export const normalizeAssWrapStyle = (value) => {
 
 const normalizeAssBoolean = (value) => {
 	const normalized = String(value ?? '').trim();
+	if (!normalized) return null;
 	return ASS_STYLE_NUMERIC_TRUE_VALUES.has(normalized);
 };
 
 const sanitizeAssFontFamily = (value) => {
 	const fontName = String(value || '')
+		.replace(/^\s*@+/, '')
 		.replace(/[\\'"]/g, '')
 		.replace(/[^\w\s.-]/g, '')
 		.trim()
 		.slice(0, 80);
 	return fontName ? `'${fontName}', sans-serif` : '';
+};
+
+const getAssFontStyleState = (value) => {
+	const rawFontName = String(value || '').trim();
+	const fontFamily = sanitizeAssFontFamily(rawFontName);
+	return fontFamily ? {
+		fontFamily,
+		verticalText: rawFontName.startsWith('@')
+	} : {};
 };
 
 const buildAssAbsolutePosition = (positionMatch, playResX, playResY) => {
@@ -242,17 +253,22 @@ const getAssStyleObjectFromState = (state = {}) => {
 	const transform = buildAssTransformStyle(state);
 	return {
 		...(state.fontFamily ? {fontFamily: state.fontFamily} : {}),
+		...(state.verticalText ? {
+			writingMode: 'vertical-rl',
+			WebkitWritingMode: 'vertical-rl',
+			textOrientation: 'mixed'
+		} : {}),
 		...(state.fontSize ? {fontSize: state.fontSize} : {}),
 		...(state.textColor ? {color: state.textColor} : {}),
 		...(state.outlineColor ? {'--bf-player-subtitle-current-border-color': state.outlineColor} : {}),
-		...(state.shadowColor && !state.outlineColor ? {'--bf-player-subtitle-current-border-color': state.shadowColor} : {}),
-		...(state.bold ? {fontWeight: 700} : {}),
-		...(state.italic ? {fontStyle: 'italic'} : {}),
-		...(state.underline || state.strikeOut ? {
+		...(state.shadowColor ? {'--bf-player-subtitle-current-shadow-color': state.shadowColor} : {}),
+		...(typeof state.bold === 'boolean' ? {fontWeight: state.bold ? 700 : 400} : {}),
+		...(typeof state.italic === 'boolean' ? {fontStyle: state.italic ? 'italic' : 'normal'} : {}),
+		...(typeof state.underline === 'boolean' || typeof state.strikeOut === 'boolean' ? {
 			textDecoration: [
 				state.underline ? 'underline' : '',
 				state.strikeOut ? 'line-through' : ''
-			].filter(Boolean).join(' ')
+			].filter(Boolean).join(' ') || 'none'
 		} : {}),
 		...(state.borderStyle ? {'--bf-player-subtitle-source-border-style': state.borderStyle} : {}),
 		...(state.outline ? {'--bf-player-subtitle-current-outline-size': `${state.outline.valueVh.toFixed(3)}vh`} : {}),
@@ -297,7 +313,7 @@ const buildAssStyleState = (sourceStyle = {}, playResY = DEFAULT_ASS_PLAY_RES_Y)
 	const style = sourceStyle || {};
 	const fontSize = style.fontSize ? buildAssSourceFontSize(style.fontSize, playResY) : null;
 	return {
-		...(style.fontName ? {fontFamily: sanitizeAssFontFamily(style.fontName)} : {}),
+		...(style.fontName ? getAssFontStyleState(style.fontName) : {}),
 		...(fontSize ? {
 			fontSize: `${fontSize.fontSizeVh.toFixed(3)}vh`,
 			fontSizeValue: fontSize.size
@@ -306,10 +322,10 @@ const buildAssStyleState = (sourceStyle = {}, playResY = DEFAULT_ASS_PLAY_RES_Y)
 		...(style.secondaryColor ? {secondaryColor: style.secondaryColor} : {}),
 		...(style.outlineColor ? {outlineColor: style.outlineColor} : {}),
 		...(style.backColor ? {shadowColor: style.backColor} : {}),
-		...(style.bold ? {bold: true} : {}),
-		...(style.italic ? {italic: true} : {}),
-		...(style.underline ? {underline: true} : {}),
-		...(style.strikeOut ? {strikeOut: true} : {}),
+		...(typeof style.bold === 'boolean' ? {bold: style.bold} : {}),
+		...(typeof style.italic === 'boolean' ? {italic: style.italic} : {}),
+		...(typeof style.underline === 'boolean' ? {underline: style.underline} : {}),
+		...(typeof style.strikeOut === 'boolean' ? {strikeOut: style.strikeOut} : {}),
 		...(style.borderStyle ? {borderStyle: style.borderStyle} : {}),
 		...(style.outline !== null && style.outline !== undefined ? {
 			outline: buildAssScaledValue(style.outline, playResY)
@@ -354,7 +370,7 @@ const applyAssOverrideBlockToState = (block, state, playResY, baseState = {}, re
 	if (/\\s0\b/i.test(block)) nextState.strikeOut = false;
 	const fontNameMatch = block.match(ASS_FONT_NAME_PATTERN);
 	if (fontNameMatch) {
-		nextState.fontFamily = sanitizeAssFontFamily(fontNameMatch[1]);
+		Object.assign(nextState, getAssFontStyleState(fontNameMatch[1]));
 	}
 	const fontSizeMatch = block.match(ASS_FONT_SIZE_PATTERN);
 	if (fontSizeMatch) {
@@ -701,8 +717,12 @@ const parseAssMetadata = (text) => {
 			.split(',')
 			.map((part) => part.trim());
 		const nameIndex = styleFormat.indexOf('name');
-	const fontNameIndex = styleFormat.indexOf('fontname');
-	const fontSizeIndex = styleFormat.indexOf('fontsize');
+		const fontNameIndex = styleFormat.indexOf('fontname');
+		const fontSizeIndex = styleFormat.indexOf('fontsize');
+		const bold = normalizeAssBoolean(values[styleFormat.indexOf('bold')]);
+		const italic = normalizeAssBoolean(values[styleFormat.indexOf('italic')]);
+		const underline = normalizeAssBoolean(values[styleFormat.indexOf('underline')]);
+		const strikeOut = normalizeAssBoolean(values[styleFormat.indexOf('strikeout')]);
 		if (nameIndex < 0) return;
 		const styleName = values[nameIndex] || '';
 		if (!styleName) return;
@@ -737,10 +757,10 @@ const parseAssMetadata = (text) => {
 			...(values[styleFormat.indexOf('backcolour')] ? {
 				backColor: normalizeAssColorHex(values[styleFormat.indexOf('backcolour')])
 			} : {}),
-			...(normalizeAssBoolean(values[styleFormat.indexOf('bold')]) ? {bold: true} : {}),
-			...(normalizeAssBoolean(values[styleFormat.indexOf('italic')]) ? {italic: true} : {}),
-			...(normalizeAssBoolean(values[styleFormat.indexOf('underline')]) ? {underline: true} : {}),
-			...(normalizeAssBoolean(values[styleFormat.indexOf('strikeout')]) ? {strikeOut: true} : {}),
+			...(bold !== null ? {bold} : {}),
+			...(italic !== null ? {italic} : {}),
+			...(underline !== null ? {underline} : {}),
+			...(strikeOut !== null ? {strikeOut} : {}),
 			...(borderStyle !== null ? {borderStyle} : {}),
 			...(outline !== null ? {outline} : {}),
 			...(shadow !== null ? {shadow} : {}),
