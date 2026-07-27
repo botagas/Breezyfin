@@ -1,4 +1,4 @@
-/* global jest */
+import {jest} from '@jest/globals';
 
 export const mockCanvasElementCreation = (getContextFactory = () => null) => {
 	const originalCreateElement = document.createElement.bind(document);
