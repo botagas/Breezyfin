@@ -43,7 +43,8 @@ export const usePlayerBackNavigation = ({
 			setShowControls(false);
 			return true;
 		}
-		return false;
+		handleBackButton();
+		return true;
 	}, [
 		closeAudioPopup,
 		closeSubtitlePopup,

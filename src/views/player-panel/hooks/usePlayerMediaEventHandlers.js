@@ -20,9 +20,13 @@ const isImageSubtitleBurnInPlaybackPath = ({video, mediaSourceData, currentSubti
 	const hasEncodeSubtitlePath = values.includes('subtitlemethod=encode') ||
 		values.includes('subtitlemethod%3dencode');
 	const subtitlePolicy = mediaSourceData?.__debugSubtitlePolicy || {};
+	const hasEncodedSubtitleIndex = /[?&]subtitlestreamindex=(?!-1(?:&|$))\d+/i.test(values) ||
+		/subtitlestreamindex%3d(?!-1(?:%26|$))\d+/i.test(values);
 	const subtitleStream = getSubtitleStreamByIndex(mediaSourceData, currentSubtitleTrack);
 	const codec = subtitlePolicy.codec || normalizeSubtitleCodec(subtitleStream);
-	return hasEncodeSubtitlePath && isBitmapSubtitleCodec(codec);
+	const burnInRequested = subtitlePolicy.forceBurnIn === true || subtitlePolicy.requiresBurnIn === true;
+	return (burnInRequested || (hasEncodeSubtitlePath && hasEncodedSubtitleIndex)) &&
+		isBitmapSubtitleCodec(codec);
 };
 
 export const usePlayerMediaEventHandlers = ({

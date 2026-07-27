@@ -236,3 +236,13 @@ export const selectHlsEnginePreference = ({
 	}
 	return {engine: null, allowNativeFallback: false, reason: 'hls-unavailable'};
 };
+
+export const getPlaybackStartupFailureMessage = (dynamicRangeInfo = null) => {
+	const rangeId = String(dynamicRangeInfo?.id || '').toUpperCase();
+	if (['DV', 'HDR10', 'HDR10_PLUS', 'HLG'].includes(rangeId)) {
+		const label = dynamicRangeInfo?.label || (rangeId === 'DV' ? 'Dolby Vision' : 'HDR');
+		return `${label} playback did not become ready after rebuilding the session. ` +
+			'This runtime may not support the selected stream; try Force Transcoding or test on TV hardware.';
+	}
+	return 'Playback failed after session rebuild attempt. Please retry or go back.';
+};

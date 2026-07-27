@@ -1,7 +1,9 @@
 import {useCallback} from 'react';
+import {useSyncPlay} from '../../../contexts/SyncPlayContext';
 import jellyfinService from '../../../services/jellyfinService';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
+import {runSyncPlayQueueAction} from '../utils/syncPlayQueueAction';
 
 export const usePlayerPlaybackCommands = ({
 	item,
@@ -32,8 +34,16 @@ export const usePlayerPlaybackCommands = ({
 	exitInProgressRef,
 	loadRequestIdRef
 }) => {
+	const syncPlay = useSyncPlay();
+	const syncPlayNext = syncPlay.group && syncPlay.followMode === 'following' ? syncPlay.next : null;
 	const handleEnded = useCallback(async () => {
 		await handleStop();
+		if (await runSyncPlayQueueAction({
+			action: syncPlayNext,
+			logMessage: 'Failed to advance the SyncPlay queue:',
+			toastMessage: 'SyncPlay could not advance to the next item.',
+			setToastMessage
+		})) return;
 
 		if (playbackSettingsRef.current.autoPlayNext && item?.Type === 'Episode' && onPlay) {
 			try {
@@ -48,7 +58,18 @@ export const usePlayerPlaybackCommands = ({
 		}
 
 		onBack();
-	}, [buildPlaybackOptions, getNextEpisode, handleStop, hasNextEpisode, item, onBack, onPlay, playbackSettingsRef]);
+	}, [
+		buildPlaybackOptions,
+		getNextEpisode,
+		handleStop,
+		hasNextEpisode,
+		item,
+		onBack,
+		onPlay,
+		playbackSettingsRef,
+		setToastMessage,
+		syncPlayNext
+	]);
 
 	const handlePlay = useCallback(async ({keepHidden = false} = {}) => {
 		if (!videoRef.current) return;

@@ -1,8 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BodyText from '@enact/sandstone/BodyText';
 import MediaRow from '../components/MediaRow';
-import Button from '../components/BreezyButton';
+import PanelActionButton from '../components/PanelActionButton';
 import IntegrationPanelLayout from '../components/IntegrationPanelLayout';
+import PanelTabNavigation from '../components/PanelTabNavigation';
 import ProviderItemPopup from '../components/ProviderItemPopup';
 import jellyfinService from '../services/jellyfinService';
 import {useProviderPanelShell} from '../hooks/useProviderPanelShell';
@@ -14,6 +15,11 @@ import css from './IntegrationPanels.module.less';
 const PAGE_SIZE = 60;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CALENDAR_RANGE_DAYS = 90;
+const CALENDAR_FILTER_TABS = Object.freeze([
+	{id: 'all', label: 'All'},
+	{id: 'movies', label: 'Movies'},
+	{id: 'series', label: 'Series'}
+]);
 const EMPTY_MESSAGES = Object.freeze({
 	'no-provider-events': 'No calendar events were returned by the configured providers.',
 	'item-type-filter': 'Calendar events are available, but none match the selected type filters.',
@@ -64,6 +70,27 @@ const createCalendarRange = (now = new Date()) => {
 	return {start: formatUtcDate(startDate), end: formatUtcDate(endDate)};
 };
 
+const getCalendarEventId = (event) => String(
+	event?.Id ||
+	event?.EventId ||
+	[
+		event?.Provider,
+		event?.Type,
+		event?.UtcDate,
+		event?.SeriesTitle,
+		event?.Title,
+		event?.SeasonNumber,
+		event?.EpisodeNumber
+	].join('|')
+);
+
+const mergeCalendarEvents = (currentItems, incomingItems) => (
+	[...new Map(
+		[...(currentItems || []), ...(incomingItems || [])]
+			.map((item) => [getCalendarEventId(item), item])
+	).values()]
+);
+
 const CalendarPanel = ({
 	onItemSelect,
 	onNavigate,
@@ -99,6 +126,7 @@ const CalendarPanel = ({
 	const lastLoadedAtRef = useRef(cacheIsFresh ? Number(cachedState?.cachedAt) : 0);
 	const itemTypesRef = useRef(itemTypes);
 	itemTypesRef.current = itemTypes;
+	const pageRequestsRef = useRef(new Map());
 	const providerShell = useProviderPanelShell({
 		cachedState, isActive, onCacheState, onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler
 	});
@@ -118,6 +146,15 @@ const CalendarPanel = ({
 	}, [cachePanelState]);
 
 	const loadPage = useCallback(async ({startIndex = 0, append = false} = {}) => {
+		const requestKey = [
+			calendarRange.start,
+			calendarRange.end,
+			[...itemTypesRef.current].sort().join(','),
+			startIndex
+		].join('|');
+		if (pageRequestsRef.current.has(requestKey)) {
+			return pageRequestsRef.current.get(requestKey);
+		}
 		const requestId = append ? requestIdRef.current : requestIdRef.current + 1;
 		if (!append) {
 			requestIdRef.current = requestId;
@@ -127,74 +164,86 @@ const CalendarPanel = ({
 		}
 		setPaginationError('');
 		setLoadingMore(append);
-		try {
-			const response = await jellyfinService.getCalendarEvents({
-				start: calendarRange.start,
-				end: calendarRange.end,
-				itemTypes: itemTypesRef.current,
-				limit: PAGE_SIZE,
-				startIndex,
-				allowPartial: true
-			});
-			if (requestId !== requestIdRef.current) return;
-			if (response?.available !== true) {
-				reportProviderFailure('Calendar', response);
-				const message = response?.problemDetails?.detail || 'Calendar providers are unavailable.';
+		let request;
+		request = (async () => {
+			try {
+				const response = await jellyfinService.getCalendarEvents({
+					start: calendarRange.start,
+					end: calendarRange.end,
+					itemTypes: itemTypesRef.current,
+					limit: PAGE_SIZE,
+					startIndex,
+					allowPartial: true
+				});
+				if (requestId !== requestIdRef.current) return;
+				if (response?.available !== true) {
+					reportProviderFailure('Calendar', response);
+					const message = response?.problemDetails?.detail || 'Calendar providers are unavailable.';
+					if (append) setPaginationError(message);
+					else setInitialError(message);
+					return;
+				}
+				const pageItems = response.result.items.map(toMediaItem);
+				if (!append && pageItems.length === 0) {
+					reportProviderDiagnostic('Calendar empty result', {
+						emptyReason: response.result.emptyReason || 'unspecified',
+						configuredRange: calendarRange,
+						providerDiagnostics: response.result.providerDiagnostics || null,
+						warningCount: response.result.warnings?.length || 0
+					});
+				}
+				const nextItems = append
+					? mergeCalendarEvents(itemsRef.current, pageItems)
+					: mergeCalendarEvents([], pageItems);
+				itemsRef.current = nextItems;
+				lastLoadedAtRef.current = Date.now();
+				setItems(nextItems);
+				setNextStartIndex(response.result.nextStartIndex);
+				setHasMore(response.result.hasMore);
+				setEmptyReason(response.result.emptyReason);
+				const nextWarnings = append
+					? mergeWarnings(warningsRef.current, response.result.warnings)
+					: (response.result.warnings || []);
+				warningsRef.current = nextWarnings;
+				setWarnings(nextWarnings);
+				(response.result.warnings || []).forEach((warning) => {
+					reportProviderFailure('Calendar partial result', warning);
+				});
+				persistPage({
+					items: nextItems,
+					nextStartIndex: response.result.nextStartIndex,
+					hasMore: response.result.hasMore,
+					warnings: nextWarnings,
+					emptyReason: response.result.emptyReason
+				});
+			} catch (error) {
+				if (requestId !== requestIdRef.current) return;
+				reportProviderFailure('Calendar', error);
+				const message = error?.problemDetails?.detail || 'Calendar providers are unavailable.';
 				if (append) setPaginationError(message);
 				else setInitialError(message);
-				return;
+			} finally {
+				if (pageRequestsRef.current.get(requestKey) === request) {
+					pageRequestsRef.current.delete(requestKey);
+				}
+				if (requestId === requestIdRef.current) {
+					setLoading(false);
+					setLoadingMore(false);
+				}
 			}
-			const pageItems = response.result.items.map(toMediaItem);
-			if (!append && pageItems.length === 0) {
-				reportProviderDiagnostic('Calendar empty result', {
-					emptyReason: response.result.emptyReason || 'unspecified',
-					configuredRange: calendarRange,
-					providerDiagnostics: response.result.providerDiagnostics || null,
-					warningCount: response.result.warnings?.length || 0
-				});
-			}
-			const nextItems = append ? [...itemsRef.current, ...pageItems] : pageItems;
-			itemsRef.current = nextItems;
-			lastLoadedAtRef.current = Date.now();
-			setItems(nextItems);
-			setNextStartIndex(response.result.nextStartIndex);
-			setHasMore(response.result.hasMore);
-			setEmptyReason(response.result.emptyReason);
-			const nextWarnings = append
-				? mergeWarnings(warningsRef.current, response.result.warnings)
-				: (response.result.warnings || []);
-			warningsRef.current = nextWarnings;
-			setWarnings(nextWarnings);
-			(response.result.warnings || []).forEach((warning) => {
-				reportProviderFailure('Calendar partial result', warning);
-			});
-			persistPage({
-				items: nextItems,
-				nextStartIndex: response.result.nextStartIndex,
-				hasMore: response.result.hasMore,
-				warnings: nextWarnings,
-				emptyReason: response.result.emptyReason
-			});
-		} catch (error) {
-			if (requestId !== requestIdRef.current) return;
-			reportProviderFailure('Calendar', error);
-			const message = error?.problemDetails?.detail || 'Calendar providers are unavailable.';
-			if (append) setPaginationError(message);
-			else setInitialError(message);
-		} finally {
-			if (requestId === requestIdRef.current) {
-				setLoading(false);
-				setLoadingMore(false);
-			}
-		}
+		})();
+		pageRequestsRef.current.set(requestKey, request);
+		return request;
 	}, [calendarRange, persistPage, reportProviderDiagnostic, reportProviderFailure, requestIdRef]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
+		const pageRequests = pageRequestsRef.current;
 		if (Date.now() - lastLoadedAtRef.current >= CACHE_TTL_MS) loadPage();
 		else setLoading(false);
 		return () => {
 			requestIdRef.current += 1;
+			pageRequests.clear();
 		};
 	}, [isActive, itemTypes, loadPage, requestIdRef]);
 
@@ -249,6 +298,14 @@ const CalendarPanel = ({
 	const showAll = useCallback(() => selectTypes(['Movie', 'Episode']), [selectTypes]);
 	const showMovies = useCallback(() => selectTypes(['Movie']), [selectTypes]);
 	const showSeries = useCallback(() => selectTypes(['Episode']), [selectTypes]);
+	const activeFilterTab = itemTypes.length === 2
+		? 'all'
+		: (itemTypes[0] === 'Movie' ? 'movies' : 'series');
+	const selectFilterTab = useCallback((tabId) => {
+		if (tabId === 'movies') showMovies();
+		else if (tabId === 'series') showSeries();
+		else showAll();
+	}, [showAll, showMovies, showSeries]);
 	const getImageCandidates = useCallback((id, item) => item.ImageCandidates, []);
 	const loadNextPage = useCallback(() => {
 		loadPage({startIndex: nextStartIndex, append: true});
@@ -275,11 +332,13 @@ const CalendarPanel = ({
 				? (EMPTY_MESSAGES[emptyReason] || 'No calendar events are available.')
 				: ''}
 		>
-			<div className={css.filterBar}>
-				<Button spotlightId="calendar-filter-all" selected={itemTypes.length === 2} onClick={showAll}>All</Button>
-				<Button spotlightId="calendar-filter-movies" selected={itemTypes.length === 1 && itemTypes[0] === 'Movie'} onClick={showMovies}>Movies</Button>
-				<Button spotlightId="calendar-filter-series" selected={itemTypes.length === 1 && itemTypes[0] === 'Episode'} onClick={showSeries}>Series</Button>
-			</div>
+			<PanelTabNavigation
+				activeId={activeFilterTab}
+				ariaLabel="Calendar media types"
+				onSelect={selectFilterTab}
+				spotlightIdPrefix="calendar-filter"
+				tabs={CALENDAR_FILTER_TABS}
+			/>
 			{warnings.length > 0 ? (
 				<BodyText className={css.warning}>Results may be incomplete because one or more configured providers failed.</BodyText>
 			) : null}
@@ -296,18 +355,21 @@ const CalendarPanel = ({
 			{paginationError ? (
 				<section className={css.feedState}>
 					<BodyText>{paginationError}</BodyText>
-					<Button spotlightId="calendar-pagination-retry" onClick={loadNextPage}>Retry</Button>
+					<PanelActionButton spotlightId="calendar-pagination-retry" onClick={loadNextPage}>
+						Retry
+					</PanelActionButton>
 				</section>
 			) : null}
 			{hasMore && !paginationError ? (
-				<Button spotlightId="calendar-load-more" disabled={loadingMore} onClick={loadNextPage}>
+				<PanelActionButton spotlightId="calendar-load-more" disabled={loadingMore} onClick={loadNextPage}>
 					{loadingMore ? 'Loading...' : 'Load More'}
-				</Button>
+				</PanelActionButton>
 			) : null}
 			<ProviderItemPopup
 				open={providerShell.externalItemOpen}
 				title={providerShell.externalItem?.Name || 'Calendar event'}
 				detail={providerShell.externalItem ? new Date(providerShell.externalItem.UtcDate).toLocaleString() : ''}
+				item={providerShell.externalItem}
 				onClose={providerShell.closeExternalItem}
 				onHide={providerShell.handleExternalItemHide}
 				spotlightId="calendar-event-close"

@@ -153,6 +153,28 @@ export const getSeasonEpisodes = async (service, seriesId, seasonId) => {
 	}
 };
 
+export const getUnwatchedSeriesEpisodes = async (service, seriesId, limit = 30, startIndex = 0) => {
+	if (!seriesId) return {items: [], totalRecordCount: 0, nextStartIndex: 0, hasMore: false};
+	const safeLimit = Math.min(200, Math.max(1, Math.trunc(Number(limit) || 30)));
+	const safeStartIndex = Math.max(0, Math.trunc(Number(startIndex) || 0));
+	const params = new URLSearchParams({
+		userId: service.userId,
+		isPlayed: 'false',
+		enableImages: 'true',
+		enableTotalRecordCount: 'true',
+		fields: 'PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,UserData,Overview,PremiereDate',
+		limit: String(safeLimit),
+		startIndex: String(safeStartIndex)
+	});
+	const data = await service._request(`/Shows/${encodeURIComponent(seriesId)}/Episodes?${params.toString()}`, {
+		context: 'getUnwatchedSeriesEpisodes'
+	});
+	const items = Array.isArray(data?.Items) ? data.Items : [];
+	const totalRecordCount = Number.isInteger(data?.TotalRecordCount) ? data.TotalRecordCount : items.length;
+	const nextStartIndex = safeStartIndex + items.length;
+	return {items, totalRecordCount, nextStartIndex, hasMore: nextStartIndex < totalRecordCount};
+};
+
 export const getNextUpEpisodeForSeries = async (service, seriesId) => {
 	try {
 		const data = await service._request(

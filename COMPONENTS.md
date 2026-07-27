@@ -18,9 +18,26 @@ This guide covers shared UI components in `src/components/`.
 - Reuse `MediaPanelBackdrop` for media-driven panel atmosphere. Feed it a representative item and, where available, an explicit provider image URL; it tries low-resolution Jellyfin-preblurred backdrop/parent/primary candidates before the provider image fallback. Authenticated Breezyfin-plugin image URLs receive the same mode-aware width, quality, and server-blur contract. Normal and Performance retain preblurred artwork, while Performance+ uses an unblurred lower-opacity image.
 - Reuse `IntegrationPanelLayout` for plugin/provider panels. It owns Toolbar-safe content
   insets, backdrop, loading/empty/error states, retry placement, and Toolbar DOWN entry;
+  pass `scrollable={false}` when a child `VirtualList`/`VirtualGridList` owns the panel's
+  vertical viewport so Sandstone has one scroll owner rather than nested vertical scrollers.
   provider details should use `ProviderItemPopup` so Popup close and Spotlight cleanup
-  complete before the item state is cleared.
-- Use `MediaCardImage` for shared grid/Home artwork. It owns opacity-only reveal, ordered source fallback through `useImageErrorFallback`, explicit dimensions, eager loading for already-virtualized cards, and opt-in performance metrics without parent-card state updates. Source changes reset visual state in a layout effect so recycled virtual items cannot hide an already-loaded cached image.
+  complete before the item state is cleared. The popup mounts content inside the shared
+  tokenized `popupSurface`, bounds and scrolls long descriptions, and uses
+  `PanelActionButton` for its Close action. Pass the provider item so available type,
+  year, rating, genre, director, and writer metadata can be shown without fabricating
+  fields absent from compact feeds.
+- Reuse `PanelTabNavigation` for Settings-style panel view/filter tabs. It owns the
+  shared pill surface, selected/focus styling, tab semantics, and stable Spotlight IDs;
+  panels should supply only tab descriptors, the active ID, and an `onSelect` handler.
+- Reuse `PanelActionButton` for text actions in integration panels and their popups.
+  `BreezyButton` is the low-level Sandstone chrome reset; it does not provide a visible
+  surface on its own. `PanelActionButton` adds the shared theme-token border, surface,
+  hover, focus, disabled, and non-scaling TV behavior.
+- Generic buttons use the shared `--bf-theme-button-fg*` text-state tokens so pointer
+  hover and Spotlight focus do not change labels/icons to an unrelated accent color.
+  Keep accent, danger, warning, favorite, and text-on-light colors for explicit
+  selected or semantic states rather than generic focus.
+- Use `MediaCardImage` for shared grid/Home artwork. It owns opacity-only reveal, ordered source fallback through `useImageErrorFallback`, explicit dimensions, eager loading for already-virtualized cards, and opt-in performance metrics without parent-card state updates. Source changes reset visual state in a layout effect so recycled virtual items cannot hide an already-loaded cached image. Shared card consumers preserve item-provided authenticated provider candidates before generated Jellyfin artwork fallbacks.
 
 ## Styling
 
@@ -48,10 +65,18 @@ This guide covers shared UI components in `src/components/`.
 - For Home rows, `MediaRow` may expose an optional icon-only section action via `onMoreClick` / `sectionKey`; keep this action generic and route destination behavior through the owning panel. It renders explicit `pending`, `loading`, and retryable `error` states for descriptor-first server Home rows through the shared Breezy loading surface; rows that resolve empty are removed by Home rather than left as empty shells. Home activates artwork by row, with the first viewport loaded immediately and later rows activated by row visibility/focus rather than per-image observers.
 - Settings rows use `src/views/settings-panel/components/SettingsStaticItems.js`. These are panel-local Sandstone base compositions that deliberately omit the marquee controller and content measurement path while retaining Enact touch, Spotlight, skin, switch, and accessibility behavior; keep their visible labels constrained with ellipsis rather than reintroducing focus marquees.
 - `src/views/player-panel/components/PlayerPanelContent.js` owns the Player's presentational surface/overlay composition. Keep playback state machines and side effects in `PlayerPanel` hooks, and add new visual layers to this component instead of regrowing the panel orchestrator's return tree.
-- `PlayerSyncPlayPopup` and `PlayerWatchPartyPopup` are panel-local participant/status
+- `PlayerSyncPlayPopup` and `PlayerWatchPartyPopup` are Player-local participant/status
   surfaces. Keep native and room protocols isolated, preserve layered Back behavior,
-  and expose controls only when the active group/host state permits them.
+  expose controls only when the active group/host state permits them, and mount their
+  content inside the shared `popupSurface` rather than styling the transparent
+  Sandstone shell directly. WatchParty actions are awaited, deduplicated while pending,
+  and report asynchronous failures inside the popup.
 - Native SyncPlay is a Toolbar utility action, not a primary navigation tab. In Elegant it replaces the duplicate right-side Search icon with a Cast action when available while Search remains in the central pill; Classic keeps Search and places the Cast action with the right-side utilities.
+- `SyncPlayGlobalOverlays` owns app-level queue-replacement consent and suspended-playback
+  notifications. Popup actions run after `onHide` so Sandstone releases Spotlight before
+  SyncPlay changes panel/player state. Both the decision popup and non-autofocusing
+  suspended-playback notification use the shared themed `popupSurface`; only the decision
+  popup uses shared first-action focus.
 
 ## Related docs
 

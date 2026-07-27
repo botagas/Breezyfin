@@ -2,6 +2,7 @@ import {useCallback, useState} from 'react';
 import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../../../components/BreezyButton';
+import PanelTabNavigation from '../../../components/PanelTabNavigation';
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import {
 	DEFAULT_SETTINGS_TAB_KEY,
@@ -18,6 +19,8 @@ import {
 	SettingsSwitchItem as SwitchItem
 } from './SettingsStaticItems';
 import css from '../../SettingsPanel.module.less';
+
+const SETTINGS_PANEL_TABS = SETTINGS_TABS.map((tab) => ({id: tab.key, label: tab.label}));
 
 const SettingsSections = ({
 	loading,
@@ -111,8 +114,7 @@ const SettingsSections = ({
 	const bitmapSubtitleRendererControl = getBitmapSubtitleRendererControlState(settings, bitmapSubtitleRendererLabel);
 	const subtitleBurnInFormatsControl = getSubtitleBurnInFormatsControlState(settings, subtitleBurnInTextCodecsLabel);
 
-	const handleTabClick = useCallback((event) => {
-		const tabKey = event.currentTarget.dataset.settingsTab;
+	const handleTabClick = useCallback((tabKey) => {
 		if (!tabKey || !isSettingsTabKey(tabKey)) return;
 		setActiveTabKey(tabKey);
 	}, []);
@@ -133,26 +135,13 @@ const SettingsSections = ({
 
 	return (
 		<div className={css.content}>
-			<div className={css.settingsTabsRow}>
-				<div className={css.settingsTabs} role="tablist" aria-label="Settings categories">
-					{SETTINGS_TABS.map((tab) => {
-						const isSelected = tab.key === activeTabKey;
-						return (
-							<Button
-								key={tab.key}
-								size="small"
-								minWidth={false}
-								className={`${css.settingsTabButton} ${isSelected ? css.settingsTabButtonSelected : ''}`}
-								data-settings-tab={tab.key}
-								selected={isSelected}
-								onClick={handleTabClick}
-							>
-								{tab.label}
-							</Button>
-						);
-					})}
-				</div>
-			</div>
+			<PanelTabNavigation
+				activeId={activeTabKey}
+				ariaLabel="Settings categories"
+				onSelect={handleTabClick}
+				spotlightIdPrefix="settings-tab"
+				tabs={SETTINGS_PANEL_TABS}
+			/>
 
 			{shouldRenderSection('serverInfo') ? (
 				<section className={css.section}>

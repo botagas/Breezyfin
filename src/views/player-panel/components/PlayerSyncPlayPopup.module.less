@@ -1,0 +1,38 @@
+.content {
+	box-sizing: border-box;
+	width: min(34rem, 92vw);
+}
+
+.statusGrid {
+	display: grid;
+	grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 1.5fr);
+	gap: 0.35rem 0.8rem;
+	margin: 0.75rem 0;
+
+	> :nth-child(odd) {
+		color: var(--bf-theme-muted-text);
+	}
+
+	> :nth-child(even) {
+		color: var(--bf-theme-text-primary);
+		text-align: right;
+	}
+}
+
+.participants {
+	max-height: 28vh;
+	margin: 0.65rem 0;
+	padding: 0.35rem 0.65rem;
+	overflow-y: auto;
+	border: 0.06rem solid var(--bf-theme-surface-border);
+	border-radius: var(--bf-theme-popup-radius);
+	background: var(--bf-theme-card-filter-chip-bg);
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+	margin-top: 0.85rem;
+}

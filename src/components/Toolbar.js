@@ -20,6 +20,10 @@ import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
 import css from './Toolbar.module.less';
 import {useRuntimeSuspended} from '../hooks/useRuntimeSuspension';
 import {popupShellCss} from '../styles/popupStyles';
+import {
+	INTEGRATION_PREFERENCES_CHANGED_EVENT,
+	readIntegrationPreferences
+} from '../utils/integrationPreferences';
 
 const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
@@ -49,12 +53,12 @@ const Toolbar = ({
 	const [userName, setUserName] = useState('User');
 	const [userAvatarUrl, setUserAvatarUrl] = useState('');
 	const [pluginFeatures, setPluginFeatures] = useState({
-		discovery: false,
 		calendar: false,
 		syncPlay: false,
 		watchParty: false,
 		hideNativeSyncButton: false
 	});
+	const [watchlistEnabled, setWatchlistEnabled] = useState(() => readIntegrationPreferences(jellyfinService).watchlistEnabled);
 	const serviceSessionKey = `${jellyfinService.serverUrl || ''}|${jellyfinService.userId || ''}|${jellyfinService.accessToken || ''}`;
 	const {disclosures, openDisclosure, closeDisclosure, setDisclosure} = useDisclosureMap(INITIAL_TOOLBAR_DISCLOSURES);
 	const showUserMenu = disclosures[TOOLBAR_DISCLOSURE_KEYS.USER_MENU] === true;
@@ -89,7 +93,7 @@ const Toolbar = ({
 		}
 		if (activeSection === 'favorites') return 'Favorites';
 		if (activeSection === 'search') return 'Search';
-		if (activeSection === 'discovery') return 'Discovery';
+		if (activeSection === 'watchlist') return 'Watchlist';
 		if (activeSection === 'calendar') return 'Calendar';
 		if (activeSection === 'syncPlay') return 'SyncPlay';
 		if (activeSection === 'watchParty') return 'Watch Party';
@@ -138,7 +142,7 @@ const Toolbar = ({
 	useEffect(() => {
 		let cancelled = false;
 		let retryTimer = null;
-		setPluginFeatures((current) => ({...current, discovery: false, calendar: false}));
+		setPluginFeatures((current) => ({...current, calendar: false}));
 		const loadCapabilities = () => {
 			jellyfinService.getBreezyfinCapabilities().then((capabilities) => {
 				if (cancelled) return;
@@ -150,7 +154,6 @@ const Toolbar = ({
 				}
 				setPluginFeatures((current) => ({
 					...current,
-					discovery: capabilities.features?.['discovery.v1'] === true,
 					calendar: capabilities.features?.['calendar.v1'] === true
 				}));
 			}).catch(() => null);
@@ -160,6 +163,15 @@ const Toolbar = ({
 			cancelled = true;
 			if (retryTimer) clearTimeout(retryTimer);
 		};
+	}, [serviceSessionKey]);
+
+	useEffect(() => {
+		const updateWatchlistPreference = () => {
+			setWatchlistEnabled(readIntegrationPreferences(jellyfinService).watchlistEnabled);
+		};
+		updateWatchlistPreference();
+		window.addEventListener(INTEGRATION_PREFERENCES_CHANGED_EVENT, updateWatchlistPreference);
+		return () => window.removeEventListener(INTEGRATION_PREFERENCES_CHANGED_EVENT, updateWatchlistPreference);
 	}, [serviceSessionKey]);
 
 	useEffect(() => {
@@ -306,8 +318,8 @@ const Toolbar = ({
 		onNavigate('settings');
 	}, [onNavigate]);
 
-	const handleNavigateDiscovery = useCallback(() => {
-		onNavigate('discovery');
+	const handleNavigateWatchlist = useCallback(() => {
+		onNavigate('watchlist');
 	}, [onNavigate]);
 
 	const handleNavigateCalendar = useCallback(() => {
@@ -561,11 +573,11 @@ const Toolbar = ({
 					handleNavigateFavorites={handleNavigateFavorites}
 					handleNavigateSearch={handleNavigateSearch}
 					handleNavigateSettings={handleNavigateSettings}
-					handleNavigateDiscovery={handleNavigateDiscovery}
+					handleNavigateWatchlist={handleNavigateWatchlist}
 					handleNavigateCalendar={handleNavigateCalendar}
 					handleNavigateSyncPlay={handleNavigateSyncPlay}
 					handleNavigateWatchParty={handleNavigateWatchParty}
-					showDiscovery={pluginFeatures.discovery}
+					showWatchlist={watchlistEnabled}
 					showCalendar={pluginFeatures.calendar}
 					showSyncPlay={pluginFeatures.syncPlay}
 					showWatchParty={pluginFeatures.watchParty}
@@ -610,11 +622,11 @@ const Toolbar = ({
 					activeLibraryId={activeLibraryId}
 					handleLibraryNavigate={handleLibraryNavigate}
 					handleNavigateSettings={handleNavigateSettings}
-					handleNavigateDiscovery={handleNavigateDiscovery}
+					handleNavigateWatchlist={handleNavigateWatchlist}
 					handleNavigateCalendar={handleNavigateCalendar}
 					handleNavigateSyncPlay={handleNavigateSyncPlay}
 					handleNavigateWatchParty={handleNavigateWatchParty}
-					showDiscovery={pluginFeatures.discovery}
+					showWatchlist={watchlistEnabled}
 					showCalendar={pluginFeatures.calendar}
 					showSyncPlay={pluginFeatures.syncPlay}
 					showWatchParty={pluginFeatures.watchParty}

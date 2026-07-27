@@ -18,18 +18,31 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 ## Current panel-local decompositions
 
 - `src/views/HomeSectionPanel.js` expands Home rows into paged section-result grids using shared panel scroll/cache behavior.
-- `src/views/DiscoveryPanel.js` renders five capability-gated read-only provider feeds
-  progressively (Trending first, then two bounded workers), retaining successful rows
-  and exposing per-row retry/paging failures. Interrupted cached loads resume unfinished
-  rows instead of preserving a stale loading state. Linked Jellyfin artwork feeds the
-  shared media backdrop before authenticated provider artwork is used as fallback.
+- `src/views/HomePanel.js` treats enabled HSS descriptors as authoritative. Ordinary
+  descriptors load Jellyfin items; Discovery descriptors load the named provider feed,
+  preserve HSS ordering/layout, and use the shared linked/external activation path.
+- `src/views/WatchlistPanel.js` provides the native Likes Watchlist plus plugin-backed
+  Series Progress, Completed Series, Movie History, and Statistics views. Discovery
+  feeds render only as enabled server-provided HSS Home sections. Its advanced result
+  tabs give Sandstone `VirtualList` exclusive vertical-scroll ownership, use fixed
+  scaled item metrics, and suppress the generic list focus zoom for full-width rows.
+  Main insight rows open their embedded Jellyfin item while nested actions stop
+  propagation. Each advanced tab has an independent 60-second cache; stale content
+  remains visible during refresh and remaining first pages warm sequentially after the
+  first successful advanced request. Watchlist and Statistics retain `AppScroller`.
+  Per-tab cache and warming behavior lives in `src/views/watchlist-panel/`.
 - `src/views/CalendarPanel.js` groups capability-gated Movie/Episode events by the
   client-local date and opts into provider-partial results while surfacing warnings.
   Filter replacement clears old-query results before loading the new query. Event cards
   preserve real episode numbering and prefer authenticated Arr artwork with linked
-  Jellyfin Movie/Series artwork as fallback. The active implementation is an Agenda;
-  Day/Week/Month Calendar views remain planned work.
-- `src/views/SyncPlayPanel.js` browses, creates, joins, and leaves native Jellyfin groups before playback, using the active queue item for the shared media backdrop when available.
+  Jellyfin Movie/Series artwork as fallback. Its media-type filter and Watchlist's view
+  selector reuse the Settings-style `PanelTabNavigation`. The active Calendar
+  implementation remains a single paged Agenda request; independent/staged date-range
+  loading belongs to the planned Day/Week/Month architecture rather than a temporary
+  Discovery-style feed loader.
+- `src/views/SyncPlayPanel.js` browses, creates, resumes, suspends, and leaves native
+  Jellyfin groups. App-level coordination owns queue/navigation state while Player owns
+  timing against the currently attached video.
 - `src/views/WatchPartyPanel.js` browses, creates, and password-joins authenticated rooms before playback.
 - `src/views/library-panel/` (`hooks/`)
 - `src/views/login-panel/` (`components/`, `hooks/`, `utils/`)

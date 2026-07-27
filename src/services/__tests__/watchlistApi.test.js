@@ -12,24 +12,42 @@ const createService = () => ({
 });
 
 describe('watchlistApi', () => {
-	it('sorts by SortName, Name, and ID before paging', async () => {
+	it('requests deterministic server paging without building a client snapshot', async () => {
 		const service = createService();
 		service._request.mockResolvedValueOnce({
 			Items: [
-				{Id: 'b', Type: 'Movie', SortName: 'Same', Name: 'Same'},
 				{Id: 'a', Type: 'Series', SortName: 'Same', Name: 'Same'},
-				{Id: 'z', Type: 'Movie', SortName: 'Alpha', Name: 'Zed'}
+				{Id: 'b', Type: 'Movie', SortName: 'Same', Name: 'Same'}
 			],
-			TotalRecordCount: 3
+			TotalRecordCount: 5
 		});
-		await expect(getLikesWatchlist(service, 2, 1)).resolves.toEqual({
+		await expect(getLikesWatchlist(service, 2, 1, ['Series'])).resolves.toEqual({
 			items: [
 				{Id: 'a', Type: 'Series', SortName: 'Same', Name: 'Same'},
 				{Id: 'b', Type: 'Movie', SortName: 'Same', Name: 'Same'}
 			],
-			totalRecordCount: 3,
+			totalRecordCount: 5,
 			nextStartIndex: 3,
-			hasMore: false
+			hasMore: true
+		});
+		const requestPath = service._request.mock.calls[0][0];
+		expect(requestPath).toContain('includeItemTypes=Series');
+		expect(requestPath).toContain('sortBy=SortName%2CName');
+		expect(requestPath).toContain('limit=2');
+		expect(requestPath).toContain('startIndex=1');
+		expect(service._request).toHaveBeenCalledTimes(1);
+	});
+
+	it('advances paging by raw server results when malformed rows are discarded', async () => {
+		const service = createService();
+		service._request.mockResolvedValueOnce({
+			Items: [{Id: 'valid'}, null],
+			TotalRecordCount: 4
+		});
+		await expect(getLikesWatchlist(service, 2, 0)).resolves.toMatchObject({
+			items: [{Id: 'valid'}],
+			nextStartIndex: 2,
+			hasMore: true
 		});
 	});
 

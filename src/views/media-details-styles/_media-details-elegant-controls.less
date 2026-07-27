@@ -6,8 +6,8 @@
 .primaryButton {
 	.elegantControlButtonCore();
 	--bf-button-fg: var(--bf-md-elegant-text-primary);
-	--bf-button-fg-hover: var(--bf-md-elegant-accent);
-	--bf-button-fg-active: var(--bf-md-elegant-accent);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
 }
 
 .actionButton,
@@ -15,8 +15,13 @@
 .episodeFavoriteButton,
 .episodeWatchedButton {
 	--bf-button-fg: var(--bf-md-elegant-text-primary);
-	--bf-button-fg-hover: var(--bf-md-elegant-accent);
-	--bf-button-fg-active: var(--bf-md-elegant-accent);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
+}
+
+.primaryButton {
+	--bf-button-fg-hover: var(--bf-md-text-on-light);
+	--bf-button-fg-active: var(--bf-md-text-on-light);
 }
 
 .trackSelectorPrimary :global(.bf-button-bg),

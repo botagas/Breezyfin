@@ -248,6 +248,7 @@ describe('playbackApi', () => {
 			playMethod: 'Transcode',
 			playSessionId: 'session-1',
 			mediaSourceId: 'source-1',
+			playlistItemId: 'playlist-item-1',
 			audioStreamIndex: 2,
 			subtitleStreamIndex: -1
 		});
@@ -267,6 +268,7 @@ describe('playbackApi', () => {
 				PlayMethod: 'Transcode',
 				PlaySessionId: 'session-1',
 				MediaSourceId: 'source-1',
+				PlaylistItemId: 'playlist-item-1',
 				AudioStreamIndex: 2,
 				SubtitleStreamIndex: -1
 			})

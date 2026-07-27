@@ -1,10 +1,11 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BodyText from '@enact/sandstone/BodyText';
 import IntegrationPanelLayout from '../components/IntegrationPanelLayout';
-import Button from '../components/BreezyButton';
+import PanelActionButton from '../components/PanelActionButton';
 import jellyfinService from '../services/jellyfinService';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
 import {usePanelScrollState} from '../hooks/usePanelScrollState';
+import {useSyncPlay} from '../contexts/SyncPlayContext';
 
 import css from './IntegrationPanels.module.less';
 
@@ -21,7 +22,8 @@ const SyncPlayPanel = ({
 }) => {
 	const serviceSessionKey = `${jellyfinService.serverUrl || ''}|${jellyfinService.userId || ''}|${jellyfinService.accessToken || ''}`;
 	const [groups, setGroups] = useState([]);
-	const [joinedGroup, setJoinedGroup] = useState(() => jellyfinService.getSyncPlayState());
+	const syncPlay = useSyncPlay();
+	const joinedGroup = syncPlay.group;
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [backdropItem, setBackdropItem] = useState(null);
@@ -51,12 +53,9 @@ const SyncPlayPanel = ({
 
 	useEffect(() => {
 		if (!isActive) return undefined;
-		setJoinedGroup(jellyfinService.getSyncPlayState());
 		loadGroups();
-		const unsubscribe = jellyfinService.subscribeSyncPlayState(setJoinedGroup);
 		return () => {
 			requestGenerationRef.current += 1;
-			unsubscribe();
 		};
 	}, [isActive, loadGroups, serviceSessionKey]);
 
@@ -93,45 +92,50 @@ const SyncPlayPanel = ({
 		const generation = requestGenerationRef.current;
 		setError('');
 		try {
-			await jellyfinService.joinSyncPlayGroup(groupId);
+			await syncPlay.joinGroup(groupId);
 			if (generation !== requestGenerationRef.current) return;
-			jellyfinService.setSyncPlayGroup(group);
-			setJoinedGroup(group);
 		} catch (_) {
 			if (generation !== requestGenerationRef.current) return;
 			setError('Could not join this SyncPlay group.');
 		}
-	}, [groups]);
+	}, [groups, syncPlay]);
 
 	const createGroup = useCallback(async () => {
 		const generation = requestGenerationRef.current;
 		setError('');
 		const groupName = `${jellyfinService.username || 'Breezyfin'} Group`;
 		try {
-			await jellyfinService.createSyncPlayGroup(groupName);
+			await syncPlay.createGroup(groupName);
 			if (generation !== requestGenerationRef.current) return;
 			await loadGroups();
 		} catch (_) {
 			if (generation !== requestGenerationRef.current) return;
 			setError('Could not create a SyncPlay group.');
 		}
-	}, [loadGroups]);
+	}, [loadGroups, syncPlay]);
 
 	const leaveGroup = useCallback(async () => {
 		const generation = requestGenerationRef.current;
 		setError('');
 		try {
-			await jellyfinService.leaveSyncPlayGroup();
+			await syncPlay.leaveGroup();
 			if (generation !== requestGenerationRef.current) return;
-			jellyfinService.setSyncPlayGroup(null);
-			setJoinedGroup(null);
 			loadGroups();
 		} catch (_) {
 			if (generation === requestGenerationRef.current) {
 				setError('Could not leave this SyncPlay group.');
 			}
 		}
-	}, [loadGroups]);
+	}, [loadGroups, syncPlay]);
+
+	const startGroupPlayback = useCallback(async () => {
+		setError('');
+		try {
+			await syncPlay.startGroupPlayback();
+		} catch (_) {
+			setError('Could not force the waiting SyncPlay group to start.');
+		}
+	}, [syncPlay]);
 
 	const firstFocusId = joinedGroup ? 'sync-play-leave' : 'sync-play-create';
 	return (
@@ -150,25 +154,41 @@ const SyncPlayPanel = ({
 			<section className={css.section}>
 				<BodyText className={css.sectionTitle}>Native Jellyfin Groups</BodyText>
 				{error ? <BodyText>{error}</BodyText> : null}
-				{error ? <Button spotlightId="sync-play-retry" onClick={loadGroups}>Retry</Button> : null}
+				{error ? <PanelActionButton spotlightId="sync-play-retry" onClick={loadGroups}>Retry</PanelActionButton> : null}
 				{joinedGroup ? (
 					<>
 						<BodyText>Joined: {joinedGroup.GroupName || joinedGroup.GroupId}</BodyText>
 						<BodyText>Participants: {(joinedGroup.Participants || []).length}</BodyText>
-						<Button spotlightId="sync-play-leave" onClick={leaveGroup}>Leave Group</Button>
+						<BodyText>
+							Group state: {syncPlay.groupState?.state || joinedGroup.State || 'Unknown'}
+						</BodyText>
+						<BodyText>Local playback: {syncPlay.followMode === 'following' ? 'Following' : 'Suspended'}</BodyText>
+						{syncPlay.followMode === 'suspended' && syncPlay.queue.activeItemId ? (
+							<PanelActionButton spotlightId="sync-play-resume" onClick={syncPlay.resumeSession}>
+								Resume Session
+							</PanelActionButton>
+						) : null}
+						{String(syncPlay.groupState?.state || joinedGroup.State || '').toLowerCase() === 'waiting' ? (
+							<PanelActionButton spotlightId="sync-play-start" onClick={startGroupPlayback}>
+								Start Group Playback
+							</PanelActionButton>
+						) : null}
+						<PanelActionButton spotlightId="sync-play-leave" onClick={leaveGroup}>Leave Group</PanelActionButton>
 					</>
 				) : (
 					<>
-						<Button spotlightId="sync-play-create" onClick={createGroup}>Create Group</Button>
+						<PanelActionButton spotlightId="sync-play-create" onClick={createGroup}>
+							Create Group
+						</PanelActionButton>
 						{groups.map((group) => (
-							<Button
+							<PanelActionButton
 								key={group.GroupId}
 								spotlightId={`sync-play-group-${group.GroupId}`}
 								data-group-id={group.GroupId}
 								onClick={joinGroup}
 							>
 								{group.GroupName || group.GroupId} ({(group.Participants || []).length})
-							</Button>
+							</PanelActionButton>
 						))}
 					</>
 				)}

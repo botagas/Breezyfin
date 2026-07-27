@@ -30,9 +30,9 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Smart subtitle and audio handling, including configurable client-rendered text and experimental bitmap subtitles where possible to preserve video quality
 - Adaptive image loading (WebP when supported, with automatic fallback on load failure)
 - Optional Breezyfin plugin Home sections with built-in Home fallback
-- Optional native Jellyfin Likes watchlist for Movies and Series
-- Read-only Discovery and Calendar views when advertised by the Breezyfin plugin
-- Native Jellyfin SyncPlay and authenticated JellyWatchParty rooms
+- Native Jellyfin Likes Watchlist with optional plugin-backed progress, history, and statistics
+- HSS-controlled Discovery feeds and a Calendar view when advertised by the Breezyfin plugin
+- App-coordinated native Jellyfin SyncPlay and authenticated JellyWatchParty rooms
 - Built-in diagnostics, logs, and cache tools for easier troubleshooting
 
 ## Install on TV (IPK)

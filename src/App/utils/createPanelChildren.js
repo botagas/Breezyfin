@@ -7,7 +7,7 @@ import FavoritesPanel from '../../views/FavoritesPanel';
 import SettingsPanel from '../../views/SettingsPanel';
 import PlayerPanel from '../../views/PlayerPanel';
 import MediaDetailsPanel from '../../views/MediaDetailsPanel';
-import DiscoveryPanel from '../../views/DiscoveryPanel';
+import WatchlistPanel from '../../views/WatchlistPanel';
 import CalendarPanel from '../../views/CalendarPanel';
 import SyncPlayPanel from '../../views/SyncPlayPanel';
 import WatchPartyPanel from '../../views/WatchPartyPanel';
@@ -43,7 +43,7 @@ export const createPanelChildren = ({
 		search: searchPanelState,
 		favorites: favoritesPanelState,
 		settings: settingsPanelState,
-		discovery: discoveryPanelState,
+		watchlist: watchlistPanelState,
 		calendar: calendarPanelState,
 		syncPlay: syncPlayPanelState,
 		watchParty: watchPartyPanelState,
@@ -68,7 +68,7 @@ export const createPanelChildren = ({
 		search: handleSearchPanelStateChange,
 		favorites: handleFavoritesPanelStateChange,
 		settings: handleSettingsPanelStateChange,
-		discovery: handleDiscoveryPanelStateChange,
+		watchlist: handleWatchlistPanelStateChange,
 		calendar: handleCalendarPanelStateChange,
 		syncPlay: handleSyncPlayPanelStateChange,
 		watchParty: handleWatchPartyPanelStateChange,
@@ -81,7 +81,7 @@ export const createPanelChildren = ({
 		search: registerSearchBackHandler,
 		favorites: registerFavoritesBackHandler,
 		settings: registerSettingsBackHandler,
-		discovery: registerDiscoveryBackHandler,
+		watchlist: registerWatchlistBackHandler,
 		calendar: registerCalendarBackHandler,
 		syncPlay: registerSyncPlayBackHandler,
 		watchParty: registerWatchPartyBackHandler,
@@ -186,17 +186,17 @@ export const createPanelChildren = ({
 			registerBackHandler={registerSettingsBackHandler}
 			noCloseButton
 		/>,
-		<DiscoveryPanel
-			key="discovery"
-			isActive={currentView === 'discovery'}
+		<WatchlistPanel
+			key="watchlist"
+			isActive={currentView === 'watchlist'}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
 			onLogout={handleLogout}
 			onExit={handleExit}
-			cachedState={discoveryPanelState}
-			onCacheState={handleDiscoveryPanelStateChange}
-			registerBackHandler={registerDiscoveryBackHandler}
+			cachedState={watchlistPanelState}
+			onCacheState={handleWatchlistPanelStateChange}
+			registerBackHandler={registerWatchlistBackHandler}
 			noCloseButton
 		/>,
 		<CalendarPanel

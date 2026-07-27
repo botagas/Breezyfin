@@ -25,11 +25,11 @@ const ToolbarClassicLayout = ({
 	activeLibraryId,
 	handleLibraryNavigate,
 	handleNavigateSettings,
-	handleNavigateDiscovery,
+	handleNavigateWatchlist,
 	handleNavigateCalendar,
 	handleNavigateSyncPlay,
 	handleNavigateWatchParty,
-	showDiscovery,
+	showWatchlist,
 	showCalendar,
 	showSyncPlay,
 	showWatchParty,
@@ -96,15 +96,15 @@ const ToolbarClassicLayout = ({
 					</SpottableDiv>
 				</div>
 				<div className={css.centerScroller} ref={centerRef} onFocus={handleCenterFocus}>
-					{showDiscovery ? (
+					{showWatchlist ? (
 						<Button
 							size="small"
-							onClick={handleNavigateDiscovery}
-							selected={activeSection === 'discovery'}
+							onClick={handleNavigateWatchlist}
+							selected={activeSection === 'watchlist'}
 							className={css.toolbarButton}
-							spotlightId="toolbar-discovery"
+							spotlightId="toolbar-watchlist"
 						>
-							Discovery
+							Watchlist
 						</Button>
 					) : null}
 					{showCalendar ? (

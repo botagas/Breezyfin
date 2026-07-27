@@ -2,7 +2,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import BodyText from '@enact/sandstone/BodyText';
 import Input from '@enact/sandstone/Input';
 import IntegrationPanelLayout from '../components/IntegrationPanelLayout';
-import Button from '../components/BreezyButton';
+import PanelActionButton from '../components/PanelActionButton';
 import jellyfinService from '../services/jellyfinService';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
 import {usePanelScrollState} from '../hooks/usePanelScrollState';
@@ -209,7 +209,9 @@ const WatchPartyPanel = ({
 				{availability?.available !== true ? (
 					<>
 						<BodyText>This server does not provide an authenticated JellyWatchParty session.</BodyText>
-						<Button spotlightId="watch-party-retry" onClick={detectAvailability}>Retry</Button>
+						<PanelActionButton spotlightId="watch-party-retry" onClick={detectAvailability}>
+							Retry
+						</PanelActionButton>
 					</>
 				) : null}
 				{availability?.available === true && state.connectionState !== 'open' ? (
@@ -220,8 +222,14 @@ const WatchPartyPanel = ({
 					<>
 						<BodyText>Joined: {state.room.name}</BodyText>
 						<BodyText>{state.room.isHost ? 'Host' : 'Participant'} - {state.room.participantCount} online</BodyText>
-						{state.room.mediaId ? <Button spotlightId="watch-party-play" onClick={playRoomItem}>Play Room Item</Button> : null}
-						<Button spotlightId="watch-party-leave" onClick={leaveRoom}>Leave Room</Button>
+						{state.room.mediaId ? (
+							<PanelActionButton spotlightId="watch-party-play" onClick={playRoomItem}>
+								Play Room Item
+							</PanelActionButton>
+						) : null}
+						<PanelActionButton spotlightId="watch-party-leave" onClick={leaveRoom}>
+							Leave Room
+						</PanelActionButton>
 					</>
 				) : availability?.available === true ? (
 					<>
@@ -240,20 +248,32 @@ const WatchPartyPanel = ({
 							onChange={handlePasswordChange}
 							className="bf-input-trigger"
 						/>
-						<Button spotlightId="watch-party-create" onClick={createRoom} disabled={state.connectionState !== 'open'}>Create Room</Button>
-						<Button spotlightId="watch-party-refresh" onClick={refreshRooms} disabled={state.connectionState !== 'open'}>Refresh Rooms</Button>
+						<PanelActionButton
+							spotlightId="watch-party-create"
+							onClick={createRoom}
+							disabled={state.connectionState !== 'open'}
+						>
+							Create Room
+						</PanelActionButton>
+						<PanelActionButton
+							spotlightId="watch-party-refresh"
+							onClick={refreshRooms}
+							disabled={state.connectionState !== 'open'}
+						>
+							Refresh Rooms
+						</PanelActionButton>
 						{state.rooms.length === 0 && state.connectionState === 'open' ? (
 							<BodyText>No watch parties are currently open.</BodyText>
 						) : null}
 						{state.rooms.map((room) => (
-							<Button
+							<PanelActionButton
 								key={room.id}
 								spotlightId={`watch-party-room-${room.id}`}
 								data-room-id={room.id}
 								onClick={joinRoom}
 							>
 								{room.name} ({room.count}){room.hasPassword ? ' - Password' : ''}
-							</Button>
+							</PanelActionButton>
 						))}
 					</>
 				) : null}

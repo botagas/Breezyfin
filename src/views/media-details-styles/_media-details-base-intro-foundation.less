@@ -27,7 +27,7 @@
 	--bf-md-text-date: rgba(199, 216, 236, 0.7);
 	--bf-md-text-episode-overview: rgba(243, 249, 255, 0.88);
 	--bf-md-text-stat: rgba(224, 236, 250, 0.84);
-	--bf-md-star-color: #ffd166;
+	--bf-md-star-color: var(--bf-theme-rating-star);
 	--bf-md-control-bg-soft: rgba(255, 255, 255, 0.06);
 	--bf-md-control-bg-hover: rgba(255, 255, 255, 0.14);
 	--bf-md-control-bg-hover-strong: rgba(255, 255, 255, 0.17);
@@ -129,7 +129,7 @@
 	&:focus :global(.icon),
 	&:global(.spottable):focus :global(.Icon),
 	&:global(.spottable):focus :global(.icon) {
-		color: rgba(var(--bf-theme-accent-rgb), 0.98) !important;
+		color: var(--bf-theme-button-fg-hover) !important;
 	}
 }
 

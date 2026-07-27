@@ -16,6 +16,7 @@ import {
 	getMediaPanelBackdropUrls,
 	getPosterCardImageUrls,
 	isPlayableMediaItem,
+	mergeMediaItemImageCandidates,
 	uniqueImageCandidates
 } from '../mediaItemUtils';
 
@@ -150,6 +151,18 @@ describe('mediaItemUtils landscape artwork', () => {
 			'backdrop:series-landscape:series-backdrop',
 			'primary:series-landscape:series-primary',
 			'primary:episode-landscape:untagged'
+		]);
+	});
+
+	it('keeps provider artwork ahead of generated Jellyfin fallbacks', () => {
+		expect(mergeMediaItemImageCandidates({
+			ImageCandidates: ['provider-image', 'shared-image'],
+			AuthenticatedImageUrl: 'authenticated-image'
+		}, ['shared-image', 'jellyfin-fallback'])).toEqual([
+			'provider-image',
+			'shared-image',
+			'authenticated-image',
+			'jellyfin-fallback'
 		]);
 	});
 

@@ -9,7 +9,7 @@ export const usePanelBackHandlerRegistry = () => {
 	const searchBackHandlerRef = useRef(null);
 	const favoritesBackHandlerRef = useRef(null);
 	const settingsBackHandlerRef = useRef(null);
-	const discoveryBackHandlerRef = useRef(null);
+	const watchlistBackHandlerRef = useRef(null);
 	const calendarBackHandlerRef = useRef(null);
 	const syncPlayBackHandlerRef = useRef(null);
 	const watchPartyBackHandlerRef = useRef(null);
@@ -51,8 +51,8 @@ export const usePanelBackHandlerRegistry = () => {
 		settingsBackHandlerRef.current = handler;
 	}, []);
 
-	const registerDiscoveryBackHandler = useCallback((handler) => {
-		discoveryBackHandlerRef.current = handler;
+	const registerWatchlistBackHandler = useCallback((handler) => {
+		watchlistBackHandlerRef.current = handler;
 	}, []);
 
 	const registerCalendarBackHandler = useCallback((handler) => {
@@ -77,7 +77,7 @@ export const usePanelBackHandlerRegistry = () => {
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
 			settingsBackHandlerRef,
-			discoveryBackHandlerRef,
+			watchlistBackHandlerRef,
 			calendarBackHandlerRef,
 			syncPlayBackHandlerRef,
 			watchPartyBackHandlerRef
@@ -91,7 +91,7 @@ export const usePanelBackHandlerRegistry = () => {
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
 		registerSettingsBackHandler,
-		registerDiscoveryBackHandler,
+		registerWatchlistBackHandler,
 		registerCalendarBackHandler,
 		registerSyncPlayBackHandler,
 		registerWatchPartyBackHandler

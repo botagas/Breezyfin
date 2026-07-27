@@ -67,6 +67,19 @@ describe('player recovery subtitle burn-in failure helpers', () => {
 		})).toBe(false);
 	});
 
+	it('does not mistake a generic transcode encode capability for active subtitle burn-in', () => {
+		expect(isSubtitleBurnInPlaybackPath({
+			values: ['/Videos/item/master.m3u8?SubtitleMethod=Encode&TranscodeReasons=VideoRangeTypeNotSupported']
+		})).toBe(false);
+		expect(isSubtitleBurnInPlaybackFailure({
+			errorData: {
+				details: 'fragLoadError',
+				response: {code: 500}
+			},
+			values: ['/videos/item/hls1/main/0.ts?SubtitleMethod=Encode&TranscodeReasons=VideoRangeTypeNotSupported']
+		})).toBe(false);
+	});
+
 	it('extracts subtitle index from encoded HLS fragment URLs for early failures', () => {
 		expect(extractSubtitleStreamIndexFromValues([
 			'/videos/item/hls1/main/0.ts?SubtitleMethod=Encode&SubtitleStreamIndex=4'

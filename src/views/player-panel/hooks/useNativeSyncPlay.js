@@ -1,53 +1,102 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
 import {
-	getSyncPlayDriftCorrection,
+	getBoundedSyncPlayDriftCorrection,
 	ServerClockOffsetEstimator
 } from '../../../utils/syncTiming';
+import {useSyncPlay} from '../../../contexts/SyncPlayContext';
+import {
+	getSyncPlayCommandTargetSeconds,
+	isSyncPlayVideoReady
+} from '../../../utils/syncPlayState';
 
 const TICKS_PER_SECOND = 10000000;
+const BUFFERING_REPORT_DELAY_MS = 3000;
 
 export const useNativeSyncPlay = ({
 	isActive,
 	item,
+	playbackGeneration,
 	videoRef,
 	handleLocalPause,
 	handleLocalPlay,
 	handleLocalSeek,
+	syncPlayStartupBridge,
 	setToastMessage
 }) => {
-	const [group, setGroup] = useState(() => jellyfinService.getSyncPlayState());
+	const syncPlay = useSyncPlay();
+	const group = syncPlay.group;
 	const [popupOpen, setPopupOpen] = useState(false);
 	const [connectionGeneration, setConnectionGeneration] = useState(0);
 	const estimatorRef = useRef(new ServerClockOffsetEstimator());
 	const targetRef = useRef(null);
 	const forceNextSeekRef = useRef(true);
 	const scheduledCommandRef = useRef(null);
+	const lastCommandKeyRef = useRef('');
+	const lastReadyKeyRef = useRef('');
+	const clockReadyRef = useRef(false);
+	const queuedCommandRef = useRef(null);
+	const initialReadySentRef = useRef(false);
+	const readyPendingRef = useRef(false);
+	const bufferingTimerRef = useRef(null);
+	const bufferingReportedRef = useRef(false);
+	const readyGenerationRef = useRef(0);
+	const reportReadyRef = useRef(() => Promise.resolve(false));
+	const flushQueuedCommandRef = useRef(() => {});
 
 	const resetRate = useCallback(() => {
 		if (videoRef.current) videoRef.current.playbackRate = 1;
 	}, [videoRef]);
 
+	const makeStateRequest = useCallback(() => {
+		const video = videoRef.current;
+		return {
+			When: new Date(Date.now() + estimatorRef.current.offsetMs).toISOString(),
+			PositionTicks: Math.floor((video?.currentTime || 0) * TICKS_PER_SECOND),
+			IsPlaying: Boolean(video && !video.paused),
+			PlaylistItemId: syncPlay.queue?.activePlaylistItemId || undefined
+		};
+	}, [syncPlay.queue?.activePlaylistItemId, videoRef]);
+
 	const applyTargetCorrection = useCallback((forceSeek = false) => {
 		const video = videoRef.current;
 		const target = targetRef.current;
-		if (!video || !target || video.paused) {
+		if (!video || !target || (video.paused && !forceSeek)) {
 			resetRate();
 			return;
 		}
 		const serverNow = Date.now() + estimatorRef.current.offsetMs;
-		const targetSeconds = target.positionSeconds + Math.max(0, (serverNow - target.whenMs) / 1000);
+		const targetSeconds = getSyncPlayCommandTargetSeconds({
+			positionTicks: target.positionTicks,
+			when: target.when,
+			serverNowMs: serverNow
+		});
+		if (!Number.isFinite(targetSeconds)) {
+			targetRef.current = null;
+			resetRate();
+			return;
+		}
 		const driftMs = (targetSeconds - video.currentTime) * 1000;
-		const correction = getSyncPlayDriftCorrection(driftMs, {forceSeek});
-		if (correction.action === 'seek') video.currentTime = Math.max(0, targetSeconds);
+		const correction = getBoundedSyncPlayDriftCorrection(driftMs, {
+			forceSeek,
+			hardSeekApplied: target.hardSeekApplied === true
+		});
+		if (correction.action === 'seek') {
+			video.currentTime = Math.max(0, targetSeconds);
+			target.hardSeekApplied = true;
+		}
 		video.playbackRate = correction.playbackRate;
 	}, [resetRate, videoRef]);
 
 	const executeCommand = useCallback((command) => {
 		const video = videoRef.current;
-		if (!video || !command?.Command) return;
+		if (!video || !command?.Command || syncPlay.followMode !== 'following') return;
+		if (command.PlaylistItemId && command.PlaylistItemId !== syncPlay.queue?.activePlaylistItemId) return;
+		const commandKey = [command.Command, command.When, command.PositionTicks, command.PlaylistItemId].join('|');
+		if (commandKey === lastCommandKeyRef.current) return;
+		lastCommandKeyRef.current = commandKey;
 		const whenMs = Date.parse(command.When);
-		const positionSeconds = Number(command.PositionTicks) / TICKS_PER_SECOND;
+		const positionTicks = Number(command.PositionTicks);
 		const run = () => {
 			switch (command.Command) {
 				case 'Pause':
@@ -56,18 +105,31 @@ export const useNativeSyncPlay = ({
 					resetRate();
 					break;
 				case 'Unpause':
-					if (Number.isFinite(positionSeconds)) {
+					if (Number.isFinite(positionTicks)) {
 						targetRef.current = {
-							positionSeconds,
-							whenMs: Number.isFinite(whenMs) ? whenMs : Date.now() + estimatorRef.current.offsetMs
+							positionTicks,
+							when: Number.isFinite(whenMs)
+								? command.When
+								: new Date(Date.now() + estimatorRef.current.offsetMs).toISOString(),
+							hardSeekApplied: false
 						};
 						applyTargetCorrection(forceNextSeekRef.current);
 						forceNextSeekRef.current = false;
 					}
-					video.play().catch(() => {});
+					Promise.resolve(
+						syncPlayStartupBridge?.startAuthoritativePlayback() ||
+						video.play()
+					)
+						.then(() => applyTargetCorrection(false))
+						.catch(() => setToastMessage({
+							message: 'SyncPlay could not start local playback.',
+							severity: 'warning'
+						}));
 					break;
 				case 'Seek':
-					if (Number.isFinite(positionSeconds)) video.currentTime = Math.max(0, positionSeconds);
+					if (Number.isFinite(positionTicks)) {
+						video.currentTime = Math.max(0, positionTicks / TICKS_PER_SECOND);
+					}
 					targetRef.current = null;
 					resetRate();
 					break;
@@ -86,44 +148,188 @@ export const useNativeSyncPlay = ({
 			? whenMs - estimatorRef.current.offsetMs
 			: Date.now();
 		scheduledCommandRef.current = setTimeout(run, Math.max(0, localWhen - Date.now()));
-	}, [applyTargetCorrection, resetRate, videoRef]);
+	}, [
+		applyTargetCorrection,
+		resetRate,
+		setToastMessage,
+		syncPlay.followMode,
+		syncPlay.queue?.activePlaylistItemId,
+		syncPlayStartupBridge,
+		videoRef
+	]);
+
+	const flushQueuedCommand = useCallback(() => {
+		const queuedCommand = queuedCommandRef.current;
+		if (!queuedCommand) return;
+		if (
+			queuedCommand.Command === 'Unpause' &&
+			!initialReadySentRef.current
+		) {
+			return;
+		}
+		queuedCommandRef.current = null;
+		executeCommand(queuedCommand);
+	}, [executeCommand]);
+
+	const reportReady = useCallback(async () => {
+		const video = videoRef.current;
+		if (
+			!clockReadyRef.current ||
+			!video ||
+			!isSyncPlayVideoReady(video) ||
+			syncPlay.followMode !== 'following'
+		) {
+			readyPendingRef.current = true;
+			return false;
+		}
+		const readyKey = [
+			item?.Id || '',
+			syncPlay.queue?.activePlaylistItemId || '',
+			video.currentSrc || video.src
+		].join('|');
+		if (
+			readyKey === lastReadyKeyRef.current &&
+			initialReadySentRef.current &&
+			!bufferingReportedRef.current
+		) {
+			readyPendingRef.current = false;
+			flushQueuedCommand();
+			return true;
+		}
+		readyPendingRef.current = false;
+		const readyGeneration = readyGenerationRef.current;
+		try {
+			await jellyfinService.syncPlayReady(makeStateRequest());
+			if (readyGeneration !== readyGenerationRef.current) return false;
+			initialReadySentRef.current = true;
+			bufferingReportedRef.current = false;
+			lastReadyKeyRef.current = readyKey;
+			flushQueuedCommand();
+			return true;
+		} catch (_) {
+			readyPendingRef.current = true;
+			lastReadyKeyRef.current = '';
+			return false;
+		}
+	}, [
+		flushQueuedCommand,
+		item?.Id,
+		makeStateRequest,
+		syncPlay.followMode,
+		syncPlay.queue?.activePlaylistItemId,
+		videoRef
+	]);
+
+	const processCommand = useCallback((command) => {
+		const video = videoRef.current;
+		if (!command?.Command || syncPlay.followMode !== 'following') return;
+		if (
+			!clockReadyRef.current ||
+			!video ||
+			!isSyncPlayVideoReady(video) ||
+			(command.Command === 'Unpause' && !initialReadySentRef.current)
+		) {
+			queuedCommandRef.current = command;
+			return;
+		}
+		executeCommand(command);
+	}, [executeCommand, syncPlay.followMode, videoRef]);
+
+	useEffect(() => {
+		reportReadyRef.current = reportReady;
+		flushQueuedCommandRef.current = flushQueuedCommand;
+	}, [flushQueuedCommand, reportReady]);
+
+	useLayoutEffect(() => {
+		if (!syncPlayStartupBridge) return undefined;
+		const shouldBlockAutomaticStart = () => (
+			isActive &&
+			Boolean(group?.GroupId) &&
+			syncPlay.followMode === 'following'
+		);
+		return syncPlayStartupBridge.registerSyncPlayHandlers({
+			shouldBlockAutomaticStart,
+			reportVideoReady: reportReady
+		});
+	}, [
+		group?.GroupId,
+		isActive,
+		reportReady,
+		syncPlay.followMode,
+		syncPlayStartupBridge
+	]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
-		const unsubscribeState = jellyfinService.subscribeSyncPlayState((nextGroup) => {
-			setGroup(nextGroup);
-			if (!nextGroup) {
-				setPopupOpen(false);
-				targetRef.current = null;
-				resetRate();
-			} else {
-				forceNextSeekRef.current = true;
-			}
-		});
 		const unsubscribeCommand = jellyfinService.onWebSocketMessage('SyncPlayCommand', (message) => {
-			executeCommand(message?.Data);
+			processCommand(message?.Data);
 		});
 		const unsubscribeConnection = jellyfinService.onWebSocketMessage('ConnectionStateChanged', ({state}) => {
 			if (state !== 'open') {
+				clockReadyRef.current = false;
 				resetRate();
 			} else {
 				setConnectionGeneration((generation) => generation + 1);
 			}
 		});
 		return () => {
-			unsubscribeState();
 			unsubscribeCommand();
 			unsubscribeConnection();
 			clearTimeout(scheduledCommandRef.current);
+			clearTimeout(bufferingTimerRef.current);
 			resetRate();
 		};
-	}, [executeCommand, isActive, resetRate]);
+	}, [isActive, processCommand, resetRate]);
 
 	useEffect(() => {
+		if (group?.GroupId) {
+			forceNextSeekRef.current = true;
+			return;
+		}
+		setPopupOpen(false);
 		targetRef.current = null;
-		forceNextSeekRef.current = true;
+		clockReadyRef.current = false;
+		readyGenerationRef.current += 1;
+		queuedCommandRef.current = null;
+		initialReadySentRef.current = false;
+		readyPendingRef.current = false;
+		bufferingReportedRef.current = false;
+		clearTimeout(bufferingTimerRef.current);
 		resetRate();
-	}, [item?.Id, resetRate]);
+	}, [group?.GroupId, resetRate]);
+
+	useEffect(() => {
+		clearTimeout(scheduledCommandRef.current);
+		clearTimeout(bufferingTimerRef.current);
+		readyGenerationRef.current += 1;
+		scheduledCommandRef.current = null;
+		bufferingTimerRef.current = null;
+		targetRef.current = null;
+		queuedCommandRef.current = null;
+		forceNextSeekRef.current = true;
+		lastCommandKeyRef.current = '';
+		lastReadyKeyRef.current = '';
+		initialReadySentRef.current = false;
+		readyPendingRef.current = false;
+		bufferingReportedRef.current = false;
+		resetRate();
+	}, [item?.Id, playbackGeneration, resetRate]);
+
+	useEffect(() => {
+		if (syncPlay.followMode === 'following') return;
+		clearTimeout(scheduledCommandRef.current);
+		scheduledCommandRef.current = null;
+		clearTimeout(bufferingTimerRef.current);
+		readyGenerationRef.current += 1;
+		bufferingTimerRef.current = null;
+		targetRef.current = null;
+		queuedCommandRef.current = null;
+		lastReadyKeyRef.current = '';
+		initialReadySentRef.current = false;
+		readyPendingRef.current = false;
+		bufferingReportedRef.current = false;
+		resetRate();
+	}, [resetRate, syncPlay.followMode]);
 
 	useEffect(() => {
 		if (!isActive || !group?.GroupId) return undefined;
@@ -131,14 +337,21 @@ export const useNativeSyncPlay = ({
 		let timer = null;
 		let sampleCount = 0;
 		estimatorRef.current.reset();
+		clockReadyRef.current = false;
 		const sampleClock = async () => {
 			try {
 				const sample = await jellyfinService.sampleSyncPlayClock();
 				if (cancelled) return;
 				const {pingMs} = estimatorRef.current.recordTimeSync(sample);
-				await jellyfinService.syncPlayPing({Ping: Math.max(0, Math.round(pingMs))});
+				clockReadyRef.current = true;
+				jellyfinService.syncPlayPing({Ping: Math.max(0, Math.round(pingMs))}).catch(() => {});
+				if (readyPendingRef.current) {
+					reportReadyRef.current();
+				} else {
+					flushQueuedCommandRef.current();
+				}
 			} catch (_) {
-				// Playback commands still work with a zero offset while the next sample retries.
+				// Keep commands queued until a valid server clock sample is available.
 			}
 			if (cancelled) return;
 			sampleCount += 1;
@@ -152,32 +365,56 @@ export const useNativeSyncPlay = ({
 	}, [connectionGeneration, group?.GroupId, isActive]);
 
 	useEffect(() => {
-		if (!isActive || !group) return undefined;
+		if (!isActive || !group?.GroupId || syncPlay.followMode !== 'following') return undefined;
 		const interval = setInterval(() => applyTargetCorrection(false), 500);
 		return () => clearInterval(interval);
-	}, [applyTargetCorrection, group, isActive]);
+	}, [applyTargetCorrection, group?.GroupId, isActive, syncPlay.followMode]);
 
 	useEffect(() => {
 		const video = videoRef.current;
-		if (!isActive || !group || !video) return undefined;
-		const makeStateRequest = () => ({
-			When: new Date().toISOString(),
-			PositionTicks: Math.floor((video.currentTime || 0) * TICKS_PER_SECOND),
-			IsPlaying: !video.paused
-		});
+		if (!isActive || !group?.GroupId || syncPlay.followMode !== 'following' || !video) return undefined;
+		const clearBufferingTimer = () => {
+			clearTimeout(bufferingTimerRef.current);
+			bufferingTimerRef.current = null;
+		};
 		const onWaiting = () => {
-			forceNextSeekRef.current = true;
+			if (!initialReadySentRef.current) return;
+			clearBufferingTimer();
 			resetRate();
-			jellyfinService.syncPlayBuffering(makeStateRequest()).catch(() => {});
+			bufferingTimerRef.current = setTimeout(() => {
+				bufferingTimerRef.current = null;
+				if (video.paused || syncPlay.followMode !== 'following') return;
+				forceNextSeekRef.current = true;
+				lastReadyKeyRef.current = '';
+				bufferingReportedRef.current = true;
+				jellyfinService.syncPlayBuffering(makeStateRequest()).catch(() => {
+					bufferingReportedRef.current = false;
+				});
+			}, BUFFERING_REPORT_DELAY_MS);
 		};
-		const onReady = () => jellyfinService.syncPlayReady(makeStateRequest()).catch(() => {});
+		const onPlaying = () => {
+			clearBufferingTimer();
+			if (bufferingReportedRef.current) {
+				readyPendingRef.current = true;
+				reportReadyRef.current();
+			}
+		};
 		video.addEventListener('waiting', onWaiting);
-		video.addEventListener('canplay', onReady);
+		video.addEventListener('playing', onPlaying);
+		if (!video.paused) onPlaying();
 		return () => {
+			clearBufferingTimer();
 			video.removeEventListener('waiting', onWaiting);
-			video.removeEventListener('canplay', onReady);
+			video.removeEventListener('playing', onPlaying);
 		};
-	}, [group, isActive, resetRate, videoRef]);
+	}, [
+		group?.GroupId,
+		isActive,
+		makeStateRequest,
+		resetRate,
+		syncPlay.followMode,
+		videoRef
+	]);
 
 	const handlePause = useCallback(() => {
 		if (!group) return handleLocalPause();
@@ -198,13 +435,9 @@ export const useNativeSyncPlay = ({
 		}).catch(() => setToastMessage('SyncPlay seek failed'));
 	}, [group, handleLocalSeek, resetRate, setToastMessage]);
 	const leaveGroup = useCallback(async () => {
-		try {
-			await jellyfinService.leaveSyncPlayGroup();
-		} finally {
-			jellyfinService.setSyncPlayGroup(null);
-			setPopupOpen(false);
-		}
-	}, []);
+		await syncPlay.leaveGroup();
+		setPopupOpen(false);
+	}, [syncPlay]);
 	const openPopup = useCallback(() => setPopupOpen(true), []);
 	const closePopup = useCallback(() => setPopupOpen(false), []);
 	const handleBack = useCallback(() => {
@@ -222,6 +455,11 @@ export const useNativeSyncPlay = ({
 		handleBack,
 		handlePause,
 		handlePlay,
-		handleSeek
+		handleSeek,
+		next: syncPlay.next,
+		previous: syncPlay.previous,
+		startGroupPlayback: syncPlay.startGroupPlayback,
+		followMode: syncPlay.followMode,
+		groupState: syncPlay.groupState
 	};
 };

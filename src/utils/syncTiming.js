@@ -70,3 +70,17 @@ export const getSyncPlayDriftCorrection = (driftMs, {forceSeek = false} = {}) =>
 		playbackRate: numericDrift > 0 ? 1.03 : 0.97
 	};
 };
+
+export const getBoundedSyncPlayDriftCorrection = (
+	driftMs,
+	{forceSeek = false, hardSeekApplied = false} = {}
+) => {
+	const correction = getSyncPlayDriftCorrection(driftMs, {
+		forceSeek: forceSeek && !hardSeekApplied
+	});
+	if (correction.action !== 'seek' || !hardSeekApplied) return correction;
+	return {
+		action: 'rate',
+		playbackRate: Number(driftMs) > 0 ? 1.03 : 0.97
+	};
+};

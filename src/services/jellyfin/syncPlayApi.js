@@ -19,7 +19,14 @@ const getStateEntry = (service) => {
 		entry.unsubscribe();
 		entry.unsubscribe = null;
 	}
-	entry = {key, group: null, listeners: new Set(), unsubscribe: null};
+	entry = {
+		key,
+		group: null,
+		lastQueueUpdateMs: 0,
+		lastQueueSignature: '',
+		listeners: new Set(),
+		unsubscribe: null
+	};
 	stateByService.set(service, entry);
 	return entry;
 };
@@ -28,20 +35,48 @@ const notifyState = (entry) => {
 	entry.listeners.forEach((listener) => listener(entry.group));
 };
 
+const getQueueSignature = (queue) => JSON.stringify([
+	queue?.LastUpdate || '',
+	queue?.PlayingItemIndex,
+	queue?.StartPositionTicks,
+	queue?.IsPlaying,
+	(queue?.Playlist || []).map((item) => [item?.PlaylistItemId, item?.ItemId])
+]);
+
+const commitPlayQueue = (entry, nextQueue, {allowMissing = false} = {}) => {
+	if (!nextQueue && !allowMissing) return false;
+	const nextUpdatedAt = Date.parse(nextQueue?.LastUpdate || '');
+	if (!Number.isFinite(nextUpdatedAt) && entry.lastQueueUpdateMs > 0) return false;
+	if (Number.isFinite(nextUpdatedAt) && nextUpdatedAt < entry.lastQueueUpdateMs) return false;
+	const nextSignature = nextQueue ? getQueueSignature(nextQueue) : '';
+	if (nextSignature === entry.lastQueueSignature) return false;
+	if (Number.isFinite(nextUpdatedAt)) entry.lastQueueUpdateMs = nextUpdatedAt;
+	entry.lastQueueSignature = nextSignature;
+	if (entry.group) entry.group = {...entry.group, PlayQueue: nextQueue || null};
+	return true;
+};
+
 export const applySyncPlayGroupUpdate = (service, message) => {
 	const update = message?.Data;
 	if (!update || typeof update.Type !== 'string') return;
 	const entry = getStateEntry(service);
+	let changed = true;
 	switch (update.Type) {
-		case 'GroupJoined':
+		case 'GroupJoined': {
 			entry.group = update.Data && typeof update.Data === 'object'
 				? update.Data
 				: {GroupId: update.GroupId, Participants: []};
+			entry.lastQueueUpdateMs = 0;
+			entry.lastQueueSignature = '';
+			if (entry.group.PlayQueue) commitPlayQueue(entry, entry.group.PlayQueue);
 			break;
+		}
 		case 'GroupLeft':
 		case 'GroupDoesNotExist':
 		case 'NotInGroup':
 			entry.group = null;
+			entry.lastQueueUpdateMs = 0;
+			entry.lastQueueSignature = '';
 			break;
 		case 'UserJoined':
 			if (entry.group && typeof update.Data === 'string') {
@@ -68,18 +103,37 @@ export const applySyncPlayGroupUpdate = (service, message) => {
 				};
 			}
 			break;
+		case 'GroupUpdate':
+			if (entry.group && update.Data && typeof update.Data === 'object') {
+				const nextQueue = update.Data.PlayQueue;
+				entry.group = {
+					...entry.group,
+					...update.Data,
+					PlayQueue: entry.group.PlayQueue
+				};
+				if (nextQueue) commitPlayQueue(entry, nextQueue);
+			} else {
+				changed = false;
+			}
+			break;
 		case 'PlayQueue':
-			if (entry.group) entry.group = {...entry.group, PlayQueue: update.Data || null};
+			if (entry.group) {
+				changed = commitPlayQueue(entry, update.Data || null, {allowMissing: true});
+			} else {
+				changed = false;
+			}
 			break;
 		default:
 			return;
 	}
-	notifyState(entry);
+	if (changed) notifyState(entry);
 };
 
 export const setSyncPlayGroup = (service, group) => {
 	const entry = getStateEntry(service);
 	entry.group = group || null;
+	entry.lastQueueUpdateMs = Date.parse(group?.PlayQueue?.LastUpdate || '') || 0;
+	entry.lastQueueSignature = group?.PlayQueue ? getQueueSignature(group.PlayQueue) : '';
 	notifyState(entry);
 };
 
@@ -158,6 +212,11 @@ export const syncPlayBuffering = (service, request) => invoke(
 );
 export const syncPlayReady = (service, request) => invoke(
 	service, 'syncPlayReady', {readyRequestDto: request}
+);
+export const syncPlaySetIgnoreWait = (service, ignoreWait) => invoke(
+	service,
+	'syncPlaySetIgnoreWait',
+	{ignoreWaitRequestDto: {IgnoreWait: Boolean(ignoreWait)}}
 );
 export const syncPlaySetRepeatMode = (service, request) => invoke(
 	service, 'syncPlaySetRepeatMode', {setRepeatModeRequestDto: request}

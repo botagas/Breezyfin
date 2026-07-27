@@ -23,6 +23,14 @@ export const uniqueImageCandidates = (candidates = []) => {
 	return unique;
 };
 
+export const mergeMediaItemImageCandidates = (item, generatedCandidates = []) => (
+	uniqueImageCandidates([
+		...(Array.isArray(item?.ImageCandidates) ? item.ImageCandidates : []),
+		item?.AuthenticatedImageUrl,
+		...generatedCandidates
+	])
+);
+
 export const hasStartedWatching = (item) => {
 	const userData = item?.UserData;
 	if (!userData) return false;

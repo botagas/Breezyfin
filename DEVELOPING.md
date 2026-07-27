@@ -54,7 +54,9 @@ Targeted audit commands:
 - `npm run audit:licenses` (stale production dependency and copied-asset notices)
 - `npm run audit:service-boundaries` (direct Jellyfin API/request-module imports outside services/tests)
 - `npm run audit:import-cycles` (local circular imports in production app source)
-- `npm run audit:hotspots` (large-file and complexity-marker hotspots, with conservative growth ceilings)
+- `npm run audit:hotspots` (informational file/function hotspot and baseline-growth
+  report; only parser or baseline corruption fails)
+- `npm run audit:hotspots:update` (explicitly refresh the reviewed hotspot baseline)
 - `npm run audit:styles` (dead CSS module candidates)
 - `npm run audit:style-imports` (stale local LESS/CSS `@import` references)
 - `npm run audit:style-entries` (stale local CSS/LESS imports from JS/JSX entrypoints)
@@ -120,6 +122,20 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Player recovery/fallback handlers: `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
 - Player lifecycle effects: `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
 - Player native SyncPlay/WatchParty composition: `src/views/player-panel/hooks/usePlayerGroupSessions.js`
+- App-level SyncPlay membership/queue/navigation coordination:
+  `src/App/hooks/useAppSyncPlayCoordinator.js`, composed into App navigation through
+  `src/App/hooks/useAppSyncPlayNavigation.js`; Player's native SyncPlay hook is the timing
+  adapter for the current video and must not perform cross-item navigation. Coordinator
+  commits update React state and live refs together; Leave/reconnect work may clear or
+  restore membership only after matching the current authenticated coordinator generation.
+- SyncPlay Player startup: `src/views/player-panel/utils/syncPlayStartupBridge.js` joins
+  `usePlayerStartupCoordinator` and `useNativeSyncPlay` without transferring queue
+  ownership into Player. While following, buffer paused, report Ready only after video,
+  subtitle, and clock readiness, and call `video.play()` only for authoritative Unpause.
+- Playback runtime isolation: create the immutable context in
+  `src/views/player-panel/utils/playbackRuntimeContext.js` before source attachment.
+  Every HLS callback and asynchronous recovery continuation must match its bound HLS
+  instance, runtime-context identity, and playback generation before taking action.
 - Smart/manual subtitle burn-in policy: `src/utils/playbackSelection.js` (`getSubtitleTranscodePolicy`)
 - Player client-side subtitle renderer/cue cache: `src/views/player-panel/hooks/usePlayerSubtitleRenderer.js`
 - ASS/SSA renderer lifecycle: `src/views/player-panel/utils/subtitle-renderers/`; Breezyfin lightweight parsing is centered in `src/views/player-panel/utils/subtitleRendererAss.js` with focused helpers for alignment, colors, font size, origin/position, karaoke, clipping, common vector drawing paths, `@font` vertical-writing intent, and `\t(...)` transform interpolation, including B-spline `s`/`p` conversion to SVG cubic paths and `\pbo` drawing baseline offsets. Lightweight ASS/SSA must prefer the raw subtitle document over Jellyfin `Stream.js` events because event payloads may omit script-level PlayRes and style metadata; `Stream.js` remains a degraded fallback when raw delivery fails. The lightweight overlay must map ASS coordinates and source dimensions onto the visible `object-fit: contain` video stage rather than the full TV viewport. `PlayResX/Y` remains the authored coordinate plane; valid `LayoutResX/Y` contributes source-layout/pixel-aspect scaling and must not replace PlayRes positioning. Preserve explicit positions, moves, origins, rotations, drawings, clips, and intentionally off-screen positions without applying style margins or safe-area correction. Only ordinary unpositioned cues use the bounded measured containment pass. The stage itself clips all output to the visible video surface. Breezyfin lightweight remains Auto, while libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in are explicit experimental/manual renderer options available in every release channel for troubleshooting. The manual-canvas libass and JASSUB modes are diagnostic paths for separating video-attached timing issues from native-video canvas compositor issues. JASSUB's packaged default font, sourcemap source, version-guarded webOS Canvas2D worker patch, and version-guarded static-asset entry patch are prepared by `scripts/prepare-subtitle-package-assets.cjs` and `scripts/subtitle-assets/jassubCanvas2dPatch.cjs`; the Canvas2D patch is required because JASSUB's WebGL path is unreliable on webOS, and the static-asset entry patch prevents Webpack from bundling JASSUB worker/WASM fallback chunks. libass workers, Breezyfin's fallback subtitle font, JASSUB static worker/WASM/font assets, libbitsub/libpgs bitmap subtitle assets, and external renderer chunks are copied into `dist/` by `scripts/copy-subtitle-assets.cjs` after `npm run pack` / `npm run pack-p`. Stable and develop builds preserve external renderer chunks, transpile ASS.js/JASSUB/libbitsub/libpgs renderer chunks for webOS packaging, validate copied JASSUB static assets, and fail if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` runtime chunks reappear.
@@ -265,8 +281,13 @@ Jellyfin service paths:
 - `src/services/jellyfin/requestErrors.js` (bounded Problem Details parsing and safe
   Jellyfin request errors; raw provider bodies must not be embedded in errors/logs)
 - `src/services/jellyfin/homeSectionsApi.js` (opaque Home descriptors/items)
-- `src/services/jellyfin/discoveryApi.js` and `calendarApi.js` (read-only provider views)
+- `src/services/jellyfin/discoveryApi.js` and `calendarApi.js` (read-only provider data;
+  Discovery is surfaced through enabled HSS Home descriptors rather than a standalone tab)
 - `src/services/jellyfin/watchlistApi.js` (native Likes read/mutation and scoped cache)
+- `src/services/jellyfin/watchlistInsightsApi.js` (capability-gated Watchlist progress,
+  history, and statistics pages supplied by the Breezyfin plugin)
+- `src/views/watchlist-panel/` (Watchlist advanced-tab cache, refresh, warming, and
+  invalidation behavior)
 - `src/services/jellyfin/websocketApi.js` (single authenticated socket lifecycle and typed dispatch)
 - `src/services/jellyfin/syncPlayApi.js` (native Jellyfin SyncPlay state and commands)
 - `src/services/jellyfin/watchPartyApi.js` (isolated authenticated room protocol and in-memory JWT)

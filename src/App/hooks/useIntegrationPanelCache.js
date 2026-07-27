@@ -3,7 +3,7 @@ import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../../constants/integration
 import {normalizePanelStatePayload} from '../utils/panelStateCache';
 
 const EMPTY_STATE = Object.freeze({
-	discovery: null,
+	watchlist: null,
 	calendar: null,
 	syncPlay: null,
 	watchParty: null

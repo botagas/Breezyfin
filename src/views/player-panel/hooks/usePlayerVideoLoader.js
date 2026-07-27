@@ -12,10 +12,12 @@ import {
 import {
 	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
+	getPlaybackStartupFailureMessage,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
 	selectHlsEnginePreference
 } from '../utils/playerVideoLoaderHelpers';
+import {createPlaybackRuntimeContext} from '../utils/playbackRuntimeContext';
 
 const NATIVE_HLS_HDR_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
 
@@ -96,6 +98,7 @@ export const usePlayerVideoLoader = ({
 	requestSubtitleDecision,
 	exitInProgressRef,
 	playbackGenerationRef,
+	playbackRuntimeContextRef,
 	setPlaybackGeneration
 }) => {
 	const loadVideo = useCallback(async (forceTranscodeOverride = false) => {
@@ -105,6 +108,7 @@ export const usePlayerVideoLoader = ({
 		loadRequestIdRef.current = requestId;
 		const generation = (playbackGenerationRef.current || 0) + 1;
 		playbackGenerationRef.current = generation;
+		playbackRuntimeContextRef.current = null;
 		setPlaybackGeneration(generation);
 		const isStaleLoad = () => (
 			exitInProgressRef.current ||
@@ -296,6 +300,27 @@ export const usePlayerVideoLoader = ({
 				playbackInfo,
 				resolvedPlayMethod
 			});
+			const runtimeMediaSourceData = {
+				...mediaSource,
+				...mediaSourceDebugData,
+				__itemId: item.Id,
+				__playbackGeneration: generation,
+				__debugVideoUrl: redactSensitiveUrl(videoUrl),
+				__debugIsHls: isHls,
+				__debugHlsEngine: isHls ? 'pending' : null
+			};
+			const playbackRuntimeContext = createPlaybackRuntimeContext({
+				generation,
+				itemId: item.Id,
+				mediaSourceData: runtimeMediaSourceData,
+				playMethod: resolvedPlayMethod,
+				dynamicRange: dynamicRangeInfo,
+				subtitlePolicy: playbackMeta.subtitlePolicy || mediaSourceDebugData.__debugSubtitlePolicy,
+				selectedAudioTrack: selectedAudio,
+				selectedSubtitleTrack: selectedSubtitle,
+				playbackOptions: playbackSettingsSnapshot
+			});
+			playbackRuntimeContextRef.current = playbackRuntimeContext;
 			let hlsEngine = null;
 
 			setMediaSourceData((previousValue) => ({
@@ -387,7 +412,7 @@ export const usePlayerVideoLoader = ({
 
 							video.src = '';
 							video.removeAttribute('src');
-							attachHlsPlayback(video, videoUrl, 'HLS.js');
+							attachHlsPlayback(video, videoUrl, 'HLS.js', playbackRuntimeContext);
 							setMediaSourceData((previousValue) => ({
 								...(previousValue || mediaSource),
 								__debugHlsEngine: 'hls.js'
@@ -437,7 +462,7 @@ export const usePlayerVideoLoader = ({
 						reason: hlsPreference.reason,
 						message: 'Using HLS.js playback.'
 					});
-					attachHlsPlayback(video, videoUrl, 'HLS.js');
+					attachHlsPlayback(video, videoUrl, 'HLS.js', playbackRuntimeContext);
 					hlsEngine = 'hls.js';
 				} else {
 					appendPlaybackDiagnostic?.({
@@ -491,7 +516,7 @@ export const usePlayerVideoLoader = ({
 				);
 				if (!rebuilt) {
 					showPlaybackError(
-						'Playback failed after session rebuild attempt. Please retry or go back.'
+						getPlaybackStartupFailureMessage(dynamicRangeInfo)
 					);
 				}
 			}, 7000);
@@ -562,6 +587,7 @@ export const usePlayerVideoLoader = ({
 		requestSubtitleDecision,
 		exitInProgressRef,
 		playbackGenerationRef,
+		playbackRuntimeContextRef,
 		setPlaybackGeneration,
 		setLoadingStatusMessage,
 		seekOffsetRef,

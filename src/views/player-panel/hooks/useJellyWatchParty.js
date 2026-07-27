@@ -252,8 +252,8 @@ export const useJellyWatchParty = ({
 	const joinRoom = useCallback((roomId, password = '') => (
 		jellyfinService.joinWatchPartyRoom(roomId, password)
 	), []);
-	const leaveRoom = useCallback(() => {
-		jellyfinService.leaveWatchPartyRoom();
+	const leaveRoom = useCallback(async () => {
+		await jellyfinService.leaveWatchPartyRoom();
 		setPopupOpen(false);
 		targetRef.current = null;
 		resetRate();

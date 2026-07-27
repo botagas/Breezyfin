@@ -5,7 +5,7 @@ import AppScroller from './AppScroller';
 import Toolbar from './Toolbar';
 import BreezyLoadingOverlay from './BreezyLoadingOverlay';
 import MediaPanelBackdrop from './MediaPanelBackdrop';
-import Button from './BreezyButton';
+import PanelActionButton from './PanelActionButton';
 import {focusSpotlightTarget} from '../utils/gridFocus';
 
 import css from './IntegrationPanelLayout.module.less';
@@ -24,6 +24,7 @@ const IntegrationPanelLayout = ({
 	errorMessage = '',
 	onRetry = null,
 	retrySpotlightId = '',
+	scrollable = true,
 	captureScrollTo,
 	onScrollStop,
 	children,
@@ -32,6 +33,25 @@ const IntegrationPanelLayout = ({
 	const errorRetryId = retrySpotlightId || `${activeSection || 'integration'}-panel-retry`;
 	const entryFocusId = errorMessage && typeof onRetry === 'function' ? errorRetryId : firstFocusId;
 	const handleNavigateDown = useCallback(() => focusSpotlightTarget(entryFocusId), [entryFocusId]);
+	const content = (
+		<div
+			className={`${css.content} ${scrollable ? '' : css.staticContent}`}
+			data-bf-integration-panel-content="true"
+		>
+			{errorMessage ? (
+				<div className={css.stateSurface} role="alert">
+					<BodyText>{errorMessage}</BodyText>
+					{typeof onRetry === 'function' ? (
+						<PanelActionButton spotlightId={errorRetryId} onClick={onRetry}>Retry</PanelActionButton>
+					) : null}
+				</div>
+			) : null}
+			{!errorMessage && emptyMessage ? (
+				<div className={css.stateSurface}><BodyText>{emptyMessage}</BodyText></div>
+			) : null}
+			{children}
+		</div>
+	);
 	return (
 		<Panel {...rest}>
 			<Header title={title} />
@@ -47,27 +67,18 @@ const IntegrationPanelLayout = ({
 			/>
 			{loading ? (
 				<div className={css.loading}><BreezyLoadingOverlay label={loadingMessage} /></div>
-			) : (
+			) : scrollable ? (
 				<AppScroller
 					className={css.scroller}
 					cbScrollTo={captureScrollTo}
 					onScrollStop={onScrollStop}
 				>
-					<div className={css.content} data-bf-integration-panel-content="true">
-						{errorMessage ? (
-							<div className={css.stateSurface} role="alert">
-								<BodyText>{errorMessage}</BodyText>
-								{typeof onRetry === 'function' ? (
-									<Button spotlightId={errorRetryId} onClick={onRetry}>Retry</Button>
-								) : null}
-							</div>
-						) : null}
-						{!errorMessage && emptyMessage ? (
-							<div className={css.stateSurface}><BodyText>{emptyMessage}</BodyText></div>
-						) : null}
-						{children}
-					</div>
+					{content}
 				</AppScroller>
+			) : (
+				<div className={`${css.scroller} ${css.staticViewport}`}>
+					{content}
+				</div>
 			)}
 		</Panel>
 	);

@@ -37,6 +37,7 @@ import {
 	buildPlaybackOverride,
 	resolveVideoSeekSeconds
 } from './player-panel/utils/playbackOverride';
+import {createSyncPlayStartupBridge} from './player-panel/utils/syncPlayStartupBridge';
 import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {normalizeScreensaverTimeoutMinutes} from '../utils/screensaver';
@@ -93,6 +94,12 @@ const PlayerPanel = ({
 	const exitInProgressRef = useRef(false);
 	const playbackGenerationRef = useRef(0);
 	const playbackStartedRef = useRef(false);
+	const playbackRuntimeContextRef = useRef(null);
+	const syncPlayStartupBridgeRef = useRef(null);
+	if (!syncPlayStartupBridgeRef.current) {
+		syncPlayStartupBridgeRef.current = createSyncPlayStartupBridge();
+	}
+	const syncPlayStartupBridge = syncPlayStartupBridgeRef.current;
 	const playbackOverrideRef = useRef(null);
 	const nativeHlsFallbackCleanupRef = useRef(null);
 	const skipButtonRef = useRef(null);
@@ -228,6 +235,7 @@ const PlayerPanel = ({
 		currentSubtitleTrack,
 		audioTracks,
 		subtitleTracks,
+		playbackOptions,
 		currentAudioTrackRef,
 		currentSubtitleTrackRef
 	});
@@ -338,7 +346,9 @@ const PlayerPanel = ({
 		subtitleCompatibilityFallbackAttemptedRef,
 		setCurrentSubtitleTrack,
 		requestSubtitleBurnInFallback,
-		exitInProgressRef
+		exitInProgressRef,
+		playbackGenerationRef,
+		playbackRuntimeContextRef
 	});
 
 	const loadVideo = usePlayerVideoLoader({
@@ -385,6 +395,7 @@ const PlayerPanel = ({
 		requestSubtitleDecision: handleSubtitleBurnInFallback,
 		exitInProgressRef,
 		playbackGenerationRef,
+		playbackRuntimeContextRef,
 		setPlaybackGeneration
 	});
 
@@ -475,6 +486,7 @@ const PlayerPanel = ({
 		clearStartWatch,
 		getPlaybackSessionContext,
 		startProgressReporting,
+		syncPlayStartupBridge,
 		setLoading,
 		setLoadingStatusMessage,
 		setPlaying,
@@ -518,7 +530,7 @@ const PlayerPanel = ({
 		attemptTranscodeFallback,
 		isCurrentTranscoding,
 		exitInProgressRef,
-		loadRequestIdRef
+		loadRequestIdRef,
 	});
 
 	const {
@@ -555,7 +567,8 @@ const PlayerPanel = ({
 		setMuted,
 		setVolume,
 		setPlaying,
-		setError
+		setError,
+		setToastMessage
 	});
 
 	const {
@@ -658,8 +671,6 @@ const PlayerPanel = ({
 		exitInProgressRef
 	});
 
-	const playerBackdropUrls = getPlayerBackdropCandidates(item, jellyfinService);
-
 	const {
 		handleAudioTrackItemClick,
 		handleSubtitleTrackItemClick
@@ -670,12 +681,14 @@ const PlayerPanel = ({
 	const groupSessions = usePlayerGroupSessions({
 		isActive,
 		item,
+		playbackGeneration,
 		videoRef,
 		playing,
 		handleLocalPause: handlePause,
 		handleLocalPlay: handlePlay,
 		handleLocalSeek: handleSeek,
 		handleLocalSurfaceClick: handleVideoSurfaceClick,
+		syncPlayStartupBridge,
 		setToastMessage
 	});
 
@@ -869,7 +882,7 @@ const PlayerPanel = ({
 			error,
 			loading,
 			loadingStatusMessage,
-			backdropUrls: playerBackdropUrls,
+			backdropUrls: getPlayerBackdropCandidates(item, jellyfinService),
 			showBackdrop: Boolean(loading || error || subtitleBurnInPrompt),
 			seekFeedback,
 			externalSubtitleLayerRef,

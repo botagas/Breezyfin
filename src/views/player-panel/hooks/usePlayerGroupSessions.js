@@ -5,21 +5,25 @@ import {useJellyWatchParty} from './useJellyWatchParty';
 export const usePlayerGroupSessions = ({
 	isActive,
 	item,
+	playbackGeneration,
 	videoRef,
 	playing,
 	handleLocalPause,
 	handleLocalPlay,
 	handleLocalSeek,
 	handleLocalSurfaceClick,
+	syncPlayStartupBridge,
 	setToastMessage
 }) => {
 	const syncPlay = useNativeSyncPlay({
 		isActive,
 		item,
+		playbackGeneration,
 		videoRef,
 		handleLocalPause,
 		handleLocalPlay,
 		handleLocalSeek,
+		syncPlayStartupBridge,
 		setToastMessage
 	});
 	const watchParty = useJellyWatchParty({
@@ -49,6 +53,8 @@ export const usePlayerGroupSessions = ({
 		handlePause: watchParty.handlePause,
 		handlePlay: watchParty.handlePlay,
 		handleSeek: watchParty.handleSeek,
+		handleNext: syncPlay.group && syncPlay.followMode === 'following' ? syncPlay.next : null,
+		handlePrevious: syncPlay.group && syncPlay.followMode === 'following' ? syncPlay.previous : null,
 		handleSurfaceClick,
 		controlsState: {
 			syncPlayGroup: watchParty.availability.hideNativeSyncButton ? null : syncPlay.group,
@@ -62,8 +68,10 @@ export const usePlayerGroupSessions = ({
 		syncPlayPopup: {
 			open: syncPlay.popupOpen,
 			group: syncPlay.group,
+			groupState: syncPlay.groupState,
 			onClose: syncPlay.closePopup,
-			onLeave: syncPlay.leaveGroup
+			onLeave: syncPlay.leaveGroup,
+			onStart: syncPlay.startGroupPlayback
 		},
 		watchPartyPopup: {
 			open: watchParty.popupOpen,

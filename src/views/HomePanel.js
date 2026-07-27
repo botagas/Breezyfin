@@ -9,15 +9,20 @@ import HeroBanner from '../components/HeroBanner';
 import Toolbar from '../components/Toolbar';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
+import ProviderItemPopup from '../components/ProviderItemPopup';
 import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getHomeSectionDescriptor} from '../constants/homeSections';
 import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../constants/integrationEvents';
 import {KeyCodes} from '../utils/keyCodes';
-import {getLandscapeCardImageUrls} from '../utils/mediaItemUtils';
+import {
+	getLandscapeCardImageUrls,
+	mergeMediaItemImageCandidates
+} from '../utils/mediaItemUtils';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
 import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import {useRuntimeDiagnosticsEnabled} from '../hooks/useRuntimeDiagnostics';
+import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import {
 	findVerticalScrollableAncestor,
@@ -38,6 +43,7 @@ import {
 	selectServerHomeRowsToLoad,
 	shouldReloadHomeContent
 } from '../utils/serverHomeRows';
+import {normalizeDiscoveryMediaItem} from '../utils/discoveryMediaItems';
 
 import css from './HomePanel.module.less';
 
@@ -113,6 +119,13 @@ const HomePanel = ({
 	const [activatedRowCount, setActivatedRowCount] = useState(2);
 	const [activeRowIndex, setActiveRowIndex] = useState(0);
 	const [serverHomeRenderCount, setServerHomeRenderCount] = useState(SERVER_HOME_INITIAL_RENDER_COUNT);
+	const {
+		activateItem: activateDiscoveryItem,
+		externalItem,
+		externalItemOpen,
+		closeExternalItem,
+		clearExternalItem
+	} = usePluginMediaItemPopup({onItemSelect, isActive});
 	const [contentRefreshVersion, setContentRefreshVersion] = useState(0);
 	const homeScrollToRef = useRef(null);
 	const homeVerticalScrollerRef = useRef(null);
@@ -142,7 +155,12 @@ const HomePanel = ({
 		onLogout,
 		onExit,
 		registerBackHandler,
-		isActive
+		isActive,
+		onPanelBack: () => {
+			if (!externalItemOpen) return false;
+			closeExternalItem();
+			return true;
+		}
 	});
 	const {
 		captureScrollTo: captureHomeScrollRestore,
@@ -250,6 +268,8 @@ const HomePanel = ({
 							title: descriptor.Title,
 							viewMode: descriptor.ViewMode,
 							supportsPaging: descriptor.SupportsPaging,
+							kind: descriptor.Kind || 'JellyfinItems',
+							feed: descriptor.Feed || null,
 							source: 'plugin'
 						},
 						items: null,
@@ -389,13 +409,27 @@ const HomePanel = ({
 				error: null
 			} : row
 		)));
-		loadServerHomeRowsProgressively(pendingRows, (row) => (
-			jellyfinService.getBreezyfinHomeSectionItems(
+		loadServerHomeRowsProgressively(pendingRows, async (row) => {
+			if (row.descriptor.kind === 'Discovery' && row.descriptor.feed) {
+				const response = await jellyfinService.getDiscoveryFeed(row.descriptor.feed, {
+					limit: HOME_ROW_PREVIEW_LIMIT,
+					startIndex: 0
+				});
+				if (response?.available !== true) return response;
+				return {
+					...response,
+					result: {
+						...response.result,
+						items: response.result.items.map(normalizeDiscoveryMediaItem)
+					}
+				};
+			}
+			return jellyfinService.getBreezyfinHomeSectionItems(
 				row.descriptor.pluginSectionId,
 				HOME_ROW_PREVIEW_LIMIT,
 				0
-			)
-		), {
+			);
+		}, {
 			onSettled: ({key, row, response, error, latencyMs}) => {
 				if (batchId !== serverHomeLoadBatchIdRef.current) return;
 				const available = response?.available === true;
@@ -413,7 +447,9 @@ const HomePanel = ({
 							loading: false,
 							status: available
 								? (items.length > 0 ? SERVER_HOME_ROW_STATUS.READY : SERVER_HOME_ROW_STATUS.EMPTY)
-								: SERVER_HOME_ROW_STATUS.ERROR,
+								: (row?.descriptor?.kind === 'Discovery'
+									? SERVER_HOME_ROW_STATUS.EMPTY
+									: SERVER_HOME_ROW_STATUS.ERROR),
 							error: available ? null : {
 								reason: diagnosticReason,
 								message: response?.message || error?.message || 'This Home section could not be loaded.'
@@ -424,6 +460,8 @@ const HomePanel = ({
 				reportHomeSectionsDiagnostic('lazy-row-settled', {
 					sectionId: row?.descriptor?.pluginSectionId || null,
 					title: row?.descriptor?.title || '',
+					kind: row?.descriptor?.kind || 'JellyfinItems',
+					feed: row?.descriptor?.feed || null,
 					available,
 					itemCount: available ? items.length : null,
 					latencyMs,
@@ -470,8 +508,12 @@ const HomePanel = ({
 	}, [contentRefreshVersion, isActive, loadContent]);
 
 	const handleItemClick = useCallback((item) => {
+		if (item?.IsDiscoveryItem) {
+			activateDiscoveryItem(item);
+			return;
+		}
 		onItemSelect(item);
-	}, [onItemSelect]);
+	}, [activateDiscoveryItem, onItemSelect]);
 
 	const handleViewMoreSection = useCallback((sectionKey) => {
 		const descriptor = serverHomeRows.find((row) => row.key === sectionKey)?.descriptor ||
@@ -481,7 +523,10 @@ const HomePanel = ({
 	}, [handleNavigation, serverHomeRows]);
 
 	const getCardImageCandidates = useCallback((item) => {
-		return getLandscapeCardImageUrls(item, {width: 640, quality: 76});
+		return mergeMediaItemImageCandidates(
+			item,
+			getLandscapeCardImageUrls(item, {width: 640, quality: 76})
+		);
 	}, []);
 
 	const getMediaRowImageCandidates = useCallback((id, mediaItem) => {
@@ -733,6 +778,14 @@ const HomePanel = ({
 					))}
 				</div>
 			</Scroller>
+			<ProviderItemPopup
+				open={externalItemOpen}
+				title={externalItem?.Name || 'Discovery'}
+				detail={externalItem?.Overview || 'No overview is available.'}
+				item={externalItem}
+				onClose={closeExternalItem}
+				onHide={clearExternalItem}
+			/>
 		</Panel>
 	);
 };

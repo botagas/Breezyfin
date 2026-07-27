@@ -22,6 +22,7 @@ import {
 	shouldRequireSubtitleBurnInConsent,
 	shouldRetrySubtitleBurnInWithSafeProfile
 } from '../utils/playerRecoveryPolicy';
+import {isPlaybackRuntimeContextCurrent} from '../utils/playbackRuntimeContext';
 
 export const usePlayerRecoveryHandlers = ({
 	maxHlsNetworkRecoveryAttempts,
@@ -59,7 +60,9 @@ export const usePlayerRecoveryHandlers = ({
 	subtitleCompatibilityFallbackAttemptedRef,
 	setCurrentSubtitleTrack,
 	requestSubtitleBurnInFallback,
-	exitInProgressRef
+	exitInProgressRef,
+	playbackGenerationRef,
+	playbackRuntimeContextRef
 }) => {
 	const resetRecoveryGuards = useCallback(() => {
 		playbackFailureLockedRef.current = false;
@@ -94,8 +97,10 @@ export const usePlayerRecoveryHandlers = ({
 	const attemptPlaybackSessionRebuild = useCallback((reason, options = {}) => {
 		const {
 			toast = '',
-			errorData = null
+			errorData = null,
+			runtimeContext = null
 		} = options;
+		const activeMediaSourceData = runtimeContext?.mediaSourceData || mediaSourceData;
 		if (exitInProgressRef.current || playbackFailureLockedRef.current) {
 			appendPlaybackDiagnostic?.({
 				scope: 'runtime-fallback',
@@ -177,7 +182,7 @@ export const usePlayerRecoveryHandlers = ({
 
 		playbackOverrideRef.current = buildPlaybackOverride({
 			baseOptions: playbackOptions,
-			mediaSourceId: mediaSourceData?.Id,
+			mediaSourceId: activeMediaSourceData?.Id,
 			audioStreamIndex: currentAudioTrackRef.current,
 			subtitleStreamIndex: currentSubtitleTrackRef.current,
 			seekSeconds
@@ -207,7 +212,7 @@ export const usePlayerRecoveryHandlers = ({
 		hlsRef,
 		loadVideoRef,
 		maxPlaySessionRebuildAttempts,
-		mediaSourceData?.Id,
+		mediaSourceData,
 		nativeHlsFallbackCleanupRef,
 		playSessionRebuildAttemptsRef,
 		exitInProgressRef,
@@ -242,16 +247,16 @@ export const usePlayerRecoveryHandlers = ({
 		}
 	}, [clearStartWatch, playbackFailureLockedRef, setError, setLoading, setLoadingStatusMessage, setShowControls, setToastMessage, startupFallbackTimerRef, stopHlsRecoveryLoop]);
 
-	const collectSubtitleErrorValues = useCallback((errorData) => {
+	const collectSubtitleErrorValues = useCallback((errorData, sourceData = mediaSourceData) => {
 		const fromMessage = typeof errorData === 'string' ? errorData : '';
 		const responseUrl = errorData?.response?.url;
 		const fragmentUrl = errorData?.frag?.url;
 		const videoUrl = videoRef.current?.currentSrc || '';
 		const sourceUrls = [
-			mediaSourceData?.TranscodingUrl,
-			mediaSourceData?.DirectStreamUrl,
-			mediaSourceData?.Path,
-			mediaSourceData?.__debugVideoUrl
+			sourceData?.TranscodingUrl,
+			sourceData?.DirectStreamUrl,
+			sourceData?.Path,
+			sourceData?.__debugVideoUrl
 		];
 		return [
 			fromMessage,
@@ -264,24 +269,24 @@ export const usePlayerRecoveryHandlers = ({
 			.filter((value) => typeof value === 'string' && value.length > 0);
 	}, [mediaSourceData, videoRef]);
 
-	const isSubtitleCompatibilityError = useCallback((errorData) => {
-		const values = collectSubtitleErrorValues(errorData);
+	const isSubtitleCompatibilityError = useCallback((errorData, sourceData = mediaSourceData) => {
+		const values = collectSubtitleErrorValues(errorData, sourceData);
 		return hasSubtitleCodecUnsupportedReason(values);
-	}, [collectSubtitleErrorValues]);
+	}, [collectSubtitleErrorValues, mediaSourceData]);
 
-	const isSubtitlePlaybackFailure = useCallback((errorData) => {
-		const values = collectSubtitleErrorValues(errorData);
+	const isSubtitlePlaybackFailure = useCallback((errorData, sourceData = mediaSourceData) => {
+		const values = collectSubtitleErrorValues(errorData, sourceData);
 		return hasSubtitleCodecUnsupportedReason(values) ||
 			isSubtitleBurnInPlaybackPath({
-				subtitlePolicy: mediaSourceData?.__debugSubtitlePolicy,
+				subtitlePolicy: sourceData?.__debugSubtitlePolicy,
 				values
 			}) ||
 			isSubtitleBurnInPlaybackFailure({
 				errorData,
-				subtitlePolicy: mediaSourceData?.__debugSubtitlePolicy,
+				subtitlePolicy: sourceData?.__debugSubtitlePolicy,
 				values
 			});
-	}, [collectSubtitleErrorValues, mediaSourceData?.__debugSubtitlePolicy]);
+	}, [collectSubtitleErrorValues, mediaSourceData]);
 
 	const attemptTranscodeFallback = useCallback(async (reason) => {
 		if (exitInProgressRef.current || playbackFailureLockedRef.current) {
@@ -427,17 +432,21 @@ export const usePlayerRecoveryHandlers = ({
 		transcodeFallbackAttemptedRef
 	]);
 
-	const attemptSubtitleCompatibilityFallback = useCallback(async (errorData = null) => {
+	const attemptSubtitleCompatibilityFallback = useCallback(async (
+		errorData = null,
+		runtimeContext = null
+	) => {
 		if (exitInProgressRef.current || playbackFailureLockedRef.current) return false;
-		const subtitlePolicy = mediaSourceData?.__debugSubtitlePolicy || {};
-		const subtitleErrorValues = collectSubtitleErrorValues(errorData);
+		const activeMediaSourceData = runtimeContext?.mediaSourceData || mediaSourceData;
+		const subtitlePolicy = activeMediaSourceData?.__debugSubtitlePolicy || {};
+		const subtitleErrorValues = collectSubtitleErrorValues(errorData, activeMediaSourceData);
 		const errorSubtitleIndex = extractSubtitleStreamIndexFromValues(subtitleErrorValues);
 		const selectedSubtitle = Number.isInteger(currentSubtitleTrackRef.current) &&
 			currentSubtitleTrackRef.current >= 0
 			? currentSubtitleTrackRef.current
 			: errorSubtitleIndex;
 		if (!(Number.isInteger(selectedSubtitle) && selectedSubtitle >= 0)) return false;
-		if (!isSubtitlePlaybackFailure(errorData)) return false;
+		if (!isSubtitlePlaybackFailure(errorData, activeMediaSourceData)) return false;
 		if (subtitleCompatibilityFallbackAttemptedRef.current) {
 			appendPlaybackDiagnostic?.({
 				scope: 'runtime-fallback',
@@ -476,7 +485,7 @@ export const usePlayerRecoveryHandlers = ({
 			errorData,
 			subtitlePolicy,
 			values: subtitleErrorValues,
-			mediaSourceData,
+			mediaSourceData: activeMediaSourceData,
 			subtitleStreamIndex: selectedSubtitle
 		});
 		if (
@@ -485,7 +494,7 @@ export const usePlayerRecoveryHandlers = ({
 			typeof requestSubtitleBurnInFallback === 'function'
 		) {
 			const requiresHdrConsent = shouldRequireSubtitleBurnInConsent({
-				mediaSourceData,
+				mediaSourceData: activeMediaSourceData,
 				subtitlePolicy,
 				playbackSettings: playbackSettingsRef.current
 			});
@@ -527,7 +536,7 @@ export const usePlayerRecoveryHandlers = ({
 		}
 		if (shouldRetrySubtitleBurnInWithSafeProfile({
 			burnInPlaybackFailed,
-			mediaSourceData,
+			mediaSourceData: activeMediaSourceData,
 			playbackOverride: playbackOverrideRef.current,
 			knownImageSubtitleHardwareBurnInFailure
 		})) {
@@ -545,7 +554,7 @@ export const usePlayerRecoveryHandlers = ({
 			});
 			playbackOverrideRef.current = buildPlaybackOverride({
 				baseOptions: playbackOptions,
-				mediaSourceId: mediaSourceData?.Id,
+				mediaSourceId: activeMediaSourceData?.Id,
 				audioStreamIndex: currentAudioTrackRef.current,
 				subtitleStreamIndex: selectedSubtitle,
 				seekSeconds: resolveVideoSeekSeconds(videoRef.current),
@@ -574,13 +583,13 @@ export const usePlayerRecoveryHandlers = ({
 			return true;
 		}
 
-		const subtitleFallbackContext = getSubtitleFallbackContext(mediaSourceData, {
+		const subtitleFallbackContext = getSubtitleFallbackContext(activeMediaSourceData, {
 			burnInRequestedOverride: burnInPlaybackFailed
 		});
 		stopHlsRecoveryLoop();
 		console.warn('[Player] Subtitle compatibility fallback: requesting no-subtitle consent.', {
 			reason: subtitleFallbackContext.reason,
-			mediaSourceId: mediaSourceData?.Id || null,
+			mediaSourceId: activeMediaSourceData?.Id || null,
 			audioStreamIndex: currentAudioTrackRef.current,
 			subtitleStreamIndex: -1
 		});
@@ -617,7 +626,7 @@ export const usePlayerRecoveryHandlers = ({
 		currentSubtitleTrackRef.current = -1;
 		playbackOverrideRef.current = buildPlaybackOverride({
 			baseOptions: playbackOptions,
-			mediaSourceId: mediaSourceData?.Id,
+			mediaSourceId: activeMediaSourceData?.Id,
 			audioStreamIndex: currentAudioTrackRef.current,
 			subtitleStreamIndex: -1,
 			seekSeconds: resolveVideoSeekSeconds(videoRef.current),
@@ -671,8 +680,33 @@ export const usePlayerRecoveryHandlers = ({
 		videoRef
 	]);
 
-	const attemptHlsFatalRecovery = useCallback((hls, errorData, source = 'HLS') => {
+	const isHlsRuntimeActive = useCallback((hls, runtimeContext = null) => {
+		if (!runtimeContext) {
+			return !exitInProgressRef.current && hlsRef.current === hls;
+		}
+		return isPlaybackRuntimeContextCurrent({
+			runtimeContext,
+			activeRuntimeContext: playbackRuntimeContextRef.current,
+			hls,
+			activeHls: hlsRef.current,
+			generation: playbackGenerationRef.current,
+			exitInProgress: exitInProgressRef.current
+		});
+	}, [
+		exitInProgressRef,
+		hlsRef,
+		playbackGenerationRef,
+		playbackRuntimeContextRef
+	]);
+
+	const attemptHlsFatalRecovery = useCallback((
+		hls,
+		errorData,
+		source = 'HLS',
+		runtimeContext = null
+	) => {
 		if (!errorData?.fatal) return false;
+		if (!isHlsRuntimeActive(hls, runtimeContext)) return true;
 		if (exitInProgressRef.current || playbackFailureLockedRef.current) return true;
 
 		if (errorData.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -683,7 +717,8 @@ export const usePlayerRecoveryHandlers = ({
 					`${source} fragment request failed with HTTP ${statusCode}`,
 					{
 						toast: 'Server stream failed. Rebuilding playback session...',
-						errorData
+						errorData,
+						runtimeContext
 					}
 				);
 				if (rebuilt) {
@@ -738,16 +773,23 @@ export const usePlayerRecoveryHandlers = ({
 		maxHlsNetworkRecoveryAttempts,
 		playbackFailureLockedRef,
 		exitInProgressRef,
+		isHlsRuntimeActive,
 		showPlaybackError
 	]);
 
-	const attachHlsPlayback = useCallback((video, sourceUrl, sourceLabel = 'HLS.js') => {
+	const attachHlsPlayback = useCallback((
+		video,
+		sourceUrl,
+		sourceLabel = 'HLS.js',
+		runtimeContext = null
+	) => {
 		const hls = new Hls(createHlsPlayerConfig(hlsConfig));
 		hlsRef.current = hls;
 		hls.loadSource(sourceUrl);
 		hls.attachMedia(video);
 
 		hls.on(Hls.Events.ERROR, (event, data) => {
+			if (!isHlsRuntimeActive(hls, runtimeContext)) return;
 			const hlsError = classifyHlsError(data);
 			const errorSummary = buildHlsErrorSummary(data);
 			if (hlsError.severity === 'error') {
@@ -762,22 +804,26 @@ export const usePlayerRecoveryHandlers = ({
 				stage: hlsError.category,
 				status: hlsError.fatal ? 'fatal' : hlsError.severity,
 				reason: hlsError.reason,
-				message: `HLS ${hlsError.category} (${hlsError.reason}) after subtitle fallback=${currentSubtitleTrackRef.current === -1 ? 'yes' : 'no'}; engine=${sourceLabel}; playMethod=${mediaSourceData?.__selectedPlayMethod || '-'}.`
+				message: `HLS ${hlsError.category} (${hlsError.reason}) after subtitle fallback=${currentSubtitleTrackRef.current === -1 ? 'yes' : 'no'}; engine=${sourceLabel}; playMethod=${runtimeContext?.playMethod || mediaSourceData?.__selectedPlayMethod || '-'}.`
 			});
-			if (isSubtitleCompatibilityError(data) && playbackSettingsRef.current.strictTranscodingMode) {
+			if (
+				isSubtitleCompatibilityError(data, runtimeContext?.mediaSourceData) &&
+				playbackSettingsRef.current.strictTranscodingMode
+			) {
 				showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
 				return;
 			}
 			if (hlsError.subtitleCandidate) {
-				attemptSubtitleCompatibilityFallback(data).then((handled) => {
+				attemptSubtitleCompatibilityFallback(data, runtimeContext).then((handled) => {
+					if (!isHlsRuntimeActive(hls, runtimeContext)) return;
 					if (!handled && hlsError.fatal) {
-						attemptHlsFatalRecovery(hls, data, sourceLabel);
+						attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
 					}
 				});
 				return;
 			}
 			if (hlsError.fatal) {
-				attemptHlsFatalRecovery(hls, data, sourceLabel);
+				attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
 			}
 		});
 
@@ -789,6 +835,7 @@ export const usePlayerRecoveryHandlers = ({
 		currentSubtitleTrackRef,
 		hlsConfig,
 		hlsRef,
+		isHlsRuntimeActive,
 		isSubtitleCompatibilityError,
 		mediaSourceData,
 		playbackSettingsRef,

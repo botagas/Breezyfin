@@ -35,31 +35,17 @@ import {usePanelHistory} from './hooks/usePanelHistory';
 import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import {useAppScreensaver} from './hooks/useAppScreensaver';
 import {useIntegrationPanelCache} from './hooks/useIntegrationPanelCache';
+import {useAppSyncPlayNavigation} from './hooks/useAppSyncPlayNavigation';
+import {SyncPlayProvider} from '../contexts/SyncPlayContext';
+import SyncPlayGlobalOverlays from '../components/SyncPlayGlobalOverlays';
+import {emitAppDebugEvent, isEditableTarget} from './utils/appInput';
 
 import css from './App.module.less';
 
 const DETAIL_RETURN_VIEWS = new Set([
-	'home', 'homeSection', 'library', 'search', 'favorites', 'settings', 'discovery', 'calendar', 'syncPlay', 'watchParty'
+	'home', 'homeSection', 'library', 'search', 'favorites', 'settings', 'watchlist', 'calendar', 'syncPlay', 'watchParty'
 ]);
 const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
-
-const emitAppDebugEvent = (name, detail) => {
-	if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') {
-		return;
-	}
-	try {
-		window.dispatchEvent(new CustomEvent(name, {detail}));
-	} catch (_) {
-		// Debug telemetry must never alter runtime behavior.
-	}
-};
-const isEditableTarget = (target) => {
-	if (!target || target.nodeType !== 1) return false;
-	if (target.isContentEditable) return true;
-	const tagName = target.tagName?.toLowerCase();
-	if (tagName === 'input' || tagName === 'textarea') return true;
-	return Boolean(target.closest?.('input, textarea, [contenteditable="true"], [role="textbox"]'));
-};
 
 const resolveInitialVisualSettings = () => {
 	const settings = readBreezyfinSettings();
@@ -144,7 +130,7 @@ const App = (props) => {
 			searchBackHandlerRef,
 			favoritesBackHandlerRef,
 			settingsBackHandlerRef,
-			discoveryBackHandlerRef,
+			watchlistBackHandlerRef,
 			calendarBackHandlerRef,
 			syncPlayBackHandlerRef,
 			watchPartyBackHandlerRef
@@ -158,7 +144,7 @@ const App = (props) => {
 		registerSearchBackHandler,
 		registerFavoritesBackHandler,
 		registerSettingsBackHandler,
-		registerDiscoveryBackHandler,
+		registerWatchlistBackHandler,
 		registerCalendarBackHandler,
 		registerSyncPlayBackHandler,
 		registerWatchPartyBackHandler
@@ -187,7 +173,6 @@ const App = (props) => {
 		setDetailsReturnView,
 		setPlayerControlsVisible
 	});
-
 	const resetSessionState = useCallback(() => {
 		setSessionActive(false);
 		setSelectedItem(null);
@@ -278,6 +263,23 @@ const App = (props) => {
 			};
 		});
 	}, [selectedItem, updateLatestHistorySnapshot]);
+	const {
+		coordinator: syncPlayCoordinator,
+		handlePlay,
+		handleBackToDetails
+	} = useAppSyncPlayNavigation({
+		authenticated: sessionActive,
+		currentView,
+		selectedItem,
+		pushPanelHistory,
+		navigateBackInHistory,
+		syncPlayerBackTargetDetailsItem,
+		fallbackToDetailsFromPlayer,
+		setSelectedItem,
+		setPlaybackOptions,
+		setPlayerControlsVisible,
+		setCurrentView
+	});
 
 	const applyVisualSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -488,8 +490,8 @@ const App = (props) => {
 				return handleSectionBack(favoritesBackHandlerRef, 'home');
 			case 'settings':
 				return handleSectionBack(settingsBackHandlerRef, 'home');
-			case 'discovery':
-				return handleSectionBack(discoveryBackHandlerRef, 'home');
+			case 'watchlist':
+				return handleSectionBack(watchlistBackHandlerRef, 'home');
 			case 'calendar':
 				return handleSectionBack(calendarBackHandlerRef, 'home');
 			case 'syncPlay':
@@ -535,7 +537,7 @@ const App = (props) => {
 			syncPlayerBackTargetDetailsItem,
 			runPanelBackHandler,
 			settingsBackHandlerRef,
-			discoveryBackHandlerRef,
+			watchlistBackHandlerRef,
 			calendarBackHandlerRef,
 			syncPlayBackHandlerRef,
 			watchPartyBackHandlerRef
@@ -692,7 +694,7 @@ const App = (props) => {
 			targetView === 'search' ||
 			targetView === 'favorites' ||
 			targetView === 'settings' ||
-			targetView === 'discovery' ||
+			targetView === 'watchlist' ||
 			targetView === 'calendar' ||
 			targetView === 'syncPlay' ||
 			targetView === 'watchParty'
@@ -757,7 +759,7 @@ const App = (props) => {
 			case 'search':
 			case 'favorites':
 			case 'settings':
-			case 'discovery':
+			case 'watchlist':
 			case 'calendar':
 			case 'syncPlay':
 			case 'watchParty':
@@ -771,22 +773,6 @@ const App = (props) => {
 				break;
 		}
 	}, [clearIntegrationPanelState, currentView, pushPanelHistory, selectedHomeSection?.id, selectedLibrary?.Id]);
-
-	const handlePlay = useCallback((item, options = null) => {
-		if (currentView !== 'player') {
-			pushPanelHistory();
-		}
-		setSelectedItem(item);
-		setPlaybackOptions(options);
-		setPlayerControlsVisible(true);
-		setCurrentView('player');
-	}, [currentView, pushPanelHistory]);
-
-	const handleBackToDetails = useCallback(() => {
-		syncPlayerBackTargetDetailsItem();
-		if (navigateBackInHistory()) return;
-		fallbackToDetailsFromPlayer();
-	}, [fallbackToDetailsFromPlayer, navigateBackInHistory, syncPlayerBackTargetDetailsItem]);
 
 	const handleExit = useCallback(() => {
 		if (typeof window !== 'undefined' && window.close) {
@@ -938,7 +924,7 @@ const App = (props) => {
 			search: registerSearchBackHandler,
 			favorites: registerFavoritesBackHandler,
 			settings: registerSettingsBackHandler,
-			discovery: registerDiscoveryBackHandler,
+			watchlist: registerWatchlistBackHandler,
 			calendar: registerCalendarBackHandler,
 			syncPlay: registerSyncPlayBackHandler,
 			watchParty: registerWatchPartyBackHandler,
@@ -953,6 +939,7 @@ const App = (props) => {
 
 	return (
 		<RuntimeDiagnosticsProvider enabled={diagnosticsEnabled}>
+			<SyncPlayProvider value={syncPlayCoordinator}>
 			<div
 				className={css.app}
 				{...runtimeDataAttributes}
@@ -984,8 +971,10 @@ const App = (props) => {
 					inputMode={inputMode}
 					suspended={screensaverActive}
 				/>
+				<SyncPlayGlobalOverlays />
 				<ScreensaverOverlay active={screensaverActive} />
 			</div>
+			</SyncPlayProvider>
 		</RuntimeDiagnosticsProvider>
 	);
 };

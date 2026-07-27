@@ -7,6 +7,7 @@ import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
 import PanelLandscapeVirtualGrid from '../components/PanelLandscapeVirtualGrid';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
+import ProviderItemPopup from '../components/ProviderItemPopup';
 import jellyfinService from '../services/jellyfinService';
 import {useMapById} from '../hooks/useMapById';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
@@ -20,6 +21,8 @@ import {
 } from '../utils/mediaFilters';
 import {buildGridQuerySignature} from '../utils/gridScrollRestore';
 import {focusSpotlightTarget} from '../utils/gridFocus';
+import {normalizeDiscoveryMediaItem} from '../utils/discoveryMediaItems';
+import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
 
 import css from './LibraryPanel.module.less';
 import browseCss from '../components/MediaBrowseControls.module.less';
@@ -34,6 +37,14 @@ const fetchHomeSectionPage = async (section, {
 } = {}) => {
 	const sectionId = section?.id || section;
 	if (section?.source === 'plugin' && section?.pluginSectionId) {
+		if (section.kind === 'Discovery' && section.feed) {
+			const discoveryResponse = await jellyfinService.getDiscoveryFeed(section.feed, {limit, startIndex});
+			if (discoveryResponse?.available !== true) throw new Error('Discovery feed is unavailable');
+			return {
+				...discoveryResponse.result,
+				items: discoveryResponse.result.items.map(normalizeDiscoveryMediaItem)
+			};
+		}
 		const response = await jellyfinService.getBreezyfinHomeSectionItems(
 			section.pluginSectionId,
 			limit,
@@ -126,6 +137,13 @@ const HomeSectionPanel = ({
 	const [hasMore, setHasMore] = useState(() => cachedQueryMatches && cachedState?.hasMore === true);
 	const [items, setItems] = useState(() => cachedItems);
 	const [error, setError] = useState('');
+	const {
+		activateItem: activateDiscoveryItem,
+		externalItem,
+		externalItemOpen,
+		closeExternalItem,
+		clearExternalItem
+	} = usePluginMediaItemPopup({onItemSelect, isActive});
 	if (!cachedQueryMatches && skipInitialCachedLoadRef.current) {
 		skipInitialCachedLoadRef.current = false;
 		nextStartIndexRef.current = cachedItems.length;
@@ -139,9 +157,15 @@ const HomeSectionPanel = ({
 		registerBackHandler,
 		isActive,
 		onPanelBack: () => {
-			if (!filterPopupOpen) return false;
-			closeFilterPopup();
-			return true;
+			if (externalItemOpen) {
+				closeExternalItem();
+				return true;
+			}
+			if (filterPopupOpen) {
+				closeFilterPopup();
+				return true;
+			}
+			return false;
 		}
 	});
 	const itemsById = useMapById(items);
@@ -331,8 +355,9 @@ const HomeSectionPanel = ({
 		cacheStateWithFilters(activeSectionId, {focusedItemId: lastFocusedCardIdRef.current});
 		const selectedItem = itemsById.get(itemId);
 		if (!selectedItem) return;
-		onItemSelect(selectedItem);
-	}, [activeSectionId, cacheStateWithFilters, itemsById, onItemSelect]);
+		if (selectedItem.IsDiscoveryItem) activateDiscoveryItem(selectedItem);
+		else onItemSelect(selectedItem);
+	}, [activateDiscoveryItem, activeSectionId, cacheStateWithFilters, itemsById, onItemSelect]);
 
 	const gridItemRendererProps = useMemo(() => ({
 		onItemClick: handleGridCardClick,
@@ -406,6 +431,14 @@ const HomeSectionPanel = ({
 						/>
 				</div>
 			</div>
+			<ProviderItemPopup
+				open={externalItemOpen}
+				title={externalItem?.Name || 'Discovery'}
+				detail={externalItem?.Overview || 'No overview is available.'}
+				item={externalItem}
+				onClose={closeExternalItem}
+				onHide={clearExternalItem}
+			/>
 		</Panel>
 	);
 };

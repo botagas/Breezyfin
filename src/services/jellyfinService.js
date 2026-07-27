@@ -30,6 +30,7 @@ import {
 	getSeasonEpisodes,
 	getSeriesSeasons,
 	getSystemInfo,
+	getUnwatchedSeriesEpisodes,
 	searchLibraryItems,
 	searchLibraryItemsPage
 } from './jellyfin/libraryApi';
@@ -51,13 +52,18 @@ import {
 } from './jellyfin/playbackApi';
 import {getBreezyfinCapabilities, getMyRequestItems} from './jellyfin/requestsApi';
 import {getHomeSectionDescriptors, getHomeSectionItems} from './jellyfin/homeSectionsApi';
-import {getDiscoveryFeed} from './jellyfin/discoveryApi';
+import {getDiscoveryDetails, getDiscoveryFeed} from './jellyfin/discoveryApi';
 import {getCalendarEvents} from './jellyfin/calendarApi';
 import {
 	addItemToLikesWatchlist,
 	getLikesWatchlist,
 	removeItemFromLikesWatchlist
 } from './jellyfin/watchlistApi';
+import {
+	getWatchlistMovieHistory,
+	getWatchlistSeriesInsights,
+	getWatchlistStatistics
+} from './jellyfin/watchlistInsightsApi';
 import {startJellyfinWebSocket, stopJellyfinWebSocket} from './jellyfin/websocketApi';
 import * as syncPlayApi from './jellyfin/syncPlayApi';
 import * as watchPartyApi from './jellyfin/watchPartyApi';
@@ -359,6 +365,10 @@ class JellyfinService {
 		return getSeasonEpisodes(this, seriesId, seasonId);
 	}
 
+	async getUnwatchedSeriesEpisodes(seriesId, limit = 30, startIndex = 0) {
+		return getUnwatchedSeriesEpisodes(this, seriesId, limit, startIndex);
+	}
+
 	async getNextUpEpisode(seriesId) {
 		return getNextUpEpisodeForSeries(this, seriesId);
 	}
@@ -421,12 +431,28 @@ class JellyfinService {
 		return getDiscoveryFeed(this, feed, options);
 	}
 
+	async getDiscoveryDetails(item, options = {}) {
+		return getDiscoveryDetails(this, item, options);
+	}
+
 	async getCalendarEvents(options = {}) {
 		return getCalendarEvents(this, options);
 	}
 
-	async getLikesWatchlist(limit = 60, startIndex = 0) {
-		return getLikesWatchlist(this, limit, startIndex);
+	async getLikesWatchlist(limit = 60, startIndex = 0, itemTypes = ['Movie', 'Series']) {
+		return getLikesWatchlist(this, limit, startIndex, itemTypes);
+	}
+
+	async getWatchlistSeriesInsights(state, limit = 30, startIndex = 0) {
+		return getWatchlistSeriesInsights(this, state, limit, startIndex);
+	}
+
+	async getWatchlistMovieHistory(limit = 30, startIndex = 0) {
+		return getWatchlistMovieHistory(this, limit, startIndex);
+	}
+
+	async getWatchlistStatistics() {
+		return getWatchlistStatistics(this);
 	}
 
 	async addToLikesWatchlist(itemId) {
@@ -466,6 +492,9 @@ class JellyfinService {
 	async syncPlaySeek(request) { return syncPlayApi.syncPlaySeek(this, request); }
 	async syncPlayBuffering(request) { return syncPlayApi.syncPlayBuffering(this, request); }
 	async syncPlayReady(request) { return syncPlayApi.syncPlayReady(this, request); }
+	async syncPlaySetIgnoreWait(ignoreWait) {
+		return syncPlayApi.syncPlaySetIgnoreWait(this, ignoreWait);
+	}
 	async syncPlaySetRepeatMode(request) { return syncPlayApi.syncPlaySetRepeatMode(this, request); }
 	async syncPlaySetShuffleMode(request) { return syncPlayApi.syncPlaySetShuffleMode(this, request); }
 	async syncPlayPing(request) { return syncPlayApi.syncPlayPing(this, request); }

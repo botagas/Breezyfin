@@ -4,7 +4,8 @@ import {
 	getPlaybackProgressPercent,
 	getPosterCardImageUrls,
 	getSeriesUnplayedCount,
-	hasStartedWatching
+	hasStartedWatching,
+	mergeMediaItemImageCandidates
 } from '../utils/mediaItemUtils';
 
 const PanelPosterMediaCard = ({
@@ -33,7 +34,10 @@ const PanelPosterMediaCard = ({
 			data-item-index={index}
 			variant={variant}
 			className={className}
-			imageCandidates={getPosterCardImageUrls(item, imageOptions)}
+			imageCandidates={mergeMediaItemImageCandidates(
+				item,
+				getPosterCardImageUrls(item, imageOptions)
+			)}
 			title={presentation.title}
 			subtitle={presentation.subtitle}
 			contextBadge={presentation.contextBadge}

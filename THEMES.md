@@ -195,6 +195,11 @@ Before merging theme changes, test:
 Also verify:
 
 - Focus/hover states are operational in both pointer and 5-way input.
+- Generic button text and icons use the theme accent on hover/focus/active states. Primary,
+  warning, danger, and favorite actions keep their semantic foreground overrides.
+  The shared behavior is controlled through `--bf-theme-button-fg`,
+  `--bf-theme-button-fg-hover`, and `--bf-theme-button-fg-active`; use explicit semantic
+  overrides for actions that must not inherit the generic accent.
 - Popup surfaces and toasts still use tokenized colors.
 - No panel uses fixed offsets that bypass shared layout tokens.
 - `npm run audit:style-imports` passes so split style imports do not drift.

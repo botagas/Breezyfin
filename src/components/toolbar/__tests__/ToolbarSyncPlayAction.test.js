@@ -40,11 +40,11 @@ const buildElegantProps = (overrides = {}) => ({
 	handleNavigateFavorites: noop(),
 	handleNavigateSearch: noop(),
 	handleNavigateSettings: noop(),
-	handleNavigateDiscovery: noop(),
+	handleNavigateWatchlist: noop(),
 	handleNavigateCalendar: noop(),
 	handleNavigateSyncPlay: noop(),
 	handleNavigateWatchParty: noop(),
-	showDiscovery: false,
+	showWatchlist: true,
 	showCalendar: false,
 	showSyncPlay: true,
 	showWatchParty: false,
@@ -90,11 +90,11 @@ const buildClassicProps = (overrides = {}) => ({
 	activeLibraryId: null,
 	handleLibraryNavigate: noop(),
 	handleNavigateSettings: noop(),
-	handleNavigateDiscovery: noop(),
+	handleNavigateWatchlist: noop(),
 	handleNavigateCalendar: noop(),
 	handleNavigateSyncPlay: noop(),
 	handleNavigateWatchParty: noop(),
-	showDiscovery: false,
+	showWatchlist: true,
 	showCalendar: false,
 	showSyncPlay: true,
 	showWatchParty: false,
@@ -108,6 +108,7 @@ describe('Toolbar SyncPlay navigation placement', () => {
 		render(<ToolbarElegantLayout {...buildElegantProps({handleNavigateSyncPlay})} />);
 
 		expect(screen.getByText('Search')).toBeTruthy();
+		expect(screen.getByText('Watchlist')).toBeTruthy();
 		expect(document.querySelector('[data-spotlight-id="toolbar-search-icon"]')).toBeNull();
 		const syncPlayAction = screen.getByRole('button', {name: 'SyncPlay'});
 		expect(syncPlayAction.dataset.spotlightId).toBe('toolbar-sync-play');
@@ -130,6 +131,7 @@ describe('Toolbar SyncPlay navigation placement', () => {
 		render(<ToolbarClassicLayout {...buildClassicProps({handleNavigateSyncPlay})} />);
 
 		expect(screen.getByRole('button', {name: 'Search'})).toBeTruthy();
+		expect(screen.getByText('Watchlist')).toBeTruthy();
 		expect(screen.queryByText('SyncPlay')).toBeNull();
 		const syncPlayAction = screen.getByRole('button', {name: 'SyncPlay'});
 		expect(screen.getByTestId('icon-dlna')).toBeTruthy();

@@ -37,9 +37,13 @@ body,
 	--bf-theme-text-solid: #ffffff;
 	--bf-theme-text-on-light: #111111;
 	--bf-theme-text-primary: rgba(244, 249, 255, 0.95);
-	--bf-button-fg: var(--bf-theme-text-solid);
-	--bf-button-fg-hover: var(--bf-button-fg);
-	--bf-button-fg-active: var(--bf-button-fg-hover);
+	--bf-theme-rating-star: #ffd166;
+	--bf-theme-button-fg: var(--bf-theme-text-primary);
+	--bf-theme-button-fg-hover: var(--bf-theme-accent);
+	--bf-theme-button-fg-active: var(--bf-theme-accent);
+	--bf-button-fg: var(--bf-theme-button-fg);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
 	--bf-theme-tab-bg: transparent;
 	--bf-theme-tab-hover-bg: rgba(255, 255, 255, 0.12);
 	--bf-theme-overlay-ultra-bg: rgba(9, 13, 19, 0.84);

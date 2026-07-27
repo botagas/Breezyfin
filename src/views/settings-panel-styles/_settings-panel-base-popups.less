@@ -1,3 +1,5 @@
+@import (reference) '../../styles/surfaceMixins.less';
+
 .popupContent {
 	--settings-popup-text-strong: var(--bf-theme-settings-text-strong, var(--bf-theme-text-primary));
 	--settings-popup-option-surface: var(--bf-theme-tab-hover-bg, rgba(255, 255, 255, 0.12));
@@ -77,21 +79,7 @@
 		box-shadow: none !important;
 	}
 
-	&:hover :global(.bf-button-bg),
-	&:focus :global(.bf-button-bg),
-	&:global(.spottable):focus :global(.bf-button-bg),
-	&:global(.spotlight) :global(.bf-button-bg),
-	&:global([data-webos-voice-focused='true']) :global(.bf-button-bg),
-	&:hover :global(.bg),
-	&:focus :global(.bg),
-	&:global(.spottable):focus :global(.bg),
-	&:global(.spotlight) :global(.bg),
-	&:global([data-webos-voice-focused='true']) :global(.bg),
-	&:global(.selected) :global(.bf-button-bg),
-	&:global(.selected) :global(.bg) {
-		background: var(--settings-popup-option-surface) !important;
-		border: none !important;
-	}
+	.buttonInteractiveSurface(var(--settings-popup-option-surface); none);
 
 	&:global(.spotlight),
 	&:global(.selected),

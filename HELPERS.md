@@ -69,7 +69,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Track inactivity through one extendable deadline instead of recreating timers on input | `useInactivityDeadline` |
 | Suspend covered App/Player runtime work with shared reason ownership | `useRuntimeSuspended` / `setRuntimeSuspension` |
 | Build shared Jellyfin image URLs without panel/service coupling | `buildItemImageUrl` / `buildUserPrimaryImageUrl` |
-| Resolve ordered card and panel artwork fallbacks | `getPosterCardImageUrls` / `getLandscapeCardImageUrls` / `getMediaPanelBackdropUrls` |
+| Resolve ordered card and panel artwork fallbacks, preserving authenticated provider candidates before generated Jellyfin URLs | `mergeMediaItemImageCandidates` / `getPosterCardImageUrls` / `getLandscapeCardImageUrls` / `getMediaPanelBackdropUrls` |
 | Apply mode-aware width, quality, and server blur to authenticated plugin image URLs | `buildExternalImageVariantUrl` |
 | Build duplicate-safe media list React keys | `buildMediaListItemKey` |
 | Centralize LoginPanel rotating backdrop state, startup-restore deferral, and load/error handling | `useLoginBackdrops` |
@@ -254,7 +254,7 @@ usePanelToolbarActions({
 ### `useIntegrationPanelCache`
 
 - File: `src/App/hooks/useIntegrationPanelCache.js`
-- Purpose: own Discovery, Calendar, SyncPlay, and WatchParty panel snapshots,
+- Purpose: own Watchlist, Calendar, SyncPlay, and WatchParty panel snapshots,
   normalized cache actions, explicit section clears, session resets, and shared
   `UserDataChanged` invalidation without regrowing `App.js`. Provider panels may cache
   bounded result pages, cursors, warnings, and scroll state, but never provider secrets.
@@ -729,9 +729,63 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 
 - File: `src/hooks/usePluginMediaItemActivation.js`
 - Purpose: share linked Jellyfin-item navigation and external provider-details
-  activation between Discovery and Calendar without weakening the service facade.
+  activation between HSS Discovery rows and Calendar without weakening the service facade.
   Pass panel `isActive`; the hook invalidates pending lookups on deactivation/unmount
   and lets only the latest activation navigate.
+- `src/hooks/usePluginMediaItemPopup.js` composes this activation with the standard
+  external-item Popup state used by Home and Home View More. It enriches external
+  Discovery records on demand; keep Home feed records compact because genres and
+  credits are requested only after the popup opens.
+
+### `useAppSyncPlayCoordinator`
+
+- File: `src/App/hooks/useAppSyncPlayCoordinator.js`
+- App composition: `src/App/hooks/useAppSyncPlayNavigation.js`
+- Context: `src/contexts/SyncPlayContext.js`
+- Purpose: own authenticated SyncPlay group membership, authoritative queue snapshots,
+  reconnect verification, suspended/following state, queue replacement consent, and
+  cross-item Player navigation. Keep current-video timing in `useNativeSyncPlay`.
+- All group and queue changes must use the coordinator commit path so React state and
+  `groupRef` / `queueRef` change synchronously. Reconnect completions must match the
+  current coordinator generation, authenticated session, requested group, and active
+  membership before they can commit.
+- Queue identity and playback revision are separate: play/pause/position changes can
+  notify a suspended client without causing duplicate cross-item navigation. App-level
+  `SyncPlayCommand` handling surfaces remote changes while browsing; `useNativeSyncPlay`
+  deduplicates current-item commands and uses `syncPlayStartupBridge` to hold the source
+  paused until video, subtitle, and Jellyfin clock readiness are available. Reporting
+  Ready never calls `video.play()`; only the authoritative Unpause completes startup.
+- Following and suspended modes must also update Jellyfin `IgnoreWait`: following clients
+  participate in the group readiness barrier, while suspended clients remain in the
+  group without blocking other participants.
+- Queue replacement follows Jellyfin's Waiting/Ready contract and must not send an
+  immediate Unpause. `startGroupPlayback` is an explicit troubleshooting override for a
+  group that remains visibly stuck in Waiting; it must never run automatically.
+- Preserve both `StateUpdate` and full `GroupUpdate` WebSocket messages so participant,
+  state, and readiness diagnostics do not become stale while playback commands continue.
+- Queue replacement waits must consult the live service snapshot before registering and
+  must reject pending waiters on logout/unmount so early WebSocket updates and stale
+  async continuations cannot create false timeouts.
+- `useAppSyncPlayNavigation` binds the coordinator to App history, Player entry, normal
+  Play interception, and local Player-Back suspension without regrowing `App.js`.
+
+### Watchlist data helpers
+
+- `src/services/jellyfin/watchlistApi.js` pages the native Jellyfin Likes source by item
+  type and title without building a whole-library client snapshot.
+- `src/services/jellyfin/watchlistInsightsApi.js` consumes capability-gated plugin pages
+  for progress/completion, movie history, and statistics. Statistics tolerate older
+  plugin responses without `TopMovies`, while validating the field when present.
+- `src/views/watchlist-panel/hooks/useWatchlistInsights.js` owns separate 60-second
+  client cache entries for each advanced Watchlist tab, stale-while-refresh behavior,
+  in-flight request deduplication, active-tab pagination, sequential first-page warming,
+  and user-data invalidation. Background warming stops when the panel becomes inactive
+  and never fetches later pages.
+- `src/utils/discoveryMediaItems.js` normalizes provider records for HSS Home rows while
+  preserving linked Jellyfin IDs and authenticated provider artwork.
+- `src/utils/providerItemMetadata.js` normalizes optional provider summary fields for
+  `ProviderItemPopup`. Compact feeds may provide only type/year/rating; genres and
+  director/writer credits render only when the provider contract supplies them.
 
 ### `useProviderPanelShell`
 
@@ -935,11 +989,24 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - centralizes episode navigation plus video surface/volume/mute/error UI handlers.
 - `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
   - centralizes playback recovery/session rebuild + fallback/transcode/HLS fatal recovery logic.
+  - receives an immutable `playbackRuntimeContext` captured before source attachment.
+    HLS callbacks and asynchronous fallback continuations must verify both their bound
+    HLS instance and playback generation before changing playback.
 - `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
   - centralizes player lifecycle effects (item bootstrap, control hide timers, stall watchdog, focus/cleanup timers).
 - `src/views/player-panel/hooks/useNativeSyncPlay.js`
-  - maps native group updates/commands to the player, reports ready/buffering state,
-    and applies the shared 250 ms correction and two-second hard-seek thresholds.
+  - timing-only adapter for the currently attached video; app-level membership, queue,
+    navigation, suspension, and replacement decisions live in
+    `src/App/hooks/useAppSyncPlayCoordinator.js` and `src/contexts/SyncPlayContext.js`.
+  - maps native group updates/commands to the player, queues commands until server-clock
+    synchronization is available, reports readiness through `syncPlayStartupBridge`,
+    and starts only on authoritative Unpause before applying the shared 250 ms correction
+    and two-second hard-seek thresholds.
+  - reports Buffering only after a continuous three-second wait and reports Ready when
+    playback recovers, matching Jellyfin's tolerance for transient media stalls.
+  - applies at most one hard seek for each authoritative SyncPlay command; later drift
+    for that command converges through bounded playback-rate correction so buffering
+    cannot create a repeated seek loop.
 - `src/views/player-panel/hooks/useJellyWatchParty.js`
   - maps isolated room events to host/guest player control, readiness, reconnect,
     clock-offset, drift-correction, and chat behavior.

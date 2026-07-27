@@ -3,7 +3,7 @@ export const INTEGRATION_PREFERENCES_CHANGED_EVENT = 'breezyfin-integration-pref
 
 const DEFAULT_PREFERENCES = Object.freeze({
 	homeSource: 'builtin',
-	watchlistEnabled: false
+	watchlistEnabled: true
 });
 
 const getScopeKey = (service) => {
@@ -26,7 +26,7 @@ const readStore = () => {
 
 const normalizePreferences = (value) => ({
 	homeSource: value?.homeSource === 'server' ? 'server' : 'builtin',
-	watchlistEnabled: value?.watchlistEnabled === true
+	watchlistEnabled: value?.watchlistEnabled !== false
 });
 
 export const readIntegrationPreferences = (service) => {

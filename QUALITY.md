@@ -31,7 +31,7 @@ The custom audit suite covers repo-specific invariants that generic tools do not
 - generated third-party notice drift
 - Jellyfin service-boundary violations
 - local import cycles
-- hotspot growth ceilings
+- advisory file/function hotspot metrics and checked-in baseline growth
 - dead CSS module class candidates
 - local style import drift
 - JS/JSX local style entrypoint import drift
@@ -43,6 +43,13 @@ The custom audit suite covers repo-specific invariants that generic tools do not
 - cross-file duplicate snippets
 
 Keep these checks even if external tools are added. External tools should supplement these repo-specific tests, not replace them without a measured comparison.
+
+`npm run audit:hotspots` parses application source with the explicitly pinned
+`@babel/parser` dependency and reports file growth plus function length, complexity,
+and nesting against `scripts/code-audit/hotspot-baseline.json`. Metric growth is
+informational and must not be treated as a correctness failure. The audit fails only
+when source parsing or baseline validation fails. Refresh the baseline deliberately
+after review with `npm run audit:hotspots:update`.
 
 ## Runtime Diagnostics Performance Contract
 
@@ -99,7 +106,13 @@ Evidence:
 
 - Axios `^1.18.1` is now an explicit runtime dependency and satisfies the Jellyfin SDK peer dependency. Its required `follow-redirects` and `form-data` chain is also resolved to non-vulnerable versions in the lockfile.
 - `npm audit --omit=dev --audit-level=high` currently passes with no production vulnerabilities.
-- The remaining low/moderate findings in an unscoped `npm audit` are confined to the nested Enact CLI build-tool chain (`elliptic` through browser polyfills and `uuid` through the development server). Those packages are not part of the production dependency closure or packaged application.
+- Findings from an unscoped `npm audit`, including current high-severity
+  `brace-expansion`, `fast-uri`, and `js-yaml` reports, are confined to the nested Enact
+  CLI build-tool chain and are not part of the packaged application.
+- Enact CLI's tarball contains undeclared nested `@enact/dev-utils` tooling. The lockfile
+  marks those extraneous entries as development-only so `--omit=dev` reflects their real
+  ancestor; preserve that metadata when refreshing the lockfile. Range-scoped overrides
+  keep normal dependency paths on patched releases without changing Enact generations.
 - Running `npm audit fix` blindly is too risky for this app because Enact/webOS packaging, Sandstone behavior, and production minification have all been regression-sensitive.
 
 Recommended adoption path:

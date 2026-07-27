@@ -1,6 +1,7 @@
 import {
 	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
+	getPlaybackStartupFailureMessage,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
 	selectHlsEnginePreference
@@ -281,5 +282,23 @@ describe('playerVideoLoaderHelpers', () => {
 			allowNativeFallback: false,
 			reason: 'hlsjs-available'
 		});
+	});
+
+	it.each([
+		['DV', 'Dolby Vision'],
+		['HDR10', 'HDR'],
+		['HDR10_PLUS', 'HDR'],
+		['HLG', 'HDR']
+	])('explains runtime startup failures for %s streams', (id, expectedLabel) => {
+		expect(getPlaybackStartupFailureMessage({id})).toContain(
+			`${expectedLabel} playback did not become ready`
+		);
+		expect(getPlaybackStartupFailureMessage({id})).toContain('test on TV hardware');
+	});
+
+	it('keeps the generic startup failure for SDR playback', () => {
+		expect(getPlaybackStartupFailureMessage({id: 'SDR'})).toBe(
+			'Playback failed after session rebuild attempt. Please retry or go back.'
+		);
 	});
 });

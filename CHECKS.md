@@ -49,11 +49,26 @@ Run these before packaging a release candidate:
    Individual row `404`, `5xx`, timeout, or malformed responses must stay local and expose
    Retry without reloading Home. Descriptor/capability failure may restore built-in Home
    without affecting Hero, My Requests, or Watchlist.
-3. Enable Likes watchlist and verify unset -> liked -> unset and disliked -> liked ->
-   unset transitions for Movie/Series. Confirm mutation and `UserDataChanged` refresh
-   Home, View More, Library, and item state without crossing server/user scopes.
-4. Verify Discovery and Calendar navigation appears only for enabled capabilities.
-   Test complete empty responses, retryable provider failures, linked-item Play,
+3. Verify Watchlist is enabled when the scoped preference is missing and an explicitly
+   disabled preference remains disabled. Test unset -> liked -> unset and disliked ->
+   liked -> unset transitions for Movie/Series. Confirm the Shows/Movies previews and
+   View More pages use real Jellyfin paging and deterministic title sorting. With the
+   updated plugin, verify Series Progress, Completed Series, Movie History, Statistics,
+   Top 5 Shows/Movies, Mark All Watched, and nested View Unwatched paging. Main insight
+   rows must open Media Details while nested actions run without opening the row. Switch
+   through warmed tabs and verify fresh data appears immediately, stale data remains
+   visible during refresh, and background warming stops after leaving Watchlist. Without
+   the plugin, keep every advanced
+   tab visible with a clear install/update requirement. Confirm mutation and
+   `UserDataChanged` refresh item state without crossing server/user scopes. Confirm
+   Watchlist and Calendar reuse the Settings pill-tab appearance, selected state,
+   Spotlight traversal, pointer behavior, and responsive wrapping.
+4. Verify Calendar navigation appears only when its capability is enabled. Verify
+   Discovery has no standalone toolbar tab and appears only in enabled HSS descriptors,
+   preserving server order/title/layout. Verify the real HSS `Discover`,
+   `DiscoverMovies`, `DiscoverTV`, `UpcomingMovies`, and `UpcomingShows` identifiers
+   route to their corresponding Breezyfin Discovery feeds. Test complete empty responses, retryable
+   provider failures, linked-item Play,
    external details, authenticated images, deterministic paging, local-date grouping,
    and Movie/Series filters. Confirm Trending renders before later Discovery rows,
    one failed feed does not remove successful feeds, transient capability failures retry,
@@ -78,18 +93,53 @@ Run these before packaging a release candidate:
    preblurred backdrop fallback as Home, and joined SyncPlay uses its active queue item
    as the backdrop without retaining stale artwork after leaving.
 5. With two Jellyfin sessions, verify native SyncPlay create/join/leave, participants,
-   connection/group status, and refresh behavior. Switch
+   connection/group status, and refresh behavior. Test remote Play/pause/seek,
+   next/previous/end-of-item, one-time cross-item navigation, inaccessible queue items,
+   and stale/duplicate queue updates. Player Back must suspend only this client without
+   pausing/stopping/leaving the group; remote changes while suspended must show the
+   non-autofocusing Join notification. Verify no-queue replacement, same-item resume,
+   different-item replace/join/cancel, queue-update timeout, and reconnect membership.
+   Watch must reopen the same queue revision after Player Back. A playable Player source
+   must pause locally, wait for the first valid server-clock sample, report Ready, and
+   remain paused until the authoritative remote Unpause seeks to the group position.
+   Transient waits shorter than three seconds must not report Buffering; sustained waits
+   must report Buffering once and Ready once after recovery without repeatedly returning
+   to the same timestamp. Verify Jellyfin no longer remains on its sync/clock indicators.
+   If the group remains in Waiting, confirm participant/state updates remain current and
+   that `Start Group Playback` is a manual force-start rather than an automatic queue
+   replacement side effect. Compare Breezyfin-to-Breezyfin or Jellyfin Web before
+   classifying a single third-party client's missing Ready response as a Breezyfin issue.
+   Restored membership after app restart must remain suspended. Switch
    server/user/token while joined and verify the previous account's group is not shown;
-   verify a failed Leave request retains the joined state and shows an error.
+   verify a failed Leave request retains the joined state and shows an error. Verify
+   readiness does not briefly start/pause normal playback, authoritative Unpause reports
+   PlaybackStart once, and stale reconnect responses cannot resurrect a departed group.
 6. Verify JellyWatchParty is hidden for `404`, malformed, disabled, or
    `auth_enabled=false` token responses. Test room create/password join/leave,
    reconnect, host transfer, ready/buffering, play/pause/seek, 500-character input,
    50-message history, and `hide_native_sync_button` without persisting JWTs,
    passwords, or chat. Verify token-refresh failure returns to an unavailable Retry state,
    and Back during a pending room-item lookup cannot navigate into Player afterward.
-7. On target webOS hardware, repeat Home, View More, Watchlist, Discovery, Calendar,
+7. On target webOS hardware, repeat Home, Discovery HSS rows/View More, Watchlist, Calendar,
    SyncPlay, WatchParty, pointer/5-way focus, layered Back, reconnect, and
    plugin-unavailable checks in Classic/Elegant and all performance modes.
+8. Open external Discovery/Calendar provider details and verify the themed popup shows
+   every available type/year/rating/genre/director/writer field, omits unavailable
+   fields cleanly, contains long text, and restores focus after Close.
+9. Compare toolbar, panel tabs/actions, Media Details, and Player controls in pointer
+   and 5-way modes. Generic hover/focus/active text and icons must use the theme accent,
+   while warning, danger, favorite, and primary-on-light states retain their semantic
+   colors.
+10. Trigger Calendar and Watchlist load-more twice rapidly. Verify each page is requested
+    once, stable event/item IDs are not appended twice, and a stale response from a
+    previous filter, range, or nested view cannot change the active results.
+11. Open the SyncPlay queue-replacement decision and WatchParty popup with 5-way input.
+    Verify the decision and WatchParty surfaces focus their first actions, pending actions
+    cannot be submitted twice, failures remain visible, and the suspended-playback
+    notification never steals focus.
+12. Replace a Player item/source while an old HLS request or subtitle fallback is pending.
+    Verify callbacks from the old HLS instance/generation cannot rebuild, recover, or
+    change subtitle policy for the new playback.
 
 ### Diagnostics/logging validation
 

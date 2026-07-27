@@ -19,11 +19,11 @@ const ToolbarElegantLayout = ({
 	handleNavigateFavorites,
 	handleNavigateSearch,
 	handleNavigateSettings,
-	handleNavigateDiscovery,
+	handleNavigateWatchlist,
 	handleNavigateCalendar,
 	handleNavigateSyncPlay,
 	handleNavigateWatchParty,
-	showDiscovery,
+	showWatchlist,
 	showCalendar,
 	showSyncPlay,
 	showWatchParty,
@@ -123,14 +123,14 @@ const ToolbarElegantLayout = ({
 							>
 								Search
 							</Button>
-							{showDiscovery ? (
+							{showWatchlist ? (
 								<Button
 									size="small"
-									onClick={handleNavigateDiscovery}
-									className={`${css.tabButton} ${activeSection === 'discovery' ? css.tabSelected : ''}`}
-									spotlightId="toolbar-discovery"
+									onClick={handleNavigateWatchlist}
+									className={`${css.tabButton} ${activeSection === 'watchlist' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-watchlist"
 								>
-									Discovery
+									Watchlist
 								</Button>
 							) : null}
 							{showCalendar ? (

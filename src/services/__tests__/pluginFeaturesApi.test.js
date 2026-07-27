@@ -1,6 +1,11 @@
 import {getHomeSectionDescriptors, getHomeSectionItems} from '../jellyfin/homeSectionsApi';
-import {getDiscoveryFeed} from '../jellyfin/discoveryApi';
+import {getDiscoveryDetails, getDiscoveryFeed} from '../jellyfin/discoveryApi';
 import {getCalendarEvents} from '../jellyfin/calendarApi';
+import {
+	getWatchlistMovieHistory,
+	getWatchlistSeriesInsights,
+	getWatchlistStatistics
+} from '../jellyfin/watchlistInsightsApi';
 import {getBreezyfinCapabilities, normalizePluginPage} from '../jellyfin/requestsApi';
 
 let serviceId = 0;
@@ -40,6 +45,146 @@ describe('plugin feature APIs', () => {
 		expect(service._request).toHaveBeenCalledTimes(3);
 	});
 
+	it('normalizes legacy and Discovery HSS descriptors', async () => {
+		const service = createService();
+		service._request
+			.mockResolvedValueOnce(capabilities(['homeSections.v1']))
+			.mockResolvedValueOnce({
+				Items: [
+					{
+						Id: '11111111111111111111111111111111', Title: 'Latest', ViewMode: 'Landscape',
+						Order: 0, SupportsPaging: true
+					},
+					{
+						Id: '22222222222222222222222222222222', Title: 'Trending', ViewMode: 'Landscape',
+						Order: 1, SupportsPaging: true, Kind: 'Discovery', Feed: 'Trending'
+					}
+				],
+				TotalRecordCount: 2
+			});
+
+		await expect(getHomeSectionDescriptors(service)).resolves.toMatchObject({
+			available: true,
+			result: {
+				items: [
+					expect.objectContaining({Kind: 'JellyfinItems', Feed: null}),
+					expect.objectContaining({Kind: 'Discovery', Feed: 'Trending'})
+				]
+			}
+		});
+	});
+
+	it('reads paged Watchlist insights and statistics through the plugin capability', async () => {
+		const service = createService();
+		service._request
+			.mockResolvedValueOnce(capabilities(['watchlistInsights.v1']))
+			.mockResolvedValueOnce({
+				Items: [{
+					Item: {Id: 'series-1', Name: 'Series', Type: 'Series'},
+					WatchedEpisodeCount: 2, TotalEpisodeCount: 10, RemainingEpisodeCount: 8,
+					LastWatchedEpisodeName: 'Episode 2', LastPlayedDate: '2026-01-01T00:00:00Z'
+				}],
+				TotalRecordCount: 1
+			})
+			.mockResolvedValueOnce({
+				Items: [{
+					Item: {
+						Id: 'movie-1', Name: 'Movie', Type: 'Movie',
+						ProductionYear: 2026, RunTimeTicks: 72000000000
+					},
+					LastPlayedDate: '2026-01-01T00:00:00Z'
+				}],
+				TotalRecordCount: 1
+			})
+			.mockResolvedValueOnce({
+				SeriesStarted: 1,
+				SeriesWatched: 0,
+				EpisodesWatched: 2,
+				MoviesWatched: 1,
+				TopShows: [{
+					Item: {Id: 'series-1', Name: 'Series', Type: 'Series'},
+					WatchedEpisodeCount: 2,
+					LastPlayedDate: '2026-01-01T00:00:00Z'
+				}],
+				TopMovies: [{
+					Item: {Id: 'movie-1', Name: 'Movie', Type: 'Movie'},
+					PlayCount: 3,
+					LastPlayedDate: '2026-01-02T00:00:00Z'
+				}]
+			});
+
+		await expect(getWatchlistSeriesInsights(service, 'InProgress')).resolves.toMatchObject({
+			available: true,
+			result: {items: [{
+				Id: 'series-1',
+				Name: 'Series',
+				Title: 'Series',
+				LastWatchedEpisodeTitle: 'Episode 2'
+			}]}
+		});
+		await expect(getWatchlistMovieHistory(service)).resolves.toMatchObject({
+			available: true,
+			result: {items: [{
+				Id: 'movie-1',
+				Title: 'Movie',
+				ProductionYear: 2026,
+				RuntimeMinutes: 120
+			}]}
+		});
+		await expect(getWatchlistStatistics(service)).resolves.toMatchObject({
+			available: true,
+			result: {
+				SeriesStarted: 1,
+				MoviesWatched: 1,
+				TopShows: [{Id: 'series-1', Title: 'Series', WatchedEpisodeCount: 2}],
+				TopMovies: [{Id: 'movie-1', Title: 'Movie', PlayCount: 3}]
+			}
+		});
+	});
+
+	it('accepts legacy Watchlist statistics without TopMovies', async () => {
+		const service = createService();
+		service._request
+			.mockResolvedValueOnce(capabilities(['watchlistInsights.v1']))
+			.mockResolvedValueOnce({
+				SeriesStarted: 1,
+				SeriesWatched: 1,
+				EpisodesWatched: 10,
+				MoviesWatched: 2,
+				TopShows: []
+			});
+
+		await expect(getWatchlistStatistics(service)).resolves.toEqual({
+			available: true,
+			result: {
+				SeriesStarted: 1,
+				SeriesWatched: 1,
+				EpisodesWatched: 10,
+				MoviesWatched: 2,
+				TopShows: [],
+				TopMovies: []
+			}
+		});
+	});
+
+	it('retains compatibility with early flat Watchlist insight records', async () => {
+		const service = createService();
+		service._request
+			.mockResolvedValueOnce(capabilities(['watchlistInsights.v1']))
+			.mockResolvedValueOnce({
+				Items: [{
+					Id: 'series-flat', Title: 'Flat Series', WatchedEpisodeCount: 1,
+					TotalEpisodeCount: 4, RemainingEpisodeCount: 3
+				}],
+				TotalRecordCount: 1
+			});
+
+		await expect(getWatchlistSeriesInsights(service, 'InProgress')).resolves.toMatchObject({
+			available: true,
+			result: {items: [{Id: 'series-flat', Name: 'Flat Series', Title: 'Flat Series'}]}
+		});
+	});
+
 	it('adds only authenticated plugin image URLs to discovery results', async () => {
 		const service = createService();
 		service._request
@@ -76,6 +221,41 @@ describe('plugin feature APIs', () => {
 			available: true,
 			result: {items: [{Id: 'movie:tmdb:2'}]}
 		});
+	});
+
+	it('loads authenticated on-demand Discovery details without expanding feed requests', async () => {
+		const service = createService();
+		service._request
+			.mockResolvedValueOnce(capabilities(['discovery.v1']))
+			.mockResolvedValueOnce({
+				Id: 'movie:tmdb:2',
+				Type: 'Movie',
+				Title: 'Movie',
+				Overview: 'Overview',
+				ProviderIds: {Tmdb: '2'},
+				CanPlay: false,
+				JellyfinItemId: null,
+				ImageUrl: '/Breezyfin/ExternalImages/details',
+				Genres: ['Drama'],
+				Directors: ['Director One'],
+				Writers: ['Writer One']
+			});
+
+		await expect(getDiscoveryDetails(service, {
+			Type: 'Movie',
+			ProviderIds: {Tmdb: '2'}
+		})).resolves.toMatchObject({
+			available: true,
+			result: {
+				Genres: ['Drama'],
+				Directors: ['Director One'],
+				Writers: ['Writer One'],
+				AuthenticatedImageUrl: expect.stringContaining('/Breezyfin/ExternalImages/details')
+			}
+		});
+		expect(service._request.mock.calls[1][0]).toContain(
+			'/Breezyfin/Discovery/Details?type=Movie&providerId=2&language=en'
+		);
 	});
 
 	it('returns unavailable rather than unrelated Calendar data after a provider failure', async () => {

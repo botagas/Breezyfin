@@ -7,7 +7,8 @@ export const BREEZYFIN_FEATURE_IDS = Object.freeze({
 	MY_REQUESTS: 'myRequests.v1',
 	HOME_SECTIONS: 'homeSections.v1',
 	DISCOVERY: 'discovery.v1',
-	CALENDAR: 'calendar.v1'
+	CALENDAR: 'calendar.v1',
+	WATCHLIST_INSIGHTS: 'watchlistInsights.v1'
 });
 const MY_REQUESTS_FEATURE_ID = BREEZYFIN_FEATURE_IDS.MY_REQUESTS;
 const SUPPORTED_CONTRACT_VERSION = '1.0';
@@ -102,6 +103,14 @@ export const getPluginFailureDetails = (error, prefix = 'plugin') => ({
 	problemDetails: error?.problemDetails || null,
 	retryable: isPluginFailureRetryable(error)
 });
+
+export const getUnavailablePluginResult = (error, prefix = 'plugin') => {
+	if (shouldPropagatePluginError(error)) throw error;
+	return {
+		available: false,
+		...getPluginFailureDetails(error, prefix)
+	};
+};
 
 export const requestBreezyfinPluginJson = async (service, path, context) => {
 	const controller = typeof AbortController === 'function' ? new AbortController() : null;

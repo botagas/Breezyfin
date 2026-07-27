@@ -82,6 +82,13 @@ export const extractSubtitleStreamIndexFromValues = (values = []) => {
 	return null;
 };
 
+export const hasActiveEncodedSubtitle = (values = []) => {
+	const subtitleStreamIndex = extractSubtitleStreamIndexFromValues(values);
+	return hasSubtitleMethodEncode(values) &&
+		Number.isInteger(subtitleStreamIndex) &&
+		subtitleStreamIndex >= 0;
+};
+
 const hasServerFragmentFailure = (errorData) => {
 	const statusCode = Number(errorData?.response?.code);
 	return errorData?.details === 'fragLoadError' &&
@@ -95,14 +102,14 @@ export const isSubtitleBurnInPlaybackFailure = ({
 	values = []
 } = {}) => {
 	if (!hasServerFragmentFailure(errorData)) return false;
-	return hasRequestedSubtitleBurnIn(subtitlePolicy) || hasSubtitleMethodEncode(values);
+	return hasRequestedSubtitleBurnIn(subtitlePolicy) || hasActiveEncodedSubtitle(values);
 };
 
 export const isSubtitleBurnInPlaybackPath = ({
 	subtitlePolicy,
 	values = []
 } = {}) => (
-	hasRequestedSubtitleBurnIn(subtitlePolicy) || hasSubtitleMethodEncode(values)
+	hasRequestedSubtitleBurnIn(subtitlePolicy) || hasActiveEncodedSubtitle(values)
 );
 
 export const shouldRetrySubtitleBurnInWithSafeProfile = ({

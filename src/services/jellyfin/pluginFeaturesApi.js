@@ -1,9 +1,8 @@
 import {
 	getBreezyfinCapabilities,
-	getPluginFailureDetails,
+	getUnavailablePluginResult,
 	normalizePluginPage,
-	requestBreezyfinPluginJson,
-	shouldPropagatePluginError
+	requestBreezyfinPluginJson
 } from './requestsApi';
 
 const normalizeLimit = (value, fallback) => {
@@ -38,11 +37,7 @@ export const getPluginFeaturePage = async (service, {
 		}
 		return {available: true, result: page};
 	} catch (error) {
-		if (shouldPropagatePluginError(error)) throw error;
-		return {
-			available: false,
-			...getPluginFailureDetails(error, 'plugin')
-		};
+		return getUnavailablePluginResult(error);
 	}
 };
 
@@ -79,3 +74,8 @@ export const addAuthenticatedPluginImageUrls = (service, response) => {
 		}
 	};
 };
+
+export const addAuthenticatedPluginImageUrl = (service, item) => ({
+	...item,
+	AuthenticatedImageUrl: buildAuthenticatedPluginImageUrl(service, item?.ImageUrl)
+});

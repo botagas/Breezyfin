@@ -1,0 +1,89 @@
+@import (reference) '../styles/surfaceMixins.less';
+
+.row {
+	position: relative;
+	z-index: 2;
+	grid-column: 1 / -1;
+	display: flex;
+	justify-content: center;
+	margin-bottom: 0.2rem;
+}
+
+.tabs {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	width: min(74rem, 100%);
+	padding: 0.4rem;
+	border-radius: 999px;
+	.popupSurface(
+		var(--bf-theme-popup-bg);
+		var(--bf-theme-surface-border);
+		var(--bf-theme-surface-shadow)
+	);
+}
+
+.tabButton {
+	--bf-button-fg: var(--bf-theme-button-fg);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
+	height: 2.25rem !important;
+	min-width: auto !important;
+	min-height: 2.25rem !important;
+	padding: 0 1.2rem !important;
+	border: none !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	font-family: 'Noto Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
+	font-size: 0.82em !important;
+	font-weight: 300 !important;
+	letter-spacing: 0.03em;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		border: none !important;
+		border-radius: 999px !important;
+		background: var(--bf-theme-tab-bg) !important;
+		box-shadow: none !important;
+	}
+
+	:global(.client),
+	:global(.marquee) {
+		font-family: inherit !important;
+		font-weight: 300 !important;
+		letter-spacing: inherit !important;
+	}
+
+	&&:hover :global(.bf-button-bg),
+	&&:focus :global(.bf-button-bg),
+	&&:global(.spottable):focus :global(.bf-button-bg),
+	&&:global(.spotlight) :global(.bf-button-bg),
+	&&:global([data-webos-voice-focused='true']) :global(.bf-button-bg),
+	&&:hover :global(.bg),
+	&&:focus :global(.bg),
+	&&:global(.spottable):focus :global(.bg),
+	&&:global(.spotlight) :global(.bg),
+	&&:global([data-webos-voice-focused='true']) :global(.bg),
+	&&:global(.selected) :global(.bf-button-bg),
+	&&:global(.selected) :global(.bg) {
+		border: none !important;
+		background: var(--bf-theme-tab-hover-bg) !important;
+	}
+}
+
+.tabButtonSelected {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+	}
+}
+
+@media (max-width: 1600px) {
+	.tabs {
+		width: 100%;
+		border-radius: 1.2rem;
+	}
+}

@@ -8,6 +8,7 @@ export const usePlayerPlaybackContext = ({
 	currentSubtitleTrack,
 	audioTracks = [],
 	subtitleTracks = [],
+	playbackOptions,
 	currentAudioTrackRef,
 	currentSubtitleTrackRef
 }) => {
@@ -44,6 +45,7 @@ export const usePlayerPlaybackContext = ({
 
 	const getPlaybackSessionContext = useCallback(() => ({
 		...playbackSessionRef.current,
+		playlistItemId: playbackOptions?.syncPlay?.playlistItemId || undefined,
 		audioStreamIndex: Number.isInteger(currentAudioTrackRef.current)
 			? currentAudioTrackRef.current
 			: undefined,
@@ -53,7 +55,7 @@ export const usePlayerPlaybackContext = ({
 		)
 			? currentSubtitleTrackRef.current
 			: undefined
-	}), [currentAudioTrackRef, currentSubtitleTrackRef, playbackSessionRef]);
+	}), [currentAudioTrackRef, currentSubtitleTrackRef, playbackOptions?.syncPlay?.playlistItemId, playbackSessionRef]);
 
 	return {
 		buildPlaybackOptions,

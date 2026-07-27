@@ -6,7 +6,7 @@ export const getPanelIndexForView = (currentView) => {
 	if (currentView === 'search') return 4;
 	if (currentView === 'favorites') return 5;
 	if (currentView === 'settings') return 6;
-	if (currentView === 'discovery') return 7;
+	if (currentView === 'watchlist') return 7;
 	if (currentView === 'calendar') return 8;
 	if (currentView === 'syncPlay') return 9;
 	if (currentView === 'watchParty') return 10;
