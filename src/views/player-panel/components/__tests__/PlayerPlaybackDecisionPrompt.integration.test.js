@@ -2,7 +2,7 @@
 import {useState} from 'react';
 import {fireEvent, screen, waitFor} from '@testing-library/react';
 import {renderWithBreezyfin} from '../../../../testUtils/renderWithBreezyfin';
-import PlayerSubtitleBurnInPrompt from '../PlayerSubtitleBurnInPrompt';
+import PlayerPlaybackDecisionPrompt from '../PlayerPlaybackDecisionPrompt';
 
 jest.mock('@enact/sandstone/Popup', () => function TestPopup(props) {
 	const React = require('react');
@@ -36,7 +36,7 @@ const PromptHarness = ({onBack, onConfirm, onDecline, onHide}) => {
 		setOpen(false);
 	};
 	return (
-		<PlayerSubtitleBurnInPrompt
+		<PlayerPlaybackDecisionPrompt
 			open={open}
 			prompt={{type: 'no-subtitles', reason: 'renderer-failed'}}
 			onBack={handleBack}
@@ -47,7 +47,7 @@ const PromptHarness = ({onBack, onConfirm, onDecline, onHide}) => {
 	);
 };
 
-describe('PlayerSubtitleBurnInPrompt lifecycle', () => {
+describe('PlayerPlaybackDecisionPrompt lifecycle', () => {
 	it('routes Popup Back through the exit path without starting a fallback', async () => {
 		const onBack = jest.fn();
 		const onConfirm = jest.fn();
@@ -68,5 +68,27 @@ describe('PlayerSubtitleBurnInPrompt lifecycle', () => {
 		expect(onConfirm).not.toHaveBeenCalled();
 		expect(onDecline).not.toHaveBeenCalled();
 		await waitFor(() => expect(onHide).toHaveBeenCalledTimes(1));
+	});
+
+	it('offers lower-bitrate SDR transcoding for a bitrate-limited DV path', () => {
+		const onAlternate = jest.fn();
+		renderWithBreezyfin(
+			<PlayerPlaybackDecisionPrompt
+				open
+				prompt={{
+					type: 'dolby-vision-original-quality',
+					configuredBitrateMbps: 20,
+					proposedBitrateMbps: 100
+				}}
+				onConfirm={jest.fn()}
+				onAlternate={onAlternate}
+				onDecline={jest.fn()}
+			/>
+		);
+
+		fireEvent.click(screen.getByText('Transcode in SDR'));
+
+		expect(onAlternate).toHaveBeenCalledTimes(1);
+		expect(screen.getByText(/current 20 Mbps limit/)).not.toBeNull();
 	});
 });

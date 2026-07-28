@@ -29,7 +29,7 @@ import { usePlayerTrackPopupHandlers } from './player-panel/hooks/usePlayerTrack
 import {usePlayerSubtitleRenderer} from './player-panel/hooks/usePlayerSubtitleRenderer';
 import {usePlayerStartupCoordinator} from './player-panel/hooks/usePlayerStartupCoordinator';
 import {usePlayerInteractionReveal} from './player-panel/hooks/usePlayerInteractionReveal';
-import {usePlayerSubtitleBurnInConsent} from './player-panel/hooks/usePlayerSubtitleBurnInConsent';
+import {usePlayerPlaybackDecision} from './player-panel/hooks/usePlayerPlaybackDecision';
 import {usePlayerPausedScreensaver} from './player-panel/hooks/usePlayerPausedScreensaver';
 import {usePlayerRuntimeDiagnostics} from './player-panel/hooks/usePlayerRuntimeDiagnostics';
 import {usePlayerGroupSessions} from './player-panel/hooks/usePlayerGroupSessions';
@@ -276,17 +276,21 @@ const PlayerPanel = ({
 		getPlaybackSessionContext
 	});
 	const {
-		subtitleBurnInPrompt,
+		playbackDecisionPrompt,
+		requestPlaybackDecision,
 		handleSubtitleBurnInFallback,
-		handleConfirmSubtitleBurnIn,
-		handleDeclineSubtitleBurnIn,
-		handleSubtitleBurnInPromptBack,
-		handleSubtitleBurnInPromptHide
-	} = usePlayerSubtitleBurnInConsent({
+		handleConfirmPlaybackDecision,
+		handleAlternatePlaybackDecision,
+		handleDeclinePlaybackDecision,
+		handlePlaybackDecisionBack,
+		handlePlaybackDecisionPromptHide
+	} = usePlayerPlaybackDecision({
 		itemId: item?.Id,
 		mediaSourceId: mediaSourceData?.Id,
 		playbackOptions,
 		currentAudioTrack,
+		currentSubtitleTrack,
+		audioTracks,
 		videoRef,
 		currentTimeRef,
 		playbackOverrideRef,
@@ -295,9 +299,12 @@ const PlayerPanel = ({
 		setLoadingStatusMessage,
 		handleStop,
 		loadVideoRef,
+		setCurrentAudioTrack,
 		setCurrentSubtitleTrack,
+		saveAudioSelection,
 		exitInProgressRef,
 		loadRequestIdRef,
+		playbackGenerationRef,
 		onBack
 	});
 	subtitleBurnInFallbackHandlerRef.current = handleSubtitleBurnInFallback;
@@ -346,6 +353,7 @@ const PlayerPanel = ({
 		subtitleCompatibilityFallbackAttemptedRef,
 		setCurrentSubtitleTrack,
 		requestSubtitleBurnInFallback,
+		requestPlaybackDecision,
 		exitInProgressRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef
@@ -392,7 +400,7 @@ const PlayerPanel = ({
 		failStartTimerRef,
 		playbackSessionRef,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic,
-		requestSubtitleDecision: handleSubtitleBurnInFallback,
+		requestPlaybackDecision,
 		exitInProgressRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef,
@@ -761,13 +769,13 @@ const PlayerPanel = ({
 		error,
 		playbackStarted: playbackStartedRef.current,
 		blocked: Boolean(
-			subtitleBurnInPrompt ||
+			playbackDecisionPrompt ||
 			showAudioPopup ||
 			showSubtitlePopup ||
 			skipOverlayVisible ||
 			showNextEpisodePrompt ||
 			playerDebugOverlayActive ||
-				groupSessions.popupOpen
+			groupSessions.popupOpen
 		),
 		timeoutMinutes: pausedScreensaverTimeoutMinutes,
 		lastInteractionRef,
@@ -793,7 +801,7 @@ const PlayerPanel = ({
 		setShowControls,
 		pausedScreensaverActive,
 		dismissPausedScreensaver,
-		handleSubtitlePromptBack: handleSubtitleBurnInPromptBack,
+		handleSubtitlePromptBack: handlePlaybackDecisionBack,
 		handleGroupSessionBack: groupSessions.handleBack
 	});
 	const getMediaSegmentsForItem = useCallback((itemId, options = {}) => {
@@ -883,7 +891,7 @@ const PlayerPanel = ({
 			loading,
 			loadingStatusMessage,
 			backdropUrls: getPlayerBackdropCandidates(item, jellyfinService),
-			showBackdrop: Boolean(loading || error || subtitleBurnInPrompt),
+			showBackdrop: Boolean(loading || error || playbackDecisionPrompt),
 			seekFeedback,
 			externalSubtitleLayerRef,
 			showControls,
@@ -910,13 +918,14 @@ const PlayerPanel = ({
 			skipOverlayRef,
 			getSkipSegmentLabel
 		},
-		subtitlePrompt: {
-			open: Boolean(subtitleBurnInPrompt),
-			prompt: subtitleBurnInPrompt,
-			onConfirm: handleConfirmSubtitleBurnIn,
-			onDecline: handleDeclineSubtitleBurnIn,
-			onBack: handleSubtitleBurnInPromptBack,
-			onHide: handleSubtitleBurnInPromptHide
+		playbackDecision: {
+			open: Boolean(playbackDecisionPrompt),
+			prompt: playbackDecisionPrompt,
+			onConfirm: handleConfirmPlaybackDecision,
+			onAlternate: handleAlternatePlaybackDecision,
+			onDecline: handleDeclinePlaybackDecision,
+			onBack: handlePlaybackDecisionBack,
+			onHide: handlePlaybackDecisionPromptHide
 		},
 		toast: {
 			message: toastMessage,

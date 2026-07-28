@@ -48,6 +48,11 @@ describe('playback runtime context', () => {
 		};
 
 		expect(isPlaybackRuntimeContextCurrent(base)).toBe(true);
+		expect(isPlaybackRuntimeContextCurrent({
+			...base,
+			hls: null,
+			activeHls: null
+		})).toBe(true);
 		expect(isPlaybackRuntimeContextCurrent({...base, activeHls: {}})).toBe(false);
 		expect(isPlaybackRuntimeContextCurrent({...base, activeRuntimeContext: {}})).toBe(false);
 		expect(isPlaybackRuntimeContextCurrent({...base, generation: 3})).toBe(false);

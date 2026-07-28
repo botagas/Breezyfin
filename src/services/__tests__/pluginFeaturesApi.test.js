@@ -7,6 +7,7 @@ import {
 	getWatchlistStatistics
 } from '../jellyfin/watchlistInsightsApi';
 import {getBreezyfinCapabilities, normalizePluginPage} from '../jellyfin/requestsApi';
+import {buildAuthenticatedPluginImageUrl} from '../jellyfin/pluginFeaturesApi';
 
 let serviceId = 0;
 const createService = () => {
@@ -203,6 +204,33 @@ describe('plugin feature APIs', () => {
 		expect(imageUrl.pathname).toBe('/Breezyfin/ExternalImages/signed');
 		expect(imageUrl.searchParams.get('width')).toBe('500');
 		expect(imageUrl.searchParams.get('api_key')).toBe(service.accessToken);
+	});
+
+	it.each([
+		['https://server.test', '/Breezyfin/ExternalImages/signed', '/Breezyfin/ExternalImages/signed'],
+		['https://server.test/', '/Breezyfin/ExternalImages/signed', '/Breezyfin/ExternalImages/signed'],
+		['https://server.test/jellyfin', '/Breezyfin/ExternalImages/signed', '/jellyfin/Breezyfin/ExternalImages/signed'],
+		['https://server.test/jellyfin/', '/Breezyfin/ExternalImages/signed', '/jellyfin/Breezyfin/ExternalImages/signed']
+	])('preserves the server base path for plugin images from %s', (serverUrl, path, expectedPath) => {
+		const imageUrl = new URL(buildAuthenticatedPluginImageUrl({
+			serverUrl,
+			accessToken: 'secret'
+		}, path, 640));
+
+		expect(imageUrl.pathname).toBe(expectedPath);
+		expect(imageUrl.searchParams.get('width')).toBe('640');
+		expect(imageUrl.searchParams.get('api_key')).toBe('secret');
+	});
+
+	it('rejects malformed plugin image context', () => {
+		expect(buildAuthenticatedPluginImageUrl({
+			serverUrl: 'not a valid url',
+			accessToken: 'secret'
+		}, '/Breezyfin/ExternalImages/signed')).toBeNull();
+		expect(buildAuthenticatedPluginImageUrl({
+			serverUrl: 'https://server.test/jellyfin',
+			accessToken: 'secret'
+		}, '/Items/item/Images/Primary')).toBeNull();
 	});
 
 	it('accepts omitted nullable discovery fields from Jellyfin JSON settings', async () => {

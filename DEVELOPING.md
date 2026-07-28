@@ -117,7 +117,11 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Player track-popup click handlers: `src/views/player-panel/hooks/usePlayerTrackPopupHandlers.js`
 - Player play/pause/retry/end command handlers: `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
 - Player stop/focus control handlers: `src/views/player-panel/hooks/usePlayerCoreControls.js`
-- Player subtitle decision prompt/reload handling for HDR/DV burn-in, image-subtitle burn-in fragility, and no-subtitle fallback consent: `src/views/player-panel/hooks/usePlayerSubtitleBurnInConsent.js`
+- Player playback decision prompt/reload handling for explicit unsupported-audio switches,
+  preflight-validated DV-to-HDR video-copy fallback, deterministic H.264 SDR fallback,
+  bitrate-limited original-quality versus SDR choices, HDR/DV subtitle burn-in,
+  image-subtitle burn-in fragility, and no-subtitle fallback consent:
+  `src/views/player-panel/hooks/usePlayerPlaybackDecision.js`
 - Player layered back navigation decisions: `src/views/player-panel/hooks/usePlayerBackNavigation.js`
 - Player audio/subtitle popup disclosure wiring: `src/views/player-panel/hooks/usePlayerDisclosures.js`
 - Player adjacent-episode checks and progress ticker: `src/views/player-panel/hooks/usePlayerEpisodeProgress.js`
@@ -141,6 +145,15 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   `src/views/player-panel/utils/playbackRuntimeContext.js` before source attachment.
   Every HLS callback and asynchronous recovery continuation must match its bound HLS
   instance, runtime-context identity, and playback generation before taking action.
+- Playback safety decisions must be returned from PlaybackInfo negotiation and handled
+  before source URL resolution or attachment. Dolby Vision video transcoding is blocked
+  unless it is validated video-copy/audio-only work. A bitrate-only DV encode may first
+  offer a one-shot 100 Mbps original-quality retry so Jellyfin can select DirectPlay or
+  video-copy DirectStream; this does not force remux. Full video encoding is not accepted
+  as preserved HDR, while a confirmed SDR video encode is valid because Jellyfin tone
+  maps the source and `*-rangetype` URL values describe accepted source capabilities.
+  Playback decisions are serialized per generation so subtitle, audio, and range prompts
+  cannot replace one another while teardown or Popup presentation is pending.
 - Smart/manual subtitle burn-in policy: `src/utils/playbackSelection.js` (`getSubtitleTranscodePolicy`)
 - Player client-side subtitle renderer/cue cache: `src/views/player-panel/hooks/usePlayerSubtitleRenderer.js`
 - ASS/SSA renderer lifecycle: `src/views/player-panel/utils/subtitle-renderers/`; Breezyfin lightweight parsing is centered in `src/views/player-panel/utils/subtitleRendererAss.js` with focused helpers for alignment, colors, font size, origin/position, karaoke, clipping, common vector drawing paths, `@font` vertical-writing intent, and `\t(...)` transform interpolation, including B-spline `s`/`p` conversion to SVG cubic paths and `\pbo` drawing baseline offsets. Lightweight ASS/SSA must prefer the raw subtitle document over Jellyfin `Stream.js` events because event payloads may omit script-level PlayRes and style metadata; `Stream.js` remains a degraded fallback when raw delivery fails. The lightweight overlay must map ASS coordinates and source dimensions onto the visible `object-fit: contain` video stage rather than the full TV viewport. `PlayResX/Y` remains the authored coordinate plane; valid `LayoutResX/Y` contributes source-layout/pixel-aspect scaling and must not replace PlayRes positioning. Preserve explicit positions, moves, origins, rotations, drawings, clips, and intentionally off-screen positions without applying style margins or safe-area correction. Only ordinary unpositioned cues use the bounded measured containment pass. The stage itself clips all output to the visible video surface. Breezyfin lightweight remains Auto, while libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in are explicit experimental/manual renderer options available in every release channel for troubleshooting. The manual-canvas libass and JASSUB modes are diagnostic paths for separating video-attached timing issues from native-video canvas compositor issues. JASSUB's packaged default font, sourcemap source, version-guarded webOS Canvas2D worker patch, and version-guarded static-asset entry patch are prepared by `scripts/prepare-subtitle-package-assets.cjs` and `scripts/subtitle-assets/jassubCanvas2dPatch.cjs`; the Canvas2D patch is required because JASSUB's WebGL path is unreliable on webOS, and the static-asset entry patch prevents Webpack from bundling JASSUB worker/WASM fallback chunks. libass workers, Breezyfin's fallback subtitle font, JASSUB static worker/WASM/font assets, libbitsub/libpgs bitmap subtitle assets, and external renderer chunks are copied into `dist/` by `scripts/copy-subtitle-assets.cjs` after `npm run pack` / `npm run pack-p`. Stable and develop builds preserve external renderer chunks, transpile ASS.js/JASSUB/libbitsub/libpgs renderer chunks for webOS packaging, validate copied JASSUB static assets, and fail if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` runtime chunks reappear.
@@ -279,11 +292,15 @@ Jellyfin service paths:
 - `src/utils/playbackSelection.js` (pure media-source/audio selection and compatibility logic)
 - `src/utils/playbackDiagnostics.js` (generic playback diagnostic construction/appending)
 - `src/services/jellyfin/playbackProfileBuilder.js` (playback profile request context)
+  - Confirmed DV-to-SDR fallback uses a dedicated HLS TS/H.264 profile with video
+    stream copy disabled. Do not broaden it back to HEVC: HEVC Main 10 can retain a
+    DV fallback signal even when the requested cap is SDR.
 - `src/services/jellyfin/subtitleApi.js` (subtitle event/raw text fetch helpers for client-side rendering)
 - `src/services/jellyfin/requestsApi.js` (session-cached plugin capability discovery,
   plugin-first My Requests paging, strict plugin error handling, and bounded tag fallback)
 - `src/services/jellyfin/pluginFeaturesApi.js` (shared capability-gated paging and
-  authenticated plugin image URL construction)
+  authenticated plugin image URL construction; image paths must join against the
+  normalized server base so reverse-proxy prefixes such as `/jellyfin` survive)
 - `src/services/jellyfin/requestErrors.js` (bounded Problem Details parsing and safe
   Jellyfin request errors; raw provider bodies must not be embedded in errors/logs)
 - `src/services/jellyfin/homeSectionsApi.js` (opaque Home descriptors/items)

@@ -3,7 +3,7 @@ import PlayerDebugOverlay from './PlayerDebugOverlay';
 import PlayerErrorPopup from './PlayerErrorPopup';
 import PlayerMediaSurface from './PlayerMediaSurface';
 import PlayerSkipOverlay from './PlayerSkipOverlay';
-import PlayerSubtitleBurnInPrompt from './PlayerSubtitleBurnInPrompt';
+import PlayerPlaybackDecisionPrompt from './PlayerPlaybackDecisionPrompt';
 import PlayerToast from './PlayerToast';
 import PlayerTrackPopups from './PlayerTrackPopups';
 import ScreensaverOverlay from '../../../components/ScreensaverOverlay';
@@ -20,7 +20,7 @@ const PlayerPanelContent = ({
 	pausedScreensaver,
 	skipOverlay,
 	startupStatus,
-	subtitlePrompt,
+	playbackDecision,
 	toast,
 	trackPopups,
 	syncPlay,
@@ -30,7 +30,7 @@ const PlayerPanelContent = ({
 		<PlayerMediaSurface {...mediaSurface} />
 		<PlayerErrorPopup {...errorPopup} />
 		<PlayerSkipOverlay {...skipOverlay} />
-		<PlayerSubtitleBurnInPrompt {...subtitlePrompt} />
+			<PlayerPlaybackDecisionPrompt {...playbackDecision} />
 		<PlayerToast {...toast} />
 		<PlayerDebugOverlay {...debugOverlay} />
 		<PlayerControlsOverlay {...controls} />

@@ -31,8 +31,7 @@ export const isPlaybackRuntimeContextCurrent = ({
 }) => Boolean(
 	runtimeContext &&
 	runtimeContext === activeRuntimeContext &&
-	hls &&
-	hls === activeHls &&
+	(!hls || hls === activeHls) &&
 	runtimeContext.generation === generation &&
 	exitInProgress !== true
 );

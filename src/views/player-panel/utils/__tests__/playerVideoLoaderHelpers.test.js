@@ -142,6 +142,7 @@ describe('playerVideoLoaderHelpers', () => {
 			__debugRequest: {directPlay: true},
 			__debugDecision: {playMethod: 'DirectPlay'},
 			__safeSubtitleBurnInProfile: false,
+			__safeSdrFallbackProfile: false,
 			__requiredDecision: null,
 			__debugSubtitlePolicy: {decision: 'client-render'},
 			__debugDiagnostics: [{scope: 'playback', status: 'applied'}],
@@ -170,6 +171,7 @@ describe('playerVideoLoaderHelpers', () => {
 				subtitlePolicy: {decision: 'client-render'},
 				requiredDecision: {type: 'subtitle-consent'},
 				safeSubtitleBurnInProfile: true,
+				safeSdrFallbackProfile: true,
 				decision: {payload: 'large'},
 				diagnostics: [{scope: 'playback'}]
 			},
@@ -184,6 +186,7 @@ describe('playerVideoLoaderHelpers', () => {
 			__requiredDecision: {type: 'subtitle-consent'},
 			__debugSubtitlePolicy: {decision: 'client-render'},
 			__safeSubtitleBurnInProfile: true,
+			__safeSdrFallbackProfile: true,
 			__debugDecision: null,
 			__debugDiagnostics: [],
 			__debugAvailableSources: []

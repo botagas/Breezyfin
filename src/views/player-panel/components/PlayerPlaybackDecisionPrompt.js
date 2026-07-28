@@ -7,10 +7,20 @@ import {popupShellCss} from '../../../styles/popupStyles';
 import popupStyles from '../../../styles/popupStyles.module.less';
 import css from '../../PlayerPanel.module.less';
 
-const PlayerSubtitleBurnInPrompt = ({
+const formatTrack = (track) => {
+	if (!track) return 'the supported audio track';
+	return [
+		track.displayTitle || track.title || track.language,
+		track.codec ? String(track.codec).toUpperCase() : '',
+		track.channels ? `${track.channels}ch` : ''
+	].filter(Boolean).join(' · ');
+};
+
+const PlayerPlaybackDecisionPrompt = ({
 	open = false,
 	prompt = null,
 	onConfirm,
+	onAlternate,
 	onDecline,
 	onBack,
 	onHide
@@ -38,6 +48,27 @@ const PlayerSubtitleBurnInPrompt = ({
 			message: 'These subtitles cannot currently be rendered on the TV. Burning them in may lose HDR/Dolby Vision quality and increases server load.',
 			confirm: 'Yes, burn in subtitles',
 			decline: 'No, play without subtitles'
+		},
+		'unsupported-audio-switch': {
+			title: 'Switch audio track?',
+			message: `The selected ${formatTrack(prompt?.selectedTrack)} track is not supported by this TV. Use ${formatTrack(prompt?.proposedTrack)} instead?`,
+			confirm: 'Use supported track',
+			decline: 'Back to details'
+		},
+		'dolby-vision-original-quality': {
+			title: 'Try original quality?',
+			message: `Jellyfin wants to re-encode Dolby Vision because it exceeds the current ${prompt?.configuredBitrateMbps || 'configured'} Mbps limit. Try Direct Play or video-copy remux at up to ${prompt?.proposedBitrateMbps || 100} Mbps, or transcode to SDR at the current limit?`,
+			confirm: 'Try original quality',
+			alternate: 'Transcode in SDR',
+			decline: 'Back to details'
+		},
+		'dynamic-range-fallback': {
+			title: prompt?.proposedRange === 'sdr' ? 'Continue in SDR?' : 'Continue in HDR?',
+			message: prompt?.proposedRange === 'sdr'
+				? 'HDR playback is not available for this stream. Continue in SDR with reduced dynamic range?'
+				: 'Jellyfin selected an unsafe Dolby Vision video transcode. Continue in HDR instead? Video quality or dynamic range may change.',
+			confirm: prompt?.proposedRange === 'sdr' ? 'Continue in SDR' : 'Continue in HDR',
+			decline: 'Back to details'
 		}
 	}[type] || {
 		title: 'Subtitle decision required',
@@ -48,7 +79,11 @@ const PlayerSubtitleBurnInPrompt = ({
 
 	return (
 		<Popup open={open} onClose={onBack || onDecline} onHide={onHide} css={popupShellCss}>
-			<div ref={contentRef} className={`${popupStyles.popupSurface} ${css.subtitleBurnInPrompt}`}>
+			<div
+				ref={contentRef}
+				data-popup-focus-scope="true"
+				className={`${popupStyles.popupSurface} ${css.subtitleBurnInPrompt}`}
+			>
 				<BodyText className={css.subtitleBurnInPromptTitle}>{copy.title}</BodyText>
 				<BodyText className={css.subtitleBurnInPromptMessage}>
 					{copy.message}
@@ -62,6 +97,11 @@ const PlayerSubtitleBurnInPrompt = ({
 					<Button className={css.subtitleBurnInPromptButton} onClick={onConfirm}>
 						{copy.confirm}
 					</Button>
+					{copy.alternate ? (
+						<Button className={css.subtitleBurnInPromptButton} onClick={onAlternate}>
+							{copy.alternate}
+						</Button>
+					) : null}
 					<Button className={css.subtitleBurnInPromptButton} onClick={onDecline}>
 						{copy.decline}
 					</Button>
@@ -71,4 +111,4 @@ const PlayerSubtitleBurnInPrompt = ({
 	);
 };
 
-export default PlayerSubtitleBurnInPrompt;
+export default PlayerPlaybackDecisionPrompt;

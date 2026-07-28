@@ -172,6 +172,32 @@ describe('playbackApi', () => {
 			}
 		]
 	});
+	const arrangeExplicitDtsAudioFallback = () => {
+		const source = createDvSourceWithAudioFallbackCandidate({
+			supportsDirectPlay: true,
+			supportsDirectStream: true,
+			transcodingUrl: '/Videos/item-1/master.m3u8?VideoCodec=copy&TranscodeReasons=AudioCodecNotSupported',
+			defaultAudioStreamIndex: 0
+		});
+		source.MediaStreams[1] = {
+			...source.MediaStreams[1],
+			Codec: 'dts-hd',
+			Language: 'eng',
+			Title: 'DTS-HD MA'
+		};
+		source.MediaStreams[2] = {
+			...source.MediaStreams[2],
+			Language: 'eng',
+			Title: 'Dolby Digital'
+		};
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+	};
 
 	beforeEach(() => {
 		resetPlaybackApiTestRuntime({
@@ -721,6 +747,295 @@ describe('playbackApi', () => {
 		expect(
 			playbackInfo?.__breezyfin?.adjustments?.some((entry) => entry?.type === 'forceDolbyVisionAudioOnlyTranscode')
 		).toBe(true);
+	});
+
+	it('skips HDR when preflight cannot produce video-copy playback', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&TranscodeReasons=ContainerBitrateExceedsLimit';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			enableDiagnostics: true
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'dynamic-range-fallback',
+			originalRange: 'DV',
+			proposedRange: 'sdr',
+			reason: 'hdr-video-copy-unavailable'
+		}));
+		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual(expect.arrayContaining([
+			expect.objectContaining({
+				scope: 'dynamic-range',
+				stage: 'hdr-copy-preflight',
+				status: 'no-match'
+			}),
+			expect.objectContaining({
+				scope: 'dynamic-range',
+				stage: 'dolby-vision-path-validation',
+				status: 'pending-user-consent'
+			})
+		]));
+	});
+
+	it('offers HDR only after preflight finds a safe video-copy path', async () => {
+		const service = createService();
+		const unsafeSource = createTranscodeOnlyDvSource();
+		unsafeSource.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&TranscodeReasons=VideoRangeTypeNotSupported';
+		const hdrCopySource = {
+			...createTranscodeOnlyDvSource(),
+			Container: 'mp4',
+			SupportsDirectStream: true,
+			TranscodingUrl:
+				'/Videos/item-1/master.m3u8?VideoCodec=copy&TranscodeReasons=AudioCodecNotSupported'
+		};
+		global.fetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					PlaySessionId: 'session-1',
+					MediaSources: [unsafeSource]
+				})
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					PlaySessionId: 'session-2',
+					MediaSources: [hdrCopySource]
+				})
+			});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			maxBitrate: 100,
+			enableDiagnostics: true
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'dynamic-range-fallback',
+			proposedRange: 'hdr10'
+		}));
+		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual(expect.arrayContaining([
+			expect.objectContaining({
+				scope: 'dynamic-range',
+				stage: 'hdr-copy-preflight',
+				status: 'applied'
+			})
+		]));
+	});
+
+	it('offers an original-quality retry before range loss for a bitrate-only DV transcode', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&TranscodeReasons=ContainerBitrateExceedsLimit';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			maxBitrate: 40
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'dolby-vision-original-quality',
+			proposedBitrateMbps: 100
+		}));
+	});
+
+	it('offers SDR after original quality and HDR-copy preflight both remain unsafe', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&TranscodeReasons=ContainerBitrateExceedsLimit';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			maxBitrate: 100,
+			confirmedDolbyVisionOriginalQuality: true
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'dynamic-range-fallback',
+			proposedRange: 'sdr'
+		}));
+	});
+
+	it('offers SDR when a confirmed HDR fallback still requires a full video encode', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&hevc-rangetype=SDR,HDR10,HLG&TranscodeReasons=VideoRangeTypeNotSupported';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			dynamicRangeCap: 'hdr10',
+			avoidDolbyVision: true,
+			confirmedDynamicRangeFallback: 'hdr10'
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'dynamic-range-fallback',
+			proposedRange: 'sdr'
+		}));
+	});
+
+	it('accepts a confirmed SDR video encode when source range parameters still mention DV', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=h264&h264-rangetype=SDR,DOVIWithSDR&TranscodeReasons=VideoRangeTypeNotSupported';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			dynamicRangeCap: 'sdr',
+			avoidDolbyVision: true,
+			confirmedDynamicRangeFallback: 'sdr'
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toBeNull();
+		expect(playbackInfo?.__breezyfin?.playMethod).toBe('Transcode');
+		expect(playbackInfo?.__breezyfin?.safeSdrFallbackProfile).toBe(true);
+		expect(playbackInfo?.__breezyfin?.dynamicRange).toEqual(expect.objectContaining({
+			id: 'SDR',
+			displayLabel: 'SDR'
+		}));
+		expect(playbackInfo?.__breezyfin?.subtitlePolicy).toEqual(expect.objectContaining({
+			originalDynamicRangeId: 'DV'
+		}));
+		const requestPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
+		expect(requestPayload.DeviceProfile.TranscodingProfiles).toEqual([
+			expect.objectContaining({
+				Container: 'ts',
+				VideoCodec: 'h264'
+			})
+		]);
+		expect(requestPayload.AllowVideoStreamCopy).toBe(false);
+	});
+
+	it('rejects HEVC output after confirmed SDR fallback before playback attachment', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&hevc-rangetype=SDR,DOVIWithSDR&TranscodeReasons=ContainerBitrateExceedsLimit';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		await expect(getItemPlaybackInfo(service, 'item-1', {
+			dynamicRangeCap: 'sdr',
+			avoidDolbyVision: true,
+			confirmedDynamicRangeFallback: 'sdr'
+		})).rejects.toThrow('required H.264 SDR transcode');
+	});
+
+	it('offers SDR directly when Force Transcoding makes HDR video copy impossible', async () => {
+		const service = createService();
+		const source = createTranscodeOnlyDvSource();
+		source.TranscodingUrl =
+			'/Videos/item-1/master.m3u8?VideoCodec=hevc&TranscodeReasons=ContainerBitrateExceedsLimit';
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			forceTranscoding: true
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'dynamic-range-fallback',
+			proposedRange: 'sdr'
+		}));
+	});
+
+	it('does not require range consent for DV audio-only transcoding', async () => {
+		const service = createService();
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [createDvAudioOnlyTranscodeSource()]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1');
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toBeNull();
+		expect(playbackInfo?.__breezyfin?.playMethod).toBe('Transcode');
+	});
+
+	it('requires confirmation before replacing an explicitly selected DTS-HD track', async () => {
+		const service = createService();
+		arrangeExplicitDtsAudioFallback();
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			audioStreamIndex: 0
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'unsupported-audio-switch',
+			selectedTrack: expect.objectContaining({index: 0, codec: 'dts-hd'}),
+			proposedTrack: expect.objectContaining({index: 1, codec: 'ac3'})
+		}));
+	});
+
+	it('does not auto-replace an unsupported audio track remapped from explicit intent', async () => {
+		const service = createService();
+		arrangeExplicitDtsAudioFallback();
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			audioTrackIntent: {
+				index: 0,
+				language: 'eng',
+				title: 'DTS-HD MA',
+				codec: 'dts-hd',
+				channels: 8
+			}
+		});
+
+		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
+			type: 'unsupported-audio-switch',
+			selectedTrack: expect.objectContaining({index: 0, codec: 'dts-hd'}),
+			proposedTrack: expect.objectContaining({index: 1, codec: 'ac3'})
+		}));
 	});
 
 	it('probes compatible audio tracks to keep Force DV on a direct playback path', async () => {

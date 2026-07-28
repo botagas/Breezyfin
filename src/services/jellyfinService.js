@@ -501,6 +501,7 @@ class JellyfinService {
 	async sampleSyncPlayClock() { return syncPlayApi.sampleSyncPlayClock(this); }
 	getSyncPlayState() { return syncPlayApi.getSyncPlayState(this); }
 	setSyncPlayGroup(group) { return syncPlayApi.setSyncPlayGroup(this, group); }
+	reconcileSyncPlayGroup(group) { return syncPlayApi.reconcileSyncPlayGroup(this, group); }
 	subscribeSyncPlayState(listener) { return syncPlayApi.subscribeSyncPlayState(this, listener); }
 
 	async detectJellyWatchParty() { return watchPartyApi.detectJellyWatchParty(this); }

@@ -21,6 +21,7 @@ export const buildPlaybackDecisionSnapshot = ({
 	confirmedBitmapBurnIn,
 	subtitleFallbackConsent,
 	safeSubtitleBurnInProfile,
+	safeSdrFallbackProfile,
 	subtitlePolicy
 } = {}) => ({
 	playMethod: playMethod || null,
@@ -41,6 +42,7 @@ export const buildPlaybackDecisionSnapshot = ({
 	confirmedBitmapBurnIn: confirmedBitmapBurnIn === true,
 	subtitleFallbackConsent: subtitleFallbackConsent || null,
 	safeSubtitleBurnInProfile: safeSubtitleBurnInProfile === true,
+	safeSdrFallbackProfile: safeSdrFallbackProfile === true,
 	subtitleDecision: subtitlePolicy?.reason || null,
 	originalDynamicRangeId: originalDynamicRange?.id || dynamicRange?.id || null,
 	fmp4HlsPreference: {
@@ -72,6 +74,7 @@ export const attachPlaybackInfoMetadata = (data, {
 	diagnostics = [],
 	decision = null,
 	safeSubtitleBurnInProfile = false,
+	safeSdrFallbackProfile = false,
 	requiredDecision = null
 }) => {
 	data.__breezyfin = {
@@ -86,6 +89,7 @@ export const attachPlaybackInfoMetadata = (data, {
 		diagnostics,
 		decision,
 		safeSubtitleBurnInProfile: safeSubtitleBurnInProfile === true,
+		safeSdrFallbackProfile: safeSdrFallbackProfile === true,
 		requiredDecision: requiredDecision || subtitlePolicy?.requiredDecision || null
 	};
 	return data;

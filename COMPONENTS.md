@@ -74,6 +74,12 @@ This guide covers shared UI components in `src/components/`.
 - For Home rows, `MediaRow` may expose an optional icon-only section action via `onMoreClick` / `sectionKey`; keep this action generic and route destination behavior through the owning panel. It renders explicit `pending`, `loading`, and retryable `error` states for descriptor-first server Home rows through the shared Breezy loading surface; rows that resolve empty are removed by Home rather than left as empty shells. Home activates artwork by row, with the first viewport loaded immediately and later rows activated by row visibility/focus rather than per-image observers.
 - Settings rows use `src/views/settings-panel/components/SettingsStaticItems.js`. These are panel-local Sandstone base compositions that deliberately omit the marquee controller and content measurement path while retaining Enact touch, Spotlight, skin, switch, and accessibility behavior; keep their visible labels constrained with ellipsis rather than reintroducing focus marquees.
 - `src/views/player-panel/components/PlayerPanelContent.js` owns the Player's presentational surface/overlay composition. Keep playback state machines and side effects in `PlayerPanel` hooks, and add new visual layers to this component instead of regrowing the panel orchestrator's return tree.
+- `PlayerPlaybackDecisionPrompt` owns the shared themed decision surface for blocking
+  audio, original-quality DV retry, lower-bitrate SDR transcoding, dynamic-range,
+  and subtitle choices. Only one
+  decision surface may own a playback generation at a time. It and `PlayerErrorPopup`
+  must mark their content as a popup focus scope and use `usePopupInitialFocus`;
+  Player-level ENTER/OK/Space handling must defer to the focused popup action.
 - `PlayerSyncPlayPopup` and `PlayerWatchPartyPopup` are Player-local participant/status
   surfaces. Keep native and room protocols isolated, preserve layered Back behavior,
   expose controls only when the active group/host state permits them, and mount their

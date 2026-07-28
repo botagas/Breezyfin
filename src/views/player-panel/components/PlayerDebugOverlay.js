@@ -257,7 +257,7 @@ const PlayerDebugOverlay = ({
 		? joinInfo(
 			decisionDebug.playMethod || '-',
 			`source=${decisionDebug.selectedMediaSourceId || '-'}`,
-			`range=${decisionDebug.dynamicRangeId || '-'}`,
+			`sourceRange=${decisionDebug.dynamicRangeId || '-'}`,
 			`container=${decisionDebug.container || '-'}`,
 			`reqA=${decisionDebug.requestedAudioStreamIndex ?? '-'}`,
 			`selA=${decisionDebug.selectedAudioStreamIndex ?? '-'}`,
@@ -272,7 +272,8 @@ const PlayerDebugOverlay = ({
 			decisionDebug.forceDolbyVision ? 'forceDV=yes' : '',
 			decisionDebug.avoidDolbyVision ? 'avoidDV=yes' : '',
 			decisionDebug.forceSubtitleBurnIn ? 'subBurn=yes' : '',
-			decisionDebug.safeSubtitleBurnInProfile ? 'safeSubBurn=yes' : ''
+			decisionDebug.safeSubtitleBurnInProfile ? 'safeSubBurn=yes' : '',
+			decisionDebug.safeSdrFallbackProfile ? 'safeSDR=yes' : ''
 		)
 		: '-';
 
@@ -351,10 +352,11 @@ const PlayerDebugOverlay = ({
 			{
 				label: 'Range',
 				value: joinInfo(
-					`label=${dynamicRangeLabel}`,
-					`type=${videoStream?.VideoRangeType || '-'}`,
-					`range=${videoStream?.VideoRange || '-'}`,
-					`cap=${mediaSourceData?.__requestedDynamicRangeCap || 'auto'}`
+					`requestedOutput=${dynamicRangeLabel}`,
+					`sourceType=${videoStream?.VideoRangeType || '-'}`,
+					`sourceRange=${videoStream?.VideoRange || '-'}`,
+					`cap=${mediaSourceData?.__requestedDynamicRangeCap || 'auto'}`,
+					mediaSourceData?.__safeSdrFallbackProfile ? 'safeSDR=yes' : ''
 				)
 			},
 			{

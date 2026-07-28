@@ -60,6 +60,7 @@ export const usePlayerRecoveryHandlers = ({
 	subtitleCompatibilityFallbackAttemptedRef,
 	setCurrentSubtitleTrack,
 	requestSubtitleBurnInFallback,
+	requestPlaybackDecision,
 	exitInProgressRef,
 	playbackGenerationRef,
 	playbackRuntimeContextRef
@@ -101,6 +102,17 @@ export const usePlayerRecoveryHandlers = ({
 			runtimeContext = null
 		} = options;
 		const activeMediaSourceData = runtimeContext?.mediaSourceData || mediaSourceData;
+		if (
+			runtimeContext &&
+			!isPlaybackRuntimeContextCurrent({
+				runtimeContext,
+				activeRuntimeContext: playbackRuntimeContextRef.current,
+				generation: playbackGenerationRef.current,
+				exitInProgress: exitInProgressRef.current
+			})
+		) {
+			return false;
+		}
 		if (exitInProgressRef.current || playbackFailureLockedRef.current) {
 			appendPlaybackDiagnostic?.({
 				scope: 'runtime-fallback',
@@ -198,7 +210,17 @@ export const usePlayerRecoveryHandlers = ({
 
 		if (typeof loadVideoRef.current === 'function') {
 			setTimeout(() => {
-				if (!exitInProgressRef.current && !playbackFailureLockedRef.current) {
+				const runtimeStillCurrent = !runtimeContext || isPlaybackRuntimeContextCurrent({
+					runtimeContext,
+					activeRuntimeContext: playbackRuntimeContextRef.current,
+					generation: playbackGenerationRef.current,
+					exitInProgress: exitInProgressRef.current
+				});
+				if (
+					runtimeStillCurrent &&
+					!exitInProgressRef.current &&
+					!playbackFailureLockedRef.current
+				) {
 					loadVideoRef.current();
 				}
 			}, 0);
@@ -219,6 +241,8 @@ export const usePlayerRecoveryHandlers = ({
 		playbackFailureLockedRef,
 		playbackOptions,
 		playbackOverrideRef,
+		playbackGenerationRef,
+		playbackRuntimeContextRef,
 		appendPlaybackDiagnostic,
 		reloadAttemptedRef,
 		seekOffsetRef,
@@ -300,7 +324,9 @@ export const usePlayerRecoveryHandlers = ({
 			return false;
 		}
 		if (playbackSettingsRef.current.forceDolbyVision === true) {
-			setToastMessage('Force DV is enabled. Disable it to allow HDR/transcode fallback.');
+			showPlaybackError(
+				'Dolby Vision playback failed while Force DV is enabled. Disable Force DV to allow a confirmed HDR or SDR fallback.'
+			);
 			appendPlaybackDiagnostic?.({
 				scope: 'runtime-fallback',
 				stage: 'transcode-fallback',
@@ -321,47 +347,27 @@ export const usePlayerRecoveryHandlers = ({
 		if (shouldAttemptRangeFallback) {
 			const nextDynamicRangeCap = currentDynamicRangeCap === 'hdr10' ? 'sdr' : 'hdr10';
 			dynamicRangeFallbackAttemptedRef.current = true;
-			setToastMessage(
-				nextDynamicRangeCap === 'hdr10'
-					? 'Dolby Vision failed. Retrying with HDR fallback...'
-					: 'HDR fallback failed. Retrying in SDR mode...'
-			);
 			appendPlaybackDiagnostic?.({
 				scope: 'runtime-fallback',
 				stage: 'dynamic-range-fallback',
-				status: 'applied',
+				status: 'pending-user-consent',
 				reason: reasonText || 'playback-failure',
-				message: `Retrying playback with ${nextDynamicRangeCap.toUpperCase()} dynamic range cap.`
+				message: `Waiting for confirmation before using ${nextDynamicRangeCap.toUpperCase()} playback.`
 			});
-			playbackOverrideRef.current = buildPlaybackOverride({
-				baseOptions: playbackOptions,
-				mediaSourceId: mediaSourceData?.Id,
-				audioStreamIndex: currentAudioTrackRef.current,
-				subtitleStreamIndex: currentSubtitleTrackRef.current,
-				seekSeconds: resolveVideoSeekSeconds(videoRef.current),
-				extra: {
-					dynamicRangeCap: nextDynamicRangeCap,
-					avoidDolbyVision: true
-				}
-			});
-			try {
-				await handleStop();
-			} catch (rangeFallbackError) {
-				console.warn('Failed while preparing dynamic range fallback:', rangeFallbackError);
-				appendPlaybackDiagnostic?.({
-					scope: 'runtime-fallback',
-					stage: 'dynamic-range-fallback',
-					status: 'failed',
-					reason: 'stop-failed',
-					message: rangeFallbackError?.message || 'Failed while preparing dynamic range fallback.'
+			if (typeof requestPlaybackDecision === 'function') {
+				await requestPlaybackDecision({
+					type: 'dynamic-range-fallback',
+					runtime: true,
+					itemId: mediaSourceData?.__itemId || null,
+					mediaSourceId: mediaSourceData?.Id || null,
+					generation: playbackGenerationRef.current,
+					originalRange: 'DV',
+					proposedRange: nextDynamicRangeCap,
+					reason: reasonText || 'dolby-vision-playback-failed',
+					resumeTicks: Math.round(
+						Math.max(0, resolveVideoSeekSeconds(videoRef.current)) * 10000000
+					)
 				});
-			}
-			setError(null);
-			setLoading(true);
-			setLoadingStatusMessage('Restarting stream...');
-			setPlaying(false);
-			if (typeof loadVideoRef.current === 'function') {
-				loadVideoRef.current();
 				return true;
 			}
 		}
@@ -420,16 +426,18 @@ export const usePlayerRecoveryHandlers = ({
 		setError,
 		setLoading,
 		setLoadingStatusMessage,
-		setPlaying,
 		setToastMessage,
 		playbackOptions,
 		playbackOverrideRef,
 		appendPlaybackDiagnostic,
+		requestPlaybackDecision,
 		currentAudioTrackRef,
 		currentSubtitleTrackRef,
 		videoRef,
 		dynamicRangeFallbackAttemptedRef,
-		transcodeFallbackAttemptedRef
+		transcodeFallbackAttemptedRef,
+		playbackGenerationRef,
+		showPlaybackError
 	]);
 
 	const attemptSubtitleCompatibilityFallback = useCallback(async (

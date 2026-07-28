@@ -105,9 +105,9 @@ export const useAppSyncPlayCoordinator = ({
 		});
 		const unsubscribeConnection = jellyfinService.onWebSocketMessage('ConnectionStateChanged', ({state}) => {
 			if (state !== 'open') return;
-			const currentGroup = jellyfinService.getSyncPlayState();
-			if (!currentGroup?.GroupId) return;
-			const requestedGroupId = currentGroup.GroupId;
+			const requestedGroup = jellyfinService.getSyncPlayState();
+			if (!requestedGroup?.GroupId) return;
+			const requestedGroupId = requestedGroup.GroupId;
 			const requestedSessionKey = getServiceSessionKey();
 			const reconnectGeneration = ++reconnectGenerationRef.current;
 			jellyfinService.getSyncPlayGroup(requestedGroupId).then((freshGroup) => {
@@ -124,7 +124,7 @@ export const useAppSyncPlayCoordinator = ({
 					jellyfinService.setSyncPlayGroup(null);
 					return;
 				}
-				jellyfinService.setSyncPlayGroup({...currentGroup, ...freshGroup});
+				jellyfinService.reconcileSyncPlayGroup(freshGroup);
 				return jellyfinService.syncPlaySetIgnoreWait(followModeRef.current !== 'following');
 			}).catch(() => {});
 		});

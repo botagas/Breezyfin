@@ -137,6 +137,33 @@ export const setSyncPlayGroup = (service, group) => {
 	notifyState(entry);
 };
 
+export const reconcileSyncPlayGroup = (service, group) => {
+	const entry = getStateEntry(service);
+	if (!group) {
+		applySyncPlayGroupUpdate(service, {
+			Data: {Type: 'GroupDoesNotExist'}
+		});
+		return;
+	}
+	if (!entry.group || String(entry.group.GroupId || '') !== String(group.GroupId || '')) {
+		applySyncPlayGroupUpdate(service, {
+			Data: {
+				Type: 'GroupJoined',
+				GroupId: group.GroupId,
+				Data: group
+			}
+		});
+		return;
+	}
+	applySyncPlayGroupUpdate(service, {
+		Data: {
+			Type: 'GroupUpdate',
+			GroupId: group.GroupId,
+			Data: group
+		}
+	});
+};
+
 export const getSyncPlayState = (service) => getStateEntry(service).group;
 
 export const subscribeSyncPlayState = (service, listener) => {

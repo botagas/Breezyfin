@@ -52,7 +52,13 @@ export const buildAuthenticatedPluginImageUrl = (service, relativePath, width = 
 	const safeWidth = Math.min(1920, Math.max(64, Math.trunc(Number(width) || 500)));
 	let url;
 	try {
-		url = new URL(relativePath, service.serverUrl);
+		const serverBase = new URL(service.serverUrl);
+		const normalizedBasePath = serverBase.pathname.replace(/\/+$/, '');
+		const normalizedPath = relativePath.replace(/^\/+/, '');
+		serverBase.pathname = `${normalizedBasePath}/${normalizedPath}`.replace(/\/{2,}/g, '/');
+		serverBase.search = '';
+		serverBase.hash = '';
+		url = serverBase;
 	} catch (_) {
 		return null;
 	}

@@ -443,6 +443,20 @@ describe('playbackSelection subtitle compatibility', () => {
 		expect(determinePlayMethod(mediaSource, {disableDirectPlay: true})).toBe('DirectStream');
 	});
 
+	it('evaluates the selected audio stream instead of any compatible stream', () => {
+		const mediaSource = createVideoAudioMediaSource({
+			videoRangeType: 'SDR',
+			audioStreams: [
+				{Codec: 'dts-hd', Index: 1, IsDefault: true},
+				{Codec: 'eac3', Index: 2}
+			]
+		});
+		mediaSource.TranscodingUrl = '/Videos/item/master.m3u8';
+
+		expect(determinePlayMethod(mediaSource, {selectedAudioStreamIndex: 1})).toBe('Transcode');
+		expect(determinePlayMethod(mediaSource, {selectedAudioStreamIndex: 2})).toBe('DirectPlay');
+	});
+
 	it('classifies tokenized subtitle codec names as text codecs', () => {
 		expect(isTextSubtitleCodec('english ass styled')).toBe(true);
 		expect(isTextSubtitleCodec('subrip')).toBe(true);

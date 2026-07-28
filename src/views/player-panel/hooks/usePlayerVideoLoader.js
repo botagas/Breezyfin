@@ -95,7 +95,7 @@ export const usePlayerVideoLoader = ({
 	failStartTimerRef,
 	playbackSessionRef,
 	appendPlaybackDiagnostic,
-	requestSubtitleDecision,
+	requestPlaybackDecision,
 	exitInProgressRef,
 	playbackGenerationRef,
 	playbackRuntimeContextRef,
@@ -267,25 +267,36 @@ export const usePlayerVideoLoader = ({
 
 			const requiredDecision = playbackMeta.requiredDecision || playbackMeta.subtitlePolicy?.requiredDecision || null;
 			if (requiredDecision) {
-					appendPlaybackDiagnostic?.({
-						scope: 'subtitle-policy',
-						stage: 'required-decision',
-						status: 'pending-user-consent',
-						reason: requiredDecision.reason || requiredDecision.type || 'subtitle-decision-required',
-						message: 'Playback startup is blocked until the subtitle decision is resolved.'
-					});
-					setLoading(false);
-					setLoadingStatusMessage('Waiting for subtitle decision...');
-					await requestSubtitleDecision?.({
-						subtitleStreamIndex: Number.isInteger(requiredDecision.subtitleStreamIndex)
-							? requiredDecision.subtitleStreamIndex
-							: selectedSubtitle,
-						reason: requiredDecision.reason,
-						requiresBitmapBurnInConsent: requiredDecision.type === 'bitmap-burn-in-fragility',
-						requiresHdrConsent: requiredDecision.type === 'hdr-dv-burn-in',
-						requiresNoSubtitleConsent: requiredDecision.type === 'no-subtitles',
-						fallbackType: requiredDecision.type
-					});
+				const isVideoQualityDecision = [
+					'dynamic-range-fallback',
+					'dolby-vision-original-quality'
+				].includes(requiredDecision.type);
+				const decisionScope = requiredDecision.type === 'unsupported-audio-switch'
+					? 'audio-track'
+					: (isVideoQualityDecision ? 'dynamic-range' : 'subtitle-policy');
+				const decisionMessage = requiredDecision.type === 'unsupported-audio-switch'
+					? 'Waiting for audio decision...'
+					: (isVideoQualityDecision
+						? 'Waiting for video quality decision...'
+						: 'Waiting for subtitle decision...');
+				appendPlaybackDiagnostic?.({
+					scope: decisionScope,
+					stage: 'required-decision',
+					status: 'pending-user-consent',
+					reason: requiredDecision.reason || requiredDecision.type || 'playback-decision-required',
+					message: 'Playback startup is blocked until the playback decision is resolved.'
+				});
+				setLoading(false);
+				setLoadingStatusMessage(decisionMessage);
+				await requestPlaybackDecision?.({
+					...requiredDecision,
+					itemId: item.Id,
+					mediaSourceId: requiredDecision.mediaSourceId || mediaSource.Id,
+					generation,
+					subtitleStreamIndex: Number.isInteger(requiredDecision.subtitleStreamIndex)
+						? requiredDecision.subtitleStreamIndex
+						: selectedSubtitle
+				});
 				return;
 			}
 
@@ -506,6 +517,7 @@ export const usePlayerVideoLoader = ({
 					'Playback stalled after load()',
 					{
 						toast: 'Playback stalled. Rebuilding session...',
+						runtimeContext: playbackRuntimeContext,
 						errorData: {
 							videoReadyState: videoRef.current?.readyState,
 							videoNetworkState: videoRef.current?.networkState,
@@ -548,11 +560,30 @@ export const usePlayerVideoLoader = ({
 				});
 				setLoading(false);
 				setLoadingStatusMessage('Waiting for subtitle decision...');
-				await requestSubtitleDecision?.({
+				await requestPlaybackDecision?.({
+					type: 'no-subtitles',
+					itemId: item.Id,
+					generation,
 					subtitleStreamIndex,
 					reason: 'subtitle-burn-in-no-source',
-					requiresNoSubtitleConsent: true,
-					fallbackType: 'no-subtitles'
+					requiresNoSubtitleConsent: true
+				});
+				return;
+			}
+			const confirmedRange = String(
+				playbackOverrideRef.current?.confirmedDynamicRangeFallback || ''
+			).toLowerCase();
+			if (confirmedRange === 'hdr10') {
+				setLoading(false);
+				setLoadingStatusMessage('Waiting for video quality decision...');
+				await requestPlaybackDecision?.({
+					type: 'dynamic-range-fallback',
+					itemId: item.Id,
+					mediaSourceId: playbackOverrideRef.current?.mediaSourceId || null,
+					generation,
+					originalRange: 'DV',
+					proposedRange: 'sdr',
+					reason: 'hdr-fallback-negotiation-failed'
 				});
 				return;
 			}
@@ -584,7 +615,7 @@ export const usePlayerVideoLoader = ({
 		playing,
 		reloadAttemptedRef,
 		resetRecoveryGuards,
-		requestSubtitleDecision,
+		requestPlaybackDecision,
 		exitInProgressRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef,

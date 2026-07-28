@@ -116,9 +116,12 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 		stage: 'direct-audio',
 		...entry
 	});
+	const hasExplicitAudioSelection =
+		Number.isInteger(options.audioStreamIndex) ||
+		Boolean(options.audioTrackIntent);
 	const canAttemptDirectAudioCompatibilityProbe =
 		!forceTranscoding &&
-		!Number.isInteger(options.audioStreamIndex) &&
+		!hasExplicitAudioSelection &&
 		selectedSource?.TranscodingUrl;
 
 	if (!canAttemptDirectAudioCompatibilityProbe) {
@@ -126,7 +129,7 @@ export const attemptDirectAudioCompatibilityProbe = async ({
 			status: 'skipped',
 			reason: forceTranscoding
 				? 'force-transcoding'
-				: (Number.isInteger(options.audioStreamIndex) ? 'explicit-audio-track' : 'no-transcoding-url'),
+				: (hasExplicitAudioSelection ? 'explicit-audio-track' : 'no-transcoding-url'),
 			message: 'Direct-audio probe was not applicable.'
 		});
 		return null;
@@ -376,10 +379,13 @@ export const attemptDefaultAudioFallback = async ({
 		stage: 'default-audio-fallback',
 		...entry
 	});
-	if (Number.isInteger(options.audioStreamIndex) || forceTranscoding || !selectedSource) {
+	const hasExplicitAudioSelection =
+		Number.isInteger(options.audioStreamIndex) ||
+		Boolean(options.audioTrackIntent);
+	if (hasExplicitAudioSelection || forceTranscoding || !selectedSource) {
 		addDiagnostic({
 			status: 'skipped',
-			reason: Number.isInteger(options.audioStreamIndex)
+			reason: hasExplicitAudioSelection
 				? 'explicit-audio-track'
 				: (forceTranscoding ? 'force-transcoding' : 'no-selected-source'),
 			message: 'Default-audio fallback was not applicable.'

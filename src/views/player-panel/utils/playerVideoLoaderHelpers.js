@@ -46,6 +46,7 @@ export const buildMediaSourceDebugData = ({
 	__debugRequest: diagnosticsEnabled ? playbackRequestDebug : null,
 	__debugDecision: diagnosticsEnabled ? (playbackMeta.decision || null) : null,
 	__safeSubtitleBurnInProfile: playbackMeta.safeSubtitleBurnInProfile === true,
+	__safeSdrFallbackProfile: playbackMeta.safeSdrFallbackProfile === true,
 	__requiredDecision: playbackMeta.requiredDecision || playbackMeta.subtitlePolicy?.requiredDecision || null,
 	__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
 	__debugDiagnostics: diagnosticsEnabled && Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],

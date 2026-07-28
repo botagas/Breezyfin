@@ -47,4 +47,25 @@ describe('usePlayerKeyboardShortcuts', () => {
 		expect(props.onUserInteraction).toHaveBeenCalledTimes(1);
 		expect(props.handlePlay).toHaveBeenCalledWith({keepHidden: true});
 	});
+
+	it.each([
+		['ENTER', KeyCodes.ENTER],
+		['OK', KeyCodes.OK],
+		['Space', KeyCodes.SPACE]
+	])('leaves %s activation to a focused popup action', (_, keyCode) => {
+		const props = buildHookProps();
+		const popup = document.createElement('div');
+		popup.dataset.popupFocusScope = 'true';
+		const action = document.createElement('button');
+		popup.appendChild(action);
+		document.body.appendChild(popup);
+		action.focus();
+		renderHook(() => usePlayerKeyboardShortcuts(props));
+
+		fireEvent.keyDown(action, {keyCode, which: keyCode});
+
+		expect(props.handlePlay).not.toHaveBeenCalled();
+		expect(props.handlePause).not.toHaveBeenCalled();
+		popup.remove();
+	});
 });

@@ -32,7 +32,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize PlayerPanel track-popup `data-track-index` click handlers | `usePlayerTrackPopupHandlers` |
 | Centralize PlayerPanel play/pause/retry/end command handlers | `usePlayerPlaybackCommands` |
 | Centralize PlayerPanel stop/focus control handlers | `usePlayerCoreControls` |
-| Centralize PlayerPanel subtitle decision prompts, including HDR/DV burn-in consent, image-subtitle burn-in fragility consent, no-subtitle fallback consent, and one-shot fallback reloads | `usePlayerSubtitleBurnInConsent` |
+| Centralize blocking Player decisions for unsupported audio switches, staged DV-to-HDR/SDR fallback, subtitle burn-in, and no-subtitle fallback | `usePlayerPlaybackDecision` |
 | Centralize PlayerPanel layered back handling decisions | `usePlayerBackNavigation` |
 | Centralize PlayerPanel audio/subtitle popup disclosure wiring | `usePlayerDisclosures` |
 | Centralize PlayerPanel adjacent-episode checks + progress reporting ticker | `usePlayerEpisodeProgress` |
@@ -104,7 +104,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Fetch, normalize, place, cache, and render PlayerPanel subtitle cues, including safe SRT/VTT inline formatting, escaped safe subtitle tags, long-running overlapping cue lookup, ASS layer/source render ordering, lightweight ASS/SSA alignment including legacy `\a` codes, margins, wrap style, `\pos(x,y)` / `\move(...)` placement, `\org(x,y)` transform origins for absolute transformed cues, bounded rectangular `\clip(x1,y1,x2,y2)` / `\iclip(x1,y1,x2,y2)`, common vector `\clip(...)` / `\iclip(...)` masks for SVG drawing cues, source-authored absolute/relative font size, colors, fonts, borders, shadows, blur, simple/complex fades, basic karaoke timing/color states, active `\K`/`\kf` sweep approximation, common `\p` vector drawing paths including B-spline `s`/`p` conversion and `\pbo` baseline offsets, style reset, scale, spacing, rotation/skew, and interpolated numeric/color `\t(...)` transforms | `normalizeSubtitleEvents` / `normalizeSubtitleText` / `findActiveSubtitleCues` / `subtitleRendererAss` / `subtitleRendererAssAlignment` / `subtitleRendererAssClip` / `subtitleRendererAssDimensions` / `subtitleRendererAssDrawing` / `subtitleRendererAssFontSize` / `subtitleRendererAssOrigin` / `subtitleRendererAssPosition` / `subtitleRendererAssTransform` / `usePlayerSubtitleRenderer` |
 | Normalize numeric Breezyfin subtitle appearance settings shared by Settings and Player overlay | `normalizeNumericSetting` / `adjustNumericSetting` / `SUBTITLE_OVERLAY_FONT_SIZE_RANGE` / `SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE` |
 | Render ASS/SSA through stable-visible experimental external renderers using app-fetched subtitle content when Smart Subtitle Handling selects them; Auto still resolves to Breezyfin lightweight rendering, while explicit libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in options remain selectable in every release channel; packaging prepares JASSUB static assets, applies version-guarded webOS patches that force Canvas2D and require explicit worker/WASM/font URLs, preserves external-renderer chunks/assets in stable and develop builds, transpiles ASS.js/JASSUB renderer chunks for webOS packaging, validates copied JASSUB static assets, and fails if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` chunks reappear; external renderer init waits for an attached video source, libass and JASSUB can also run in manual caller-owned canvas diagnostic modes, their intervals share `rendererRuntimeSuspension`, and renderer-layer diagnostics report playback phase, video state, external layer/canvas/ASS.js box visibility, hit-test target, dimensions, JASSUB backend, active DOM node counts, canvas pixel probe state, manual sync counters, and renderer update counters for real-TV debugging | `subtitle-renderers/subtitleRendererRegistry.js` plus `libassRenderer`, `jassubRenderer`, `assJsRenderer`, `manualCanvasLayout`, `rendererRuntimeSuspension`, `videoSourceReady`, and `rendererDiagnostics`; `scripts/prepare-subtitle-package-assets.cjs`; `scripts/copy-subtitle-assets.cjs`; `scripts/subtitle-assets/jassubCanvas2dPatch.cjs` |
-| Render PGS/PGSSUB bitmap subtitles through Smart Subtitle Handling before burn-in fallback; image subtitles are detached from Jellyfin playback requests, the selected subtitle index is preserved for client rendering, Auto tries libbitsub first and then libpgs using DeliveryUrl/raw URL candidates before optional binary preflight, and renderer disposal, bitmap diagnostics, warning-gated image subtitle burn-in, and no-subtitle fallback consent stay explicit | `src/utils/bitmapSubtitleRenderers.js`; `subtitle-renderers/libbitsubRenderer.js`; `subtitle-renderers/libpgsRenderer.js`; `getSubtitleTranscodePolicy`; `getBitmapSubtitleDeliveryCandidates`; `getSubtitleTrackBinary`; `PlayerSubtitleBurnInPrompt` |
+| Render PGS/PGSSUB bitmap subtitles through Smart Subtitle Handling before burn-in fallback; image subtitles are detached from Jellyfin playback requests, the selected subtitle index is preserved for client rendering, Auto tries libbitsub first and then libpgs using DeliveryUrl/raw URL candidates before optional binary preflight, and renderer disposal, bitmap diagnostics, warning-gated image subtitle burn-in, and no-subtitle fallback consent stay explicit | `src/utils/bitmapSubtitleRenderers.js`; `subtitle-renderers/libbitsubRenderer.js`; `subtitle-renderers/libpgsRenderer.js`; `getSubtitleTranscodePolicy`; `getBitmapSubtitleDeliveryCandidates`; `getSubtitleTrackBinary`; `PlayerPlaybackDecisionPrompt` |
 | Normalize PlayerPanel subtitle overlay appearance, map ASS coordinates onto the visible video stage, preserve authored placement, contain only managed multiline text boxes, group region cues by ASS layer, and apply full-stage rectangular/inverse/vector clips | `getSubtitleOverlayAttributes` / `getSubtitleVideoStageGeometry` / `getAssCoordinatePlane` / `getAssCueContainmentPolicy` / `getAssCueContainment` / `groupSubtitleCuesByPlacement` / `groupSubtitleCuesByLayer` / `getSubtitleAbsolutePositionStyle` / `getSubtitleClipLayerStyle` |
 
 ---
@@ -940,8 +940,13 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - transient seek feedback label overlay.
 - `src/views/player-panel/components/PlayerSkipOverlay.js`
   - skip-intro/next-episode pill overlay shell.
-- `src/views/player-panel/components/PlayerSubtitleBurnInPrompt.js`
-  - generic subtitle decision popup for HDR/DV burn-in consent, image-subtitle burn-in fragility consent, and no-subtitle fallback consent.
+- `src/views/player-panel/components/PlayerPlaybackDecisionPrompt.js`
+  - shared themed, first-focus popup for blocking audio, dynamic-range, subtitle
+    burn-in, and no-subtitle playback decisions.
+  - bitrate-limited Dolby Vision exposes original-quality/video-copy playback and
+    lower-bitrate SDR transcoding as separate explicit actions.
+  - HDR is offered only after a bounded PlaybackInfo preflight finds DirectPlay,
+    DirectStream, or audio-only transcoding with video copy.
 - `src/views/player-panel/components/PlayerToast.js`
   - lightweight player toast shell.
 - `src/views/player-panel/components/PlayerControlsOverlay.js`
@@ -977,8 +982,12 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - centralizes player command handlers (`play/pause/retry/end/back`) above low-level stop/recovery.
 - `src/views/player-panel/hooks/usePlayerCoreControls.js`
   - centralizes stop lifecycle, startup-watch timer cleanup, and skip-overlay focus targeting.
-- `src/views/player-panel/hooks/usePlayerSubtitleBurnInConsent.js`
-  - centralizes subtitle decision prompt state, one-shot bitmap/HDR burn-in override reloads, and user-confirmed no-subtitle fallback.
+- `src/views/player-panel/hooks/usePlayerPlaybackDecision.js`
+  - centralizes generation-bound, serialized playback decision state and one-shot
+    reloads for audio replacement, the bitrate-only DV original-quality attempt,
+    staged dynamic-range fallback, subtitle burn-in, and user-confirmed no-subtitle
+    playback. Its synchronous reservation prevents concurrent runtime callbacks from
+    replacing an active or teardown-pending prompt.
 - `src/views/player-panel/hooks/usePlayerBackNavigation.js`
   - centralizes layered PlayerPanel back handling (track popups -> skip overlay -> controls).
 - `src/views/player-panel/hooks/usePlayerDisclosures.js`

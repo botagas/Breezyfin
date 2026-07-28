@@ -34,6 +34,13 @@ import {
 	summarizeMediaSourceRanges,
 	usesMkvContainer
 } from './playback-api/dolbyVision';
+import {
+	buildDolbyVisionOriginalQualityDecision,
+	buildDynamicRangeFallbackDecision,
+	classifyDolbyVisionPlaybackPath,
+	findSupportedAudioSwitch,
+	isConfirmedDynamicRangeFallbackPath
+} from './playback-api/playbackSafety';
 import {attachPlaybackInfoMetadata, buildPlaybackDecisionSnapshot} from './playback-api/metadata';
 import {createNoMediaSourceError, PlaybackNegotiationError} from './playback-api/errors';
 import {
@@ -42,7 +49,10 @@ import {
 	attemptDirectAudioCompatibilityProbe,
 	attemptDolbyVisionMkvCompatibilityRetry
 } from './playback-api/sourceNegotiation';
-import {getDynamicRangeDisplayLabel} from '../../utils/playbackDynamicRange';
+import {
+	getDynamicRangeDisplayLabel,
+	getDynamicRangeInfo
+} from '../../utils/playbackDynamicRange';
 import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
 import {resolveSubtitleTrackIndex} from '../../utils/trackMatching';
 
@@ -75,6 +85,67 @@ const selectPreferredSourceFromPlaybackInfo = (data, createSourceSelectionOption
 	};
 };
 
+const probeSafeHdrCopyPath = async ({
+	service,
+	itemId,
+	options,
+	activePayload,
+	selectedSource,
+	selectedAudioStreamIndex
+} = {}) => {
+	const {payload} = buildPlaybackRequestContext({
+		...(options || {}),
+		mediaSourceId: selectedSource?.Id || options?.mediaSourceId,
+		audioStreamIndex: Number.isInteger(selectedAudioStreamIndex)
+			? selectedAudioStreamIndex
+			: options?.audioStreamIndex,
+		subtitleStreamIndex: toInteger(activePayload?.SubtitleStreamIndex),
+		forceTranscoding: false,
+		disableDirectPlay: false,
+		forceSubtitleBurnIn: false,
+		dynamicRangeCap: 'hdr10',
+		avoidDolbyVision: true,
+		confirmedDynamicRangeFallback: null
+	});
+	const probeData = await fetchPlaybackInfo(service, itemId, payload);
+	if (!probeData?.MediaSources?.length) {
+		return {available: false, reason: 'empty-playback-info'};
+	}
+	const selection = selectMediaSource(probeData.MediaSources, {
+		preferredMediaSourceId: selectedSource?.Id || options?.mediaSourceId,
+		forceTranscoding: false,
+		dynamicRangeCap: 'hdr10',
+		preferDolbyVision: false,
+		avoidDolbyVision: true
+	});
+	const candidate = probeData.MediaSources[selection.index >= 0 ? selection.index : 0] || null;
+	const playMethod = determinePlayMethod(candidate, {
+		forceTranscoding: false,
+		disableDirectPlay: false,
+		dynamicRangeCap: 'hdr10',
+		selectedAudioStreamIndex
+	});
+	if (playMethod === 'DirectPlay' || playMethod === 'DirectStream') {
+		return {
+			available: true,
+			reason: String(playMethod).toLowerCase(),
+			playMethod,
+			mediaSourceId: candidate?.Id || null
+		};
+	}
+	const path = classifyDolbyVisionPlaybackPath({
+		mediaSource: candidate,
+		playMethod,
+		forceSubtitleBurnIn: false
+	});
+	return {
+		available: path.classification === 'audio-only-transcode-safe',
+		reason: path.reason,
+		playMethod,
+		mediaSourceId: candidate?.Id || null
+	};
+};
+
 export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 	try {
 		const collectDiagnostics = options.enableDiagnostics === true;
@@ -93,7 +164,8 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			enableSubtitleBurnIn,
 			allowSubtitleBurnInOnHdr,
 			subtitleBurnInTextCodecs,
-			dynamicRangeCap
+			dynamicRangeCap,
+			safeSdrFallbackProfile
 		} = buildPlaybackRequestContext(options);
 		let requestedAudioStreamIndex = initialRequestedAudioStreamIndex;
 		let activePayload = payload;
@@ -137,9 +209,22 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		});
 		const adjustments = [];
 		const diagnostics = [];
+		let requiredDecision = null;
+		const decisionResumeTicks = Number.isFinite(Number(options.startTimeTicks))
+			? Math.max(0, Number(options.startTimeTicks))
+			: Math.round(Math.max(0, Number(options.seekSeconds) || 0) * 10000000);
 		const addDiagnostic = collectDiagnostics
 			? (entry) => appendPlaybackDiagnostic(diagnostics, entry)
 			: () => diagnostics;
+		if (safeSdrFallbackProfile) {
+			addDiagnostic({
+				scope: 'dynamic-range',
+				stage: 'sdr-safe-profile',
+				status: 'applied',
+				reason: 'confirmed-sdr-fallback',
+				message: 'Confirmed SDR fallback is restricted to HLS TS with H.264 video and stream copy disabled.'
+			});
+		}
 
 		const knownBitmapSubtitle = shouldDetachKnownBitmapSubtitleBeforeRequest({
 			options,
@@ -491,6 +576,33 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			requestedAudioStreamIndex = defaultAudioFallbackResult.requestedAudioStreamIndex;
 			adjustments.push(defaultAudioFallbackResult.adjustment);
 		}
+		const explicitAudioSelection =
+			Number.isInteger(options.audioStreamIndex) ||
+			Boolean(options.audioTrackIntent);
+		if (explicitAudioSelection) {
+			const audioSwitch = findSupportedAudioSwitch({
+				mediaSource: selectedSource,
+				selectedAudioStreamIndex: requestedAudioStreamIndex,
+				preferredAudioLanguage: options.preferredAudioLanguage
+			});
+			if (audioSwitch) {
+				requiredDecision = {
+					type: 'unsupported-audio-switch',
+					reason: 'selected-audio-codec-unsupported',
+					mediaSourceId: selectedSource?.Id || null,
+					resumeTicks: decisionResumeTicks,
+					selectedTrack: audioSwitch.selectedTrack,
+					proposedTrack: audioSwitch.proposedTrack
+				};
+				addDiagnostic({
+					scope: 'audio-track',
+					stage: 'unsupported-audio-decision',
+					status: 'pending-user-consent',
+					reason: requiredDecision.reason,
+					message: `Selected audio stream ${audioSwitch.selectedTrack?.index} is unsupported; stream ${audioSwitch.proposedTrack?.index} is available.`
+				});
+			}
+		}
 		if (forceDolbyVision && getMediaSourceDynamicRangeInfo(selectedSource)?.id !== 'DV') {
 			const availableRanges = summarizeMediaSourceRanges(data.MediaSources);
 			throw new Error(`Force DV is enabled, but selected source is not Dolby Vision. Available: ${availableRanges}`);
@@ -537,7 +649,8 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			const preliminaryPlayMethod = determinePlayMethod(selectedSource, {
 				forceTranscoding,
 				disableDirectPlay,
-				dynamicRangeCap
+				dynamicRangeCap,
+				selectedAudioStreamIndex: requestedAudioStreamIndex
 			});
 			const shouldDetachDefaultBitmapSubtitle =
 				preliminaryPlayMethod === 'Transcode' &&
@@ -656,7 +769,8 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		let playMethod = determinePlayMethod(selectedSource, {
 			forceTranscoding: forceTranscoding || effectiveForceSubtitleBurnIn,
 			disableDirectPlay,
-			dynamicRangeCap
+			dynamicRangeCap,
+			selectedAudioStreamIndex: requestedAudioStreamIndex
 		});
 		if (forceDolbyVision && playMethod === 'Transcode') {
 			if (isForceDolbyVisionAudioOnlyTranscode(selectedSource)) {
@@ -667,7 +781,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			} else {
 				const availableRanges = summarizeMediaSourceRanges(data.MediaSources);
 				throw new Error(
-					`Force DV requires direct playback or audio-only transcode, but Jellyfin selected incompatible transcoding. Available: ${availableRanges}`
+					`Force DV requires direct playback or audio-only transcode, but Jellyfin selected incompatible transcoding. Disable Force DV to allow a confirmed HDR or SDR fallback. Available: ${availableRanges}`
 				);
 			}
 		}
@@ -839,9 +953,130 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 		}
 
 		const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(selectedSource);
+		const confirmedDynamicRangeFallback = String(options.confirmedDynamicRangeFallback || '').toLowerCase();
+		const confirmedDolbyVisionOriginalQuality =
+			options.confirmedDolbyVisionOriginalQuality === true;
+		let dynamicRangePath = null;
+		let pendingDynamicRangeTarget = null;
+		let confirmedSdrPathValidated = false;
+		if (dynamicRangeInfo?.id === 'DV' && playMethod === 'Transcode') {
+			dynamicRangePath = classifyDolbyVisionPlaybackPath({
+				mediaSource: selectedSource,
+				playMethod,
+				forceSubtitleBurnIn: effectiveForceSubtitleBurnIn
+			});
+			const confirmedRangePath =
+				(confirmedDynamicRangeFallback === 'hdr10' || confirmedDynamicRangeFallback === 'sdr') &&
+				confirmedDynamicRangeFallback === dynamicRangeCap &&
+				isConfirmedDynamicRangeFallbackPath({
+					pathClassification: dynamicRangePath,
+					target: confirmedDynamicRangeFallback
+				});
+			confirmedSdrPathValidated =
+				confirmedDynamicRangeFallback === 'sdr' &&
+				confirmedRangePath;
+			if (
+				dynamicRangePath.classification !== 'audio-only-transcode-safe' &&
+				!confirmedRangePath
+			) {
+				if (forceDolbyVision) {
+					throw new Error(
+						'Jellyfin selected an unsafe Dolby Vision video transcode while Force DV is enabled. Disable Force DV to allow a confirmed HDR or SDR fallback.'
+					);
+				}
+				if (confirmedDynamicRangeFallback === 'sdr') {
+					throw new Error(
+						'Jellyfin did not return the required H.264 SDR transcode after the confirmed Dolby Vision fallback.'
+					);
+				}
+				const originalQualityDecision = buildDolbyVisionOriginalQualityDecision({
+					mediaSource: selectedSource,
+					pathClassification: dynamicRangePath,
+					maxBitrate: options.maxBitrate,
+					confirmedOriginalQuality: confirmedDolbyVisionOriginalQuality,
+					forceTranscoding,
+					itemId,
+					resumeTicks: decisionResumeTicks
+				});
+				let dynamicRangeDecision = originalQualityDecision || buildDynamicRangeFallbackDecision({
+					mediaSource: selectedSource,
+					dynamicRangeCap,
+					itemId,
+					resumeTicks: decisionResumeTicks,
+					reason: dynamicRangePath.reason,
+					pathClassification: dynamicRangePath.classification,
+					forceVideoTranscoding: forceTranscoding
+				});
+				if (
+					dynamicRangeDecision?.proposedRange === 'hdr10' &&
+					!requiredDecision &&
+					!subtitlePolicy?.requiredDecision &&
+					!effectiveForceSubtitleBurnIn
+				) {
+					let hdrProbe = {available: false, reason: 'request-failed'};
+					try {
+						hdrProbe = await probeSafeHdrCopyPath({
+							service,
+							itemId,
+							options,
+							activePayload,
+							selectedSource,
+							selectedAudioStreamIndex: requestedAudioStreamIndex
+						});
+					} catch (probeError) {
+						hdrProbe = {
+							available: false,
+							reason: probeError?.message || 'request-failed'
+						};
+					}
+					addDiagnostic({
+						scope: 'dynamic-range',
+						stage: 'hdr-copy-preflight',
+						status: hdrProbe.available ? 'applied' : 'no-match',
+						reason: hdrProbe.reason,
+						message: hdrProbe.available
+							? `HDR fallback preflight found ${hdrProbe.playMethod || 'video-copy playback'}.`
+							: 'HDR fallback preflight did not return DirectPlay, DirectStream, or an audio-only video-copy transcode.'
+					});
+					if (!hdrProbe.available) {
+						dynamicRangeDecision = buildDynamicRangeFallbackDecision({
+							mediaSource: selectedSource,
+							dynamicRangeCap,
+							itemId,
+							resumeTicks: decisionResumeTicks,
+							reason: 'hdr-video-copy-unavailable',
+							pathClassification: dynamicRangePath.classification,
+							forceVideoTranscoding: true
+						});
+					}
+				}
+				if (dynamicRangeDecision && !requiredDecision && !subtitlePolicy?.requiredDecision) {
+					requiredDecision = dynamicRangeDecision;
+					pendingDynamicRangeTarget =
+						dynamicRangeDecision.proposedRange ||
+						`original-${dynamicRangeDecision.proposedBitrateMbps || 0}mbps`;
+				}
+			}
+			addDiagnostic({
+				scope: 'dynamic-range',
+				stage: 'dolby-vision-path-validation',
+				status: dynamicRangePath.classification === 'audio-only-transcode-safe' || confirmedRangePath
+					? 'applied'
+					: 'pending-user-consent',
+				reason: dynamicRangePath.reason,
+				message: `Dolby Vision path=${dynamicRangePath.classification}; videoCodec=${dynamicRangePath.videoCodec || '-'}; target=${pendingDynamicRangeTarget || confirmedDynamicRangeFallback || 'none'}; consent=${confirmedRangePath ? 'confirmed' : (pendingDynamicRangeTarget ? 'pending' : 'not-required')}.`
+			});
+		}
+		const effectiveDynamicRangeInfo = confirmedSdrPathValidated
+			? getDynamicRangeInfo({
+				Type: 'Video',
+				VideoRange: 'SDR',
+				VideoRangeType: 'SDR'
+			})
+			: dynamicRangeInfo;
 		const dynamicRange = {
-			...dynamicRangeInfo,
-			displayLabel: getDynamicRangeDisplayLabel(dynamicRangeInfo, dynamicRangeCap)
+			...effectiveDynamicRangeInfo,
+			displayLabel: getDynamicRangeDisplayLabel(effectiveDynamicRangeInfo, dynamicRangeCap)
 		};
 		const subtitleStream = getSubtitleStreamByIndex(selectedSource, selectedSubtitleStreamIndex) || preDetachedSubtitleStream;
 		const playbackSubtitlePolicy = {
@@ -876,6 +1111,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			confirmedBitmapBurnIn,
 			subtitleFallbackConsent,
 			safeSubtitleBurnInProfile: safeSubtitleBurnInProfileApplied,
+			safeSdrFallbackProfile,
 			subtitlePolicy: playbackSubtitlePolicy
 		}) : null;
 
@@ -890,7 +1126,9 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			requestDebug,
 			diagnostics,
 			decision,
-			safeSubtitleBurnInProfile: safeSubtitleBurnInProfileApplied
+			safeSubtitleBurnInProfile: safeSubtitleBurnInProfileApplied,
+			safeSdrFallbackProfile,
+			requiredDecision: requiredDecision || subtitlePolicy?.requiredDecision || null
 		});
 	} catch (error) {
 		if (!(error instanceof PlaybackNegotiationError)) {

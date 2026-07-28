@@ -13,6 +13,8 @@ Rules:
 
 Expected scope: minimal corrective improvements, UI/UX changes, etc.
 
+- None.
+
 ## Medium changes / issues
 
 Expected scope: bounded work spanning a small number of services, scripts, tests, or UI surfaces.

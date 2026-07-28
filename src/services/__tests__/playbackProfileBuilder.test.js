@@ -140,6 +140,33 @@ describe('playbackProfileBuilder subtitle profiles', () => {
 			})
 		]);
 	});
+
+	it('uses a deterministic H.264 transcode profile after SDR fallback consent', () => {
+		const context = buildPlaybackRequestContext({
+			maxBitrate: 20,
+			dynamicRangeCap: 'sdr',
+			confirmedDynamicRangeFallback: 'sdr'
+		});
+
+		expect(context.safeSdrFallbackProfile).toBe(true);
+		expect(context.payload).toEqual(expect.objectContaining({
+			EnableDirectPlay: false,
+			EnableDirectStream: false,
+			EnableTranscoding: true,
+			AllowVideoStreamCopy: false,
+			AllowAudioStreamCopy: false,
+			MaxStreamingBitrate: 20000000
+		}));
+		expect(context.payload.DeviceProfile.DirectPlayProfiles).toEqual([]);
+		expect(context.payload.DeviceProfile.TranscodingProfiles).toEqual([
+			expect.objectContaining({
+				Container: 'ts',
+				Protocol: 'hls',
+				VideoCodec: 'h264',
+				AudioCodec: 'aac'
+			})
+		]);
+	});
 });
 
 describe('playbackProfileBuilder transcoding profiles', () => {

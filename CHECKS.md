@@ -50,6 +50,10 @@ Run these before packaging a release candidate:
     Verify the decision and WatchParty surfaces focus their first actions, pending actions
     cannot be submitted twice, failures remain visible, and the suspended-playback
     notification never steals focus.
+- Reconnect SyncPlay while a newer `PlayQueue` update is arriving. Verify the delayed
+  group lookup cannot restore an older item, queue revision, or participant session.
+- Test authenticated plugin artwork on both root-hosted and reverse-proxy-subpath
+  Jellyfin servers; image URLs must preserve the server base path and auth parameters.
 
 ### Diagnostics/logging validation
 

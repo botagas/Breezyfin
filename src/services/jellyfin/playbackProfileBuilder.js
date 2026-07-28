@@ -254,6 +254,10 @@ export const buildSafeSubtitleBurnInTranscodingProfiles = () => ([
 	}
 ]);
 
+export const buildSafeSdrFallbackTranscodingProfiles = () => (
+	buildSafeSubtitleBurnInTranscodingProfiles()
+);
+
 export const buildSubtitleProfiles = ({
 	relaxedPlaybackProfile,
 	forceSubtitleBurnIn,
@@ -439,10 +443,17 @@ export const buildPlaybackRequestContext = (options = {}) => {
 			.filter(Boolean)
 		: [];
 	const dynamicRangeCap = normalizeDynamicRangeCap(options.dynamicRangeCap);
+	const confirmedDynamicRangeFallback = normalizeDynamicRangeCap(
+		options.confirmedDynamicRangeFallback
+	);
+	const forceSafeSdrFallback =
+		dynamicRangeCap === 'sdr' &&
+		confirmedDynamicRangeFallback === 'sdr';
 	const allowStreamCopyOnTranscode = options.allowStreamCopyOnTranscode !== false;
 	const forceBurnInTranscoding = forceSubtitleBurnIn;
+	const forceVideoTranscoding = forceBurnInTranscoding || forceSafeSdrFallback;
 	const allowStreamCopy = enableTranscoding &&
-		!forceBurnInTranscoding &&
+		!forceVideoTranscoding &&
 		(!forceTranscoding || allowStreamCopyOnTranscode);
 	const maxBitrateSetting = options.maxBitrate ? parseInt(options.maxBitrate, 10) : null;
 	const requestedAudioStreamIndex = Number.isInteger(options.audioStreamIndex) ? options.audioStreamIndex : null;
@@ -451,25 +462,27 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		forceSubtitleBurnIn
 	});
 	const directPlayProfiles = buildDirectPlayProfiles(
-		forceTranscoding || forceBurnInTranscoding || disableDirectPlay,
+		forceTranscoding || forceVideoTranscoding || disableDirectPlay,
 		relaxedPlaybackProfile,
 		playbackCapabilities
 	);
 	const transcodingProfiles = forceBurnInTranscoding
 		? buildSafeSubtitleBurnInTranscodingProfiles()
+		: (forceSafeSdrFallback
+			? buildSafeSdrFallbackTranscodingProfiles()
 		: buildTranscodingProfiles(
 			relaxedPlaybackProfile,
 			playbackCapabilities,
 			{preferFmp4Mp4}
-		);
+		));
 	const subtitleProfiles = buildSubtitleProfiles({
 		relaxedPlaybackProfile,
 		forceSubtitleBurnIn,
 		subtitleBurnInTextCodecs
 	});
 
-	payload.EnableDirectPlay = !forceTranscoding && !forceBurnInTranscoding && !disableDirectPlay;
-	payload.EnableDirectStream = !forceTranscoding && !forceBurnInTranscoding;
+	payload.EnableDirectPlay = !forceTranscoding && !forceVideoTranscoding && !disableDirectPlay;
+	payload.EnableDirectStream = !forceTranscoding && !forceVideoTranscoding;
 	payload.EnableTranscoding = enableTranscoding;
 	payload.AllowVideoStreamCopy = allowStreamCopy;
 	payload.AllowAudioStreamCopy = allowStreamCopy;
@@ -502,6 +515,7 @@ export const buildPlaybackRequestContext = (options = {}) => {
 		enableSubtitleBurnIn,
 		allowSubtitleBurnInOnHdr,
 		subtitleBurnInTextCodecs,
-		dynamicRangeCap
+		dynamicRangeCap,
+		safeSdrFallbackProfile: forceSafeSdrFallback
 	};
 };

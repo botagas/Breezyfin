@@ -664,13 +664,20 @@ export const reorderMediaSources = (mediaSources, selectedIndex) => {
 export const determinePlayMethod = (mediaSource, {
 	forceTranscoding = false,
 	disableDirectPlay = false,
-	dynamicRangeCap = 'auto'
+	dynamicRangeCap = 'auto',
+	selectedAudioStreamIndex = null
 } = {}) => {
 	if (!mediaSource) return 'DirectStream';
 	if (forceTranscoding) return 'Transcode';
 
 	const audioStreams = getAudioStreams(mediaSource);
-	const hasCompatibleAudio = !audioStreams.length || audioStreams.some((stream) => isSupportedAudioCodec(stream.Codec));
+	const selectedAudioIndex = toInteger(selectedAudioStreamIndex);
+	const selectedAudioStream = selectedAudioIndex === null
+		? null
+		: audioStreams.find((stream) => toInteger(stream?.Index) === selectedAudioIndex);
+	const hasCompatibleAudio = selectedAudioStream
+		? isSupportedAudioCodec(selectedAudioStream.Codec)
+		: (!audioStreams.length || audioStreams.some((stream) => isSupportedAudioCodec(stream.Codec)));
 	const dynamicRangeInfo = getMediaSourceDynamicRangeInfo(mediaSource);
 	const playbackCapabilities = getPlaybackCapabilities();
 	const normalizedRangeCap = normalizeDynamicRangeCap(dynamicRangeCap);

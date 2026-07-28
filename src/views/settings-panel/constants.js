@@ -10,7 +10,7 @@ export {
 } from '../../utils/subtitleAppearance';
 
 export const DEFAULT_SETTINGS = {
-	maxBitrate: '40',
+	maxBitrate: '100',
 	enableTranscoding: true,
 	forceTranscoding: false,
 	smartSubtitleTranscoding: true,
@@ -71,10 +71,10 @@ export const DEFAULT_SETTINGS = {
 export const BITRATE_OPTIONS = [
 	{value: '10', label: '10 Mbps'},
 	{value: '20', label: '20 Mbps'},
-	{value: '40', label: '40 Mbps (Default)'},
+	{value: '40', label: '40 Mbps'},
 	{value: '60', label: '60 Mbps'},
 	{value: '80', label: '80 Mbps'},
-	{value: '100', label: '100 Mbps'},
+	{value: '100', label: '100 Mbps (Default)'},
 	{value: '120', label: '120 Mbps'}
 ];
 

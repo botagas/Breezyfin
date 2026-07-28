@@ -9,6 +9,7 @@ jest.mock('../../../services/jellyfinService', () => ({
 		subscribeSyncPlayState: jest.fn(),
 		onWebSocketMessage: jest.fn(),
 		getSyncPlayGroup: jest.fn(),
+		reconcileSyncPlayGroup: jest.fn(),
 		setSyncPlayGroup: jest.fn(),
 		joinSyncPlayGroup: jest.fn(),
 		createSyncPlayGroup: jest.fn(),
@@ -56,6 +57,18 @@ describe('useAppSyncPlayCoordinator', () => {
 		jellyfinService.setSyncPlayGroup.mockImplementation((nextGroup) => {
 			currentGroup = nextGroup;
 			stateListener?.(nextGroup);
+		});
+		jellyfinService.reconcileSyncPlayGroup.mockImplementation((freshGroup) => {
+			const liveQueue = currentGroup?.PlayQueue;
+			const freshQueue = freshGroup?.PlayQueue;
+			const liveUpdatedAt = Date.parse(liveQueue?.LastUpdate || '') || 0;
+			const freshUpdatedAt = Date.parse(freshQueue?.LastUpdate || '') || 0;
+			currentGroup = {
+				...(currentGroup || {}),
+				...(freshGroup || {}),
+				PlayQueue: liveUpdatedAt > freshUpdatedAt ? liveQueue : freshQueue
+			};
+			stateListener?.(currentGroup);
 		});
 	});
 
@@ -195,6 +208,52 @@ describe('useAppSyncPlayCoordinator', () => {
 		expect(jellyfinService.setSyncPlayGroup).not.toHaveBeenCalledWith(
 			expect.objectContaining({GroupId: 'group-1'})
 		);
+	});
+
+	it('does not let a delayed reconnect overwrite a newer queue update', async () => {
+		currentGroup = {
+			...buildGroup('old-item'),
+			PlayQueue: {
+				...buildGroup('old-item').PlayQueue,
+				LastUpdate: '2026-01-01T00:00:01Z'
+			}
+		};
+		let resolveFreshGroup;
+		jellyfinService.getSyncPlayGroup.mockReturnValue(new Promise((resolve) => {
+			resolveFreshGroup = resolve;
+		}));
+		const {result} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'syncPlay',
+			selectedItemId: null,
+			onOpenRemoteItem: jest.fn()
+		}));
+
+		act(() => {
+			websocketListeners.ConnectionStateChanged({state: 'open'});
+			currentGroup = {
+				...currentGroup,
+				PlayQueue: {
+					...buildGroup('new-item').PlayQueue,
+					LastUpdate: '2026-01-01T00:00:03Z'
+				}
+			};
+			stateListener(currentGroup);
+		});
+		await act(async () => {
+			resolveFreshGroup({
+				...buildGroup('old-item'),
+				PlayQueue: {
+					...buildGroup('old-item').PlayQueue,
+					LastUpdate: '2026-01-01T00:00:02Z'
+				}
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(jellyfinService.reconcileSyncPlayGroup).toHaveBeenCalledTimes(1);
+		expect(result.current.queue.activeItemId).toBe('new-item');
 	});
 
 	it('updates Jellyfin wait participation when following and suspending', async () => {

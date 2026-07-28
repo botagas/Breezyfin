@@ -4,6 +4,7 @@ import {
 	getSyncPlayDriftCorrection,
 	getSyncPlayState,
 	joinSyncPlayGroup,
+	reconcileSyncPlayGroup,
 	sampleSyncPlayClock,
 	ServerClockOffsetEstimator,
 	syncPlayBuffering,
@@ -147,6 +148,40 @@ describe('syncPlay timing', () => {
 		expect(getSyncPlayState(service)).toEqual(expect.objectContaining({
 			GroupName: 'Updated',
 			PlayQueue: newerQueue
+		}));
+	});
+
+	it('does not let a delayed reconnect response replace a newer play queue', () => {
+		const service = {};
+		const reconnectQueue = {
+			LastUpdate: '2026-01-01T00:00:02Z',
+			PlayingItemIndex: 0,
+			Playlist: [{ItemId: 'old-item', PlaylistItemId: 'old-playlist'}]
+		};
+		const liveQueue = {
+			LastUpdate: '2026-01-01T00:00:03Z',
+			PlayingItemIndex: 0,
+			Playlist: [{ItemId: 'new-item', PlaylistItemId: 'new-playlist'}]
+		};
+		applySyncPlayGroupUpdate(service, {
+			Data: {
+				Type: 'GroupJoined',
+				Data: {GroupId: 'group-1', GroupName: 'Before', PlayQueue: reconnectQueue}
+			}
+		});
+		applySyncPlayGroupUpdate(service, {
+			Data: {Type: 'PlayQueue', Data: liveQueue}
+		});
+
+		reconcileSyncPlayGroup(service, {
+			GroupId: 'group-1',
+			GroupName: 'After reconnect',
+			PlayQueue: reconnectQueue
+		});
+
+		expect(getSyncPlayState(service)).toEqual(expect.objectContaining({
+			GroupName: 'After reconnect',
+			PlayQueue: liveQueue
 		}));
 	});
 
