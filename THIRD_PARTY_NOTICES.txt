@@ -138,7 +138,6 @@ Source: node_modules/libbitsub/pkg/LICENSE
 MIT License
 
 Copyright (c) 2026 Jaruwit Jaiya
-Copyright (c) 2024 David Schulte, and Libpgs contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
