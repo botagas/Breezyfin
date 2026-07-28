@@ -50,11 +50,10 @@ Expected scope: architectural work, a new feature surface, or changes spanning s
 - Set up a GitHub Pages demo backed by a safe, maintainable demo Jellyfin environment.
 - Add advanced SyncPlay queue management after the core coordinator is validated on TV:
   queue editing/reordering, repeat, shuffle, and host-oriented queue controls.
-- Add Seerr-backed `Plan to Watch` only as a distinct request-planning surface; do not
-  merge it with the native Jellyfin Likes Watchlist source.
-- Add the planned authenticated Seerr Request action to `ProviderItemPopup`.
+- Consider adding Seerr-backed `Plan to Watch` Watchlist feature only as a distinct request-planning surface; do not merge it with the native Jellyfin Likes Watchlist source.
+- Add authenticated Seerr Request action to `ProviderItemPopup`.
   Keep compact Discovery feed loading paged and fetch bounded enriched details only
-  when the popup opens; do not add one upstream detail request per Home card.
+  when the popup opens; do not add one upstream detail request per Home card.  
 
 ## Needs investigation before sizing
 
@@ -73,7 +72,7 @@ Expected scope: unknown until profiling, API research, dependency analysis, or r
   supported server-version registration and authorization model, then decide which
   configuration/status pages belong in Jellyfin without coupling the TV client to
   injected scripts or making Plugin Pages a prerequisite for REST capabilities.
-- Discovery pop-up should include an image on the left and the title at the top of the pop-up. The rest of the existing content would be on the right. The image could be an image gallery. Different images could be viewed using left/right buttons which would be rendered inside the image. Limit to 3 images at most. Do not display as image gallery if only 1 image is available. If no image is available, then the right content would take up the space of the image as well. Discovery pop-up's title should be the title of the movie/show. If it's a show, it should allow selecting seasons to request (if multiple are available). 
+- Consider a detailed Discovery pop-up, which would include an image on the left and the title at the top of the pop-up. The image could be an image gallery. Different images could be viewed using left/right focusable buttons which would be rendered inside the image. Limit to 3 images at most. Do not display as image gallery if only 1 image is available. If no image is available, then the right content would take up the space of the image as well. The rest of the existing content would be on the right. Discovery pop-up's title should be the title of the movie/show. If it's a show, it should allow selecting seasons to request (if multiple are available). 
 
 
 ## Deferred compatibility work

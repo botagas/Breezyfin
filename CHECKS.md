@@ -61,9 +61,7 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
-- For a bitrate-limited Dolby Vision source, confirm `Try original quality` uses the
-  runtime capability's maximum streaming bitrate as a one-shot override without changing
-  the saved quality setting.
+- None.
 
 ### Navigation/focus validation
 
@@ -75,11 +73,7 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
-- Open My Requests View More and verify `All`, `Unplayed`, `Played`, and combined
-  Favorites filters retain plugin-provided items and continue loading across multiple
-  server pages without duplicates or a premature empty state.
-- With server-provided HSS Home enabled, verify the My Requests row remains ordered and
-  previewed by HSS while View More can paginate beyond the HSS row's item count.
+- None.
 
 ### Media Details validation
 
