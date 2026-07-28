@@ -378,6 +378,7 @@ const WatchlistPanel = ({
 	const firstBackdrop = nestedView ? items[0] : shows[0] || movies[0] || insightEntry.items[0] || null;
 	const title = nestedView?.title || 'Watchlist';
 	const statistics = insightEntry.statistics;
+	const statisticsUsesStaticViewport = activeTab === 'statistics' && !statistics;
 	const insightChildProps = useMemo(() => ({
 		items: insightEntry.items,
 		onItemClick: handleInsightItemClick,
@@ -399,7 +400,7 @@ const WatchlistPanel = ({
 			errorMessage={error}
 			captureScrollTo={captureScrollTo}
 			onScrollStop={handleScrollStop}
-			scrollable={!nestedView && !VIRTUAL_TABS.includes(activeTab)}
+			scrollable={!nestedView && !VIRTUAL_TABS.includes(activeTab) && !statisticsUsesStaticViewport}
 		>
 			{!nestedView ? (
 				<PanelTabNavigation
@@ -411,7 +412,7 @@ const WatchlistPanel = ({
 				/>
 			) : null}
 			{!nestedView && activeTab === 'watchlist' && !error ? (
-				<>
+				<div className={css.watchlistContent}>
 					{loading ? <BreezyLoadingOverlay label="Loading Watchlist..." /> : null}
 					<MediaRow
 						title="Shows"
@@ -432,7 +433,7 @@ const WatchlistPanel = ({
 					{!loading && shows.length === 0 && movies.length === 0 ? (
 						<BodyText className={css.empty}>Your Watchlist is empty.</BodyText>
 					) : null}
-				</>
+				</div>
 			) : null}
 			{nestedView ? (
 				<div className={css.gridViewport}>
@@ -480,7 +481,7 @@ const WatchlistPanel = ({
 				</div>
 			) : null}
 			{!nestedView && activeTab === 'statistics' ? (
-				<>
+				<div className={css.listViewport}>
 					{insightEntry.loading ? <BreezyLoadingOverlay label="Loading Statistics..." /> : null}
 					{insightEntry.error ? (
 						<div className={css.inlineState} role="alert">
@@ -512,7 +513,7 @@ const WatchlistPanel = ({
 							</div>
 						</>
 					) : null}
-				</>
+				</div>
 			) : null}
 		</IntegrationPanelLayout>
 	);

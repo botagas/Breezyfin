@@ -27,4 +27,20 @@ describe('ToolbarLibraryPicker focus', () => {
 		expect(focused).toBe(true);
 		expect(document.activeElement?.getAttribute('data-spotlight-id')).toBe('toolbar-library-picker-movies');
 	});
+
+	it('uses one shared popup surface without nested distortion layers', async () => {
+		renderWithBreezyfin(
+			<ToolbarLibraryPicker
+				useElegantGlass
+				libraries={[{Id: 'movies', Name: 'Movies'}]}
+				activeSection="home"
+				activeLibraryId={null}
+				onLibrarySelect={jest.fn()}
+				contentRef={{current: null}}
+			/>
+		);
+
+		expect(await screen.findByText('Movies')).toBeTruthy();
+		expect(screen.getByRole('region', {name: 'Library selection'})).toBeTruthy();
+	});
 });

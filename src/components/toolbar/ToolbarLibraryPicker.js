@@ -17,22 +17,23 @@ const ToolbarLibraryPicker = ({
 	onLibrarySelect,
 	contentRef
 }) => {
+	const contentClassName = [
+		popupStyles.popupSurface,
+		css.libraryNativeContent,
+		useElegantGlass ? css.libraryNativeContentGlass : ''
+	].filter(Boolean).join(' ');
+
 	return (
 		<LibraryPickerSpotlightContainer
 			spotlightId="toolbar-library-picker"
 		>
 			<div
 				ref={contentRef}
-				className={`${popupStyles.popupSurface} ${css.libraryNativeContent} ${useElegantGlass ? css.libraryNativeContentGlass : ''}`}
+				className={contentClassName}
 				data-popup-focus-scope="true"
+				role="region"
+				aria-label="Library selection"
 			>
-				{useElegantGlass && (
-					<>
-						<div className={`${css.liquidLayerFilter} ${css.liquidLayerFilterMuted}`} />
-						<div className={css.liquidLayerOverlay} />
-						<div className={css.liquidLayerSpecular} />
-					</>
-				)}
 				<div className={css.libraryNativeInner}>
 					<BodyText className={css.libraryNativeTitle}>Libraries</BodyText>
 					<div className={css.libraryNativeGrid}>

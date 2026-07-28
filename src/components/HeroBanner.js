@@ -343,7 +343,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 
 			<div className={css.content}>
 				<div className={`${css.info} ${css.infoTransition}`} key={infoKey}>
-					<div className={css.logoWrapper}>
+					<div className={`${css.logoWrapper} ${showLogo ? css.logoWrapperImage : ''}`}>
 						{showLogo ? (
 							<img
 								src={logoUrl}
@@ -372,8 +372,12 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 									<div className={css.metadataItem}>{currentItem.OfficialRating}</div>
 								)}
 								{currentItem.CommunityRating && (
-									<div className={css.metadataItem}>
-										Rating {currentItem.CommunityRating.toFixed(1)}
+									<div
+										className={`${css.metadataItem} ${css.metadataRating}`}
+										aria-label={`Rating ${currentItem.CommunityRating.toFixed(1)} out of 10`}
+									>
+										<span className={css.ratingStar} aria-hidden="true">★</span>
+										<span>{currentItem.CommunityRating.toFixed(1)}</span>
 									</div>
 								)}
 							</div>

@@ -72,3 +72,22 @@
 		background: @background !important;
 	}
 }
+
+.panelScrollbar(@size: 0.35rem) {
+	scrollbar-width: thin;
+	scrollbar-color: var(--bf-theme-panel-scrollbar-thumb) var(--bf-theme-panel-scrollbar-track);
+
+	&::-webkit-scrollbar {
+		width: @size;
+	}
+
+	&::-webkit-scrollbar-track {
+		border-radius: 999px;
+		background: var(--bf-theme-panel-scrollbar-track);
+	}
+
+	&::-webkit-scrollbar-thumb {
+		border-radius: 999px;
+		background: var(--bf-theme-panel-scrollbar-thumb);
+	}
+}

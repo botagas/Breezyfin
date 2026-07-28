@@ -91,6 +91,7 @@ For implementation and workflow details, use:
 
 - [`DEVELOPING.md`](./DEVELOPING.md) for architecture conventions, decomposition rules, shared hooks/utilities, and style patterns
 - [`QUALITY.md`](./QUALITY.md) for lint/test/audit coverage and external tooling evaluation notes
+- [`WORKAROUNDS.md`](./WORKAROUNDS.md) for active upstream/runtime workarounds, their validation, and removal conditions
 - [`HELPERS.md`](./HELPERS.md), [`THEMES.md`](./THEMES.md), [`COMPONENTS.md`](./COMPONENTS.md), [`VIEWS.md`](./VIEWS.md) for focused references
 - [`CHECKS.md`](./CHECKS.md) for recurring validation and pre-release verification
 - [`TODOS.md`](./TODOS.md) for prioritized planned work

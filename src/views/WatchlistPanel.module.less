@@ -1,3 +1,5 @@
+@import (reference) '../styles/cardStyles.less';
+
 .gridViewport,
 .listViewport {
 	position: relative;
@@ -5,6 +7,11 @@
 	flex: 1;
 	height: auto;
 	min-height: 30rem;
+}
+
+.watchlistContent {
+	position: relative;
+	min-height: calc(100vh - var(--bf-top-chrome-height) - var(--bf-panel-content-bottom-padding) - 5rem);
 }
 
 .insightList {
@@ -25,12 +32,16 @@
 	margin: 0.375rem 0;
 	padding: 0.75rem 1rem;
 	overflow: hidden;
+	border: 1px solid @card-border-rest;
 	border-radius: var(--bf-theme-popup-radius);
 	background: var(--bf-theme-settings-server-card-bg);
+	outline: none;
+	transition: border-color 180ms ease;
 }
 
+.insightRow:hover,
 .insightRow:focus {
-	outline: 0.12rem solid var(--bf-theme-settings-focus-border);
+	border-color: @card-border-focus;
 }
 
 .insightImage {
@@ -51,6 +62,7 @@
 .insightCopy {
 	min-width: 0;
 	flex: 1;
+	overflow: hidden;
 }
 
 .insightCopy :global(.BodyText) {
@@ -67,8 +79,15 @@
 }
 
 .insightTitle {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	max-height: 1.2em;
+	overflow: hidden;
 	font-size: 1.55rem;
 	line-height: 1.2;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .insightActions {
@@ -186,12 +205,25 @@
 }
 
 .empty {
-	position: relative;
+	position: absolute;
+	inset: 0;
 	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0;
+	pointer-events: none;
+	text-align: center;
+	color: var(--bf-theme-muted-text);
 }
 
 @media (max-width: 1400px) {
 	.rankings {
 		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+:global([data-bf-animations='off']) .insightRow,
+:global([data-bf-all-animations='off']) .insightRow {
+	transition: none;
 }

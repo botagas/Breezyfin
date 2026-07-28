@@ -14,6 +14,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 
 - [`README.md`](./README.md)
 - [`QUALITY.md`](./QUALITY.md)
+- [`WORKAROUNDS.md`](./WORKAROUNDS.md)
 - [`HELPERS.md`](./HELPERS.md)
 - [`THEMES.md`](./THEMES.md)
 - [`COMPONENTS.md`](./COMPONENTS.md)
@@ -26,6 +27,7 @@ This document is the detailed developer guide for architecture patterns, shared 
 Use [`CHECKS.md`](./CHECKS.md) as the single source of truth for recurring validation and release gates.
 Runtime framework packages are intentionally pinned to Enact 4.9.8, Sandstone 2.9.13, React/ReactDOM 18.3.1, and iLib 14.21.1. Use the repository-local Enact CLI 7.3.3 through npm scripts; do not install or invoke a separate global Enact CLI in CI. Enact 5/Limestone/React 19 remains a compatibility investigation rather than part of routine dependency maintenance.
 `npm run pack` and `npm run pack-p` use Enact's supported `--no-linting` build option because CLI 7's embedded Webpack lint configuration enables React 19 compiler-only rules. `npm run lint` remains mandatory and uses the checked-in React 18-aware flat configuration; CI and release workflows run it before every build.
+Enact CLI 7.3.2+ aliases `react-is` from its React 19 tool dependency by default. Breezyfin redirects that build alias through the explicitly pinned `react-is-18` npm package alias so React 18 elements remain valid to Sandstone PropTypes in development builds. Keep both aliases together; `npm run audit:runtime-deps` validates the contract.
 Keep `package.json` `enact.publicUrl` set to `.` even though `homepage` points to GitHub. webOS loads the application through `file://`, so root-relative or repository-prefixed entry assets produce a black screen. Postpack validates that generated script and stylesheet entry paths remain relative.
 After stable `npm run pack-p`, `ares-package dist` is the final webOS CLI smoke check to confirm the production `dist/` can be packaged into an IPK.
 For develop/non-stable packaging validation, run `REACT_APP_ENABLE_PERSISTENT_LOGS=1 REACT_APP_RELEASE_CHANNEL=develop npm run pack-p`, then immediately run `ares-package dist` against that flagged `dist/`.
@@ -69,6 +71,9 @@ Targeted audit commands:
 - `npm run audit:jscpd` (broad JSCPD duplicate-analysis gate using `.jscpd.json`)
 
 Audit results are decision inputs, not style targets. If an audit flags an intentional helper/component pattern, improve the shared API or audit rule instead of reshaping code only to make the report disappear.
+Before simplifying dependency aliases, package-source patches, internal Sandstone selectors,
+mixed scroll ownership, or legacy compatibility styles, check `WORKAROUNDS.md`. Update that
+register in the same change whenever an active workaround or its removal condition changes.
 
 Release packaging runs `prepare:release-notices` before either pack command and copies `LICENSE` plus `THIRD_PARTY_NOTICES.txt` into `dist/`. Production packages omit subtitle-engine declarations and source maps that are not needed at runtime; develop packages retain useful source maps. Run `npm run report:package-size` after a build to inspect application, iLib, subtitle-engine, font, and source-map footprint groups.
 

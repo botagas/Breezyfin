@@ -21315,7 +21315,7 @@
         }
       }
     },
-    "src/test/mocks/jellyfinSyncPlayApi.js": {
+    "src/testUtils/mocks/jellyfinSyncPlayApi.js": {
       "lines": 4,
       "decisionMarkers": 0,
       "hookMarkers": 0,

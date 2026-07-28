@@ -4,6 +4,7 @@ import jellyfinService from '../../services/jellyfinService';
 import CalendarPanel from '../CalendarPanel';
 
 let mockRenderedRows = [];
+const DOCUMENT_POSITION_FOLLOWING = 4;
 const mockRequestIdRef = {current: 0};
 const mockProviderShell = {
 	cachePanelState: jest.fn(),
@@ -43,7 +44,7 @@ jest.mock('../../components/IntegrationPanelLayout', () => function TestLayout({
 });
 
 jest.mock('../../components/PanelTabNavigation', () => function TestTabs() {
-	return <div />;
+	return <div data-testid="calendar-tabs" />;
 });
 
 jest.mock('../../components/ProviderItemPopup', () => function TestPopup() {
@@ -122,5 +123,24 @@ describe('CalendarPanel paging', () => {
 			const latestItems = mockRenderedRows.at(-1)?.items || [];
 			expect(latestItems.map((item) => item.Id)).toEqual(['event-1', 'event-2']);
 		});
+	});
+
+	it('renders the requested-only empty explanation after the media filters', async () => {
+		jellyfinService.getCalendarEvents.mockResolvedValue({
+			available: true,
+			result: {
+				emptyReason: 'requested-only-filter',
+				hasMore: false,
+				items: [],
+				nextStartIndex: 0,
+				warnings: []
+			}
+		});
+
+		render(<CalendarPanel isActive />);
+
+		const tabs = screen.getByTestId('calendar-tabs');
+		const message = await screen.findByText('No calendar events match media requested by this user.');
+		expect(tabs.compareDocumentPosition(message) & DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	});
 });

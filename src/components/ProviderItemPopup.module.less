@@ -1,3 +1,5 @@
+@import (reference) '../styles/surfaceMixins.less';
+
 .content {
 	box-sizing: border-box;
 	width: min(42rem, 92vw);
@@ -11,7 +13,7 @@
 	color: var(--bf-theme-text-primary);
 	font-size: 0.8rem;
 
-	span {
+	> span {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.22rem;
@@ -27,6 +29,10 @@
 	width: 0.86em !important;
 	min-width: 0.86em !important;
 	height: 0.86em !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	background: transparent !important;
 	color: var(--bf-theme-rating-star) !important;
 	font-size: 0.86em !important;
 	line-height: 0.86em !important;
@@ -52,6 +58,7 @@
 	overflow-y: auto;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
+	.panelScrollbar();
 }
 
 .actions {

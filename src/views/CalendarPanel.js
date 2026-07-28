@@ -312,6 +312,9 @@ const CalendarPanel = ({
 	}, [loadPage, nextStartIndex]);
 	const firstFocusId = 'calendar-filter-all';
 	const retryInitial = useCallback(() => loadPage(), [loadPage]);
+	const emptyMessage = !loading && !initialError && groupedRows.length === 0
+		? (EMPTY_MESSAGES[emptyReason] || 'No calendar events are available.')
+		: '';
 
 	return (
 		<IntegrationPanelLayout
@@ -328,9 +331,6 @@ const CalendarPanel = ({
 			onScrollStop={providerShell.handleScrollStop}
 			errorMessage={items.length === 0 ? (initialError || activationError) : activationError}
 			onRetry={items.length === 0 && initialError ? retryInitial : null}
-			emptyMessage={!loading && !initialError && groupedRows.length === 0
-				? (EMPTY_MESSAGES[emptyReason] || 'No calendar events are available.')
-				: ''}
 		>
 			<PanelTabNavigation
 				activeId={activeFilterTab}
@@ -339,6 +339,11 @@ const CalendarPanel = ({
 				spotlightIdPrefix="calendar-filter"
 				tabs={CALENDAR_FILTER_TABS}
 			/>
+			{emptyMessage ? (
+				<div className={`${css.feedState} ${css.emptyState}`}>
+					<BodyText>{emptyMessage}</BodyText>
+				</div>
+			) : null}
 			{warnings.length > 0 ? (
 				<BodyText className={css.warning}>Results may be incomplete because one or more configured providers failed.</BodyText>
 			) : null}

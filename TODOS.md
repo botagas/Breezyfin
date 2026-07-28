@@ -7,16 +7,25 @@ Rules:
 - Keep validation/test runbooks in `CHECKS.md` after their related implementation is complete.
 - Move investigation items into a sized section once their constraints and likely implementation are understood.
 - Keep deferred platform-compatibility work in its own section rather than assigning it an active implementation scale.
+- When the section is empty after work has been completed, keep the section for future use.
 
 ## Small changes / issues
 
 Expected scope: minimal corrective improvements, UI/UX changes, etc.
 
-- Discovery pop-up's rating star has it's own background, seemingly inheriting the same style as the parent. 
-- Discovery pop-up doesn't use our scrollbar and instead shows the default one for the summary.
-- Media Bar shows "Rating" instead of showing a star. 
-- Watchlist Series Progress and other tabs should reuse a similar border hover effect as the rest of the theme. Current examples are section rows or media details episode rows.
-- Media Bar title image may not always fit the image logo of the movie/show (may crop top or bottom). 
+## Medium changes / issues
+
+Expected scope: bounded work spanning a small number of services, scripts, tests, or UI surfaces.
+
+- Add an opt-in, non-blocking `test:demo` integration smoke suite against the controlled
+  Jellyfin/plugin development container. Cover public server discovery, passwordless or
+  configured authentication, bounded library paging, image delivery, PlaybackInfo
+  response contracts, and Breezyfin plugin capability endpoints without coupling normal
+  Jest or release CI gates to a live server. Use isolated test-user state, strict
+  timeouts, token redaction, and explicit cleanup for any unavoidable mutations. Until
+  the development container has suitable media fixtures, the official Jellyfin demo
+  server may provide optional read-only playback compatibility checks, but it must not
+  become the authoritative or blocking integration environment.
 
 ## Large / cross-cutting changes
 

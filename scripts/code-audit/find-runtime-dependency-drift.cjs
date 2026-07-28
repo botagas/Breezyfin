@@ -20,6 +20,7 @@ const EXPECTED_RUNTIME = Object.freeze({
 });
 
 const failures = [];
+const EXPECTED_BUILD_REACT_IS = '18.3.1';
 const runtimeEntries = getRuntimePackageEntries(packageLock);
 for (const [name, expectedVersion] of Object.entries(EXPECTED_RUNTIME)) {
 	if (packageJson.dependencies?.[name] !== expectedVersion) {
@@ -33,6 +34,16 @@ for (const [name, expectedVersion] of Object.entries(EXPECTED_RUNTIME)) {
 	if (versions.size !== 1 || !versions.has(expectedVersion)) {
 		failures.push(`${name} production closure resolved ${[...versions].join(', ') || 'nothing'}; expected only ${expectedVersion}.`);
 	}
+}
+
+if (packageJson.devDependencies?.['react-is-18'] !== `npm:react-is@${EXPECTED_BUILD_REACT_IS}`) {
+	failures.push(`react-is-18 must alias react-is@${EXPECTED_BUILD_REACT_IS} for the React 18 build toolchain.`);
+}
+if (packageJson.enact?.alias?.['react-is'] !== 'react-is-18') {
+	failures.push('Enact must resolve react-is through the react-is-18 package alias to prevent React 19 CLI type checks leaking into React 18 builds.');
+}
+if (packageLock.packages?.['node_modules/react-is-18']?.version !== EXPECTED_BUILD_REACT_IS) {
+	failures.push(`react-is-18 resolved ${packageLock.packages?.['node_modules/react-is-18']?.version || 'nothing'}; expected ${EXPECTED_BUILD_REACT_IS}.`);
 }
 
 console.log('Checked production Enact, React, and iLib runtime generations.');

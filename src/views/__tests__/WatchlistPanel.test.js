@@ -5,6 +5,7 @@ import WatchlistPanel from '../WatchlistPanel';
 
 let layoutProps = null;
 let virtualListProps = null;
+const DOCUMENT_POSITION_FOLLOWING = 4;
 const freshInsightEntries = (overrides = {}) => ({
 	progress: {items: [], cachedAt: Date.now(), hasMore: false, nextStartIndex: 0},
 	completed: {items: [], cachedAt: Date.now(), hasMore: false, nextStartIndex: 0},
@@ -79,7 +80,7 @@ jest.mock('../../components/IntegrationPanelLayout', () => function TestLayout(p
 });
 
 jest.mock('../../components/PanelTabNavigation', () => function TestTabs() {
-	return <div />;
+	return <div data-testid="watchlist-tabs" />;
 });
 
 jest.mock('../../components/PanelLandscapeVirtualGrid', () => function TestGrid() {
@@ -198,6 +199,83 @@ describe('WatchlistPanel advanced list layout', () => {
 		expect(screen.getByText('12 episodes')).toBeTruthy();
 		expect(screen.getByText('Top 5 Movies')).toBeTruthy();
 		expect(screen.getByText('3 plays')).toBeTruthy();
+	});
+
+	it('contains a Statistics availability failure below the tab navigation', async () => {
+		jellyfinService.getWatchlistStatistics.mockResolvedValue({
+			available: false,
+			diagnosticReason: 'plugin-feature-disabled'
+		});
+
+		render(
+			<WatchlistPanel
+				isActive
+				cachedState={{
+					activeTab: 'statistics',
+					insightEntries: freshInsightEntries({
+						statistics: {cachedAt: 0, statistics: null}
+					})
+				}}
+				onItemSelect={jest.fn()}
+			/>
+		);
+
+		const tabs = screen.getByTestId('watchlist-tabs');
+		const alert = await screen.findByRole('alert');
+		expect(tabs.compareDocumentPosition(alert) & DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		expect(alert.parentElement.className).toContain('listViewport');
+		expect(layoutProps.scrollable).toBe(false);
+	});
+
+	it('constrains long insight titles inside the fixed VirtualList row', async () => {
+		const longTitle = 'An Exceptionally Long Series Title That Must Stay Inside One Fixed Watchlist Insight Row';
+		render(
+			<WatchlistPanel
+				isActive
+				cachedState={{
+					activeTab: 'progress',
+					insightEntries: freshInsightEntries({
+						progress: {
+							items: [{
+								Id: 'series-long-title',
+								Title: longTitle,
+								WatchedEpisodeCount: 3,
+								TotalEpisodeCount: 10,
+								RemainingEpisodeCount: 7
+							}],
+							cachedAt: Date.now(),
+							hasMore: false,
+							nextStartIndex: 1
+						}
+					})
+				}}
+				onItemSelect={jest.fn()}
+			/>
+		);
+
+		const title = await screen.findByText(longTitle);
+		expect(title.className).toContain('insightTitle');
+		expect(virtualListProps.itemSize).toBe(320);
+	});
+
+	it('centers the native Watchlist empty state in its content viewport', async () => {
+		jellyfinService.getLikesWatchlist.mockResolvedValue({
+			items: [],
+			nextStartIndex: 0,
+			hasMore: false
+		});
+
+		render(
+			<WatchlistPanel
+				isActive
+				cachedState={{activeTab: 'watchlist'}}
+				onItemSelect={jest.fn()}
+			/>
+		);
+
+		const emptyState = await screen.findByText('Your Watchlist is empty.');
+		expect(emptyState.className).toContain('empty');
+		expect(emptyState.parentElement.className).toContain('watchlistContent');
 	});
 
 	it('deduplicates repeated Mark All Watched activation while the mutation is pending', async () => {

@@ -65,6 +65,9 @@ Version/capability detection is implemented in `src/utils/platformCapabilities.j
   - webOS 6 popup fallback behaviors (solid-surface compatibility path).
 - `src/styles/panelLayoutMixins.less`
   - Shared panel fill container mixin.
+- `src/styles/surfaceMixins.less`
+  - Shared popup/button surface behavior and the tokenized panel scrollbar used by
+    bounded native overflow regions.
 - `src/styles/compatMixins.less`
   - Shared compatibility mixins (gap fallbacks, scroll metric stabilization).
 
@@ -129,6 +132,8 @@ Shared Hero backdrop, media-panel atmosphere, text-fallback contrast, Elegant li
 ## 6) Compatibility patches
 
 Compatibility is capability-driven and scoped by root attributes.
+The active legacy-style rationale, removal conditions, and validation contract are tracked
+as WA-007 in `WORKAROUNDS.md`.
 
 ### webOS 6 compatibility
 

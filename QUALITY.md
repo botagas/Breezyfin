@@ -124,7 +124,7 @@ Recommended adoption path:
 
 ## Release Supply-Chain Checks
 
-- `npm run audit:runtime-deps` validates the production closure remains on Enact 4, Sandstone 2, and React 18 without mixed runtime generations.
+- `npm run audit:runtime-deps` validates the production closure remains on Enact 4, Sandstone 2, and React 18 without mixed runtime generations. It also verifies that Enact CLI resolves its build-time `react-is` alias to Breezyfin's pinned React 18-compatible root package instead of leaking the CLI's React 19 element checks into development bundles.
 - `npm run audit:licenses` validates the generated `THIRD_PARTY_NOTICES.txt`, including copied subtitle-engine and Museo font licenses.
 - `npm run audit:private-refs` rejects external-client implementation references, private test-media names, and backup artifacts outside intentional README attribution.
 - `npm run report:package-size` groups packaged bytes into app bundles, iLib, subtitle engines, fonts, source maps/declarations, and other files.

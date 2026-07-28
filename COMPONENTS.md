@@ -20,12 +20,20 @@ This guide covers shared UI components in `src/components/`.
   insets, backdrop, loading/empty/error states, retry placement, and Toolbar DOWN entry;
   pass `scrollable={false}` when a child `VirtualList`/`VirtualGridList` owns the panel's
   vertical viewport so Sandstone has one scroll owner rather than nested vertical scrollers.
+  When controls must remain before an empty explanation, render a panel-local contained
+  state after those controls rather than using the layout's pre-content `emptyMessage`.
   provider details should use `ProviderItemPopup` so Popup close and Spotlight cleanup
   complete before the item state is cleared. The popup mounts content inside the shared
   tokenized `popupSurface`, bounds and scrolls long descriptions, and uses
   `PanelActionButton` for its Close action. Pass the provider item so available type,
   year, rating, genre, director, and writer metadata can be shown without fabricating
   fields absent from compact feeds.
+- Watchlist intentionally uses mixed, exclusive scroll ownership: native Watchlist and
+  populated Statistics use `AppScroller`, while Series Progress, Completed Series, and
+  Movie History give the viewport to Sandstone `VirtualList`. Empty/loading Statistics
+  uses a static state viewport so its placement matches the other advanced tabs. This is
+  tracked as WA-006 in `WORKAROUNDS.md`; do not collapse the branches without validating
+  navbar scroll-under behavior and Spotlight focus.
 - Reuse `PanelTabNavigation` for Settings-style panel view/filter tabs. It owns the
   shared pill surface, selected/focus styling, tab semantics, and stable Spotlight IDs;
   panels should supply only tab descriptors, the active ID, and an `onSelect` handler.
@@ -61,6 +69,7 @@ This guide covers shared UI components in `src/components/`.
 - `ScreensaverOverlay` owns only the moving black-screen presentation, 30 FPS boundary reflection, smooth direction heading, and optional wake message. App-session inactivity belongs to `useAppScreensaver`; paused-player wake/resume behavior belongs to `usePlayerPausedScreensaver`.
 - Reuse `MediaFilterControls` with `useMediaFilterState` for Library-like filter popups so selected, draft, reset, apply, and first-focus behavior stay aligned.
 - Keep popup-owning components mounted until Sandstone calls `onHide`; do not replace their ancestor with a loading branch during close animations because Spotlight pause/resume cleanup belongs to the Popup lifecycle.
+- Toolbar library selection uses the shared `popupSurface` as its only glass/backdrop composition. Keep theme-specific library button states, but do not stack extra distortion or backdrop-filter layers inside the popup because pointer/focus repaint cost is significant on TVs.
 - For uniform, potentially long result grids, use `MediaVirtualGrid` rather than custom row navigation, pointer/5-way mode splitting, DOM card queries, or pagination sentinels. Preserve Enact renderer props (`index`, `data-index`, and remaining item props), and cache loaded pages plus the focused item ID in the owning panel. Keep the grid instance mounted during filter/search reloads; pass an empty item list, disable its Spotlight container, and place loading/empty feedback above it so Sandstone can finish pending scroller callbacks safely.
 - For Home rows, `MediaRow` may expose an optional icon-only section action via `onMoreClick` / `sectionKey`; keep this action generic and route destination behavior through the owning panel. It renders explicit `pending`, `loading`, and retryable `error` states for descriptor-first server Home rows through the shared Breezy loading surface; rows that resolve empty are removed by Home rather than left as empty shells. Home activates artwork by row, with the first viewport loaded immediately and later rows activated by row visibility/focus rather than per-image observers.
 - Settings rows use `src/views/settings-panel/components/SettingsStaticItems.js`. These are panel-local Sandstone base compositions that deliberately omit the marquee controller and content measurement path while retaining Enact touch, Spotlight, skin, switch, and accessibility behavior; keep their visible labels constrained with ellipsis rather than reintroducing focus marquees.
