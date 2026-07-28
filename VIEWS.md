@@ -17,7 +17,11 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 
 ## Current panel-local decompositions
 
-- `src/views/HomeSectionPanel.js` expands Home rows into paged section-result grids using shared panel scroll/cache behavior.
+- `src/views/HomeSectionPanel.js` expands Home rows into paged section-result grids using
+  shared panel scroll/cache behavior. Panel-local paging normalization and bounded
+  filtered collection live in `src/views/home-section-panel/utils/`. HSS My Requests
+  descriptors retain their HSS Home preview but use the plugin's complete ownership
+  paging endpoint in View More.
 - `src/views/HomePanel.js` treats enabled HSS descriptors as authoritative. Ordinary
   descriptors load Jellyfin items; Discovery descriptors load the named provider feed,
   preserve HSS ordering/layout, and use the shared linked/external activation path.

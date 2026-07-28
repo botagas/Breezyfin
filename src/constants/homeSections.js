@@ -42,3 +42,9 @@ export const HOME_SECTION_DESCRIPTORS = {
 export const getHomeSectionDescriptor = (sectionId) => (
 	HOME_SECTION_DESCRIPTORS[sectionId] || null
 );
+
+export const isMyRequestsHomeSection = (section) => (
+	section === HOME_SECTION_IDS.MY_REQUESTS ||
+	section?.id === HOME_SECTION_IDS.MY_REQUESTS ||
+	section?.kind === 'MyRequests'
+);

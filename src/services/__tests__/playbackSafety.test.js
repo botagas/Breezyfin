@@ -120,24 +120,46 @@ describe('Dolby Vision playback safety', () => {
 			mediaSource,
 			pathClassification,
 			maxBitrate: 40,
+			maxSupportedBitrateMbps: 120,
 			itemId: 'item-1'
 		})).toEqual(expect.objectContaining({
 			type: 'dolby-vision-original-quality',
-			proposedBitrateMbps: 100,
+			proposedBitrateMbps: 120,
 			configuredBitrateMbps: 40,
 			mediaSourceId: 'source-1'
 		}));
 		expect(buildDolbyVisionOriginalQualityDecision({
 			mediaSource,
 			pathClassification,
-			maxBitrate: 100
+			maxBitrate: 120,
+			maxSupportedBitrateMbps: 120
 		})).toBeNull();
 		expect(buildDolbyVisionOriginalQualityDecision({
 			mediaSource,
 			pathClassification,
 			maxBitrate: 40,
+			maxSupportedBitrateMbps: 120,
 			confirmedOriginalQuality: true
 		})).toBeNull();
+	});
+
+	it('uses the runtime playback ceiling for the original-quality retry', () => {
+		const mediaSource = createDolbyVisionSource({
+			transcodingUrl: '/Videos/item/master.m3u8?VideoCodec=hevc&TranscodeReasons=ContainerBitrateExceedsLimit'
+		});
+		const pathClassification = classifyDolbyVisionPlaybackPath({
+			mediaSource,
+			playMethod: 'Transcode'
+		});
+
+		expect(buildDolbyVisionOriginalQualityDecision({
+			mediaSource,
+			pathClassification,
+			maxBitrate: 40,
+			maxSupportedBitrateMbps: 96.9
+		})).toEqual(expect.objectContaining({
+			proposedBitrateMbps: 96
+		}));
 	});
 
 	it('skips the nonviable HDR prompt when video transcoding is forced', () => {

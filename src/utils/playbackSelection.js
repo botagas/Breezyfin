@@ -13,6 +13,7 @@ import {
 	BITMAP_SUBTITLE_RENDERERS,
 	normalizeBitmapSubtitleRenderer as normalizeBitmapSubtitleRendererValue
 } from './bitmapSubtitleRenderers';
+import {CLIENT_MAX_STREAMING_BITRATE_BPS} from '../constants/playback';
 
 export const WEBOS_AUDIO_CODEC_PRIORITY = [
 	'eac3',
@@ -527,7 +528,7 @@ export const scoreMediaSource = (mediaSource, {forceTranscoding = false, dynamic
 	if (videoStream?.Width >= 3840) score += 60;
 	else if (videoStream?.Width >= 1920) score += 40;
 	else if (videoStream?.Width >= 1280) score += 20;
-	if (videoStream?.BitRate && videoStream.BitRate <= 120000000) score += 20;
+	if (videoStream?.BitRate && videoStream.BitRate <= CLIENT_MAX_STREAMING_BITRATE_BPS) score += 20;
 
 	if (!canDynamicRangeSatisfyCap(dynamicRangeInfo, normalizedRangeCap)) {
 		score -= 220;

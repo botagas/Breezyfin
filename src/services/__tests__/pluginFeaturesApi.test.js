@@ -46,33 +46,38 @@ describe('plugin feature APIs', () => {
 		expect(service._request).toHaveBeenCalledTimes(3);
 	});
 
-	it('normalizes legacy and Discovery HSS descriptors', async () => {
+	it('normalizes legacy, Discovery, and My Requests HSS descriptors', async () => {
 		const service = createService();
 		service._request
 			.mockResolvedValueOnce(capabilities(['homeSections.v1']))
 			.mockResolvedValueOnce({
-				Items: [
-					{
-						Id: '11111111111111111111111111111111', Title: 'Latest', ViewMode: 'Landscape',
-						Order: 0, SupportsPaging: true
-					},
-					{
-						Id: '22222222222222222222222222222222', Title: 'Trending', ViewMode: 'Landscape',
-						Order: 1, SupportsPaging: true, Kind: 'Discovery', Feed: 'Trending'
-					}
-				],
-				TotalRecordCount: 2
-			});
+					Items: [
+						{
+							Id: '11111111111111111111111111111111', Title: 'Latest', ViewMode: 'Landscape',
+							Order: 0, SupportsPaging: true
+						},
+						{
+							Id: '22222222222222222222222222222222', Title: 'Trending', ViewMode: 'Landscape',
+							Order: 1, SupportsPaging: true, Kind: 'Discovery', Feed: 'Trending'
+						},
+						{
+							Id: '33333333333333333333333333333333', Title: 'My Requests', ViewMode: 'Landscape',
+							Order: 2, SupportsPaging: true, Kind: 'MyRequests', Feed: null
+						}
+					],
+					TotalRecordCount: 3
+				});
 
 		await expect(getHomeSectionDescriptors(service)).resolves.toMatchObject({
 			available: true,
 			result: {
 				items: [
-					expect.objectContaining({Kind: 'JellyfinItems', Feed: null}),
-					expect.objectContaining({Kind: 'Discovery', Feed: 'Trending'})
-				]
-			}
-		});
+						expect.objectContaining({Kind: 'JellyfinItems', Feed: null}),
+						expect.objectContaining({Kind: 'Discovery', Feed: 'Trending'}),
+						expect.objectContaining({Kind: 'MyRequests', Feed: null})
+					]
+				}
+			});
 	});
 
 	it('reads paged Watchlist insights and statistics through the plugin capability', async () => {

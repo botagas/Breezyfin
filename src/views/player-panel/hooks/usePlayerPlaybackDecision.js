@@ -318,7 +318,7 @@ export const usePlayerPlaybackDecision = ({
 			return;
 		}
 		if (type === 'dolby-vision-original-quality') {
-			const proposedBitrate = Number(playbackDecisionPrompt.proposedBitrateMbps) || 100;
+			const proposedBitrate = Number(playbackDecisionPrompt.proposedBitrateMbps) || 120;
 			await restartWithPlaybackOverride({
 				decisionMediaSourceId: playbackDecisionPrompt.mediaSourceId || mediaSourceId,
 				seekSeconds: Number.isFinite(Number(playbackDecisionPrompt.resumeTicks))

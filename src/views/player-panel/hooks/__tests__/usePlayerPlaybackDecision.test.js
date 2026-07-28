@@ -147,7 +147,7 @@ describe('usePlayerPlaybackDecision', () => {
 				itemId: 'item-1',
 				mediaSourceId: 'source-1',
 				generation: 4,
-				proposedBitrateMbps: 100
+				proposedBitrateMbps: 120
 			});
 		});
 		await act(async () => {
@@ -155,7 +155,7 @@ describe('usePlayerPlaybackDecision', () => {
 		});
 
 		expect(props.playbackOverrideRef.current).toEqual(expect.objectContaining({
-			maxBitrate: '100',
+			maxBitrate: '120',
 			confirmedDolbyVisionOriginalQuality: true
 		}));
 		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);

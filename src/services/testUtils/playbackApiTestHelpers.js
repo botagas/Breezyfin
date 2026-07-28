@@ -32,7 +32,8 @@ export const resetPlaybackApiTestRuntime = ({
 	getRuntimePlatformCapabilities.mockReturnValue({
 		playback: {
 			supportsDolbyVision: true,
-			supportsDolbyVisionInMkv: true
+			supportsDolbyVisionInMkv: true,
+			maxStreamingBitrate: 120000000
 		}
 	});
 };

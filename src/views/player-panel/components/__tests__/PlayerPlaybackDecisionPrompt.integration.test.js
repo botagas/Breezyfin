@@ -78,7 +78,7 @@ describe('PlayerPlaybackDecisionPrompt lifecycle', () => {
 				prompt={{
 					type: 'dolby-vision-original-quality',
 					configuredBitrateMbps: 20,
-					proposedBitrateMbps: 100
+					proposedBitrateMbps: 120
 				}}
 				onConfirm={jest.fn()}
 				onAlternate={onAlternate}

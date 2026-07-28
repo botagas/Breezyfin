@@ -2,6 +2,7 @@ import {getRuntimePlatformCapabilities} from '../../utils/platformCapabilities';
 import {normalizeDynamicRangeCap} from '../../utils/playbackDynamicRange';
 import {normalizeAssSubtitleRenderer as normalizeAssSubtitleRendererValue} from '../../utils/assSubtitleRenderers';
 import {normalizeBitmapSubtitleRenderer as normalizeBitmapSubtitleRendererValue} from '../../utils/bitmapSubtitleRenderers';
+import {CLIENT_MAX_STREAMING_BITRATE_BPS} from '../../constants/playback';
 
 const VIDEO_RANGE_TYPES = {
 	DV_FALLBACKS: [
@@ -317,7 +318,7 @@ export const buildPlaybackDeviceProfile = ({
 }) => {
 	const maxStreamingBitrate = maxBitrateSetting
 		? maxBitrateSetting * 1000000
-		: (playbackCapabilities.maxStreamingBitrate || 120000000);
+		: (playbackCapabilities.maxStreamingBitrate || CLIENT_MAX_STREAMING_BITRATE_BPS);
 	const maxAudioChannels = String(playbackCapabilities.maxAudioChannels || 6);
 	const videoRangeTypes = buildVideoRangeTypeValue(playbackCapabilities, dynamicRangeCap);
 

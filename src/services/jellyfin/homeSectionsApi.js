@@ -2,7 +2,7 @@ import {BREEZYFIN_FEATURE_IDS} from './requestsApi';
 import {createPluginPaging, getPluginFeaturePage} from './pluginFeaturesApi';
 
 const VIEW_MODES = new Set(['Portrait', 'Landscape', 'Square', 'Small']);
-const HOME_SECTION_KINDS = new Set(['JellyfinItems', 'Discovery']);
+const HOME_SECTION_KINDS = new Set(['JellyfinItems', 'Discovery', 'MyRequests']);
 const DISCOVERY_FEEDS = new Set([
 	'Trending',
 	'PopularMovies',
@@ -25,7 +25,7 @@ const isHomeSection = (item) => (
 
 const normalizeHomeSection = (item) => ({
 	...item,
-	Kind: item.Kind === 'Discovery' ? 'Discovery' : 'JellyfinItems',
+	Kind: HOME_SECTION_KINDS.has(item.Kind) ? item.Kind : 'JellyfinItems',
 	Feed: item.Kind === 'Discovery' && DISCOVERY_FEEDS.has(item.Feed) ? item.Feed : null
 });
 

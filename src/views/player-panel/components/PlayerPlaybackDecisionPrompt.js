@@ -57,7 +57,7 @@ const PlayerPlaybackDecisionPrompt = ({
 		},
 		'dolby-vision-original-quality': {
 			title: 'Try original quality?',
-			message: `Jellyfin wants to re-encode Dolby Vision because it exceeds the current ${prompt?.configuredBitrateMbps || 'configured'} Mbps limit. Try Direct Play or video-copy remux at up to ${prompt?.proposedBitrateMbps || 100} Mbps, or transcode to SDR at the current limit?`,
+			message: `Jellyfin wants to re-encode Dolby Vision because it exceeds the current ${prompt?.configuredBitrateMbps || 'configured'} Mbps limit. Try Direct Play or video-copy remux at the detected client maximum of ${prompt?.proposedBitrateMbps || 120} Mbps, or transcode to SDR at the current limit?`,
 			confirm: 'Try original quality',
 			alternate: 'Transcode in SDR',
 			decline: 'Back to details'

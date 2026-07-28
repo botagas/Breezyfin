@@ -148,10 +148,11 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Playback safety decisions must be returned from PlaybackInfo negotiation and handled
   before source URL resolution or attachment. Dolby Vision video transcoding is blocked
   unless it is validated video-copy/audio-only work. A bitrate-only DV encode may first
-  offer a one-shot 100 Mbps original-quality retry so Jellyfin can select DirectPlay or
-  video-copy DirectStream; this does not force remux. Full video encoding is not accepted
-  as preserved HDR, while a confirmed SDR video encode is valid because Jellyfin tone
-  maps the source and `*-rangetype` URL values describe accepted source capabilities.
+  offer a one-shot retry at the runtime playback capability's maximum streaming bitrate
+  so Jellyfin can select DirectPlay or video-copy DirectStream; this does not force remux.
+  Full video encoding is not accepted as preserved HDR, while a confirmed SDR video
+  encode is valid because Jellyfin tone maps the source and `*-rangetype` URL values
+  describe accepted source capabilities.
   Playback decisions are serialized per generation so subtitle, audio, and range prompts
   cannot replace one another while teardown or Popup presentation is pending.
 - Smart/manual subtitle burn-in policy: `src/utils/playbackSelection.js` (`getSubtitleTranscodePolicy`)
@@ -175,6 +176,13 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   `src/utils/syncTiming.js`.
 - Sandstone Popup lifecycle: keep the Popup and its owning controls mounted through close, commit reload-causing state from `onHide`, and let Sandstone restore Spotlight before replacing result content.
 - Shared Sandstone virtual grids: Search, Favorites, Home View More, and Library use `src/components/MediaVirtualGrid.js`. Do not add panel-specific DOM row calculations, manual pointer/5-way Spotlight disabling, app-owned coordinate navigation, or load-more sentinels. Panels own query/results paging and cache loaded pages plus focused item ID; Enact owns rendered-item virtualization and directional grid navigation. Keep the same grid mounted and Spotlight-disabled with empty items during query/filter reloads so pending Sandstone scroll updates cannot target an unmounted scroller. Keep overhang mode-aware and treat mounted virtual items as the image-loading window rather than layering native lazy loading on top.
+- Home View More normalizes both array responses and plugin page envelopes through
+  `src/views/home-section-panel/utils/homeSectionPaging.js`. Filtered scans must carry
+  the server-provided cursor and `hasMore` state forward; when a bounded scan window has
+  no matches, continue to the next window before presenting a terminal empty state.
+- HSS remains authoritative for Home row order and preview content. A descriptor with
+  `Kind: MyRequests` is the semantic exception for View More: route its paged grid
+  through `myRequests.v1` rather than inheriting HSS's bounded row result.
 - Shared media-card images: use `src/components/MediaCardImage.js` with ordered candidates from `src/utils/mediaItemUtils.js`. Keep card reveal opacity-only and advance through tagged/item/parent/untagged candidates before showing a placeholder.
 - Toolbar DOWN routing: use Toolbar's explicit `onNavigateDown` contract for panel entry; picker/menu scopes take priority over panel-level navigation and must not be inferred from broad `toolbar-*` prefixes.
 - Toolbar Back routing: `usePanelToolbarActions` exposes the same layered Back callback to both App/remote handling and the visible Toolbar action. Nested panel state must get first refusal before Toolbar disclosures and the Home/history fallback.

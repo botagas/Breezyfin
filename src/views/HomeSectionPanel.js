@@ -12,7 +12,7 @@ import jellyfinService from '../services/jellyfinService';
 import {useMapById} from '../hooks/useMapById';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
 import {useMediaFilterState} from '../hooks/useMediaFilterState';
-import {HOME_SECTION_IDS, getHomeSectionDescriptor} from '../constants/homeSections';
+import {getHomeSectionDescriptor, isMyRequestsHomeSection} from '../constants/homeSections';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
 import {getJellyfinUsername} from '../utils/jellyfinUser';
 import {
@@ -21,8 +21,12 @@ import {
 } from '../utils/mediaFilters';
 import {buildGridQuerySignature} from '../utils/gridScrollRestore';
 import {focusSpotlightTarget} from '../utils/gridFocus';
-import {normalizeDiscoveryMediaItem} from '../utils/discoveryMediaItems';
 import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
+import {
+	collectFilteredHomeSectionPage,
+	normalizeHomeSectionPage
+} from './home-section-panel/utils/homeSectionPaging';
+import {fetchHomeSectionPage} from './home-section-panel/utils/homeSectionSource';
 
 import css from './LibraryPanel.module.less';
 import browseCss from '../components/MediaBrowseControls.module.less';
@@ -30,50 +34,6 @@ import browseCss from '../components/MediaBrowseControls.module.less';
 const PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
 const FILTERED_PAGE_SCAN_LIMIT = 6;
 const HOME_SECTION_IMAGE_OPTIONS = Object.freeze({includeBackdrop: true, includeSeriesFallback: true});
-
-const fetchHomeSectionPage = async (section, {
-	limit = PAGE_SIZE,
-	startIndex = 0
-} = {}) => {
-	const sectionId = section?.id || section;
-	if (section?.source === 'plugin' && section?.pluginSectionId) {
-		if (section.kind === 'Discovery' && section.feed) {
-			const discoveryResponse = await jellyfinService.getDiscoveryFeed(section.feed, {limit, startIndex});
-			if (discoveryResponse?.available !== true) throw new Error('Discovery feed is unavailable');
-			return {
-				...discoveryResponse.result,
-				items: discoveryResponse.result.items.map(normalizeDiscoveryMediaItem)
-			};
-		}
-		const response = await jellyfinService.getBreezyfinHomeSectionItems(
-			section.pluginSectionId,
-			limit,
-			startIndex
-		);
-		if (response?.available !== true) throw new Error('Server Home section is unavailable');
-		return response.result;
-	}
-	switch (sectionId) {
-		case HOME_SECTION_IDS.RECENTLY_ADDED:
-			return jellyfinService.getRecentlyAdded(limit, startIndex);
-		case HOME_SECTION_IDS.CONTINUE_WATCHING:
-			return jellyfinService.getResumeItems(limit, startIndex);
-		case HOME_SECTION_IDS.NEXT_UP:
-			return jellyfinService.getNextUp(limit, startIndex);
-		case HOME_SECTION_IDS.LATEST_MOVIES:
-			return jellyfinService.getLatestMedia(['Movie'], limit, startIndex);
-		case HOME_SECTION_IDS.LATEST_SHOWS:
-			return jellyfinService.getLatestMedia(['Series'], limit, startIndex);
-		case HOME_SECTION_IDS.MY_REQUESTS: {
-			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-			return jellyfinService.getMyRequests(null, ['Movie', 'Series'], limit, startIndex, userName);
-		}
-		case HOME_SECTION_IDS.WATCHLIST:
-			return jellyfinService.getLikesWatchlist(limit, startIndex);
-		default:
-			return [];
-	}
-};
 
 const HomeSectionPanel = ({
 	section,
@@ -176,89 +136,38 @@ const HomeSectionPanel = ({
 		requestId,
 		currentFilterState
 	}) => {
-		if (activeSectionId === HOME_SECTION_IDS.MY_REQUESTS) {
-			const requestUserName = await getJellyfinUsername(jellyfinService);
-			let requestCursor = startIndex;
-			let requestCollected = [];
-			let requestScans = 0;
-			let requestSourceHasMore = true;
-			while (requestCollected.length < PAGE_SIZE && requestScans < FILTERED_PAGE_SCAN_LIMIT && requestSourceHasMore) {
-				const result = await jellyfinService.getMyRequests(
-					null,
-					['Movie', 'Series'],
-					PAGE_SIZE - requestCollected.length,
-					requestCursor,
-					requestUserName
-				);
-				if (requestId !== requestIdRef.current) {
-					return {items: [], nextStartIndex: requestCursor, hasMore: false};
-				}
-				const safeItems = Array.isArray(result?.items) ? result.items : [];
-				const nextStartIndex = Number(result?.nextStartIndex);
-				const resolvedNextStartIndex = Number.isFinite(nextStartIndex)
-					? Math.max(0, Math.trunc(nextStartIndex))
-					: requestCursor + safeItems.length;
-				if (resolvedNextStartIndex <= requestCursor && safeItems.length === 0) {
-					requestSourceHasMore = false;
-					break;
-				}
-				requestCollected = [
-					...requestCollected,
-					...safeItems.filter((item) => mediaItemMatchesFilters(item, {
-						...currentFilterState,
-						useMyRequestsSource: false,
-						username: requestUserName
-					}))
-				];
-				requestCursor = resolvedNextStartIndex;
-				requestSourceHasMore = result?.hasMore === true;
-				requestScans += 1;
-			}
-			return {
-				items: requestCollected.slice(0, PAGE_SIZE),
-				nextStartIndex: requestCursor,
-				hasMore: requestSourceHasMore
-			};
-		}
+		const requestMembershipSatisfied = isMyRequestsHomeSection(activeSection);
+		const requestUserName = requestMembershipSatisfied || currentFilterState.useMyRequestsSource
+			? await getJellyfinUsername(jellyfinService)
+			: '';
 
-		let cursor = startIndex;
-		let collected = [];
-		let scans = 0;
-		let sourceHasMore = true;
-		const userName = currentFilterState.useMyRequestsSource ? await getJellyfinUsername(jellyfinService) : '';
-
-		while (collected.length < PAGE_SIZE && scans < FILTERED_PAGE_SCAN_LIMIT && sourceHasMore) {
-			const rawLimit = PAGE_SIZE - collected.length;
-			const rawPage = await fetchHomeSectionPage(activeSection, {
-				limit: rawLimit,
-				startIndex: cursor
-			});
-			if (requestId !== requestIdRef.current) {
-				return {items: [], nextStartIndex: cursor, hasMore: false};
-			}
-			const safeItems = Array.isArray(rawPage) ? rawPage : [];
-			if (safeItems.length === 0) {
-				sourceHasMore = false;
-				break;
-			}
-			cursor += safeItems.length;
-			collected = [
-				...collected,
-				...safeItems.filter((item) => mediaItemMatchesFilters(item, {
-					...currentFilterState,
-					username: userName
-				}))
-			];
-			sourceHasMore = safeItems.length >= rawLimit;
-			scans += 1;
-		}
-
-		return {
-			items: collected,
-			nextStartIndex: cursor,
-			hasMore: sourceHasMore
-		};
-	}, [activeSection, activeSectionId]);
+		return collectFilteredHomeSectionPage({
+			startIndex,
+			pageSize: PAGE_SIZE,
+			scanLimit: FILTERED_PAGE_SCAN_LIMIT,
+			isStale: () => requestId !== requestIdRef.current,
+			fetchPage: ({startIndex: pageStartIndex, limit}) => (
+				requestMembershipSatisfied
+					? jellyfinService.getMyRequests(
+						null,
+						['Movie', 'Series'],
+						limit,
+						pageStartIndex,
+						requestUserName
+					)
+						: fetchHomeSectionPage(jellyfinService, activeSection, {
+						limit,
+						startIndex: pageStartIndex
+					})
+			),
+			matchesItem: (item) => mediaItemMatchesFilters(item, {
+				...currentFilterState,
+				username: requestUserName
+			}, {
+				requestMembershipSatisfied
+			})
+		});
+	}, [activeSection]);
 
 	const loadPage = useCallback(async ({
 		startIndex = 0,
@@ -280,21 +189,18 @@ const HomeSectionPanel = ({
 					requestId,
 					currentFilterState: filterState
 				})
-				: await fetchHomeSectionPage(activeSection, {
+				: await fetchHomeSectionPage(jellyfinService, activeSection, {
 					limit: PAGE_SIZE,
 					startIndex
 				});
 			if (requestId !== requestIdRef.current) return;
-			const safeItems = Array.isArray(pageResult)
-				? pageResult
-				: Array.isArray(pageResult?.items)
-					? pageResult.items
-					: [];
-			const nextStartIndex = Number(pageResult?.nextStartIndex);
-			nextStartIndexRef.current = Number.isFinite(nextStartIndex)
-				? Math.max(0, Math.trunc(nextStartIndex))
-				: startIndex + safeItems.length;
-			setHasMore(typeof pageResult?.hasMore === 'boolean' ? pageResult.hasMore : safeItems.length >= PAGE_SIZE);
+			const normalizedPage = normalizeHomeSectionPage(pageResult, {
+				startIndex,
+				requestedLimit: PAGE_SIZE
+			});
+			const safeItems = normalizedPage.items;
+			nextStartIndexRef.current = normalizedPage.nextStartIndex;
+			setHasMore(normalizedPage.hasMore);
 			setItems((previousItems) => {
 				if (!append) return safeItems;
 				const existingIds = new Set(previousItems.map((item) => String(item.Id)));
@@ -325,6 +231,19 @@ const HomeSectionPanel = ({
 			append: true
 		});
 	}, [activeSectionId, hasMore, loadPage, loading]);
+
+	const findingFilteredResults = (
+		isActive &&
+		hasActiveFilters &&
+		!loading &&
+		!error &&
+		items.length === 0 &&
+		hasMore
+	);
+	useEffect(() => {
+		if (!findingFilteredResults) return;
+		loadNextPage();
+	}, [findingFilteredResults, loadNextPage]);
 
 	useEffect(() => {
 		if (skipInitialCachedLoadRef.current) {
@@ -375,7 +294,7 @@ const HomeSectionPanel = ({
 		/>
 	);
 	const title = activeSection?.title || 'Home Section';
-	const showEmpty = !loading && !error && items.length === 0;
+	const showEmpty = !loading && !error && items.length === 0 && !hasMore;
 
 	return (
 		<Panel {...rest}>
@@ -405,6 +324,11 @@ const HomeSectionPanel = ({
 				</MediaBrowseOverlay>
 				<div className={`${css.virtualGridViewport} ${browseCss.panelResultsOffset}`}>
 					{loading ? <div className={css.loading}><BreezyLoadingOverlay /></div> : null}
+						{findingFilteredResults ? (
+							<div className={css.loading}>
+								<BreezyLoadingOverlay label="Finding matching items..." />
+							</div>
+						) : null}
 						{error ? (
 							<div className={css.emptyState}>
 								<BodyText>{error}</BodyText>

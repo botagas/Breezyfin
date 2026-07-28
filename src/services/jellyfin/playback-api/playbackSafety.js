@@ -5,10 +5,11 @@ import {
 	toInteger,
 	WEBOS_AUDIO_CODEC_PRIORITY
 } from '../../../utils/playbackSelection';
+import {CLIENT_MAX_STREAMING_BITRATE_MBPS} from '../../../constants/playback';
 import {normalizeDynamicRangeCap} from '../../../utils/playbackDynamicRange';
 import {isAudioOnlyTranscodeReason} from './dolbyVision';
 
-export const DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS = 100;
+export const DEFAULT_DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS = CLIENT_MAX_STREAMING_BITRATE_MBPS;
 
 const parseTranscodingUrl = (transcodingUrl) => {
 	if (!transcodingUrl) return null;
@@ -169,6 +170,7 @@ export const buildDolbyVisionOriginalQualityDecision = ({
 	mediaSource,
 	pathClassification,
 	maxBitrate,
+	maxSupportedBitrateMbps,
 	confirmedOriginalQuality = false,
 	forceTranscoding = false,
 	itemId = null,
@@ -178,7 +180,11 @@ export const buildDolbyVisionOriginalQualityDecision = ({
 	const parsedBitrate = Number(maxBitrate);
 	const configuredBitrate = Number.isFinite(parsedBitrate) && parsedBitrate > 0
 		? parsedBitrate
-		: DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS;
+		: DEFAULT_DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS;
+	const parsedSupportedBitrate = Number(maxSupportedBitrateMbps);
+	const supportedBitrate = Number.isFinite(parsedSupportedBitrate) && parsedSupportedBitrate > 0
+		? Math.max(1, Math.floor(parsedSupportedBitrate))
+		: DEFAULT_DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS;
 	const transcodeReasons = Array.isArray(pathClassification?.transcodeReasons)
 		? pathClassification.transcodeReasons
 		: [];
@@ -188,7 +194,7 @@ export const buildDolbyVisionOriginalQualityDecision = ({
 	if (
 		confirmedOriginalQuality ||
 		forceTranscoding ||
-		configuredBitrate >= DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS ||
+		configuredBitrate >= supportedBitrate ||
 		pathClassification?.classification !== 'unsafe-video-transcode' ||
 		!bitrateOnlyFailure
 	) {
@@ -198,7 +204,7 @@ export const buildDolbyVisionOriginalQualityDecision = ({
 		type: 'dolby-vision-original-quality',
 		reason: 'dolby-vision-bitrate-limit',
 		originalRange: 'DV',
-		proposedBitrateMbps: DOLBY_VISION_ORIGINAL_QUALITY_BITRATE_MBPS,
+		proposedBitrateMbps: supportedBitrate,
 		configuredBitrateMbps: configuredBitrate,
 		itemId,
 		mediaSourceId: mediaSource?.Id || null,

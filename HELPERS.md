@@ -192,6 +192,20 @@ const {
   - a panel needs consistent `All`, `Unplayed`, `Played`, `Favorites`, or `My Requests` filtering.
   - filter state must be normalized before caching or comparison.
 
+### Home Section Paging Utilities
+- Files:
+  - `src/views/home-section-panel/utils/homeSectionPaging.js`
+  - `src/views/home-section-panel/utils/homeSectionSource.js`
+- Purpose:
+  - normalize legacy array pages and plugin paging envelopes without losing server cursors;
+  - collect a bounded page of locally filtered Home View More results;
+  - preserve continuation when a scan window contains no matching items;
+  - route semantic HSS My Requests View More sections through authoritative
+    `/Breezyfin/MyRequests` paging while leaving their Home preview on HSS.
+- Use when:
+  - Home View More consumes a section whose server response may be either an array or a
+    structured `{items, nextStartIndex, hasMore}` page.
+
 ### `useScrollerScrollMemory` and `useCachedScrollTopState`
 - File: `src/hooks/useScrollerScrollMemory.js`
 - Purpose:

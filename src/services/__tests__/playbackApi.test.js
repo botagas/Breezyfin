@@ -851,7 +851,7 @@ describe('playbackApi', () => {
 
 		expect(playbackInfo?.__breezyfin?.requiredDecision).toEqual(expect.objectContaining({
 			type: 'dolby-vision-original-quality',
-			proposedBitrateMbps: 100
+			proposedBitrateMbps: 120
 		}));
 	});
 

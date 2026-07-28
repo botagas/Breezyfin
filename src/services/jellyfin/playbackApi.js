@@ -993,6 +993,8 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 					mediaSource: selectedSource,
 					pathClassification: dynamicRangePath,
 					maxBitrate: options.maxBitrate,
+					maxSupportedBitrateMbps:
+						Number(runtimePlaybackCapabilities.maxStreamingBitrate) / 1000000,
 					confirmedOriginalQuality: confirmedDolbyVisionOriginalQuality,
 					forceTranscoding,
 					itemId,

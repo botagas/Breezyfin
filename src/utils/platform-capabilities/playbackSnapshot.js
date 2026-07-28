@@ -3,6 +3,7 @@ import {
 	detectCodecSupport,
 	detectImageFormatSupport
 } from './mediaDetection';
+import {CLIENT_MAX_STREAMING_BITRATE_BPS} from '../../constants/playback';
 
 export const buildPlaybackCapabilitySnapshot = ({
 	webos,
@@ -99,7 +100,7 @@ export const buildPlaybackCapabilitySnapshot = ({
 		nativeHls: webos,
 		nativeHlsFmp4: webos && versionBucket >= 5,
 		maxAudioChannels: webos25Plus ? 8 : 6,
-		maxStreamingBitrate: webos && versionBucket >= 24 ? 120000000 : 100000000,
+		maxStreamingBitrate: CLIENT_MAX_STREAMING_BITRATE_BPS,
 		audioCodecs: Array.from(new Set([...commonAudioCodecs, ...pcmAudioCodecs, ...(supportsOpus ? ['opus'] : []), 'flac'])),
 		audioCodecsByContainer: {
 			mp4: mp4AudioCodecs,
