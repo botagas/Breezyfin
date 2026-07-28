@@ -1,5 +1,13 @@
 <p align="center">
-<img src="./images/Breezyfin_main.png">
+<img src="./images/Breezyfin_main.png" alt="Breezyfin">
+</p>
+
+<p align="center">
+  <a href="https://github.com/botagas/Breezyfin/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/botagas/Breezyfin?style=flat-square&logo=github&label=Stars"></a>
+  <a href="https://github.com/botagas/Breezyfin/releases"><img alt="GitHub release downloads" src="https://img.shields.io/github/downloads/botagas/Breezyfin/total?style=flat-square&logo=github&label=Downloads"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/botagas/Breezyfin?style=flat-square&label=License"></a>
+  <a href="https://github.com/botagas/Breezyfin/releases/latest"><img alt="Latest stable version" src="https://img.shields.io/github/v/release/botagas/Breezyfin?style=flat-square&label=Stable&sort=semver"></a>
+  <a href="https://github.com/botagas/Breezyfin/blob/develop/package.json"><img alt="Develop version" src="https://img.shields.io/github/package-json/v/botagas/Breezyfin/develop?style=flat-square&label=Develop"></a>
 </p>
 
 
@@ -146,16 +154,6 @@ Pull requests and issues are welcome! Please follow the code style and add tests
 Breezyfin is licensed under [`GPL-3.0-only`](./LICENSE). Third-party components
 and packaged assets remain under their respective licenses, listed in
 [`THIRD_PARTY_NOTICES.txt`](./THIRD_PARTY_NOTICES.txt).
-
-## Project statistics
-
-<a href="https://www.star-history.com/?repos=botagas%2FBreezyfin&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=botagas/Breezyfin&type=date&theme=dark&legend=top-left&sealed_token=xcU9n3SiewHcJ2Dmz1ieEhUtSRGj1hAR6dVKNA__s0yOF_DgnKZ5OkE2CPyIDNjuWE-DvW2JnbzYwrxZ93XFEJOQDARQxEW4afczii5uokEZ1e7EgzqVJths_RSe9HX7RRu0yMbgTnszST-9q92scy2XeHmtkhwRV65Sm2H57eMA7NJlO7mhjel5KBmb" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=botagas/Breezyfin&type=date&legend=top-left&sealed_token=xcU9n3SiewHcJ2Dmz1ieEhUtSRGj1hAR6dVKNA__s0yOF_DgnKZ5OkE2CPyIDNjuWE-DvW2JnbzYwrxZ93XFEJOQDARQxEW4afczii5uokEZ1e7EgzqVJths_RSe9HX7RRu0yMbgTnszST-9q92scy2XeHmtkhwRV65Sm2H57eMA7NJlO7mhjel5KBmb" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=botagas/Breezyfin&type=date&legend=top-left&sealed_token=xcU9n3SiewHcJ2Dmz1ieEhUtSRGj1hAR6dVKNA__s0yOF_DgnKZ5OkE2CPyIDNjuWE-DvW2JnbzYwrxZ93XFEJOQDARQxEW4afczii5uokEZ1e7EgzqVJths_RSe9HX7RRu0yMbgTnszST-9q92scy2XeHmtkhwRV65Sm2H57eMA7NJlO7mhjel5KBmb" />
- </picture>
-</a>
 
 ## Credits
 
