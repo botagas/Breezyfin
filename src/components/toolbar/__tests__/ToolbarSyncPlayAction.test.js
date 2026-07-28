@@ -103,6 +103,16 @@ const buildClassicProps = (overrides = {}) => ({
 });
 
 describe('Toolbar SyncPlay navigation placement', () => {
+	it('describes the Elegant Back action without promising a direct Home jump', () => {
+		render(<ToolbarElegantLayout {...buildElegantProps({
+			isHomeSection: false,
+			elegantPanelTitle: 'Watchlist Shows'
+		})} />);
+
+		expect(screen.getByRole('button', {name: 'Back from Watchlist Shows'})).toBeTruthy();
+		expect(screen.getByText('Watchlist Shows')).toBeTruthy();
+	});
+
 	it('uses the Elegant right-side Search slot for a Cast action', () => {
 		const handleNavigateSyncPlay = jest.fn();
 		render(<ToolbarElegantLayout {...buildElegantProps({handleNavigateSyncPlay})} />);

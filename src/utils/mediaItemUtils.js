@@ -4,6 +4,14 @@ const canBuildImageUrl = () => {
 	return Boolean(jellyfinService?.serverUrl && jellyfinService?.accessToken);
 };
 
+const getJellyfinImageItemId = (item) => {
+	if (!item) return null;
+	if (item.IsDiscoveryItem === true) {
+		return item.JellyfinImageItemId || item.JellyfinItemId || null;
+	}
+	return item.Id || null;
+};
+
 const buildPrimaryImageUrl = (itemId, {maxWidth = 400, tag, quality, blur} = {}) => {
 	if (!itemId || !canBuildImageUrl()) return null;
 	return jellyfinService.getImageUrl(itemId, 'Primary', maxWidth, {tag, quality, blur});
@@ -99,6 +107,8 @@ export const getPosterCardImageUrls = (item, {
 	quality = 78
 } = {}) => {
 	if (!item || !canBuildImageUrl()) return [];
+	const imageItemId = getJellyfinImageItemId(item);
+	if (!imageItemId) return [];
 	const candidates = [];
 	const addCandidate = (url) => {
 		if (url) candidates.push(url);
@@ -106,18 +116,18 @@ export const getPosterCardImageUrls = (item, {
 
 	if (item.Type === 'Person') {
 		if (item.PrimaryImageTag) {
-			addCandidate(buildPrimaryImageUrl(item.Id, {
+			addCandidate(buildPrimaryImageUrl(imageItemId, {
 				maxWidth: personMaxWidth,
 				tag: item.PrimaryImageTag,
 				quality
 			}));
 		}
-		addCandidate(buildPrimaryImageUrl(item.Id, {maxWidth: personMaxWidth, quality}));
+		addCandidate(buildPrimaryImageUrl(imageItemId, {maxWidth: personMaxWidth, quality}));
 		return uniqueImageCandidates(candidates);
 	}
 
 	if (item?.ImageTags?.Primary) {
-		addCandidate(buildPrimaryImageUrl(item.Id, {
+		addCandidate(buildPrimaryImageUrl(imageItemId, {
 			maxWidth,
 			tag: item.ImageTags.Primary,
 			quality
@@ -125,7 +135,7 @@ export const getPosterCardImageUrls = (item, {
 	}
 
 	if (includeBackdrop && Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
-		addCandidate(buildBackdropImageUrl(item.Id, {
+		addCandidate(buildBackdropImageUrl(imageItemId, {
 			maxWidth,
 			index: 0,
 			tag: item.BackdropImageTags[0],
@@ -141,7 +151,7 @@ export const getPosterCardImageUrls = (item, {
 		}));
 	}
 
-	addCandidate(buildPrimaryImageUrl(item.Id, {maxWidth, quality}));
+	addCandidate(buildPrimaryImageUrl(imageItemId, {maxWidth, quality}));
 	return uniqueImageCandidates(candidates);
 };
 
@@ -155,6 +165,8 @@ export const getLandscapeCardImageUrls = (item, {
 	quality = 76
 } = {}) => {
 	if (!item || !canBuildImageUrl()) return [];
+	const imageItemId = getJellyfinImageItemId(item);
+	if (!imageItemId) return [];
 	const candidates = [];
 	const addCandidate = (url) => {
 		if (url) candidates.push(url);
@@ -162,14 +174,14 @@ export const getLandscapeCardImageUrls = (item, {
 
 	// Prefer episode primary art first for episode-heavy rows.
 	if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
-		addCandidate(jellyfinService.getImageUrl(item.Id, 'Primary', width, {
+		addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
 			tag: item.ImageTags.Primary,
 			quality
 		}));
 	}
 
 	if (Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
-		addCandidate(jellyfinService.getBackdropUrl(item.Id, 0, width, {
+		addCandidate(jellyfinService.getBackdropUrl(imageItemId, 0, width, {
 			tag: item.BackdropImageTags[0],
 			quality
 		}));
@@ -184,7 +196,7 @@ export const getLandscapeCardImageUrls = (item, {
 	}
 
 	if (item?.Type !== 'Episode' && item?.ImageTags?.Primary) {
-		addCandidate(jellyfinService.getImageUrl(item.Id, 'Primary', width, {
+		addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
 			tag: item.ImageTags.Primary,
 			quality
 		}));
@@ -197,7 +209,7 @@ export const getLandscapeCardImageUrls = (item, {
 		}));
 	}
 
-	addCandidate(jellyfinService.getImageUrl(item.Id, 'Primary', width, {quality}));
+	addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {quality}));
 	return uniqueImageCandidates(candidates);
 };
 
@@ -211,6 +223,8 @@ export const getMediaPanelBackdropUrls = (item, {
 	blur
 } = {}) => {
 	if (!item || !canBuildImageUrl()) return [];
+	const imageItemId = getJellyfinImageItemId(item);
+	if (!imageItemId) return [];
 
 	const candidates = [];
 	const addCandidate = (url) => {
@@ -221,17 +235,17 @@ export const getMediaPanelBackdropUrls = (item, {
 	const parentBackdropItemId = item?.ParentBackdropItemId || item?.SeriesId;
 
 	const imageOptions = {quality, blur};
-	addCandidate(jellyfinService.getBackdropUrl(item.Id, 0, width, {...imageOptions, tag: ownBackdropTag}));
+	addCandidate(jellyfinService.getBackdropUrl(imageItemId, 0, width, {...imageOptions, tag: ownBackdropTag}));
 	if (parentBackdropItemId) {
 		addCandidate(jellyfinService.getBackdropUrl(parentBackdropItemId, 0, width, {...imageOptions, tag: parentBackdropTag}));
 	}
 	if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
-		addCandidate(jellyfinService.getImageUrl(item.Id, 'Primary', width, {
+		addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
 			...imageOptions,
 			tag: item.ImageTags.Primary
 		}));
 	}
-	addCandidate(jellyfinService.getImageUrl(item.Id, 'Primary', width, {
+	addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
 		...imageOptions,
 		tag: item?.ImageTags?.Primary || item?.PrimaryImageTag
 	}));

@@ -204,4 +204,34 @@ describe('mediaItemUtils landscape artwork', () => {
 			'untagged-primary-url'
 		]);
 	});
+
+	it('does not treat provider-only discovery IDs as Jellyfin image IDs', () => {
+		const item = {
+			Id: 'movie:provider:123',
+			Type: 'Movie',
+			IsDiscoveryItem: true,
+			JellyfinItemId: null
+		};
+
+		expect(getLandscapeCardImageUrls(item)).toEqual([]);
+		expect(getMediaPanelBackdropUrls(item)).toEqual([]);
+		expect(jellyfinService.getBackdropUrl).not.toHaveBeenCalled();
+		expect(jellyfinService.getImageUrl).not.toHaveBeenCalled();
+	});
+
+	it('uses the linked Jellyfin item ID for discovery image fallbacks', () => {
+		jellyfinService.getBackdropUrl.mockImplementation((id) => `backdrop:${id}`);
+		jellyfinService.getImageUrl.mockImplementation((id) => `primary:${id}`);
+		const item = {
+			Id: 'movie:provider:123',
+			Type: 'Movie',
+			IsDiscoveryItem: true,
+			JellyfinItemId: 'jellyfin-movie-123'
+		};
+
+		expect(getMediaPanelBackdropUrls(item)).toEqual([
+			'backdrop:jellyfin-movie-123',
+			'primary:jellyfin-movie-123'
+		]);
+	});
 });

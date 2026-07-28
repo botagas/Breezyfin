@@ -3,6 +3,7 @@ import Heading from '@enact/sandstone/Heading';
 import Icon from '@enact/sandstone/Icon';
 import BodyText from '@enact/sandstone/BodyText';
 import Spottable from '@enact/spotlight/Spottable';
+import {buildMediaListItemKey} from '../../../utils/reactKeys';
 import css from '../../MediaDetailsPanel.module.less';
 
 const SpottableDiv = Spottable('div');
@@ -21,7 +22,9 @@ const MediaCastSection = ({
 }) => {
 	const castList = Array.isArray(cast) ? cast : [];
 	const [loadedCastImageKeys, setLoadedCastImageKeys] = useState(() => new Set());
-	const castKeysSignature = castList.map((person) => String(person?.Id || person?.Name || '?')).join('|');
+	const castKeysSignature = castList
+		.map((person, index) => buildMediaListItemKey('cast', person, index))
+		.join('|');
 
 	useEffect(() => {
 		setLoadedCastImageKeys(new Set());
@@ -61,8 +64,8 @@ const MediaCastSection = ({
 			{!isCastCollapsed && (
 				<div className={css.castScroller} ref={castScrollerRef}>
 					<div className={css.castRow} ref={castRowRef}>
-						{castList.map((person) => {
-							const personKey = String(person?.Id || person?.Name || '?');
+						{castList.map((person, index) => {
+							const personKey = buildMediaListItemKey('cast', person, index);
 							const imageLoaded = loadedCastImageKeys.has(personKey);
 							return (
 								<SpottableDiv

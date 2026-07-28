@@ -58,6 +58,7 @@ const IntegrationPanelLayout = ({
 			<Toolbar
 				activeSection={activeSection}
 				isActive={isActive}
+				panelTitle={title}
 				onNavigateDown={handleNavigateDown}
 				{...toolbarActions}
 			/>

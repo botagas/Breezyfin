@@ -45,7 +45,9 @@ const Toolbar = ({
 	onSwitchUser,
 	onLogout,
 	onExit,
-	onNavigateDown
+	onNavigateDown,
+	onBack,
+	panelTitle = ''
 }) => {
 	const runtimeSuspended = useRuntimeSuspended();
 	const [libraries, setLibraries] = useState([]);
@@ -87,6 +89,7 @@ const Toolbar = ({
 	].join(', ')), []);
 	usePopupInitialFocus(showLibrariesPopup, librariesPopupContentRef);
 	const elegantPanelTitle = useMemo(() => {
+		if (panelTitle) return panelTitle;
 		if (isHomeSection) return '';
 		if (activeSection === 'library') {
 			return librariesById.get(String(activeLibraryId))?.Name || 'Library';
@@ -99,7 +102,7 @@ const Toolbar = ({
 		if (activeSection === 'watchParty') return 'Watch Party';
 		if (activeSection === 'settings') return 'Settings';
 		return activeSection ? activeSection.charAt(0).toUpperCase() + activeSection.slice(1) : '';
-	}, [activeLibraryId, activeSection, isHomeSection, librariesById]);
+	}, [activeLibraryId, activeSection, isHomeSection, librariesById, panelTitle]);
 
 	const applyToolbarThemeFromSettings = useCallback((settingsPayload) => {
 		const nextTheme = settingsPayload?.navbarTheme;
@@ -301,6 +304,7 @@ const Toolbar = ({
 	}, [onNavigate]);
 
 	const handleClassicBack = useCallback(() => {
+		if (onBack?.() === true) return;
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		// Keep Home safe from accidental exit prompts via toolbar click.
@@ -308,7 +312,7 @@ const Toolbar = ({
 		if (typeof window !== 'undefined' && typeof window.history?.back === 'function') {
 			window.history.back();
 		}
-	}, [activeSection, closeDisclosure]);
+	}, [activeSection, closeDisclosure, onBack]);
 
 	const handleNavigateFavorites = useCallback(() => {
 		onNavigate('favorites');
@@ -335,10 +339,11 @@ const Toolbar = ({
 	}, [onNavigate]);
 
 	const handleElegantBack = useCallback(() => {
+		if (onBack?.() === true) return;
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
 		onNavigate('home');
-	}, [closeDisclosure, onNavigate]);
+	}, [closeDisclosure, onBack, onNavigate]);
 
 	const handleLibraryNavigate = useCallback((event) => {
 		const libraryId = event.currentTarget.dataset.libraryId;

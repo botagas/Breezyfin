@@ -24,7 +24,7 @@ import css from './WatchlistPanel.module.less';
 const SpottableDiv = Spottable('div');
 const PAGE_SIZE = 30;
 const PREVIEW_SIZE = 10;
-const INSIGHT_ITEM_SIZE = ri.scale(320);
+const INSIGHT_ITEM_SIZE = ri.scale(256);
 const VIRTUAL_TABS = Object.freeze(['progress', 'completed', 'movies']);
 const TABS = Object.freeze([
 	{id: 'watchlist', label: 'Watchlist'},

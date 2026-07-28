@@ -151,7 +151,7 @@ describe('WatchlistPanel advanced list layout', () => {
 		expect(virtualListProps).toEqual(expect.objectContaining({
 			id: 'watchlist-progress-list',
 			spotlightId: 'watchlist-progress-list',
-			itemSize: 320,
+			itemSize: 256,
 			snapToCenter: false
 		}));
 		expect(virtualListProps.overscrollEffectOn).toEqual({
@@ -255,7 +255,7 @@ describe('WatchlistPanel advanced list layout', () => {
 
 		const title = await screen.findByText(longTitle);
 		expect(title.className).toContain('insightTitle');
-		expect(virtualListProps.itemSize).toBe(320);
+		expect(virtualListProps.itemSize).toBe(256);
 	});
 
 	it('centers the native Watchlist empty state in its content viewport', async () => {

@@ -11,8 +11,8 @@ jest.mock('../AppScroller', () => function TestScroller({children}) {
 	return <div data-testid="app-scroller">{children}</div>;
 });
 
-jest.mock('../Toolbar', () => function TestToolbar() {
-	return <nav />;
+jest.mock('../Toolbar', () => function TestToolbar({panelTitle}) {
+	return <nav data-panel-title={panelTitle} />;
 });
 
 jest.mock('../BreezyLoadingOverlay', () => function TestLoading({label}) {
@@ -51,5 +51,6 @@ describe('IntegrationPanelLayout scroll ownership', () => {
 		expect(
 			screen.getByText('Virtual list content').closest('[data-bf-integration-panel-content="true"]')
 		).toBeTruthy();
+		expect(document.querySelector('nav').dataset.panelTitle).toBe('Watchlist');
 	});
 });

@@ -15,7 +15,7 @@ This guide covers shared UI components in `src/components/`.
 - Reuse `MediaFilterControls` for Library-like filter trigger/popup UI instead of duplicating filter popup markup in each panel.
 - Reuse `MediaBrowseControls` for browse input and filter-trigger surfaces, and wrap it in `MediaBrowseOverlay` so Search, Library, Home View More, and Favorites share the same overlay placement and reserved-results spacing.
 - Reuse `MediaVirtualGrid` for uniform Search, Favorites, Library, and Home View More result grids. Panels own server paging and cached query state; the wrapper owns Enact item metrics, mode-aware overhang, visible-index/focus prefetch, virtualization, stable item-ID restoration, no overscroll, and the shared non-scaling focus treatment.
-- Reuse `MediaPanelBackdrop` for media-driven panel atmosphere. Feed it a representative item and, where available, an explicit provider image URL; it tries low-resolution Jellyfin-preblurred backdrop/parent/primary candidates before the provider image fallback. Authenticated Breezyfin-plugin image URLs receive the same mode-aware width, quality, and server-blur contract. Normal and Performance retain preblurred artwork, while Performance+ uses an unblurred lower-opacity image.
+- Reuse `MediaPanelBackdrop` for media-driven panel atmosphere. Feed it a representative item and, where available, an explicit provider image URL; it tries low-resolution Jellyfin-preblurred backdrop/parent/primary candidates before the provider image fallback. Provider-only records must not use their synthetic provider ID for Jellyfin image requests; linked records use `JellyfinImageItemId`/`JellyfinItemId`. Authenticated Breezyfin-plugin image URLs receive the same mode-aware width, quality, and server-blur contract. Normal and Performance retain preblurred artwork, while Performance+ uses an unblurred lower-opacity image.
 - Reuse `IntegrationPanelLayout` for plugin/provider panels. It owns Toolbar-safe content
   insets, backdrop, loading/empty/error states, retry placement, and Toolbar DOWN entry;
   pass `scrollable={false}` when a child `VirtualList`/`VirtualGridList` owns the panel's
@@ -81,6 +81,7 @@ This guide covers shared UI components in `src/components/`.
   Sandstone shell directly. WatchParty actions are awaited, deduplicated while pending,
   and report asynchronous failures inside the popup.
 - Native SyncPlay is a Toolbar utility action, not a primary navigation tab. In Elegant it replaces the duplicate right-side Search icon with a Cast action when available while Search remains in the central pill; Classic keeps Search and places the Cast action with the right-side utilities.
+- The visible Toolbar Back action must run the same layered handler registered by `usePanelToolbarActions` before falling back to panel history/Home. `IntegrationPanelLayout` supplies its current title to the compact Toolbar so nested views such as Watchlist View More identify the layer that Back will close.
 - `SyncPlayGlobalOverlays` owns app-level queue-replacement consent and suspended-playback
   notifications. Popup actions run after `onHide` so Sandstone releases Spotlight before
   SyncPlay changes panel/player state. Both the decision popup and non-autofocusing

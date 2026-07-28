@@ -216,6 +216,7 @@ usePanelBackHandler(registerBackHandler, handler, { enabled = true })
   - `useToolbarActions` callback bundling
   - `useToolbarBackHandler` bridge
   - `usePanelBackHandler` layered back registration
+  - the visible Toolbar `onBack` action, so pointer/ENTER and remote Back use the same layer order
 - Signature:
 ```js
 usePanelToolbarActions({
@@ -299,7 +300,8 @@ useToolbarActions({
   onSwitchUser,
   onLogout,
   onExit,
-  registerBackHandler
+  registerBackHandler,
+  onBack
 })
 ```
 - Use when:

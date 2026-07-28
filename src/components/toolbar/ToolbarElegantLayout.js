@@ -90,7 +90,7 @@ const ToolbarElegantLayout = ({
 								<SpottableDiv
 									onClick={handleElegantBack}
 									className={`${css.iconButton} ${css.elegantBackButton}`}
-									aria-label={`Back to Home from ${elegantPanelTitle}`}
+									aria-label={`Back from ${elegantPanelTitle}`}
 									spotlightId="toolbar-back"
 								>
 									<Icon style={{'--icon-size': '1rem'}}>arrowsmallleft</Icon>

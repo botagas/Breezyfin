@@ -5,13 +5,15 @@ export const useToolbarActions = ({
 	onSwitchUser,
 	onLogout,
 	onExit,
-	registerBackHandler
+	registerBackHandler,
+	onBack
 }) => {
 	return useMemo(() => ({
 		onNavigate,
 		onSwitchUser,
 		onLogout,
 		onExit,
-		registerBackHandler
-	}), [onExit, onLogout, onNavigate, onSwitchUser, registerBackHandler]);
+		registerBackHandler,
+		onBack
+	}), [onBack, onExit, onLogout, onNavigate, onSwitchUser, registerBackHandler]);
 };
