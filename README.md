@@ -25,9 +25,6 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 
 ## Current capabilities
 
-> [!NOTE]
-> If you face difficulties after major updates, it is advised to run **Wipe Cache and Reload (Keep Login)** once and then report the issues if they persist.
-
 - Multi-server, multi-user saved sessions with quick account switching
 - Session restore on startup, with automatic redirect to Login when token/session is expired
 - TV-first navigation tuned for LG Magic Remote (5-way and pointer flows)
@@ -44,6 +41,9 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Built-in diagnostics, logs, and cache tools for easier troubleshooting
 
 ## Install on TV (IPK)
+
+> [!NOTE]
+> If you're facing difficulties after a major update, consider clearing the cache in **Settings -> Diagnostics** once before reporting the issue.
 
 Watch repository releases for prebuilt IPK artifacts.
 
