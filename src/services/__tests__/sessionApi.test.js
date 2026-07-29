@@ -58,6 +58,7 @@ describe('sessionApi', () => {
 		jest.clearAllMocks();
 		localStorage.clear();
 		global.fetch = jest.fn();
+		serverManager.setActiveServer.mockReturnValue({id: 'srv-1'});
 		errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 	});
@@ -98,7 +99,7 @@ describe('sessionApi', () => {
 		expect(global.fetch).toHaveBeenCalledWith('http://server.local/System/Info/Public');
 	});
 
-	it('authenticates with resolved version/device metadata and persists legacy session payload', async () => {
+	it('authenticates with resolved version/device metadata without retaining legacy storage', async () => {
 		const service = createService();
 		service.serverUrl = 'http://server.local';
 		service.api = {};
@@ -117,6 +118,11 @@ describe('sessionApi', () => {
 				ServerName: 'Living Room'
 			})
 		);
+		localStorage.setItem('jellyfinAuth', JSON.stringify({
+			serverUrl: 'http://legacy.local',
+			accessToken: 'legacy-token',
+			userId: 'legacy-user'
+		}));
 
 		await expect(authenticateWithServer(service, 'Alice', 'secret')).resolves.toEqual({
 			Id: 'user-1',
@@ -139,11 +145,7 @@ describe('sessionApi', () => {
 			avatarTag: 'avatar-1'
 		}));
 		expect(serverManager.setActiveServer).toHaveBeenCalledWith('srv-1', 'user-1');
-		expect(localStorage.getItem('jellyfinAuth')).toBe(JSON.stringify({
-			serverUrl: 'http://server.local',
-			accessToken: 'token-1',
-			userId: 'user-1'
-		}));
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
 	});
 
 	it('submits an empty password when authenticating a passwordless user', async () => {
@@ -175,6 +177,11 @@ describe('sessionApi', () => {
 
 	it('restores active session from server manager before legacy storage', () => {
 		const service = createService();
+		localStorage.setItem('jellyfinAuth', JSON.stringify({
+			serverUrl: 'http://legacy.local',
+			accessToken: 'legacy-token',
+			userId: 'legacy-user'
+		}));
 		serverManager.getActiveServer.mockReturnValue({
 			url: 'http://active.local',
 			name: 'Active',
@@ -191,6 +198,24 @@ describe('sessionApi', () => {
 		expect(service.serverUrl).toBe('http://active.local');
 		expect(service.userId).toBe('user-1');
 		expect(service.jellyfin.createApi).toHaveBeenCalledWith('http://active.local', 'token-1');
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
+	});
+
+	it('retains a valid legacy session when managed migration cannot be confirmed', () => {
+		const service = createService();
+		const legacySession = JSON.stringify({
+			serverUrl: 'http://legacy.local',
+			accessToken: 'legacy-token',
+			userId: 'legacy-user'
+		});
+		serverManager.getActiveServer.mockReturnValue(null);
+		serverManager.addServer.mockReturnValue(null);
+		localStorage.setItem('jellyfinAuth', legacySession);
+
+		expect(restoreServiceSession(service)).toBe(true);
+		expect(localStorage.getItem('jellyfinAuth')).toBe(legacySession);
+		expect(serverManager.setActiveServer).not.toHaveBeenCalled();
+		expect(service.jellyfin.createApi).toHaveBeenCalledWith('http://legacy.local', 'legacy-token');
 	});
 
 	it('removes malformed legacy payload when active session is unavailable', () => {

@@ -60,6 +60,7 @@ describe('jellyfinService', () => {
 		localStorage.clear();
 		resetServiceState();
 		global.fetch = jest.fn();
+		serverManager.setActiveServer.mockReturnValue({id: 'srv1'});
 		errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 	});
@@ -149,6 +150,11 @@ describe('jellyfinService', () => {
 	it('authenticates and persists active session', async () => {
 		jellyfinService.serverUrl = 'http://media.local';
 		jellyfinService.api = {};
+		localStorage.setItem('jellyfinAuth', JSON.stringify({
+			serverUrl: 'http://legacy.local',
+			accessToken: 'legacy-token',
+			userId: 'legacy-user'
+		}));
 		const resolveClientVersionSpy = jest.spyOn(jellyfinService, 'resolveClientVersion').mockResolvedValue('9.9.9');
 		const getClientVersionSpy = jest.spyOn(jellyfinService, 'getClientVersion').mockReturnValue('9.9.9');
 		serverManager.addServer.mockReturnValue({serverId: 'srv1', userId: 'user1'});
@@ -193,13 +199,7 @@ describe('jellyfinService', () => {
 				})
 			);
 			expect(serverManager.setActiveServer).toHaveBeenCalledWith('srv1', 'user1');
-
-			const savedAuth = JSON.parse(localStorage.getItem('jellyfinAuth'));
-			expect(savedAuth).toEqual({
-				serverUrl: 'http://media.local',
-				accessToken: 'token-123',
-				userId: 'user1'
-			});
+			expect(localStorage.getItem('jellyfinAuth')).toBe(null);
 		} finally {
 			resolveClientVersionSpy.mockRestore();
 			getClientVersionSpy.mockRestore();
@@ -255,6 +255,7 @@ describe('jellyfinService', () => {
 			})
 		);
 		expect(serverManager.setActiveServer).toHaveBeenCalledWith('legacy-srv', 'legacy-user');
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
 	});
 
 	it('clears malformed legacy jellyfinAuth payload and does not restore session', () => {

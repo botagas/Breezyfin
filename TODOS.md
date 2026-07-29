@@ -13,12 +13,25 @@ Rules:
 
 Expected scope: minimal corrective improvements, UI/UX changes, etc.
 
-- None.
+- Remove the deprecated `jellyfinAuth` read-and-migrate path no earlier than `0.4.0`,
+  after the managed `breezyfin_servers` migration has shipped for multiple release
+  cycles. Before removal, document that users upgrading directly from older releases
+  may need to sign in again and verify logout, switch-user, cache clearing, and
+  multi-server restoration remain correct.
 
 ## Medium changes / issues
 
 Expected scope: bounded work spanning a small number of services, scripts, tests, or UI surfaces.
 
+- Add a bundled, versioned announcement Popup for important release notices. Store
+  dismissed announcement IDs rather than only a last-seen version, present one notice
+  at a time after authenticated session restoration on a normal browsing panel, and
+  defer while Login, Player, crash recovery, or another blocking Popup owns focus.
+  Reuse the shared popup surface, action button, first-focus, and `onHide` lifecycle.
+  Keep credential-invalidating migrations on a dedicated non-dismissible migration
+  flow rather than using general announcements.
+- Implement an update service reusing the announcement system, which would check if an update is 
+  available and would show the changelog for versions that are newer than the one the client is running at the moment.
 - Add an opt-in, non-blocking `test:demo` integration smoke suite against the controlled
   Jellyfin/plugin development container. Cover public server discovery, passwordless or
   configured authentication, bounded library paging, image delivery, PlaybackInfo
@@ -43,14 +56,19 @@ Expected scope: architectural work, a new feature surface, or changes spanning s
   to plan incremental decomposition of the largest current hotspots, especially
   `subtitleRenderer`, `App`, `playbackApi` / `playbackSelection`, and Media Details
   focus/interaction hooks. Metric growth alone must not block otherwise correct work.
-- Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
-- After the bounded placement slice passes TV validation, define the next Breezyfin Lightweight ASS/SSA compatibility slice. Candidate gaps are advanced collision behavior, arbitrary text vector masks, mixed inline `\org` transforms, advanced vertical layout/collision behavior, and transform/vector edge cases; avoid pursuing full libass parity without representative files and real-TV performance evidence.
-- Add VobSub/DVD subtitle delivery and client-rendering support if the Jellyfin raw subtitle endpoints and bitmap renderer libraries provide a reliable path. Keep unsupported image formats on the existing consent-gated burn-in/no-subtitle fallback flow.
-- Expand staged panel loading reveal beyond Media Details (background -> branding -> full UI) with data-ready gating so reveal only starts after panel content is loaded.
+- Add in-app settings help/details UI so users can understand what each option does, expected side 
+  effects, and recommended usage.
+- After the bounded placement slice passes TV validation, define the next Breezyfin Lightweight ASS/
+  SSA compatibility slice. Candidate gaps are advanced collision behavior, arbitrary text vector masks, mixed inline `\org` transforms, advanced vertical layout/collision behavior, and transform/vector edge cases; avoid pursuing full libass parity without representative files and real-TV performance evidence.
+- Add VobSub/DVD subtitle delivery and client-rendering support if the Jellyfin raw subtitle endpoints 
+  and bitmap renderer libraries provide a reliable path. Keep unsupported image formats on the existing consent-gated burn-in/no-subtitle fallback flow.
+- Expand staged panel loading reveal beyond Media Details (background -> branding -> full UI) with 
+  data-ready gating so reveal only starts after panel content is loaded.
 - Set up a GitHub Pages demo backed by a safe, maintainable demo Jellyfin environment.
 - Add advanced SyncPlay queue management after the core coordinator is validated on TV:
   queue editing/reordering, repeat, shuffle, and host-oriented queue controls.
-- Consider adding Seerr-backed `Plan to Watch` Watchlist feature only as a distinct request-planning surface; do not merge it with the native Jellyfin Likes Watchlist source.
+- Consider adding Seerr-backed `Plan to Watch` Watchlist feature only as a distinct request-planning 
+  surface; do not merge it with the native Jellyfin Likes Watchlist source.
 - Add authenticated Seerr Request action to `ProviderItemPopup`.
   Keep compact Discovery feed loading paged and fetch bounded enriched details only
   when the popup opens; do not add one upstream detail request per Home card.  
@@ -65,14 +83,18 @@ Expected scope: unknown until profiling, API research, dependency analysis, or r
   smaller positioned signs. Compare authored font availability/fallback, webOS text
   rasterization, device-pixel scaling, and bounded shadow/stroke alternatives without
   regressing line wrapping, source colors, or TV performance.
-- Evaluate Enact 5, Limestone, and React 19 only when Breezyfin can raise its minimum webOS requirement or maintain separate legacy and modern builds. Include Enact CLI/toolchain advisories in that isolated investigation; do not mix it into Enact 4/React 18 release maintenance.
-- Investigate server discovery for manual login, including SSDP/webOS constraints and fallback discovery approaches when multicast is unavailable through VPNs or segmented networks.
-- Investigate a proper navbar/search scroll-under overlay using Enact-supported layout and virtual-list insets. Avoid negative-margin, transform, or duplicated-scroll workarounds.
+- Evaluate Enact 5, Limestone, and React 19 only when Breezyfin can raise its minimum webOS 
+  requirement or maintain separate legacy and modern builds. Include Enact CLI/toolchain advisories in that isolated investigation; do not mix it into Enact 4/React 18 release maintenance.
+- Investigate server discovery for manual login, including SSDP/webOS constraints and fallback 
+  discovery approaches when multicast is unavailable through VPNs or segmented networks.
+- Investigate a proper navbar/search scroll-under overlay using Enact-supported layout and 
+  virtual-list insets. Avoid negative-margin, transform, or duplicated-scroll workarounds.
 - Investigate Jellyfin Plugin Pages support for the Breezyfin plugin. Confirm the
   supported server-version registration and authorization model, then decide which
   configuration/status pages belong in Jellyfin without coupling the TV client to
   injected scripts or making Plugin Pages a prerequisite for REST capabilities.
-- Consider a detailed Discovery pop-up, which would include an image on the left and the title at the top of the pop-up. The image could be an image gallery. Different images could be viewed using left/right focusable buttons which would be rendered inside the image. Limit to 3 images at most. Do not display as image gallery if only 1 image is available. If no image is available, then the right content would take up the space of the image as well. The rest of the existing content would be on the right. Discovery pop-up's title should be the title of the movie/show. If it's a show, it should allow selecting seasons to request (if multiple are available). 
+- Consider a detailed Discovery pop-up, which would include an image on the left and the title at the 
+  top of the pop-up. The image could be an image gallery. Different images could be viewed using left/right focusable buttons which would be rendered inside the image. Limit to 3 images at most. Do not display as image gallery if only 1 image is available. If no image is available, then the right content would take up the space of the image as well. The rest of the existing content would be on the right. Discovery pop-up's title should be the title of the movie/show. If it's a show, it should allow selecting seasons to request (if multiple are available). 
 
 
 ## Deferred compatibility work

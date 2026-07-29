@@ -97,11 +97,6 @@ export const authenticateWithServer = async (service, username, password) => {
 			service.sessionExpiredNotified = false;
 
 			service.api.accessToken = service.accessToken;
-			localStorage.setItem(LEGACY_AUTH_KEY, JSON.stringify({
-				serverUrl: service.serverUrl,
-				accessToken: service.accessToken,
-				userId: service.userId
-			}));
 
 			const saved = serverManager.addServer({
 				serverUrl: service.serverUrl,
@@ -112,7 +107,10 @@ export const authenticateWithServer = async (service, username, password) => {
 				avatarTag: data.User?.PrimaryImageTag || null
 			});
 			if (saved) {
-				serverManager.setActiveServer(saved.serverId, saved.userId);
+				const active = serverManager.setActiveServer(saved.serverId, saved.userId);
+				if (active) {
+					localStorage.removeItem(LEGACY_AUTH_KEY);
+				}
 			}
 
 			return data.User;
@@ -126,6 +124,7 @@ export const authenticateWithServer = async (service, username, password) => {
 export const restoreServiceSession = (service, serverId = null, userId = null) => {
 	const active = serverManager.getActiveServer(serverId, userId);
 	if (active && active.activeUser) {
+		localStorage.removeItem(LEGACY_AUTH_KEY);
 		return applySessionFromStore(service, {
 			url: active.url,
 			accessToken: active.activeUser.accessToken,
@@ -164,7 +163,10 @@ export const restoreServiceSession = (service, serverId = null, userId = null) =
 			avatarTag: null
 		});
 		if (saved) {
-			serverManager.setActiveServer(saved.serverId, saved.userId);
+			const activeSession = serverManager.setActiveServer(saved.serverId, saved.userId);
+			if (activeSession) {
+				localStorage.removeItem(LEGACY_AUTH_KEY);
+			}
 		}
 		return true;
 	}
