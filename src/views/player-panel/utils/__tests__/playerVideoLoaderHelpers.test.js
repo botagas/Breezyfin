@@ -1,7 +1,6 @@
 import {
 	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
-	getPlaybackStartupFailureMessage,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
 	selectHlsEnginePreference
@@ -88,6 +87,24 @@ describe('playerVideoLoaderHelpers', () => {
 		expect(selection).toEqual({
 			selectedAudio: 1,
 			selectedSubtitle: 3
+		});
+	});
+
+	it('uses PlaybackInfo-selected tracks as the authoritative runtime selection', () => {
+		const selection = resolveInitialTrackSelection({
+			audioStreams: [{Index: 1}, {Index: 7}],
+			subtitleStreams: [{Index: 2}, {Index: 8}],
+			playbackOverride: {audioStreamIndex: 1, subtitleStreamIndex: 2},
+			negotiatedAudioStreamIndex: 7,
+			negotiatedSubtitleStreamIndex: 8,
+			clientRenderedSubtitleStreamIndex: 8,
+			pickPreferredAudio: () => 1,
+			pickPreferredSubtitle: () => 2
+		});
+
+		expect(selection).toEqual({
+			selectedAudio: 7,
+			selectedSubtitle: 8
 		});
 	});
 
@@ -287,21 +304,4 @@ describe('playerVideoLoaderHelpers', () => {
 		});
 	});
 
-	it.each([
-		['DV', 'Dolby Vision'],
-		['HDR10', 'HDR'],
-		['HDR10_PLUS', 'HDR'],
-		['HLG', 'HDR']
-	])('explains runtime startup failures for %s streams', (id, expectedLabel) => {
-		expect(getPlaybackStartupFailureMessage({id})).toContain(
-			`${expectedLabel} playback did not become ready`
-		);
-		expect(getPlaybackStartupFailureMessage({id})).toContain('test on TV hardware');
-	});
-
-	it('keeps the generic startup failure for SDR playback', () => {
-		expect(getPlaybackStartupFailureMessage({id: 'SDR'})).toBe(
-			'Playback failed after session rebuild attempt. Please retry or go back.'
-		);
-	});
 });

@@ -1121,6 +1121,8 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			playMethod,
 			selectedSource,
 			selectedAudioStreamIndex: requestedAudioStreamIndex,
+			selectedSubtitleStreamIndex,
+			clientRenderedSubtitleStreamIndex,
 			adjustments,
 			dynamicRange,
 			dynamicRangeCap,

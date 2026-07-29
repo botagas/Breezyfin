@@ -1,11 +1,3 @@
-jest.mock('../../../../services/jellyfinService', () => ({
-	__esModule: true,
-	default: {
-		reportPlaybackStart: jest.fn(),
-		reportPlaybackProgress: jest.fn()
-	}
-}));
-
 import {act, renderHook} from '@testing-library/react';
 import {SyncPlayProvider} from '../../../../contexts/SyncPlayContext';
 import {usePlayerEpisodeAndSurfaceHandlers} from '../usePlayerEpisodeAndSurfaceHandlers';
@@ -52,8 +44,7 @@ const createPlaybackProps = (overrides = {}) => ({
 	playbackSettingsRef: {current: {autoPlayNext: true}},
 	videoRef: {current: null},
 	handleStop: jest.fn().mockResolvedValue(undefined),
-	getPlaybackSessionContext: jest.fn(() => ({})),
-	startProgressReporting: jest.fn(),
+	reportPlaybackProgressNow: jest.fn(),
 	setPlaying: jest.fn(),
 	setShowControls: jest.fn(),
 	setError: jest.fn(),

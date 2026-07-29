@@ -12,14 +12,17 @@ import {
 import {
 	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
-	getPlaybackStartupFailureMessage,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
 	selectHlsEnginePreference
 } from '../utils/playerVideoLoaderHelpers';
-import {createPlaybackRuntimeContext} from '../utils/playbackRuntimeContext';
+import {
+	createNativePlaybackSourceToken,
+	createPlaybackRuntimeContext
+} from '../utils/playbackRuntimeContext';
 
 const NATIVE_HLS_HDR_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
+const MAX_VIDEO_MOUNT_RETRIES = 20;
 
 const normalizeToastText = (value) => (
 	String(value || '')
@@ -83,47 +86,62 @@ export const usePlayerVideoLoader = ({
 	pickPreferredSubtitle,
 	setCurrentAudioTrack,
 	setCurrentSubtitleTrack,
-	startupFallbackTimerRef,
-	attemptTranscodeFallback,
 	attachHlsPlayback,
 	pendingOverrideClearRef,
 	showPlaybackError,
-	startWatchTimerRef,
-	playing,
-	attemptPlaybackSessionRebuild,
-	playbackFailureLockedRef,
-	failStartTimerRef,
 	playbackSessionRef,
 	appendPlaybackDiagnostic,
 	requestPlaybackDecision,
 	exitInProgressRef,
 	playbackGenerationRef,
 	playbackRuntimeContextRef,
+	nativeSourceTokenRef,
+	videoMountRetryTimerRef,
+	onPlaybackSourceAttached,
+	onPlaybackSourceInvalidated,
 	setPlaybackGeneration
 }) => {
-	const loadVideo = useCallback(async (forceTranscodeOverride = false) => {
+	const loadVideo = useCallback(async (forceTranscodeOverride = false, mountRetry = null) => {
 		if (!item || exitInProgressRef.current) return;
 
-		const requestId = (loadRequestIdRef.current || 0) + 1;
-		loadRequestIdRef.current = requestId;
+		const isMountRetry = Number.isInteger(mountRetry?.requestId);
+		const requestId = isMountRetry
+			? mountRetry.requestId
+			: (loadRequestIdRef.current || 0) + 1;
+		if (!isMountRetry) {
+			loadRequestIdRef.current = requestId;
+			if (videoMountRetryTimerRef.current) {
+				clearTimeout(videoMountRetryTimerRef.current);
+				videoMountRetryTimerRef.current = null;
+			}
+		}
+		if (!videoRef.current) {
+			const attempt = Number(mountRetry?.attempt) || 0;
+			if (loadRequestIdRef.current !== requestId || exitInProgressRef.current) return;
+			if (attempt >= MAX_VIDEO_MOUNT_RETRIES) {
+				showPlaybackError('The video surface was not available. Please retry.', {detachMedia: true});
+				return;
+			}
+			videoMountRetryTimerRef.current = setTimeout(() => {
+				videoMountRetryTimerRef.current = null;
+				if (loadRequestIdRef.current === requestId && !exitInProgressRef.current) {
+					loadVideo(forceTranscodeOverride, {requestId, attempt: attempt + 1});
+				}
+			}, 100);
+			return;
+		}
+
 		const generation = (playbackGenerationRef.current || 0) + 1;
 		playbackGenerationRef.current = generation;
 		playbackRuntimeContextRef.current = null;
+		nativeSourceTokenRef.current = null;
+		onPlaybackSourceInvalidated?.();
 		setPlaybackGeneration(generation);
 		const isStaleLoad = () => (
 			exitInProgressRef.current ||
 			loadRequestIdRef.current !== requestId ||
 			playbackGenerationRef.current !== generation
 		);
-
-		if (!videoRef.current) {
-			setTimeout(() => {
-				if (!isStaleLoad()) {
-					loadVideo(forceTranscodeOverride);
-				}
-			}, 100);
-			return;
-		}
 
 		resetRecoveryGuards();
 		playbackStartedRef.current = false;
@@ -258,6 +276,9 @@ export const usePlayerVideoLoader = ({
 				subtitleStreams,
 				playbackOptions,
 				playbackOverride: playbackOverrideRef.current,
+				negotiatedAudioStreamIndex: playbackMeta.selectedAudioStreamIndex,
+				negotiatedSubtitleStreamIndex: playbackMeta.selectedSubtitleStreamIndex,
+				clientRenderedSubtitleStreamIndex: playbackMeta.clientRenderedSubtitleStreamIndex,
 				pickPreferredAudio,
 				pickPreferredSubtitle
 			});
@@ -302,8 +323,7 @@ export const usePlayerVideoLoader = ({
 
 			const {
 				videoUrl,
-				isHls,
-				useTranscoding
+				isHls
 			} = resolvePlaybackVideoUrl({
 				service: jellyfinService,
 				itemId: item.Id,
@@ -352,21 +372,29 @@ export const usePlayerVideoLoader = ({
 			}
 			if (isStaleLoad()) return;
 
-			if (!useTranscoding && mediaSource.SupportsTranscoding) {
-				if (startupFallbackTimerRef.current) {
-					clearTimeout(startupFallbackTimerRef.current);
-				}
-				startupFallbackTimerRef.current = setTimeout(() => {
-					if (isStaleLoad()) return;
-					console.warn('[Player] Direct playback startup timeout, attempting transcode fallback');
-					attemptTranscodeFallback('Startup timeout');
-				}, 12000);
-			}
-
+			let activeSourceToken = null;
+			const registerSource = (engine) => {
+				const sourceToken = createNativePlaybackSourceToken({
+					runtimeContext: playbackRuntimeContext,
+					video,
+					sourceUrl: videoUrl,
+					engine
+				});
+				activeSourceToken = sourceToken;
+				nativeSourceTokenRef.current = sourceToken;
+				onPlaybackSourceAttached?.(sourceToken);
+				return sourceToken;
+			};
 			if (isHls) {
+				const nativeHlsMimeResults = {
+					'application/vnd.apple.mpegURL':
+						video.canPlayType('application/vnd.apple.mpegURL'),
+					'application/x-mpegURL':
+						video.canPlayType('application/x-mpegURL')
+				};
 				const nativeHlsSupported = Boolean(
-					video.canPlayType('application/vnd.apple.mpegURL') ||
-					video.canPlayType('application/x-mpegURL')
+					nativeHlsMimeResults['application/vnd.apple.mpegURL'] ||
+					nativeHlsMimeResults['application/x-mpegURL']
 				);
 				const hlsJsSupported = Hls.isSupported();
 				const hlsPreference = selectHlsEnginePreference({
@@ -382,7 +410,7 @@ export const usePlayerVideoLoader = ({
 						stage: 'select',
 						status: 'applied',
 						reason: hlsPreference.reason,
-						message: 'Using native HLS playback.'
+						message: `Using native HLS playback (${JSON.stringify(nativeHlsMimeResults)}).`
 					});
 
 					if (hlsPreference.allowNativeFallback) {
@@ -390,6 +418,7 @@ export const usePlayerVideoLoader = ({
 						let fallbackTimer = null;
 						let errorHandler = null;
 						let startupHandler = null;
+						const startupInitialTime = Number(video.currentTime) || 0;
 						const cleanupNativeFallback = () => {
 							if (fallbackTimer) {
 								clearTimeout(fallbackTimer);
@@ -399,8 +428,9 @@ export const usePlayerVideoLoader = ({
 								video.removeEventListener('error', errorHandler);
 							}
 							if (startupHandler) {
-								video.removeEventListener('loadeddata', startupHandler);
 								video.removeEventListener('canplay', startupHandler);
+								video.removeEventListener('playing', startupHandler);
+								video.removeEventListener('timeupdate', startupHandler);
 							}
 							if (nativeHlsFallbackCleanupRef?.current === cleanupNativeFallback) {
 								nativeHlsFallbackCleanupRef.current = null;
@@ -412,6 +442,10 @@ export const usePlayerVideoLoader = ({
 							if (fallbackTriggered || !hlsJsSupported || isStaleLoad()) return;
 							fallbackTriggered = true;
 							cleanupNativeFallback();
+							if (nativeSourceTokenRef.current === activeSourceToken) {
+								nativeSourceTokenRef.current = null;
+								onPlaybackSourceInvalidated?.();
+							}
 							hlsEngine = 'hls.js';
 							appendPlaybackDiagnostic?.({
 								scope: 'hls-engine',
@@ -424,6 +458,7 @@ export const usePlayerVideoLoader = ({
 							video.src = '';
 							video.removeAttribute('src');
 							attachHlsPlayback(video, videoUrl, 'HLS.js', playbackRuntimeContext);
+							registerSource('hls.js');
 							setMediaSourceData((previousValue) => ({
 								...(previousValue || mediaSource),
 								__debugHlsEngine: 'hls.js'
@@ -454,13 +489,17 @@ export const usePlayerVideoLoader = ({
 							});
 							tryHlsJsFallback('native-hls-error');
 						};
-						startupHandler = () => {
+						startupHandler = (event) => {
+							const hasProgress = event?.type !== 'timeupdate' ||
+								Math.abs((Number(video.currentTime) || 0) - startupInitialTime) >= 0.25;
+							if (!hasProgress) return;
 							cleanupNativeFallback();
 						};
 
 						video.addEventListener('error', errorHandler, {once: true});
-						video.addEventListener('loadeddata', startupHandler, {once: true});
 						video.addEventListener('canplay', startupHandler, {once: true});
+						video.addEventListener('playing', startupHandler, {once: true});
+						video.addEventListener('timeupdate', startupHandler);
 					}
 
 					video.src = videoUrl;
@@ -495,56 +534,11 @@ export const usePlayerVideoLoader = ({
 				__debugHlsEngine: isHls ? (hlsEngine || 'unknown') : null
 			}));
 
+			if (!activeSourceToken) {
+				registerSource(isHls ? (hlsEngine || 'unknown') : 'native');
+			}
 			video.load();
 			if (isStaleLoad()) return;
-
-			if (startWatchTimerRef.current) {
-				clearTimeout(startWatchTimerRef.current);
-			}
-			startWatchTimerRef.current = setTimeout(() => {
-				if (isStaleLoad()) return;
-				if (!videoRef.current) return;
-
-				const last = lastProgressRef.current || {time: 0, timestamp: 0};
-				const now = Date.now();
-				const stagnant =
-					(now - last.timestamp > 5000) &&
-					Math.abs((videoRef.current.currentTime || 0) - last.time) < 0.25;
-				if (!playbackStartedRef.current && videoRef.current.readyState >= 3) return;
-				if (playing && !stagnant) return;
-
-				const rebuilt = attemptPlaybackSessionRebuild(
-					'Playback stalled after load()',
-					{
-						toast: 'Playback stalled. Rebuilding session...',
-						runtimeContext: playbackRuntimeContext,
-						errorData: {
-							videoReadyState: videoRef.current?.readyState,
-							videoNetworkState: videoRef.current?.networkState,
-							videoCurrentTime: videoRef.current?.currentTime,
-							lastProgress: last
-						}
-					}
-				);
-				if (!rebuilt) {
-					showPlaybackError(
-						getPlaybackStartupFailureMessage(dynamicRangeInfo)
-					);
-				}
-			}, 7000);
-
-			if (failStartTimerRef.current) {
-				clearTimeout(failStartTimerRef.current);
-			}
-			failStartTimerRef.current = setTimeout(() => {
-				if (isStaleLoad()) return;
-				if (playbackFailureLockedRef.current) return;
-				const videoElement = videoRef.current;
-				if (!videoElement) return;
-				if (videoElement.readyState >= 3) return;
-				console.warn('[Player] Playback failed to start within timeout, showing retry');
-				showPlaybackError('Playback failed to start. Please try again.');
-			}, 12000);
 		} catch (err) {
 			if (isStaleLoad()) return;
 			if (err?.code === 'subtitle-burn-in-no-source') {
@@ -593,9 +587,6 @@ export const usePlayerVideoLoader = ({
 	}, [
 		appendPlaybackDiagnostic,
 		attachHlsPlayback,
-		attemptTranscodeFallback,
-		attemptPlaybackSessionRebuild,
-		failStartTimerRef,
 		hlsRef,
 		item,
 		nativeHlsFallbackCleanupRef,
@@ -607,18 +598,19 @@ export const usePlayerVideoLoader = ({
 		pickPreferredAudio,
 		pickPreferredSubtitle,
 		playbackStartedRef,
-		playbackFailureLockedRef,
 		playbackOptions,
 		playbackOverrideRef,
 		playbackSessionRef,
 		playbackSettingsRef,
-		playing,
 		reloadAttemptedRef,
 		resetRecoveryGuards,
 		requestPlaybackDecision,
 		exitInProgressRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef,
+		nativeSourceTokenRef,
+		onPlaybackSourceAttached,
+		onPlaybackSourceInvalidated,
 		setPlaybackGeneration,
 		setLoadingStatusMessage,
 		seekOffsetRef,
@@ -632,9 +624,8 @@ export const usePlayerVideoLoader = ({
 		setSubtitleTracks,
 		setToastMessage,
 		showPlaybackError,
-		startWatchTimerRef,
-		startupFallbackTimerRef,
 		subtitleCompatibilityFallbackAttemptedRef,
+		videoMountRetryTimerRef,
 		videoRef
 	]);
 

@@ -35,3 +35,36 @@ export const isPlaybackRuntimeContextCurrent = ({
 	runtimeContext.generation === generation &&
 	exitInProgress !== true
 );
+
+export const createNativePlaybackSourceToken = ({
+	runtimeContext,
+	video,
+	sourceUrl,
+	engine = 'native'
+}) => Object.freeze({
+	generation: runtimeContext?.generation,
+	itemId: runtimeContext?.itemId || '',
+	mediaSourceId: runtimeContext?.mediaSourceId || '',
+	playMethod: runtimeContext?.playMethod || '',
+	runtimeContext,
+	video,
+	sourceUrl: String(sourceUrl || ''),
+	engine
+});
+
+export const isNativePlaybackSourceTokenCurrent = ({
+	sourceToken,
+	activeSourceToken,
+	activeRuntimeContext,
+	generation,
+	eventTarget = null,
+	exitInProgress = false
+}) => Boolean(
+	sourceToken &&
+	sourceToken === activeSourceToken &&
+	sourceToken.runtimeContext === activeRuntimeContext &&
+	sourceToken.generation === generation &&
+	sourceToken.video &&
+	(!eventTarget || eventTarget === sourceToken.video) &&
+	exitInProgress !== true
+);

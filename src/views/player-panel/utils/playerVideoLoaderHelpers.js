@@ -112,6 +112,9 @@ export const resolveInitialTrackSelection = ({
 	subtitleStreams = [],
 	playbackOptions = {},
 	playbackOverride = null,
+	negotiatedAudioStreamIndex = null,
+	negotiatedSubtitleStreamIndex = null,
+	clientRenderedSubtitleStreamIndex = null,
 	pickPreferredAudio,
 	pickPreferredSubtitle
 } = {}) => {
@@ -150,11 +153,17 @@ export const resolveInitialTrackSelection = ({
 			? playbackOverride.subtitleStreamIndex
 			: null;
 	return {
-		selectedAudio: Number.isInteger(overrideAudio) ? overrideAudio : initialAudio,
+		selectedAudio: Number.isInteger(negotiatedAudioStreamIndex)
+			? negotiatedAudioStreamIndex
+			: (Number.isInteger(overrideAudio) ? overrideAudio : initialAudio),
 		selectedSubtitle:
-			(overrideSubtitle === -1 || Number.isInteger(overrideSubtitle))
-				? overrideSubtitle
-				: initialSubtitle
+			(clientRenderedSubtitleStreamIndex === -1 || Number.isInteger(clientRenderedSubtitleStreamIndex))
+				? clientRenderedSubtitleStreamIndex
+				: (negotiatedSubtitleStreamIndex === -1 || Number.isInteger(negotiatedSubtitleStreamIndex))
+					? negotiatedSubtitleStreamIndex
+					: (overrideSubtitle === -1 || Number.isInteger(overrideSubtitle))
+						? overrideSubtitle
+						: initialSubtitle
 	};
 };
 
@@ -236,14 +245,4 @@ export const selectHlsEnginePreference = ({
 		return {engine: 'hls.js', allowNativeFallback: false, reason: 'hlsjs-available'};
 	}
 	return {engine: null, allowNativeFallback: false, reason: 'hls-unavailable'};
-};
-
-export const getPlaybackStartupFailureMessage = (dynamicRangeInfo = null) => {
-	const rangeId = String(dynamicRangeInfo?.id || '').toUpperCase();
-	if (['DV', 'HDR10', 'HDR10_PLUS', 'HLG'].includes(rangeId)) {
-		const label = dynamicRangeInfo?.label || (rangeId === 'DV' ? 'Dolby Vision' : 'HDR');
-		return `${label} playback did not become ready after rebuilding the session. ` +
-			'This runtime may not support the selected stream; try Force Transcoding or test on TV hardware.';
-	}
-	return 'Playback failed after session rebuild attempt. Please retry or go back.';
 };

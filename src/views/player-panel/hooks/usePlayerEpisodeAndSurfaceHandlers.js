@@ -26,7 +26,6 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 	muted,
 	setMuted,
 	setVolume,
-	setPlaying,
 	setError,
 	setToastMessage
 }) => {
@@ -137,14 +136,6 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 		setMuted(newMuted);
 	}, [lastInteractionRef, muted, setMuted, videoRef]);
 
-	const handleVideoPlaying = useCallback(() => {
-		setPlaying(true);
-	}, [setPlaying]);
-
-	const handleVideoPause = useCallback(() => {
-		setPlaying(false);
-	}, [setPlaying]);
-
 	const clearError = useCallback(() => {
 		setError(null);
 	}, [setError]);
@@ -155,8 +146,6 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 		handleVideoSurfaceClick,
 		handleVolumeChange,
 		toggleMute,
-		handleVideoPlaying,
-		handleVideoPause,
 		clearError
 	};
 };

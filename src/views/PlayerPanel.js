@@ -28,6 +28,7 @@ import { usePlayerPlaybackContext } from './player-panel/hooks/usePlayerPlayback
 import { usePlayerTrackPopupHandlers } from './player-panel/hooks/usePlayerTrackPopupHandlers';
 import {usePlayerSubtitleRenderer} from './player-panel/hooks/usePlayerSubtitleRenderer';
 import {usePlayerStartupCoordinator} from './player-panel/hooks/usePlayerStartupCoordinator';
+import {usePlayerPlaybackReporter} from './player-panel/hooks/usePlayerPlaybackReporter';
 import {usePlayerInteractionReveal} from './player-panel/hooks/usePlayerInteractionReveal';
 import {usePlayerPlaybackDecision} from './player-panel/hooks/usePlayerPlaybackDecision';
 import {usePlayerPausedScreensaver} from './player-panel/hooks/usePlayerPausedScreensaver';
@@ -84,7 +85,8 @@ const PlayerPanel = ({
 	const currentAudioTrackRef = useRef(null);
 	const currentSubtitleTrackRef = useRef(null);
 	const currentTimeRef = useRef(0);
-	const startupFallbackTimerRef = useRef(null);
+	const startupDeadlineTimerRef = useRef(null);
+	const videoMountRetryTimerRef = useRef(null);
 	const transcodeFallbackAttemptedRef = useRef(false);
 	const dynamicRangeFallbackAttemptedRef = useRef(false);
 	const reloadAttemptedRef = useRef(false);
@@ -95,6 +97,8 @@ const PlayerPanel = ({
 	const playbackGenerationRef = useRef(0);
 	const playbackStartedRef = useRef(false);
 	const playbackRuntimeContextRef = useRef(null);
+	const nativeSourceTokenRef = useRef(null);
+	const startupCoordinatorControlRef = useRef(null);
 	const syncPlayStartupBridgeRef = useRef(null);
 	if (!syncPlayStartupBridgeRef.current) {
 		syncPlayStartupBridgeRef.current = createSyncPlayStartupBridge();
@@ -108,8 +112,6 @@ const PlayerPanel = ({
 	const controlsRef = useRef(null);
 	const lastInteractionRef = useRef(0);
 	const pausedScreensaverActiveRef = useRef(false);
-	const startWatchTimerRef = useRef(null);
-	const failStartTimerRef = useRef(null);
 	const pendingOverrideClearRef = useRef(false);
 
 	useEffect(() => {
@@ -239,23 +241,39 @@ const PlayerPanel = ({
 		currentAudioTrackRef,
 		currentSubtitleTrackRef
 	});
+	const {
+		reportPlaybackStartedOnce,
+		reportPlaybackProgressNow,
+		reportPlaybackStopped,
+		startProgressReporting,
+		stopProgressReporting
+	} = usePlayerPlaybackReporter({
+		item,
+		videoRef,
+		progressIntervalRef,
+		playbackGenerationRef,
+		playbackSessionRef,
+		getPlaybackSessionContext
+	});
 
 	const {
 		hasNextEpisode,
 		hasPreviousEpisode,
 		nextEpisodeData,
 		getNextEpisode,
-		getPreviousEpisode,
-		startProgressReporting
+		getPreviousEpisode
 	} = usePlayerEpisodeProgress({
-		item,
-		videoRef,
-		progressIntervalRef,
-		getPlaybackSessionContext
+		item
 	});
+	const handlePlaybackSourceAttached = useCallback((sourceToken) => (
+		startupCoordinatorControlRef.current?.registerPlaybackSource?.(sourceToken) ?? false
+	), []);
+	const handlePlaybackSourceInvalidated = useCallback(() => {
+		startupCoordinatorControlRef.current?.invalidatePlaybackSource?.();
+	}, []);
 
 	const {
-		clearStartWatch,
+		clearStartupDeadline,
 		focusPlayerWakeAction,
 		focusSkipOverlayAction,
 		handleStop
@@ -265,15 +283,17 @@ const PlayerPanel = ({
 		hlsRef,
 		nativeHlsFallbackCleanupRef,
 		playbackSessionRef,
-		progressIntervalRef,
-		startupFallbackTimerRef,
-		startWatchTimerRef,
-		failStartTimerRef,
+		startupDeadlineTimerRef,
+		videoMountRetryTimerRef,
+		nativeSourceTokenRef,
+		playbackRuntimeContextRef,
+		onPlaybackSourceInvalidated: handlePlaybackSourceInvalidated,
+		stopProgressReporting,
+		reportPlaybackStopped,
 		skipFocusRetryTimerRef,
 		skipButtonRef,
 		skipOverlayRef,
-		playPauseButtonRef,
-		getPlaybackSessionContext
+		playPauseButtonRef
 	});
 	const {
 		playbackDecisionPrompt,
@@ -322,7 +342,7 @@ const PlayerPanel = ({
 		maxHlsMediaRecoveryAttempts: MAX_HLS_MEDIA_RECOVERY_ATTEMPTS,
 		maxPlaySessionRebuildAttempts: MAX_PLAY_SESSION_REBUILD_ATTEMPTS,
 		hlsConfig: HLS_PLAYER_CONFIG,
-		clearStartWatch,
+		clearStartupDeadline,
 		playbackOptions,
 		setToastMessage,
 		setError,
@@ -342,7 +362,6 @@ const PlayerPanel = ({
 		playSessionRebuildAttemptsRef,
 		videoRef,
 		seekOffsetRef,
-		startupFallbackTimerRef,
 		playbackOverrideRef,
 		loadVideoRef,
 		mediaSourceData,
@@ -357,7 +376,9 @@ const PlayerPanel = ({
 		exitInProgressRef,
 		playbackStartedRef,
 		playbackGenerationRef,
-		playbackRuntimeContextRef
+		playbackRuntimeContextRef,
+		nativeSourceTokenRef,
+		onPlaybackSourceInvalidated: handlePlaybackSourceInvalidated
 	});
 
 	const loadVideo = usePlayerVideoLoader({
@@ -389,22 +410,19 @@ const PlayerPanel = ({
 		pickPreferredSubtitle,
 		setCurrentAudioTrack,
 		setCurrentSubtitleTrack,
-		startupFallbackTimerRef,
-		attemptTranscodeFallback,
 		attachHlsPlayback,
 		pendingOverrideClearRef,
 		showPlaybackError,
-		startWatchTimerRef,
-		playing,
-		attemptPlaybackSessionRebuild,
-		playbackFailureLockedRef,
-		failStartTimerRef,
 		playbackSessionRef,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		requestPlaybackDecision,
 		exitInProgressRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef,
+		nativeSourceTokenRef,
+		videoMountRetryTimerRef,
+		onPlaybackSourceAttached: handlePlaybackSourceAttached,
+		onPlaybackSourceInvalidated: handlePlaybackSourceInvalidated,
 		setPlaybackGeneration
 	});
 
@@ -479,11 +497,17 @@ const PlayerPanel = ({
 	), [requestSubtitleRendererFallback]);
 	const {
 		status: playbackStartupStatus,
-		markVideoReady
+		registerPlaybackSource,
+		invalidatePlaybackSource,
+		reportPlaybackEvidence,
+		requestPlaybackStart
 	} = usePlayerStartupCoordinator({
 		item,
 		playbackGeneration,
 		videoRef,
+		nativeSourceTokenRef,
+		playbackRuntimeContextRef,
+		playbackGenerationRef,
 		currentSubtitleTrack,
 		subtitleRendererPolicy,
 		subtitleRendererState,
@@ -491,11 +515,11 @@ const PlayerPanel = ({
 		playbackStartedRef,
 		playbackOverrideRef,
 		pendingOverrideClearRef,
-		startupFallbackTimerRef,
-		clearStartWatch,
-		getPlaybackSessionContext,
+		startupDeadlineTimerRef,
+		reportPlaybackStartedOnce,
 		startProgressReporting,
 		syncPlayStartupBridge,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		setLoading,
 		setLoadingStatusMessage,
 		setPlaying,
@@ -505,6 +529,12 @@ const PlayerPanel = ({
 		isCurrentTranscoding,
 		onSubtitleTimeout: handleSubtitleStartupTimeout
 	});
+	startupCoordinatorControlRef.current = {
+		registerPlaybackSource,
+		invalidatePlaybackSource,
+		reportPlaybackEvidence,
+		requestPlaybackStart
+	};
 
 	const {
 		handleEnded,
@@ -522,8 +552,7 @@ const PlayerPanel = ({
 		playbackSettingsRef,
 		videoRef,
 		handleStop,
-		getPlaybackSessionContext,
-		startProgressReporting,
+		reportPlaybackProgressNow,
 		setPlaying,
 		setShowControls,
 		setError,
@@ -548,8 +577,6 @@ const PlayerPanel = ({
 		handleVideoSurfaceClick,
 		handleVolumeChange,
 		toggleMute,
-		handleVideoPlaying,
-		handleVideoPause,
 		clearError
 	} = usePlayerEpisodeAndSurfaceHandlers({
 		item,
@@ -575,7 +602,6 @@ const PlayerPanel = ({
 		muted,
 		setMuted,
 		setVolume,
-		setPlaying,
 		setError,
 		setToastMessage
 	});
@@ -613,7 +639,6 @@ const PlayerPanel = ({
 		handleAudioTrackChange,
 		handleSubtitleTrackChange
 	} = usePlayerSeekAndTrackSwitching({
-		item,
 		videoRef,
 		hlsRef,
 		duration,
@@ -624,7 +649,7 @@ const PlayerPanel = ({
 		playbackSettingsRef,
 		currentAudioTrack,
 		currentSubtitleTrack,
-		getPlaybackSessionContext,
+		reportPlaybackProgressNow,
 		handleStop,
 		loadVideo,
 		playbackOverrideRef,
@@ -651,6 +676,8 @@ const PlayerPanel = ({
 		handleLoadedData,
 		handleCanPlay,
 		handleTimeUpdate,
+		handleVideoPlaying,
+		handleVideoPause,
 		handleVideoError
 	} = usePlayerMediaEventHandlers({
 		item,
@@ -676,8 +703,12 @@ const PlayerPanel = ({
 		currentSubtitleTrack,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		onNativeAudioSwitchFallback: handleInitialNativeAudioFallback,
-		onVideoCanPlay: markVideoReady,
-		exitInProgressRef
+		onPlaybackEvidence: reportPlaybackEvidence,
+		setPlaying,
+		exitInProgressRef,
+		nativeSourceTokenRef,
+		playbackRuntimeContextRef,
+		playbackGenerationRef
 	});
 
 	const {

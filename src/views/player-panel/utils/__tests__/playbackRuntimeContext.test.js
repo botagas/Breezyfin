@@ -1,5 +1,7 @@
 import {
+	createNativePlaybackSourceToken,
 	createPlaybackRuntimeContext,
+	isNativePlaybackSourceTokenCurrent,
 	isPlaybackRuntimeContextCurrent
 } from '../playbackRuntimeContext';
 
@@ -57,5 +59,34 @@ describe('playback runtime context', () => {
 		expect(isPlaybackRuntimeContextCurrent({...base, activeRuntimeContext: {}})).toBe(false);
 		expect(isPlaybackRuntimeContextCurrent({...base, generation: 3})).toBe(false);
 		expect(isPlaybackRuntimeContextCurrent({...base, exitInProgress: true})).toBe(false);
+	});
+
+	it('binds native events to one video, source context, and generation', () => {
+		const video = {};
+		const context = createPlaybackRuntimeContext({
+			generation: 4,
+			itemId: 'item-1',
+			mediaSourceData: {Id: 'source-1'},
+			playMethod: 'DirectPlay'
+		});
+		const sourceToken = createNativePlaybackSourceToken({
+			runtimeContext: context,
+			video,
+			sourceUrl: 'video.mkv'
+		});
+		const current = {
+			sourceToken,
+			activeSourceToken: sourceToken,
+			activeRuntimeContext: context,
+			generation: 4,
+			eventTarget: video,
+			exitInProgress: false
+		};
+
+		expect(isNativePlaybackSourceTokenCurrent(current)).toBe(true);
+		expect(isNativePlaybackSourceTokenCurrent({...current, activeSourceToken: {}})).toBe(false);
+		expect(isNativePlaybackSourceTokenCurrent({...current, generation: 5})).toBe(false);
+		expect(isNativePlaybackSourceTokenCurrent({...current, eventTarget: {}})).toBe(false);
+		expect(isNativePlaybackSourceTokenCurrent({...current, exitInProgress: true})).toBe(false);
 	});
 });

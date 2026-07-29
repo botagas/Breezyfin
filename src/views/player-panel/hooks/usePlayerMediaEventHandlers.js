@@ -13,6 +13,7 @@ import {
 	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
 	SERVER_TRANSCODING_FAILURE_MESSAGE
 } from '../utils/playerRecoveryPolicy';
+import {isNativePlaybackSourceTokenCurrent} from '../utils/playbackRuntimeContext';
 
 const isImageSubtitleBurnInPlaybackPath = ({video, mediaSourceData, currentSubtitleTrack}) => {
 	const values = [
@@ -58,9 +59,29 @@ export const usePlayerMediaEventHandlers = ({
 	currentSubtitleTrack,
 	appendPlaybackDiagnostic,
 	onNativeAudioSwitchFallback,
-	onVideoCanPlay,
-	exitInProgressRef
+	onPlaybackEvidence,
+	setPlaying,
+	exitInProgressRef,
+	nativeSourceTokenRef,
+	playbackRuntimeContextRef,
+	playbackGenerationRef
 }) => {
+	const isCurrentNativeEvent = useCallback((event, sourceToken = nativeSourceTokenRef.current) => (
+		isNativePlaybackSourceTokenCurrent({
+			sourceToken,
+			activeSourceToken: nativeSourceTokenRef.current,
+			activeRuntimeContext: playbackRuntimeContextRef.current,
+			generation: playbackGenerationRef.current,
+			eventTarget: event?.currentTarget || event?.target || null,
+			exitInProgress: exitInProgressRef.current
+		})
+	), [
+		exitInProgressRef,
+		nativeSourceTokenRef,
+		playbackGenerationRef,
+		playbackRuntimeContextRef
+	]);
+
 	const applyInitialNativeAudioSelection = useCallback((phase) => {
 		const defaultAudioTrack = Number.isInteger(mediaSourceData?.DefaultAudioStreamIndex)
 			? mediaSourceData.DefaultAudioStreamIndex
@@ -115,7 +136,8 @@ export const usePlayerMediaEventHandlers = ({
 		videoRef
 	]);
 
-	const handleLoadedMetadata = useCallback(() => {
+	const handleLoadedMetadata = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
 		if (videoRef.current) {
 			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
 			if (typeof overrideSeek === 'number') {
@@ -127,41 +149,80 @@ export const usePlayerMediaEventHandlers = ({
 				setCurrentTime(startPosition);
 			}
 		}
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'loadedmetadata',
+			status: 'ready',
+			reason: nativeSourceTokenRef.current?.engine || 'native',
+			message: 'Current playback source emitted loadedmetadata.'
+		});
 		applyInitialNativeAudioSelection('metadata');
-	}, [applyInitialNativeAudioSelection, item, playbackOverrideRef, setCurrentTime, videoRef]);
+	}, [appendPlaybackDiagnostic, applyInitialNativeAudioSelection, isCurrentNativeEvent, item, nativeSourceTokenRef, playbackOverrideRef, setCurrentTime, videoRef]);
 
-	const handleLoadedData = useCallback(() => {
+	const handleLoadedData = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
 		if (!videoRef.current || !loading) return;
-		// `canplay` owns startup finalization. `loadeddata` can fire too early on webOS.
 		lastProgressRef.current = {
 			time: videoRef.current.currentTime || 0,
 			timestamp: Date.now()
 		};
-	}, [lastProgressRef, loading, videoRef]);
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'loadeddata',
+			status: 'ready',
+			reason: nativeSourceTokenRef.current?.engine || 'native',
+			message: 'Current playback source emitted loadeddata.'
+		});
+	}, [appendPlaybackDiagnostic, isCurrentNativeEvent, lastProgressRef, loading, nativeSourceTokenRef, videoRef]);
 
-	const handleCanPlay = useCallback(() => {
-		if (!videoRef.current || playbackStartedRef.current || exitInProgressRef.current) return;
+	const handleCanPlay = useCallback((event) => {
+		if (!isCurrentNativeEvent(event) || !videoRef.current || exitInProgressRef.current) return;
 		applyInitialNativeAudioSelection('canplay');
-		onVideoCanPlay?.();
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'canplay',
+			status: 'ready',
+			reason: nativeSourceTokenRef.current?.engine || 'native',
+			message: 'Current playback source emitted canplay.'
+		});
 	}, [
+		appendPlaybackDiagnostic,
 		applyInitialNativeAudioSelection,
 		exitInProgressRef,
-		onVideoCanPlay,
-		playbackStartedRef,
+		isCurrentNativeEvent,
+		nativeSourceTokenRef,
 		videoRef
 	]);
 
-	const handleTimeUpdate = useCallback(() => {
+	const handleTimeUpdate = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
 		if (videoRef.current) {
 			const actualTime = videoRef.current.currentTime + seekOffsetRef.current;
+			const previousTime = Number(lastProgressRef.current?.time) || 0;
 			setCurrentTime(actualTime);
 			checkSkipSegments(actualTime);
 			lastProgressRef.current = {time: actualTime, timestamp: Date.now()};
+			if (videoRef.current.paused === false && Math.abs(actualTime - previousTime) >= 0.25) {
+				onPlaybackEvidence?.('timeline-progress', nativeSourceTokenRef.current);
+			}
 		}
-	}, [checkSkipSegments, lastProgressRef, seekOffsetRef, setCurrentTime, videoRef]);
+	}, [checkSkipSegments, isCurrentNativeEvent, lastProgressRef, nativeSourceTokenRef, onPlaybackEvidence, seekOffsetRef, setCurrentTime, videoRef]);
+
+	const handleVideoPlaying = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
+		setPlaying(true);
+		onPlaybackEvidence?.('playing-event', nativeSourceTokenRef.current);
+	}, [isCurrentNativeEvent, nativeSourceTokenRef, onPlaybackEvidence, setPlaying]);
+
+	const handleVideoPause = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
+		setPlaying(false);
+	}, [isCurrentNativeEvent, setPlaying]);
 
 	const handleVideoError = useCallback(async (event) => {
 		if (playbackFailureLockedRef.current || exitInProgressRef.current) return;
+		const sourceToken = nativeSourceTokenRef.current;
+		if (!isCurrentNativeEvent(event, sourceToken)) return;
 		const video = videoRef.current;
 		const mediaError = video?.error;
 
@@ -196,13 +257,13 @@ export const usePlayerMediaEventHandlers = ({
 		}
 
 		const subtitleFallbackWorked = await attemptSubtitleCompatibilityFallback(errorMessage);
-		if (subtitleFallbackWorked) {
+		if (!isCurrentNativeEvent(null, sourceToken) || subtitleFallbackWorked) {
 			return;
 		}
 
 		if (!isCurrentTranscoding) {
 			const didFallback = await attemptTranscodeFallback(errorMessage);
-			if (didFallback) {
+			if (!isCurrentNativeEvent(null, sourceToken) || didFallback) {
 				return;
 			}
 		}
@@ -239,8 +300,10 @@ export const usePlayerMediaEventHandlers = ({
 		exitInProgressRef,
 		handleStop,
 		isCurrentTranscoding,
+		isCurrentNativeEvent,
 		isSubtitleCompatibilityError,
 		mediaSourceData,
+		nativeSourceTokenRef,
 		playbackFailureLockedRef,
 		playbackStartedRef,
 		playbackSettingsRef,
@@ -253,6 +316,8 @@ export const usePlayerMediaEventHandlers = ({
 		handleLoadedData,
 		handleCanPlay,
 		handleTimeUpdate,
+		handleVideoPlaying,
+		handleVideoPause,
 		handleVideoError
 	};
 };

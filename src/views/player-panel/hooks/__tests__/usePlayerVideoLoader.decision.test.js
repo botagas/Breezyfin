@@ -49,22 +49,19 @@ const createProps = () => {
 			pickPreferredSubtitle: jest.fn(() => -1),
 			setCurrentAudioTrack: jest.fn(),
 			setCurrentSubtitleTrack: jest.fn(),
-			startupFallbackTimerRef: {current: null},
-			attemptTranscodeFallback: jest.fn(),
 			attachHlsPlayback: jest.fn(),
 			pendingOverrideClearRef: {current: false},
 			showPlaybackError: jest.fn(),
-			startWatchTimerRef: {current: null},
-			playing: false,
-			attemptPlaybackSessionRebuild: jest.fn(),
-			playbackFailureLockedRef: {current: false},
-			failStartTimerRef: {current: null},
 			playbackSessionRef: {current: null},
 			appendPlaybackDiagnostic: jest.fn(),
 			requestPlaybackDecision: jest.fn().mockResolvedValue(undefined),
 			exitInProgressRef: {current: false},
 			playbackGenerationRef: {current: 0},
 			playbackRuntimeContextRef: {current: null},
+			nativeSourceTokenRef: {current: null},
+			videoMountRetryTimerRef: {current: null},
+			onPlaybackSourceAttached: jest.fn(),
+			onPlaybackSourceInvalidated: jest.fn(),
 			setPlaybackGeneration: jest.fn()
 		}
 	};
@@ -111,7 +108,6 @@ describe('usePlayerVideoLoader blocking playback decisions', () => {
 		expect(video.src).toBe('');
 		expect(video.load).not.toHaveBeenCalled();
 		expect(props.attachHlsPlayback).not.toHaveBeenCalled();
-		expect(props.startWatchTimerRef.current).toBeNull();
 		expect(props.playbackSessionRef.current).toEqual(expect.objectContaining({
 			playSessionId: 'session-1'
 		}));

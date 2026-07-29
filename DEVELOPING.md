@@ -111,6 +111,7 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Player wheel/pointer-edge controls reveal: `src/views/player-panel/hooks/usePlayerInteractionReveal.js`
 - Player video load/session orchestration: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
 - Player video/client-subtitle readiness gate: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
+- Player generation-aware serialized reporting: `src/views/player-panel/hooks/usePlayerPlaybackReporter.js`
 - Player playback option/session-context derivation: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
 - Player skip/prompt state machine: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
 - Player seek/track-switch flow: `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
@@ -139,12 +140,22 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   restore membership only after matching the current authenticated coordinator generation.
 - SyncPlay Player startup: `src/views/player-panel/utils/syncPlayStartupBridge.js` joins
   `usePlayerStartupCoordinator` and `useNativeSyncPlay` without transferring queue
-  ownership into Player. While following, buffer paused, report Ready only after video,
-  subtitle, and clock readiness, and call `video.play()` only for authoritative Unpause.
+  ownership into Player. While following, prepare the source paused, report Ready only
+  after source, subtitle, and clock readiness, and call `video.play()` only for
+  authoritative Unpause. Normal native playback requests `video.play()` after source
+  assignment and client-subtitle readiness; `canplay` is diagnostic evidence, not a gate.
+- Player startup authority belongs to `usePlayerStartupCoordinator`. Loader hooks may
+  register sources but must not add competing startup timers. Playback completion and
+  Jellyfin `PlaybackStart` reporting are committed once from the active generation after
+  a resolved `play()` request, `playing`, or genuine timeline advancement.
 - Playback runtime isolation: create the immutable context in
   `src/views/player-panel/utils/playbackRuntimeContext.js` before source attachment.
-  Every HLS callback and asynchronous recovery continuation must match its bound HLS
-  instance, runtime-context identity, and playback generation before taking action.
+  Native media events must also match the active source token and video element. Every
+  native/HLS callback and asynchronous recovery continuation must match its runtime
+  context and playback generation before taking action.
+- Playback reporting is serialized by `usePlayerPlaybackReporter`; direct reporting calls
+  from controls, seek handlers, or timers would bypass pause-state coalescing and are not
+  allowed.
 - Playback safety decisions must be returned from PlaybackInfo negotiation and handled
   before source URL resolution or attachment. Dolby Vision video transcoding is blocked
   unless it is validated video-copy/audio-only work. A bitrate-only DV encode may first

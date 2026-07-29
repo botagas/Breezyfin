@@ -450,52 +450,33 @@ usePlayerInteractionReveal({
   - media source/session selection
   - audio/subtitle initialization
   - stream URL construction (direct/hls/transcode)
-  - startup and stall recovery wiring
-- Signature:
-```js
-const loadVideo = usePlayerVideoLoader({
-  item,
-  videoRef,
-  hlsRef,
-  loadVideoRef,
-  resetRecoveryGuards,
-  setLoading,
-  reloadAttemptedRef,
-  subtitleCompatibilityFallbackAttemptedRef,
-  lastProgressRef,
-  setError,
-  seekOffsetRef,
-  loadTrackPreferences,
-  playbackOverrideRef,
-  playbackOptions,
-  playbackSettingsRef,
-  setToastMessage,
-  setMediaSourceData,
-  setDuration,
-  setAudioTracks,
-  setSubtitleTracks,
-  pickPreferredAudio,
-  pickPreferredSubtitle,
-  setCurrentAudioTrack,
-  setCurrentSubtitleTrack,
-  startupFallbackTimerRef,
-  attemptTranscodeFallback,
-  attachHlsPlayback,
-  pendingOverrideClearRef,
-  showPlaybackError,
-  startWatchTimerRef,
-  playing,
-  attemptPlaybackSessionRebuild,
-  playbackFailureLockedRef,
-  failStartTimerRef,
-  playbackSessionRef,
-  appendPlaybackDiagnostic
-});
-```
+  - immutable playback runtime/source registration before `video.load()`
+  - bounded video-element mount retry
+
+  Loader code must not own generic startup watchdogs. Source startup and its single
+  post-`play()` deadline belong to `usePlayerStartupCoordinator`.
 
 ### `usePlayerStartupCoordinator`
 - File: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
-- Purpose: keep attached video paused until its media source and selected client subtitle renderer are ready, then start playback once. Client-rendered subtitle preparation times out after 15 seconds and enters the existing explicit fallback/consent flow rather than silently starting without subtitles.
+- Purpose:
+  - register and invalidate generation-bound native source tokens
+  - request normal playback after source assignment and selected client-subtitle readiness,
+    without waiting for `canplay`
+  - keep SyncPlay paused until its authoritative `Unpause`
+  - accept `play()` resolution, `playing`, or genuine timeline movement as startup evidence
+  - own the single post-`play()` startup deadline and DirectPlay fallback
+  - finalize loading/reporting exactly once
+
+  Client-rendered subtitle preparation has its own 15-second timeout and enters the
+  existing explicit fallback/consent flow rather than silently starting without subtitles.
+
+### `usePlayerPlaybackReporter`
+- File: `src/views/player-panel/hooks/usePlayerPlaybackReporter.js`
+- Purpose:
+  - report `PlaybackStart` once per item/session/generation
+  - serialize progress, pause, seek, and stop reporting
+  - coalesce timer ticks while preserving the latest forced state
+  - keep reporting failures best-effort and isolated from Player controls
 
 ### `usePlayerPlaybackContext`
 - File: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`

@@ -66,6 +66,17 @@ Run these before packaging a release candidate:
   enabled, verify the runtime trail includes the exit-code 159/systemd syscall-policy
   guidance; DirectPlay failures and failures after playback starts must retain their
   existing classifications.
+- Start an SDR H.264/AAC item through native playback on TV and verify DirectPlay requests
+  playback without waiting for `canplay`. Confirm loading and PlaybackStart commit once
+  after `play()`, `playing`, or timeline progress.
+- Force a genuine native DirectPlay startup failure. Verify Breezyfin shows
+  `Direct playback did not start. Retrying with server transcoding.`, retries once, and
+  preserves the existing HDR/DV and subtitle consent prompts where applicable.
+- Verify exhausted startup recovery pauses and detaches media before showing one terminal
+  error, so audio cannot continue behind the popup. Exercise Back and source replacement
+  while startup is pending to confirm old native/HLS events cannot restart recovery.
+- During pause, resume, seek, and regular progress ticks, confirm Jellyfin receives one
+  serialized reporting request at a time and resume does not send another PlaybackStart.
 
 ### Navigation/focus validation
 

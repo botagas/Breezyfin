@@ -60,7 +60,6 @@ export const getSyncPlayCommandTargetSeconds = ({
 
 export const isSyncPlayVideoReady = (video) => (
 	Boolean(video) &&
-	Number(video.readyState) >= 3 &&
 	Boolean(video.currentSrc || video.src)
 );
 

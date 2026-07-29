@@ -1,6 +1,5 @@
 import {useCallback} from 'react';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
-import jellyfinService from '../../../services/jellyfinService';
 import {
 	getSubtitleTranscodePolicy,
 	shouldTranscodeForSubtitleSelection
@@ -12,7 +11,6 @@ import {
 import {buildPlaybackOverride} from '../utils/playbackOverride';
 
 export const usePlayerSeekAndTrackSwitching = ({
-	item,
 	videoRef,
 	hlsRef,
 	duration,
@@ -23,7 +21,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 	playbackSettingsRef,
 	currentAudioTrack,
 	currentSubtitleTrack,
-	getPlaybackSessionContext,
+	reportPlaybackProgressNow,
 	handleStop,
 	loadVideo,
 	playbackOverrideRef,
@@ -89,13 +87,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 
 		if (isHls) {
 			videoRef.current.currentTime = seekTime;
-			const seekTicks = Math.floor(seekTime * JELLYFIN_TICKS_PER_SECOND);
-			await jellyfinService.reportPlaybackProgress(
-				item.Id,
-				seekTicks,
-				videoRef.current.paused,
-				getPlaybackSessionContext()
-			);
+			await reportPlaybackProgressNow(videoRef.current.paused);
 			return;
 		}
 
@@ -125,15 +117,14 @@ export const usePlayerSeekAndTrackSwitching = ({
 		checkSkipSegments,
 		currentAudioTrack,
 		currentSubtitleTrack,
-		getPlaybackSessionContext,
 		handleStop,
 		isCurrentTranscoding,
-		item?.Id,
 		lastInteractionRef,
 		loadVideo,
 		mediaSourceData,
 		playbackOptions,
 		playbackOverrideRef,
+		reportPlaybackProgressNow,
 		setCurrentTime,
 		setLoading,
 		videoRef

@@ -19,7 +19,7 @@ const createProps = () => {
 			maxHlsMediaRecoveryAttempts: 1,
 			maxPlaySessionRebuildAttempts: 1,
 			hlsConfig: {},
-			clearStartWatch: jest.fn(),
+			clearStartupDeadline: jest.fn(),
 			playbackOptions: {},
 			setToastMessage: jest.fn(),
 			setError: jest.fn(),
@@ -46,7 +46,6 @@ const createProps = () => {
 				}
 			},
 			seekOffsetRef: {current: 0},
-			startupFallbackTimerRef: {current: null},
 			playbackOverrideRef: {current: null},
 			loadVideoRef: {current: jest.fn()},
 			mediaSourceData: {Id: 'source-1'},
@@ -61,7 +60,9 @@ const createProps = () => {
 			exitInProgressRef: {current: false},
 			playbackStartedRef: {current: false},
 			playbackGenerationRef: {current: 3},
-			playbackRuntimeContextRef: {current: runtimeContext}
+			playbackRuntimeContextRef: {current: runtimeContext},
+			nativeSourceTokenRef: {current: {}},
+			onPlaybackSourceInvalidated: jest.fn()
 		}
 	};
 };
@@ -102,6 +103,33 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 		});
 
 		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+	});
+
+	it('pauses active native media before presenting a terminal playback error', () => {
+		const {props} = createProps();
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		act(() => {
+			result.current.showPlaybackError('Playback failed');
+		});
+
+		expect(props.videoRef.current.pause).toHaveBeenCalledTimes(1);
+		expect(props.setPlaying).toHaveBeenCalledWith(false);
+		expect(props.setError).toHaveBeenCalledWith('Playback failed');
+	});
+
+	it('detaches and invalidates native media for terminal startup errors', () => {
+		const {props} = createProps();
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		act(() => {
+			result.current.showPlaybackError('Playback failed', {detachMedia: true});
+		});
+
+		expect(props.videoRef.current.removeAttribute).toHaveBeenCalledWith('src');
+		expect(props.nativeSourceTokenRef.current).toBeNull();
+		expect(props.playbackRuntimeContextRef.current).toBeNull();
+		expect(props.onPlaybackSourceInvalidated).toHaveBeenCalledTimes(1);
 	});
 
 	it('reports an exhausted initial transcode fragment failure as a server startup failure', () => {

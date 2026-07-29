@@ -1,18 +1,21 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 
-import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
-import jellyfinService from '../../../services/jellyfinService';
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
 import {
+	PLAYER_PLAYBACK_START_TIMEOUT_MS,
 	PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS,
 	getPlayerStartupState,
 	isInterruptedPlaybackStartError
 } from '../utils/playerStartupState';
+import {isNativePlaybackSourceTokenCurrent} from '../utils/playbackRuntimeContext';
 
 export const usePlayerStartupCoordinator = ({
 	item,
 	playbackGeneration,
 	videoRef,
+	nativeSourceTokenRef,
+	playbackRuntimeContextRef,
+	playbackGenerationRef,
 	currentSubtitleTrack,
 	subtitleRendererPolicy,
 	subtitleRendererState,
@@ -20,11 +23,11 @@ export const usePlayerStartupCoordinator = ({
 	playbackStartedRef,
 	playbackOverrideRef,
 	pendingOverrideClearRef,
-	startupFallbackTimerRef,
-	clearStartWatch,
-	getPlaybackSessionContext,
+	startupDeadlineTimerRef,
+	reportPlaybackStartedOnce,
 	startProgressReporting,
 	syncPlayStartupBridge,
+	appendPlaybackDiagnostic,
 	setLoading,
 	setLoadingStatusMessage,
 	setPlaying,
@@ -34,113 +37,230 @@ export const usePlayerStartupCoordinator = ({
 	isCurrentTranscoding,
 	onSubtitleTimeout
 }) => {
-	const [videoReady, setVideoReady] = useState(false);
-	const [status, setStatus] = useState('waiting-video');
+	const [sourceVersion, setSourceVersion] = useState(0);
+	const [status, setStatus] = useState('waiting-source');
+	const sourceTokenRef = useRef(null);
 	const startInFlightRef = useRef(false);
 	const startAttemptRef = useRef(0);
 	const timeoutHandledRef = useRef(false);
 	const syncPlayReadyRequestedRef = useRef(false);
 
-	useEffect(() => {
-		setVideoReady(false);
-		setStatus('waiting-video');
-		startInFlightRef.current = false;
+	const clearStartupDeadline = useCallback(() => {
+		if (startupDeadlineTimerRef.current) {
+			clearTimeout(startupDeadlineTimerRef.current);
+			startupDeadlineTimerRef.current = null;
+		}
+	}, [startupDeadlineTimerRef]);
+
+	const isTokenCurrent = useCallback((sourceToken = sourceTokenRef.current) => (
+		isNativePlaybackSourceTokenCurrent({
+			sourceToken,
+			activeSourceToken: nativeSourceTokenRef.current,
+			activeRuntimeContext: playbackRuntimeContextRef.current,
+			generation: playbackGenerationRef.current,
+			exitInProgress: exitInProgressRef.current
+		})
+	), [
+		exitInProgressRef,
+		nativeSourceTokenRef,
+		playbackGenerationRef,
+		playbackRuntimeContextRef
+	]);
+
+	const invalidatePlaybackSource = useCallback(() => {
 		startAttemptRef.current += 1;
+		startInFlightRef.current = false;
+		sourceTokenRef.current = null;
+		clearStartupDeadline();
+		setStatus('waiting-source');
+		setSourceVersion((current) => current + 1);
+	}, [clearStartupDeadline]);
+
+	const registerPlaybackSource = useCallback((sourceToken) => {
+		if (!sourceToken || exitInProgressRef.current) return false;
+		sourceTokenRef.current = sourceToken;
+		startAttemptRef.current += 1;
+		startInFlightRef.current = false;
 		timeoutHandledRef.current = false;
 		syncPlayReadyRequestedRef.current = false;
-	}, [item?.Id, playbackGeneration]);
+		playbackStartedRef.current = false;
+		clearStartupDeadline();
+		setStatus('waiting-subtitles');
+		setSourceVersion((current) => current + 1);
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'source-assigned',
+			status: 'ready',
+			reason: sourceToken.engine,
+			message: `Playback source generation ${sourceToken.generation} is attached.`
+		});
+		return true;
+	}, [
+		appendPlaybackDiagnostic,
+		clearStartupDeadline,
+		exitInProgressRef,
+		playbackStartedRef
+	]);
 
-	const markVideoReady = useCallback(() => {
-		if (exitInProgressRef.current) return;
-		setVideoReady(true);
-	}, [exitInProgressRef]);
-
-	const completePlaybackStart = useCallback(async () => {
-		if (exitInProgressRef.current || playbackStartedRef.current || startInFlightRef.current) {
-			return false;
+	const commitPlaybackStarted = useCallback((signal = 'unknown', sourceToken = sourceTokenRef.current) => {
+		if (!isTokenCurrent(sourceToken) || playbackStartedRef.current) return false;
+		playbackStartedRef.current = true;
+		startInFlightRef.current = false;
+		clearStartupDeadline();
+		setStatus('started');
+		setLoading(false);
+		setPlaying(true);
+		if (pendingOverrideClearRef.current) {
+			playbackOverrideRef.current = null;
+			pendingOverrideClearRef.current = false;
 		}
-		const video = videoRef.current;
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'confirmed',
+			status: 'ready',
+			reason: signal,
+			message: `Playback startup confirmed by ${signal}.`
+		});
+		reportPlaybackStartedOnce();
+		startProgressReporting();
+		return true;
+	}, [
+		appendPlaybackDiagnostic,
+		clearStartupDeadline,
+		isTokenCurrent,
+		pendingOverrideClearRef,
+		playbackOverrideRef,
+		playbackStartedRef,
+		reportPlaybackStartedOnce,
+		setLoading,
+		setPlaying,
+		startProgressReporting
+	]);
+
+	const handleStartupTimeout = useCallback(async (sourceToken, startAttempt) => {
+		if (
+			startAttemptRef.current !== startAttempt ||
+			playbackStartedRef.current ||
+			!isTokenCurrent(sourceToken)
+		) return false;
+		setStatus('timed-out');
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'timeout',
+			status: 'failed',
+			reason: 'startup-no-progress',
+			message: 'Playback made no progress after the play request.'
+		});
+		if (!isCurrentTranscoding) {
+			const didFallback = await attemptTranscodeFallback('startup-no-progress');
+			if (didFallback || !isTokenCurrent(sourceToken)) return didFallback;
+		}
+		showPlaybackError(
+			'The media did not begin loading or playing. Please retry or go back.',
+			{detachMedia: true}
+		);
+		return false;
+	}, [
+		appendPlaybackDiagnostic,
+		attemptTranscodeFallback,
+		isCurrentTranscoding,
+		isTokenCurrent,
+		playbackStartedRef,
+		showPlaybackError
+	]);
+
+	const requestPlaybackStart = useCallback(async () => {
+		const sourceToken = sourceTokenRef.current;
+		if (
+			!isTokenCurrent(sourceToken) ||
+			playbackStartedRef.current ||
+			startInFlightRef.current
+		) return false;
+		const video = sourceToken.video || videoRef.current;
 		if (!video) return false;
 		startInFlightRef.current = true;
 		const startAttempt = ++startAttemptRef.current;
+		setStatus('starting');
+		setLoading(true);
 		setLoadingStatusMessage('Starting playback...');
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'play-request',
+			status: 'requested',
+			reason: sourceToken.playMethod,
+			message: 'Requesting playback without waiting for canplay.'
+		});
+		clearStartupDeadline();
+		startupDeadlineTimerRef.current = setTimeout(() => {
+			startupDeadlineTimerRef.current = null;
+			handleStartupTimeout(sourceToken, startAttempt);
+		}, PLAYER_PLAYBACK_START_TIMEOUT_MS);
 
 		try {
 			await video.play();
-			if (exitInProgressRef.current || startAttemptRef.current !== startAttempt) return false;
-			playbackStartedRef.current = true;
-			setLoading(false);
-			setPlaying(true);
-			if (pendingOverrideClearRef.current) {
-				playbackOverrideRef.current = null;
-				pendingOverrideClearRef.current = false;
-			}
-			clearStartWatch();
-			if (startupFallbackTimerRef.current) {
-				clearTimeout(startupFallbackTimerRef.current);
-				startupFallbackTimerRef.current = null;
-			}
-			const positionTicks = Math.floor((video.currentTime || 0) * JELLYFIN_TICKS_PER_SECOND);
-			try {
-				await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
-			} catch (error) {
-				console.warn('Failed to report playback start:', error);
-			}
-			startProgressReporting();
-			return true;
+			if (startAttemptRef.current !== startAttempt) return false;
+			return commitPlaybackStarted('play-promise', sourceToken);
 		} catch (playError) {
 			if (
-				exitInProgressRef.current ||
 				startAttemptRef.current !== startAttempt ||
+				playbackStartedRef.current ||
+				!isTokenCurrent(sourceToken) ||
 				isInterruptedPlaybackStartError(playError)
 			) return false;
-			playbackStartedRef.current = false;
+			clearStartupDeadline();
+			startInFlightRef.current = false;
 			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
-			setPlaying(false);
 			if (isFatalPlaybackError(playError) && !isCurrentTranscoding) {
 				const didFallback = await attemptTranscodeFallback(errorMessage);
-				if (didFallback) return false;
+				if (didFallback || !isTokenCurrent(sourceToken)) return false;
 			}
 			if (isFatalPlaybackError(playError)) {
-				showPlaybackError(errorMessage);
+				setStatus('failed');
+				showPlaybackError(errorMessage, {detachMedia: true});
 			} else {
 				setToastMessage('Playback failed to start. Press Play/Retry.');
 			}
 			return false;
-		} finally {
-			if (startAttemptRef.current === startAttempt) {
-				startInFlightRef.current = false;
-			}
 		}
 	}, [
+		appendPlaybackDiagnostic,
 		attemptTranscodeFallback,
-		clearStartWatch,
-		exitInProgressRef,
-		getPlaybackSessionContext,
+		clearStartupDeadline,
+		commitPlaybackStarted,
+		handleStartupTimeout,
 		isCurrentTranscoding,
-		item,
-		pendingOverrideClearRef,
-		playbackOverrideRef,
+		isTokenCurrent,
 		playbackStartedRef,
 		setLoading,
 		setLoadingStatusMessage,
-		setPlaying,
 		setToastMessage,
 		showPlaybackError,
-		startProgressReporting,
-		startupFallbackTimerRef,
+		startupDeadlineTimerRef,
 		videoRef
 	]);
 
-	useEffect(() => {
-		if (!syncPlayStartupBridge) return undefined;
-		return syncPlayStartupBridge.registerStartupHandler(completePlaybackStart);
-	}, [completePlaybackStart, syncPlayStartupBridge]);
+	const reportPlaybackEvidence = useCallback((signal, sourceToken = sourceTokenRef.current) => (
+		commitPlaybackStarted(signal, sourceToken)
+	), [commitPlaybackStarted]);
 
 	useEffect(() => {
-		if (exitInProgressRef.current || playbackStartedRef.current || startInFlightRef.current) return undefined;
+		invalidatePlaybackSource();
+		timeoutHandledRef.current = false;
+		syncPlayReadyRequestedRef.current = false;
+	}, [invalidatePlaybackSource, item?.Id, playbackGeneration]);
+
+	useEffect(() => {
+		if (!syncPlayStartupBridge) return undefined;
+		return syncPlayStartupBridge.registerStartupHandler(requestPlaybackStart);
+	}, [requestPlaybackStart, syncPlayStartupBridge]);
+
+	useEffect(() => {
+		const sourceToken = sourceTokenRef.current;
+		if (!isTokenCurrent(sourceToken) || playbackStartedRef.current || startInFlightRef.current) {
+			return undefined;
+		}
 		const nextStatus = getPlayerStartupState({
-			videoReady,
+			sourceAttached: true,
 			currentSubtitleTrack,
 			subtitleRendererPolicy,
 			subtitleRendererStatus: subtitleRendererState?.status
@@ -151,7 +271,11 @@ export const usePlayerStartupCoordinator = ({
 			setLoading(true);
 			setLoadingStatusMessage('Preparing subtitles...');
 			const timeoutId = setTimeout(() => {
-				if (exitInProgressRef.current || playbackStartedRef.current || timeoutHandledRef.current) return;
+				if (
+					!isTokenCurrent(sourceToken) ||
+					playbackStartedRef.current ||
+					timeoutHandledRef.current
+				) return;
 				timeoutHandledRef.current = true;
 				setStatus('timed-out');
 				Promise.resolve(onSubtitleTimeout?.()).catch((error) => {
@@ -161,38 +285,47 @@ export const usePlayerStartupCoordinator = ({
 			return () => clearTimeout(timeoutId);
 		}
 
-		if (nextStatus !== 'ready') return undefined;
+		if (nextStatus !== 'starting') return undefined;
 		if (syncPlayStartupBridge?.shouldBlockAutomaticStart()) {
 			setStatus('waiting-syncplay');
 			setLoading(true);
 			setLoadingStatusMessage('Waiting for SyncPlay...');
 			if (!syncPlayReadyRequestedRef.current) {
 				syncPlayReadyRequestedRef.current = true;
-				Promise.resolve(syncPlayStartupBridge.reportVideoReady()).catch(() => {
+				Promise.resolve(syncPlayStartupBridge.reportVideoReady()).then((ready) => {
+					if (!ready) syncPlayReadyRequestedRef.current = false;
+				}).catch(() => {
 					syncPlayReadyRequestedRef.current = false;
 				});
 			}
 			return undefined;
 		}
-		completePlaybackStart();
+		requestPlaybackStart();
 		return undefined;
 	}, [
-		completePlaybackStart,
 		currentSubtitleTrack,
-		exitInProgressRef,
+		isTokenCurrent,
 		onSubtitleTimeout,
 		playbackStartedRef,
+		requestPlaybackStart,
 		setLoading,
 		setLoadingStatusMessage,
+		sourceVersion,
 		subtitleRendererPolicy,
 		subtitleRendererState?.status,
-		syncPlayStartupBridge,
-		videoReady
+		syncPlayStartupBridge
 	]);
+
+	useEffect(() => () => {
+		startAttemptRef.current += 1;
+		clearStartupDeadline();
+	}, [clearStartupDeadline]);
 
 	return {
 		status,
-		markVideoReady,
-		completePlaybackStart
+		registerPlaybackSource,
+		invalidatePlaybackSource,
+		reportPlaybackEvidence,
+		requestPlaybackStart
 	};
 };

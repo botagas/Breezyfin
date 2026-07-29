@@ -32,7 +32,7 @@ export const usePlayerRecoveryHandlers = ({
 	maxHlsMediaRecoveryAttempts,
 	maxPlaySessionRebuildAttempts,
 	hlsConfig,
-	clearStartWatch,
+	clearStartupDeadline,
 	playbackOptions,
 	setToastMessage,
 	setError,
@@ -52,7 +52,6 @@ export const usePlayerRecoveryHandlers = ({
 	playSessionRebuildAttemptsRef,
 	videoRef,
 	seekOffsetRef,
-	startupFallbackTimerRef,
 	playbackOverrideRef,
 	loadVideoRef,
 	mediaSourceData,
@@ -67,7 +66,9 @@ export const usePlayerRecoveryHandlers = ({
 	exitInProgressRef,
 	playbackStartedRef,
 	playbackGenerationRef,
-	playbackRuntimeContextRef
+	playbackRuntimeContextRef,
+	nativeSourceTokenRef,
+	onPlaybackSourceInvalidated
 }) => {
 	const resetRecoveryGuards = useCallback(() => {
 		playbackFailureLockedRef.current = false;
@@ -169,11 +170,7 @@ export const usePlayerRecoveryHandlers = ({
 			message: `Rebuilding playback session (${rebuildAttempt}/${maxPlaySessionRebuildAttempts}).`
 		});
 
-		clearStartWatch();
-		if (startupFallbackTimerRef.current) {
-			clearTimeout(startupFallbackTimerRef.current);
-			startupFallbackTimerRef.current = null;
-		}
+		clearStartupDeadline();
 		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
 			nativeHlsFallbackCleanupRef.current();
 		}
@@ -232,7 +229,7 @@ export const usePlayerRecoveryHandlers = ({
 		}
 		return false;
 	}, [
-		clearStartWatch,
+		clearStartupDeadline,
 		currentAudioTrackRef,
 		currentSubtitleTrackRef,
 		hlsRef,
@@ -255,25 +252,37 @@ export const usePlayerRecoveryHandlers = ({
 		setLoadingStatusMessage,
 		setPlaying,
 		setToastMessage,
-		startupFallbackTimerRef,
 		videoRef
 	]);
 
-	const showPlaybackError = useCallback((message) => {
+	const showPlaybackError = useCallback((message, {detachMedia = false} = {}) => {
 		playbackFailureLockedRef.current = true;
 		stopHlsRecoveryLoop();
+		try {
+			videoRef.current?.pause();
+		} catch (_) {
+			// Ignore native media teardown failures while presenting the terminal error.
+		}
+		if (detachMedia && videoRef.current) {
+			try {
+				videoRef.current.removeAttribute('src');
+				videoRef.current.load();
+			} catch (_) {
+				// Ignore native detach failures while presenting the terminal error.
+			}
+			nativeSourceTokenRef.current = null;
+			playbackRuntimeContextRef.current = null;
+			onPlaybackSourceInvalidated?.();
+		}
 		const errorMessage = message || 'Failed to play video';
 		setError(errorMessage);
 		setToastMessage('');
 		setShowControls(true);
 		setLoading(false);
+		setPlaying(false);
 		setLoadingStatusMessage('Loading...');
-		clearStartWatch();
-		if (startupFallbackTimerRef.current) {
-			clearTimeout(startupFallbackTimerRef.current);
-			startupFallbackTimerRef.current = null;
-		}
-	}, [clearStartWatch, playbackFailureLockedRef, setError, setLoading, setLoadingStatusMessage, setShowControls, setToastMessage, startupFallbackTimerRef, stopHlsRecoveryLoop]);
+		clearStartupDeadline();
+	}, [clearStartupDeadline, nativeSourceTokenRef, onPlaybackSourceInvalidated, playbackFailureLockedRef, playbackRuntimeContextRef, setError, setLoading, setLoadingStatusMessage, setPlaying, setShowControls, setToastMessage, stopHlsRecoveryLoop, videoRef]);
 
 	const collectSubtitleErrorValues = useCallback((errorData, sourceData = mediaSourceData) => {
 		const fromMessage = typeof errorData === 'string' ? errorData : '';
@@ -411,7 +420,14 @@ export const usePlayerRecoveryHandlers = ({
 			subtitleStreamIndex: currentSubtitleTrackRef.current,
 			seekSeconds: resolveVideoSeekSeconds(videoRef.current)
 		});
-		setToastMessage('Switching to transcoding...');
+		setToastMessage(
+			reasonText === 'startup-no-progress'
+				? {
+					message: 'Direct playback did not start. Retrying with server transcoding.',
+					severity: 'warning'
+				}
+				: 'Switching to transcoding...'
+		);
 		await handleStop();
 		setError(null);
 		setLoading(true);
