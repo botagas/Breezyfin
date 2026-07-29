@@ -276,6 +276,28 @@ describe('WatchlistPanel advanced list layout', () => {
 		const emptyState = await screen.findByText('Your Watchlist is empty.');
 		expect(emptyState.className).toContain('empty');
 		expect(emptyState.parentElement.className).toContain('watchlistContent');
+		expect(layoutProps.scrollable).toBe(false);
+	});
+
+	it('centers an insight loading indicator in the tab viewport', async () => {
+		jellyfinService.getWatchlistSeriesInsights.mockReturnValue(new Promise(() => {}));
+		const {unmount} = render(
+			<WatchlistPanel
+				isActive
+				cachedState={{
+					activeTab: 'progress',
+					insightEntries: freshInsightEntries({
+						progress: {cachedAt: 0, items: []}
+					})
+				}}
+				onItemSelect={jest.fn()}
+			/>
+		);
+
+		const loadingState = await screen.findByRole('status');
+		expect(loadingState.className).toContain('loadingState');
+		expect(loadingState.parentElement.className).toContain('listViewport');
+		unmount();
 	});
 
 	it('deduplicates repeated Mark All Watched activation while the mutation is pending', async () => {

@@ -11,7 +11,8 @@
 
 .watchlistContent {
 	position: relative;
-	min-height: calc(100vh - var(--bf-top-chrome-height) - var(--bf-panel-content-bottom-padding) - 5rem);
+	flex: 1;
+	min-height: 30rem;
 }
 
 .insightList {
@@ -107,6 +108,12 @@
 	pointer-events: none;
 	text-align: center;
 	color: var(--bf-theme-muted-text);
+}
+
+.loadingState {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
 }
 
 .statistics {
