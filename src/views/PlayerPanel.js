@@ -355,6 +355,7 @@ const PlayerPanel = ({
 		requestSubtitleBurnInFallback,
 		requestPlaybackDecision,
 		exitInProgressRef,
+		playbackStartedRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef
 	});

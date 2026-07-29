@@ -96,7 +96,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Build consistent playback restart/reload overrides | `buildPlaybackOverride` / `resolveVideoSeekSeconds` |
 | Create mutable per-instance HLS.js config and classify/redact runtime errors before recovery/fallback handling | `createHlsPlayerConfig` / `classifyHlsError` / `getHlsErrorHttpStatus` / `buildHlsErrorSummary` |
 | Redact sensitive URLs, headers, errors, values, and console arguments before output or storage | `redactSensitiveUrl` / `redactSensitiveText` / `sanitizeSensitiveValue` / `sanitizeConsoleArgs` |
-| Classify Player subtitle/burn-in recovery without side effects | `playerRecoveryPolicy` helpers |
+| Classify Player subtitle/burn-in recovery and probable server-transcoder startup failures without side effects | `playerRecoveryPolicy` helpers |
 | Keep PlayerPanel loader decisions pure/testable | `buildPlayerPlaybackSettingsSnapshot` / `resolveInitialTrackSelection` / `resolvePlaybackVideoUrl` / `selectHlsEnginePreference` |
 | Normalize PlayerPanel subtitle renderer failure and fallback status names, and route renderer failures into burn-in/no-subtitle consent decisions | `normalizeSubtitleRendererFailureReason` / `getSubtitleBurnInFallbackStatus` / `runSubtitleBurnInFallbackDecision` |
 | Resolve raw subtitle fetch format priority from Jellyfin subtitle codecs | `getRawSubtitleFormats` |

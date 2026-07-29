@@ -1,6 +1,10 @@
 import {act, renderHook} from '@testing-library/react';
 import {usePlayerRecoveryHandlers} from '../usePlayerRecoveryHandlers';
 import {createPlaybackRuntimeContext} from '../../utils/playbackRuntimeContext';
+import {
+	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
+	SERVER_TRANSCODING_FAILURE_MESSAGE
+} from '../../utils/playerRecoveryPolicy';
 
 const createProps = () => {
 	const runtimeContext = createPlaybackRuntimeContext({
@@ -55,6 +59,7 @@ const createProps = () => {
 			requestSubtitleBurnInFallback: jest.fn(),
 			requestPlaybackDecision: jest.fn(),
 			exitInProgressRef: {current: false},
+			playbackStartedRef: {current: false},
 			playbackGenerationRef: {current: 3},
 			playbackRuntimeContextRef: {current: runtimeContext}
 		}
@@ -97,5 +102,47 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 		});
 
 		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+	});
+
+	it('reports an exhausted initial transcode fragment failure as a server startup failure', () => {
+		const {props} = createProps();
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 3,
+			itemId: 'item-1',
+			mediaSourceData: {
+				Id: 'source-1',
+				TranscodingUrl: '/Videos/item-1/master.m3u8'
+			},
+			playMethod: 'Transcode'
+		});
+		const hls = {
+			stopLoad: jest.fn(),
+			destroy: jest.fn()
+		};
+		props.hlsRef.current = hls;
+		props.reloadAttemptedRef.current = true;
+		props.playbackRuntimeContextRef.current = runtimeContext;
+
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		act(() => {
+			expect(result.current.attemptHlsFatalRecovery(
+				hls,
+				{
+					type: 'networkError',
+					details: 'fragLoadError',
+					fatal: true,
+					response: {code: 500}
+				},
+				'HLS.js',
+				runtimeContext
+			)).toBe(true);
+		});
+
+		expect(props.setError).toHaveBeenCalledWith(SERVER_TRANSCODING_FAILURE_MESSAGE);
+		expect(props.appendPlaybackDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+			reason: 'server-transcoder-startup-failure',
+			message: SERVER_TRANSCODING_FAILURE_DIAGNOSTIC
+		}));
 	});
 });

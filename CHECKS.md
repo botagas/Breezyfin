@@ -61,7 +61,11 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
-- None.
+- Force a server-side transcode startup failure and verify the Player reports
+  `Server transcoding failed` rather than generic format support. With Diagnostics
+  enabled, verify the runtime trail includes the exit-code 159/systemd syscall-policy
+  guidance; DirectPlay failures and failures after playback starts must retain their
+  existing classifications.
 
 ### Navigation/focus validation
 

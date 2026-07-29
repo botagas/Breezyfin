@@ -3,6 +3,10 @@ import {fireEvent, render, screen} from '@testing-library/react';
 import {KeyCodes} from '../../../../utils/keyCodes';
 import PlayerErrorPopup from '../PlayerErrorPopup';
 import {usePlayerKeyboardShortcuts} from '../../hooks/usePlayerKeyboardShortcuts';
+import {
+	SERVER_TRANSCODING_FAILURE_MESSAGE,
+	SERVER_TRANSCODING_FAILURE_TITLE
+} from '../../utils/playerRecoveryPolicy';
 
 jest.mock('@enact/sandstone/Popup', () => function TestPopup({children, open}) {
 	return open ? <section>{children}</section> : null;
@@ -33,7 +37,7 @@ jest.mock('../../../../components/BreezyButton', () => function TestButton({
 	);
 });
 
-const Harness = ({onRetry, onBack}) => {
+const Harness = ({onRetry, onBack, error = 'Format not supported'}) => {
 	usePlayerKeyboardShortcuts({
 		isActive: true,
 		onUserInteraction: jest.fn(),
@@ -57,7 +61,7 @@ const Harness = ({onRetry, onBack}) => {
 	return (
 		<PlayerErrorPopup
 			open
-			error="Format not supported"
+			error={error}
 			onClose={jest.fn()}
 			onRetry={onRetry}
 			onBack={onBack}
@@ -106,5 +110,19 @@ describe('PlayerErrorPopup activation', () => {
 
 		expect(onBack).toHaveBeenCalledTimes(1);
 		expect(onRetry).not.toHaveBeenCalled();
+	});
+
+	it('renders the dedicated server-transcoding title and guidance', () => {
+		render(
+			<Harness
+				onRetry={jest.fn()}
+				onBack={jest.fn()}
+				error={SERVER_TRANSCODING_FAILURE_MESSAGE}
+			/>
+		);
+
+		expect(screen.getByText(SERVER_TRANSCODING_FAILURE_TITLE)).toBeTruthy();
+		expect(screen.getByText(SERVER_TRANSCODING_FAILURE_MESSAGE)).toBeTruthy();
+		expect(screen.queryByText('Playback Error')).toBeNull();
 	});
 });

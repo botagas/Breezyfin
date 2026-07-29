@@ -164,6 +164,11 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Runtime diagnostics ownership: `src/hooks/useRuntimeDiagnostics.js` publishes the master collection state and clears shared media metric state when disabled. Collect optional metrics only after checking this context; do not merely hide their UI.
 - Rendered integration tests: `src/testUtils/renderWithBreezyfin.js` installs the Sandstone theme and Spotlight root. Use it for Popup lifecycle, Toolbar focus, Player prompt Back, and virtual-grid restoration contracts after pure helper coverage is in place.
 - Player recovery policy: pure subtitle/burn-in recovery classification lives in `src/views/player-panel/utils/playerRecoveryPolicy.js`; `usePlayerRecoveryHandlers` owns side effects and must not duplicate policy derivation.
+- Initial failures on a confirmed Transcode path are reported as probable server-transcoder
+  startup failures only when playback has not started and the client receives an HLS
+  fragment `5xx` or native media code 4. The user-facing message must not assert an exact
+  FFmpeg cause; exit-code 159/systemd guidance belongs in diagnostics because Jellyfin
+  does not normally expose the FFmpeg exit reason through the media response.
 - Runtime suspension: App and paused-Player screensavers publish suspension reasons through `src/hooks/useRuntimeSuspension.js`. Covered animation, clock, optional diagnostic, progress, stall, and manual subtitle-sync work must subscribe to that shared signal rather than adding screen-specific global flags.
 - Inactivity handling: App and paused-Player screensavers share deadline scheduling through `src/hooks/useInactivityDeadline.js`; activity extends one deadline instead of rebuilding a timer per input event. Prefer pointer events, use mouse fallback only when Pointer Events are unavailable, and keep idle listeners passive.
 - Jellyfin subtitle fetch contract: `src/services/jellyfin/subtitleApi.js` returns structured event and raw text results for client-side rendering.

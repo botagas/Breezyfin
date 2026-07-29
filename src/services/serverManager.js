@@ -1,6 +1,7 @@
 const SERVERS_KEY = 'breezyfin_servers';
 const ACTIVE_SERVER_KEY = 'breezyfin_active_server';
 const ACTIVE_USER_KEY = 'breezyfin_active_user';
+let fallbackIdSequence = 0;
 
 const safeJsonParse = (value, fallback) => {
 	try {
@@ -31,7 +32,19 @@ const persistActive = (serverId, userId) => {
 	localStorage.setItem(ACTIVE_USER_KEY, userId || '');
 };
 
-const generateId = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+const generateId = (prefix) => {
+	const cryptoProvider = typeof globalThis !== 'undefined' ? globalThis.crypto : null;
+	if (cryptoProvider?.getRandomValues) {
+		const randomValues = new Uint32Array(2);
+		cryptoProvider.getRandomValues(randomValues);
+		const randomSuffix = Array.from(randomValues, (value) => value.toString(36)).join('');
+		return `${prefix}_${Date.now().toString(36)}_${randomSuffix}`;
+	}
+
+	// Legacy webOS fallback: uniqueness is required here, not unpredictability.
+	fallbackIdSequence = (fallbackIdSequence + 1) >>> 0;
+	return `${prefix}_${Date.now().toString(36)}_${fallbackIdSequence.toString(36)}`;
+};
 
 const getActiveIds = () => {
 	if (typeof localStorage === 'undefined') return { serverId: null, userId: null };

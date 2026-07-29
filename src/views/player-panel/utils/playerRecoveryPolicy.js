@@ -7,6 +7,26 @@ import {
 
 const HDR_DYNAMIC_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
 
+export const SERVER_TRANSCODING_FAILURE_TITLE = 'Server transcoding failed';
+export const SERVER_TRANSCODING_FAILURE_MESSAGE =
+	'Jellyfin could not start the requested video transcode. This could be an issue with FFmpeg, hardware-acceleration, permissions, service-sandbox configuration, or else. Check the latest Jellyfin FFmpeg log.';
+export const SERVER_TRANSCODING_FAILURE_DIAGNOSTIC =
+	'If Jellyfin reports FFmpeg exit code 159 on a systemd installation, the service syscall policy may be terminating FFmpeg. Review SystemCallFilter and SystemCallErrorNumber.';
+
+export const isServerTranscodingStartupFailure = ({
+	isTranscoding = false,
+	playbackStarted = false,
+	mediaErrorCode = null,
+	errorData = null
+} = {}) => {
+	if (!isTranscoding || playbackStarted) return false;
+	if (Number(mediaErrorCode) === 4) return true;
+	const statusCode = Number(errorData?.response?.code ?? errorData?.response?.status);
+	return errorData?.details === 'fragLoadError' &&
+		Number.isFinite(statusCode) &&
+		statusCode >= 500;
+};
+
 export const getSubtitleFallbackContext = (mediaSourceData, {burnInRequestedOverride = false} = {}) => {
 	const policy = mediaSourceData?.__debugSubtitlePolicy || {};
 	const burnInRequested = burnInRequestedOverride ||

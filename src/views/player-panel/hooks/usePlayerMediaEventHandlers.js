@@ -8,6 +8,11 @@ import {
 	isBitmapSubtitleCodec,
 	normalizeSubtitleCodec
 } from '../../../utils/playbackSelection';
+import {
+	isServerTranscodingStartupFailure,
+	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
+	SERVER_TRANSCODING_FAILURE_MESSAGE
+} from '../utils/playerRecoveryPolicy';
 
 const isImageSubtitleBurnInPlaybackPath = ({video, mediaSourceData, currentSubtitleTrack}) => {
 	const values = [
@@ -202,13 +207,32 @@ export const usePlayerMediaEventHandlers = ({
 			}
 		}
 
+		const serverTranscodingStartupFailure = isServerTranscodingStartupFailure({
+			isTranscoding: isCurrentTranscoding,
+			playbackStarted: playbackStartedRef.current,
+			mediaErrorCode: mediaError?.code
+		});
+		if (serverTranscodingStartupFailure) {
+			appendPlaybackDiagnostic?.({
+				scope: 'transcode',
+				stage: 'startup-failure',
+				status: 'error',
+				reason: 'server-transcoder-startup-failure',
+				message: SERVER_TRANSCODING_FAILURE_DIAGNOSTIC
+			});
+		}
 		try {
 			await handleStop();
 		} catch (stopErr) {
 			console.warn('Error while handling playback failure:', stopErr);
 		}
-		showPlaybackError(errorMessage);
+		showPlaybackError(
+			serverTranscodingStartupFailure
+				? SERVER_TRANSCODING_FAILURE_MESSAGE
+				: errorMessage
+		);
 	}, [
+		appendPlaybackDiagnostic,
 		attemptSubtitleCompatibilityFallback,
 		attemptTranscodeFallback,
 		currentSubtitleTrack,
@@ -218,6 +242,7 @@ export const usePlayerMediaEventHandlers = ({
 		isSubtitleCompatibilityError,
 		mediaSourceData,
 		playbackFailureLockedRef,
+		playbackStartedRef,
 		playbackSettingsRef,
 		showPlaybackError,
 		videoRef

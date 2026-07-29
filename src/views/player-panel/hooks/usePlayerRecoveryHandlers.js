@@ -17,8 +17,11 @@ import {
 	hasRequestedSubtitleBurnIn,
 	hasSubtitleCodecUnsupportedReason,
 	isKnownImageSubtitleBurnInFailure,
+	isServerTranscodingStartupFailure,
 	isSubtitleBurnInPlaybackFailure,
 	isSubtitleBurnInPlaybackPath,
+	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
+	SERVER_TRANSCODING_FAILURE_MESSAGE,
 	shouldRequireSubtitleBurnInConsent,
 	shouldRetrySubtitleBurnInWithSafeProfile
 } from '../utils/playerRecoveryPolicy';
@@ -62,6 +65,7 @@ export const usePlayerRecoveryHandlers = ({
 	requestSubtitleBurnInFallback,
 	requestPlaybackDecision,
 	exitInProgressRef,
+	playbackStartedRef,
 	playbackGenerationRef,
 	playbackRuntimeContextRef
 }) => {
@@ -732,6 +736,25 @@ export const usePlayerRecoveryHandlers = ({
 				if (rebuilt) {
 					return true;
 				}
+				const activeMediaSourceData = runtimeContext?.mediaSourceData || mediaSourceData;
+				const isTranscodingPath = runtimeContext?.playMethod === 'Transcode' ||
+					activeMediaSourceData?.__selectedPlayMethod === 'Transcode' ||
+					Boolean(activeMediaSourceData?.TranscodingUrl);
+				if (isServerTranscodingStartupFailure({
+					isTranscoding: isTranscodingPath,
+					playbackStarted: playbackStartedRef.current,
+					errorData
+				})) {
+					appendPlaybackDiagnostic?.({
+						scope: 'transcode',
+						stage: 'startup-failure',
+						status: 'error',
+						reason: 'server-transcoder-startup-failure',
+						message: SERVER_TRANSCODING_FAILURE_DIAGNOSTIC
+					});
+					showPlaybackError(SERVER_TRANSCODING_FAILURE_MESSAGE);
+					return true;
+				}
 				showPlaybackError(
 					'Playback failed after session rebuild attempt. Please retry or go back.'
 				);
@@ -779,6 +802,9 @@ export const usePlayerRecoveryHandlers = ({
 		hlsNetworkRecoveryAttemptsRef,
 		maxHlsMediaRecoveryAttempts,
 		maxHlsNetworkRecoveryAttempts,
+		mediaSourceData,
+		appendPlaybackDiagnostic,
+		playbackStartedRef,
 		playbackFailureLockedRef,
 		exitInProgressRef,
 		isHlsRuntimeActive,

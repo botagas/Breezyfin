@@ -2,8 +2,12 @@ import {
 	extractSubtitleStreamIndexFromValues,
 	hasRequestedSubtitleBurnIn,
 	isKnownImageSubtitleBurnInFailure,
+	isServerTranscodingStartupFailure,
 	isSubtitleBurnInPlaybackFailure,
 	isSubtitleBurnInPlaybackPath,
+	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
+	SERVER_TRANSCODING_FAILURE_MESSAGE,
+	SERVER_TRANSCODING_FAILURE_TITLE,
 	shouldRetrySubtitleBurnInWithSafeProfile
 } from '../../utils/playerRecoveryPolicy';
 import {classifyHlsError} from '../../utils/hlsErrorClassification';
@@ -194,5 +198,57 @@ describe('HLS error classification', () => {
 			subtitleCandidate: false,
 			recoverableBySessionRebuild: false
 		}));
+	});
+});
+
+describe('server transcoder startup failure classification', () => {
+	it('classifies an initial transcoded HLS fragment 500', () => {
+		expect(isServerTranscodingStartupFailure({
+			isTranscoding: true,
+			playbackStarted: false,
+			errorData: {
+				details: 'fragLoadError',
+				response: {code: 500}
+			}
+		})).toBe(true);
+	});
+
+	it('classifies an initial native format error on a transcoding path', () => {
+		expect(isServerTranscodingStartupFailure({
+			isTranscoding: true,
+			playbackStarted: false,
+			mediaErrorCode: 4
+		})).toBe(true);
+	});
+
+	it('does not relabel direct, later, or non-server failures', () => {
+		expect(isServerTranscodingStartupFailure({
+			isTranscoding: false,
+			playbackStarted: false,
+			mediaErrorCode: 4
+		})).toBe(false);
+		expect(isServerTranscodingStartupFailure({
+			isTranscoding: true,
+			playbackStarted: true,
+			mediaErrorCode: 4
+		})).toBe(false);
+		expect(isServerTranscodingStartupFailure({
+			isTranscoding: true,
+			playbackStarted: false,
+			errorData: {
+				details: 'fragLoadError',
+				response: {code: 404}
+			}
+		})).toBe(false);
+	});
+
+	it('keeps the user and diagnostic copy stable', () => {
+		expect(SERVER_TRANSCODING_FAILURE_TITLE).toBe('Server transcoding failed');
+		expect(SERVER_TRANSCODING_FAILURE_MESSAGE).toContain(
+			'Check the latest Jellyfin FFmpeg log.'
+		);
+		expect(SERVER_TRANSCODING_FAILURE_DIAGNOSTIC).toContain(
+			'FFmpeg exit code 159'
+		);
 	});
 });
