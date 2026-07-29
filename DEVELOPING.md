@@ -51,7 +51,7 @@ Targeted audit commands:
 - `npm run audit:runtime-debug` (leftover `console.log`, `console.debug`, or `debugger` in app source)
 - `npm run audit:sensitive-logging` (raw playback URLs or console arguments that bypass shared redaction)
 - `npm run audit:portability` (machine-specific paths and unredacted token literals)
-- `npm run audit:private-refs` (external-client/test-media references and backup artifacts outside intentional README attribution)
+- `npm run audit:repository-hygiene` (backup/temporary artifacts plus optional local-only literal checks)
 - `npm run audit:runtime-deps` (mixed or unexpected Enact, Sandstone, React, or iLib production generations)
 - `npm run audit:licenses` (stale production dependency and copied-asset notices)
 - `npm run audit:service-boundaries` (direct Jellyfin API/request-module imports outside services/tests)
@@ -109,8 +109,9 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Player remote/media-key handler: `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
 - Player controls-visibility synchronization: `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
 - Player wheel/pointer-edge controls reveal: `src/views/player-panel/hooks/usePlayerInteractionReveal.js`
-- Player video load/session orchestration: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
-- Player video/client-subtitle readiness gate: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
+- Player playback negotiation and resolved-source descriptors: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
+- Player native/native-HLS/HLS.js source ownership: `src/views/player-panel/hooks/usePlayerSourcePipeline.js`
+- Player engine/client-subtitle/SyncPlay readiness gate: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
 - Player generation-aware serialized reporting: `src/views/player-panel/hooks/usePlayerPlaybackReporter.js`
 - Player playback option/session-context derivation: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
 - Player skip/prompt state machine: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
@@ -141,18 +142,31 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - SyncPlay Player startup: `src/views/player-panel/utils/syncPlayStartupBridge.js` joins
   `usePlayerStartupCoordinator` and `useNativeSyncPlay` without transferring queue
   ownership into Player. While following, prepare the source paused, report Ready only
-  after source, subtitle, and clock readiness, and call `video.play()` only for
+  after engine, subtitle, and clock readiness, and call `video.play()` only for
   authoritative Unpause. Normal native playback requests `video.play()` after source
   assignment and client-subtitle readiness; `canplay` is diagnostic evidence, not a gate.
-- Player startup authority belongs to `usePlayerStartupCoordinator`. Loader hooks may
-  register sources but must not add competing startup timers. Playback completion and
-  Jellyfin `PlaybackStart` reporting are committed once from the active generation after
-  a resolved `play()` request, `playing`, or genuine timeline advancement.
+- Source ownership belongs to `usePlayerSourcePipeline`. `usePlayerVideoLoader` negotiates
+  and supplies an immutable descriptor but must not assign `video.src`, call
+  `video.load()`, construct HLS.js, or detach media. HLS.js resets native media before
+  attachment, receives no native lifecycle reset while it owns the attached MediaSource,
+  calls `loadSource` from `MEDIA_ATTACHED`, and becomes engine-ready only after the first
+  current-generation `FRAG_BUFFERED`. Recovery hooks choose bounded policy actions
+  through the pipeline instead of owning source adapters.
+- Player startup authority belongs to `usePlayerStartupCoordinator`. Source and loader
+  hooks must not add competing playback-start timers. Engine bootstrap, client-subtitle
+  preparation, and post-`play()` progress have independent deadlines. The subtitle
+  deadline is keyed to the source/track and must not restart when engine readiness or
+  renderer diagnostics rerender. Playback completion and Jellyfin `PlaybackStart`
+  reporting are committed once from the active generation after its engine is ready,
+  its `play()` request has been issued, and that request resolves or produces `playing`
+  or genuine timeline advancement.
 - Playback runtime isolation: create the immutable context in
   `src/views/player-panel/utils/playbackRuntimeContext.js` before source attachment.
-  Native media events must also match the active source token and video element. Every
-  native/HLS callback and asynchronous recovery continuation must match its runtime
-  context and playback generation before taking action.
+  Every adapter replacement creates a new immutable source token. Native media events
+  must match that token, video element, and attachment time; HLS.js media errors stay
+  on its generation-bound `Hls.Events.ERROR` path. HLS callbacks, timers, renderer-ready state,
+  and asynchronous recovery continuations must match the active token, runtime context,
+  and playback generation before taking action.
 - Playback reporting is serialized by `usePlayerPlaybackReporter`; direct reporting calls
   from controls, seek handlers, or timers would bypass pause-state coalescing and are not
   allowed.

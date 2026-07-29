@@ -3,6 +3,7 @@ import {act, renderHook, waitFor} from '@testing-library/react';
 import {usePlayerStartupCoordinator} from '../usePlayerStartupCoordinator';
 import {
 	PLAYER_PLAYBACK_START_TIMEOUT_MS,
+	PLAYER_HLS_ENGINE_STARTUP_TIMEOUT_MS,
 	PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS,
 	getPlayerStartupState,
 	isInterruptedPlaybackStartError
@@ -69,6 +70,50 @@ const createCoordinatorProps = ({syncPlayStartupBridge = createSyncPlayStartupBr
 	};
 };
 
+const configureClientSubtitleSource = (
+	view,
+	subtitleRendererState = {status: 'loading'}
+) => {
+	const runtimeContext = createPlaybackRuntimeContext({
+		generation: 1,
+		itemId: 'item-1',
+		mediaSourceData: {Id: 'source-1'},
+		playMethod: 'DirectPlay',
+		subtitlePolicy: {clientRender: true},
+		selectedSubtitleTrack: 2
+	});
+	view.sourceToken = createNativePlaybackSourceToken({
+		runtimeContext,
+		video: view.video,
+		sourceUrl: 'video.mkv'
+	});
+	view.props.playbackRuntimeContextRef.current = runtimeContext;
+	view.props.nativeSourceTokenRef.current = view.sourceToken;
+	view.props.currentSubtitleTrack = 2;
+	view.props.subtitleRendererPolicy = {clientRender: true};
+	view.props.subtitleRendererState = subtitleRendererState;
+	return view;
+};
+
+const markClientSubtitleReady = (view) => {
+	view.props.subtitleRendererState = {
+		status: 'ready',
+		debug: {cacheKey: 'item-1:source-1:1:2'}
+	};
+};
+
+const expectClientSubtitleGateThenStart = async ({view, result, rerender}) => {
+	act(() => {
+		result.current.registerPlaybackSource(view.sourceToken);
+	});
+	await waitFor(() => expect(result.current.status).toBe('waiting-subtitles'));
+	expect(view.video.play).not.toHaveBeenCalled();
+
+	markClientSubtitleReady(view);
+	rerender();
+	await waitFor(() => expect(view.video.play).toHaveBeenCalledTimes(1));
+};
+
 describe('usePlayerStartupCoordinator state', () => {
 	afterEach(() => {
 		jest.useRealTimers();
@@ -112,10 +157,109 @@ describe('usePlayerStartupCoordinator state', () => {
 			subtitleRendererPolicy: {clientRender: true}
 		};
 		expect(getPlayerStartupState({...baseState, subtitleRendererStatus: 'ready'})).toBe('starting');
+		expect(getPlayerStartupState({
+			...baseState,
+			subtitleRendererStatus: 'ready',
+			subtitleRendererReadyForSource: false
+		})).toBe('waiting-subtitles');
 		expect(getPlayerStartupState({...baseState, subtitleRendererStatus: 'fetch-failed'})).toBe('failed');
 		expect(getPlayerStartupState({...baseState, subtitleRendererStatus: 'timed-out'})).toBe('timed-out');
 		expect(PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS).toBe(15000);
 		expect(PLAYER_PLAYBACK_START_TIMEOUT_MS).toBe(12000);
+		expect(PLAYER_HLS_ENGINE_STARTUP_TIMEOUT_MS).toBe(30000);
+	});
+
+	it('waits for HLS.js engine readiness before requesting playback', async () => {
+		const view = createCoordinatorProps();
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken, {engineReady: false});
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-engine'));
+		expect(view.video.play).not.toHaveBeenCalled();
+
+		act(() => {
+			result.current.reportPlaybackEngineReady(
+				view.sourceToken,
+				'first-fragment-buffered'
+			);
+		});
+		await waitFor(() => expect(view.video.play).toHaveBeenCalledTimes(1));
+	});
+
+	it('rejects playback evidence and direct start requests before engine readiness', async () => {
+		const view = createCoordinatorProps();
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken, {engineReady: false});
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-engine'));
+
+		await act(async () => {
+			expect(result.current.reportPlaybackEvidence(
+				'playing-event',
+				view.sourceToken
+			)).toBe(false);
+			await expect(result.current.requestPlaybackStart()).resolves.toBe(false);
+		});
+
+		expect(view.video.play).not.toHaveBeenCalled();
+		expect(view.props.reportPlaybackStartedOnce).not.toHaveBeenCalled();
+	});
+
+	it('identifies server subtitle transcode preparation while HLS.js is bootstrapping', async () => {
+		const view = createCoordinatorProps();
+		view.sourceToken = Object.freeze({
+			...view.sourceToken,
+			engine: 'hls.js',
+			serverBurnIn: true
+		});
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken, {engineReady: false});
+		});
+
+		await waitFor(() => {
+			expect(view.props.setLoadingStatusMessage).toHaveBeenCalledWith(
+				'Preparing server subtitle transcode...'
+			);
+		});
+		expect(view.video.play).not.toHaveBeenCalled();
+	});
+
+	it('keeps client subtitle readiness independent from HLS engine readiness', async () => {
+		const view = configureClientSubtitleSource(createCoordinatorProps());
+		const {result, rerender} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken, {engineReady: false});
+		});
+		act(() => {
+			result.current.reportPlaybackEngineReady(
+				view.sourceToken,
+				'first-fragment-buffered'
+			);
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-subtitles'));
+		expect(view.video.play).not.toHaveBeenCalled();
+
+		markClientSubtitleReady(view);
+		rerender();
+		await waitFor(() => expect(view.video.play).toHaveBeenCalledTimes(1));
+	});
+
+	it('does not let a previous source renderer satisfy the new subtitle gate', async () => {
+		const view = configureClientSubtitleSource(createCoordinatorProps(), {
+			status: 'ready',
+			debug: {cacheKey: 'old-item:old-source:0:2'}
+		});
+		const {result, rerender} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		await expectClientSubtitleGateThenStart({view, result, rerender});
 	});
 
 	it('requests normal playback after source assignment without waiting for canplay', async () => {
@@ -133,21 +277,86 @@ describe('usePlayerStartupCoordinator state', () => {
 	});
 
 	it('keeps client-rendered subtitles as the only readiness gate before play', async () => {
-		const view = createCoordinatorProps();
-		view.props.currentSubtitleTrack = 2;
-		view.props.subtitleRendererPolicy = {clientRender: true};
-		view.props.subtitleRendererState = {status: 'loading'};
+		const view = configureClientSubtitleSource(createCoordinatorProps());
 		const {result, rerender} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		await expectClientSubtitleGateThenStart({view, result, rerender});
+	});
+
+	it('rejects authoritative start requests while client subtitles are pending', async () => {
+		const syncPlayStartupBridge = createSyncPlayStartupBridge();
+		syncPlayStartupBridge.registerSyncPlayHandlers({
+			shouldBlockAutomaticStart: () => true,
+			reportVideoReady: jest.fn().mockResolvedValue(true)
+		});
+		const view = configureClientSubtitleSource(
+			createCoordinatorProps({syncPlayStartupBridge})
+		);
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
 
 		act(() => {
 			result.current.registerPlaybackSource(view.sourceToken);
 		});
 		await waitFor(() => expect(result.current.status).toBe('waiting-subtitles'));
-		expect(view.video.play).not.toHaveBeenCalled();
 
-		view.props.subtitleRendererState = {status: 'ready'};
+		await act(async () => {
+			await expect(syncPlayStartupBridge.startAuthoritativePlayback()).resolves.toBe(false);
+		});
+
+		expect(view.video.play).not.toHaveBeenCalled();
+		expect(view.props.reportPlaybackStartedOnce).not.toHaveBeenCalled();
+	});
+
+	it('keeps one subtitle deadline when engine readiness rerenders startup', async () => {
+		jest.useFakeTimers();
+		const view = configureClientSubtitleSource(createCoordinatorProps());
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken, {engineReady: false});
+		});
+		await act(async () => {
+			jest.advanceTimersByTime(10000);
+			await Promise.resolve();
+		});
+		expect(view.props.onSubtitleTimeout).not.toHaveBeenCalled();
+
+		act(() => {
+			result.current.reportPlaybackEngineReady(
+				view.sourceToken,
+				'first-fragment-buffered'
+			);
+		});
+		await act(async () => {
+			jest.advanceTimersByTime(PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS - 10000);
+			await Promise.resolve();
+		});
+
+		expect(view.props.onSubtitleTimeout).toHaveBeenCalledTimes(1);
+		expect(view.video.play).not.toHaveBeenCalled();
+	});
+
+	it('cancels the subtitle deadline when renderer preparation fails explicitly', async () => {
+		jest.useFakeTimers();
+		const view = configureClientSubtitleSource(createCoordinatorProps());
+		const {result, rerender} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken);
+		});
+		await act(async () => {
+			jest.advanceTimersByTime(10000);
+			await Promise.resolve();
+		});
+
+		view.props.subtitleRendererState = {status: 'fetch-failed'};
 		rerender();
-		await waitFor(() => expect(view.video.play).toHaveBeenCalledTimes(1));
+		await act(async () => {
+			jest.advanceTimersByTime(PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS);
+			await Promise.resolve();
+		});
+
+		expect(view.props.onSubtitleTimeout).not.toHaveBeenCalled();
 	});
 
 	it('accepts playback evidence while play is pending and ignores its late rejection', async () => {
@@ -254,5 +463,57 @@ describe('usePlayerStartupCoordinator state', () => {
 		expect(view.video.play).toHaveBeenCalledTimes(1);
 		expect(view.props.reportPlaybackStartedOnce).toHaveBeenCalledTimes(1);
 		expect(view.props.startProgressReporting).toHaveBeenCalledTimes(1);
+	});
+
+	it('ignores playback evidence while SyncPlay is waiting for authoritative start', async () => {
+		const syncPlayStartupBridge = createSyncPlayStartupBridge();
+		syncPlayStartupBridge.registerSyncPlayHandlers({
+			shouldBlockAutomaticStart: () => true,
+			reportVideoReady: jest.fn().mockResolvedValue(true)
+		});
+		const view = createCoordinatorProps({syncPlayStartupBridge});
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken);
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-syncplay'));
+
+		act(() => {
+			expect(result.current.reportPlaybackEvidence(
+				'playing-event',
+				view.sourceToken
+			)).toBe(false);
+		});
+
+		expect(view.props.reportPlaybackStartedOnce).not.toHaveBeenCalled();
+		expect(view.props.startProgressReporting).not.toHaveBeenCalled();
+	});
+
+	it('does not report SyncPlay ready before the HLS engine is ready', async () => {
+		const syncPlayStartupBridge = createSyncPlayStartupBridge();
+		const reportVideoReady = jest.fn().mockResolvedValue(true);
+		syncPlayStartupBridge.registerSyncPlayHandlers({
+			shouldBlockAutomaticStart: () => true,
+			reportVideoReady
+		});
+		const view = createCoordinatorProps({syncPlayStartupBridge});
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken, {engineReady: false});
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-engine'));
+		expect(reportVideoReady).not.toHaveBeenCalled();
+
+		act(() => {
+			result.current.reportPlaybackEngineReady(
+				view.sourceToken,
+				'first-fragment-buffered'
+			);
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-syncplay'));
+		expect(reportVideoReady).toHaveBeenCalledTimes(1);
+		expect(view.video.play).not.toHaveBeenCalled();
 	});
 });

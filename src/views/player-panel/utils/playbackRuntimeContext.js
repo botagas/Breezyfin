@@ -40,16 +40,27 @@ export const createNativePlaybackSourceToken = ({
 	runtimeContext,
 	video,
 	sourceUrl,
-	engine = 'native'
+	engine = 'native',
+	sourceGeneration = runtimeContext?.generation,
+	serverBurnIn = false,
+	attachedAtEpochMs = Date.now(),
+	attachedAtEventTime = (
+		typeof performance !== 'undefined' &&
+		typeof performance.now === 'function'
+	) ? performance.now() : 0
 }) => Object.freeze({
 	generation: runtimeContext?.generation,
+	sourceGeneration,
 	itemId: runtimeContext?.itemId || '',
 	mediaSourceId: runtimeContext?.mediaSourceId || '',
 	playMethod: runtimeContext?.playMethod || '',
 	runtimeContext,
 	video,
 	sourceUrl: String(sourceUrl || ''),
-	engine
+	engine,
+	serverBurnIn: serverBurnIn === true,
+	attachedAtEpochMs,
+	attachedAtEventTime
 });
 
 export const isNativePlaybackSourceTokenCurrent = ({
@@ -67,4 +78,33 @@ export const isNativePlaybackSourceTokenCurrent = ({
 	sourceToken.video &&
 	(!eventTarget || eventTarget === sourceToken.video) &&
 	exitInProgress !== true
+);
+
+const isEventAfterSourceAttachment = (event, sourceToken) => {
+	const eventTime = Number(event?.timeStamp);
+	if (!(eventTime > 0)) return true;
+	const attachedAt = eventTime >= 1e12
+		? Number(sourceToken?.attachedAtEpochMs)
+		: Number(sourceToken?.attachedAtEventTime);
+	return !Number.isFinite(attachedAt) || eventTime >= attachedAt;
+};
+
+export const isPlaybackSourceMediaEventCurrent = ({
+	event,
+	sourceToken,
+	activeSourceToken,
+	activeRuntimeContext,
+	generation,
+	exitInProgress = false
+}) => (
+	isNativePlaybackSourceTokenCurrent({
+		sourceToken,
+		activeSourceToken,
+		activeRuntimeContext,
+		generation,
+		eventTarget: event?.currentTarget || event?.target || null,
+		exitInProgress
+	}) &&
+	isEventAfterSourceAttachment(event, sourceToken) &&
+	!(sourceToken?.engine === 'hls.js' && event?.type === 'error')
 );

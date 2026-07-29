@@ -22,7 +22,7 @@ This guide covers shared UI components in `src/components/`.
   vertical viewport so Sandstone has one scroll owner rather than nested vertical scrollers.
   When controls must remain before an empty explanation, render a panel-local contained
   state after those controls rather than using the layout's pre-content `emptyMessage`.
-  provider details should use `ProviderItemPopup` so Popup close and Spotlight cleanup
+  Provider details should use `ProviderItemPopup` so Popup close and Spotlight cleanup
   complete before the item state is cleared. The popup mounts content inside the shared
   tokenized `popupSurface`, bounds and scrolls long descriptions, and uses
   `PanelActionButton` for its Close action. Pass the provider item so available type,
@@ -45,9 +45,9 @@ This guide covers shared UI components in `src/components/`.
   retain Sandstone's selected state while sharing the same persistent Selected marker
   and complete rounded active surface instead of relying on focus alone.
 - Generic buttons use the shared `--bf-theme-button-fg*` text-state tokens so pointer
-  hover and Spotlight focus do not change labels/icons to an unrelated accent color.
-  Keep accent, danger, warning, favorite, and text-on-light colors for explicit
-  selected or semantic states rather than generic focus.
+  hover and Spotlight focus use the active theme accent consistently. Primary, danger,
+  warning, favorite, selected, and text-on-light actions keep explicit semantic
+  foreground overrides.
 - Use `MediaCardImage` for shared grid/Home artwork. It owns opacity-only reveal, ordered source fallback through `useImageErrorFallback`, explicit dimensions, eager loading for already-virtualized cards, and opt-in performance metrics without parent-card state updates. Source changes reset visual state in a layout effect so recycled virtual items cannot hide an already-loaded cached image. Shared card consumers preserve item-provided authenticated provider candidates before generated Jellyfin artwork fallbacks.
 
 ## Styling
@@ -68,8 +68,8 @@ This guide covers shared UI components in `src/components/`.
 - Keep focus/selected visuals consistent with toolbar/media-details/player button states.
 - For image components, route format and ordered source fallback through `useImageErrorFallback`; do not add per-panel image-error state machines or infer parent artwork by mutating IDs inside URLs.
 - Use `PosterMediaCard` with `variant="poster-grid"` for Search/Favorites-style grids and `variant="landscape-grid"` for Library-like grids. `PanelPosterMediaCard` defaults to the landscape variant and owns watched/progress presentation; panels should not pass CSS-module class-slot maps for shared image, placeholder, title, or status styling. Put panel-specific status pills in `contextBadgeExtras` so they share the card's top-left badge stack instead of reproducing badge offsets.
-- `BreezyfinWindMark` owns the bundled transparent logo, shared pulse, and brand/white presentation for screensaver surfaces. `BreezyLoadingOverlay` uses the CSS-only three-stroke gust indicator.
-- `ScreensaverOverlay` owns only the moving black-screen presentation, 30 FPS boundary reflection, smooth direction heading, and optional wake message. App-session inactivity belongs to `useAppScreensaver`; paused-player wake/resume behavior belongs to `usePlayerPausedScreensaver`.
+- `BreezyfinWindMark` owns the bundled transparent logo, optional pulse, and brand/white presentation. The screensaver uses its precomputed white asset without the decorative pulse; `BreezyLoadingOverlay` uses the separate CSS-only three-stroke gust indicator.
+- `ScreensaverOverlay` owns only the moving black-screen presentation, elapsed-time `requestAnimationFrame` boundary reflection, smooth direction heading, and optional wake message. App-session inactivity belongs to `useAppScreensaver`; paused-player wake/resume behavior belongs to `usePlayerPausedScreensaver`.
 - Reuse `MediaFilterControls` with `useMediaFilterState` for Library-like filter popups so selected, draft, reset, apply, and first-focus behavior stay aligned.
 - Keep popup-owning components mounted until Sandstone calls `onHide`; do not replace their ancestor with a loading branch during close animations because Spotlight pause/resume cleanup belongs to the Popup lifecycle.
 - Toolbar library selection uses the shared `popupSurface` as its only glass/backdrop composition. Keep theme-specific library button states, but do not stack extra distortion or backdrop-filter layers inside the popup because pointer/focus repaint cost is significant on TVs.

@@ -24,7 +24,7 @@ Run these before packaging a release candidate:
 2. `npm run test -- --watch=false --runInBand`
 3. `npm run audit`
 4. Require `npm audit --omit=dev --audit-level=high` to pass; review the separate unscoped audit's CLI-only findings using `QUALITY.md` rather than applying broad automatic fixes.
-5. Verify `npm run audit:runtime-deps`, `npm run audit:licenses`, and `npm run audit:private-refs` pass as part of the aggregate audit.
+5. Verify `npm run audit:runtime-deps`, `npm run audit:licenses`, and `npm run audit:repository-hygiene` pass as part of the aggregate audit.
 6. Production build: `CI=true npm run pack-p`
 7. Run `npm run report:package-size` and confirm the package contains `LICENSE` and `THIRD_PARTY_NOTICES.txt` but no production subtitle declarations or unnecessary source maps.
 8. Inspect `dist/index.html` and confirm JavaScript/CSS entry assets are relative (`./...`), never `/...` or an HTTP repository path; postpack enforces this for `file://` webOS startup.
@@ -75,6 +75,18 @@ Run these before packaging a release candidate:
 - Verify exhausted startup recovery pauses and detaches media before showing one terminal
   error, so audio cannot continue behind the popup. Exercise Back and source replacement
   while startup is pending to confirm old native/HLS events cannot restart recovery.
+- Test cold and warm Jellyfin ASS burn-in in the Simulator. Confirm the status progresses
+  from `Preparing server subtitle transcode...` to `Starting playback...`, HLS.js does
+  not request playback at `MEDIA_ATTACHED` or `MANIFEST_PARSED`, and a slow first segment
+  is governed by the 30-second engine deadline rather than the 12-second post-play
+  deadline.
+- Test native HLS on TV and its bounded SDR fallback in the Simulator. Confirm fallback
+  creates a new source token, `loadeddata` alone does not cancel fallback, the old native
+  events cannot satisfy startup, and no native `video.load()` occurs while HLS.js owns
+  the attached MediaSource.
+- Test client subtitles and HLS.js with each readiness order: subtitles first and first
+  fragment first. Playback must start only after both are current-generation ready;
+  server burn-in and native subtitle delivery must not wait for a client renderer.
 - During pause, resume, seek, and regular progress ticks, confirm Jellyfin receives one
   serialized reporting request at a time and resume does not send another PlaybackStart.
 - Open audio and subtitle pickers in both Media Details and Player. Confirm the active

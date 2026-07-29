@@ -38,10 +38,15 @@ export const usePlayerStartupCoordinator = ({
 	const [sourceVersion, setSourceVersion] = useState(0);
 	const [status, setStatus] = useState('waiting-source');
 	const sourceTokenRef = useRef(null);
+	const engineReadyRef = useRef(false);
+	const startupGatesReadyRef = useRef(false);
 	const startInFlightRef = useRef(false);
 	const startAttemptRef = useRef(0);
 	const timeoutHandledRef = useRef(false);
 	const syncPlayReadyRequestedRef = useRef(false);
+	const subtitleDeadlineRef = useRef({key: '', timer: null});
+	const subtitleTimeoutCallbackRef = useRef(onSubtitleTimeout);
+	subtitleTimeoutCallbackRef.current = onSubtitleTimeout;
 
 	const clearStartupDeadline = useCallback(() => {
 		if (startupDeadlineTimerRef.current) {
@@ -49,6 +54,13 @@ export const usePlayerStartupCoordinator = ({
 			startupDeadlineTimerRef.current = null;
 		}
 	}, [startupDeadlineTimerRef]);
+
+	const clearSubtitleDeadline = useCallback(() => {
+		if (subtitleDeadlineRef.current.timer) {
+			clearTimeout(subtitleDeadlineRef.current.timer);
+		}
+		subtitleDeadlineRef.current = {key: '', timer: null};
+	}, []);
 
 	const isTokenCurrent = useCallback((sourceToken = sourceTokenRef.current) => (
 		isNativePlaybackSourceTokenCurrent({
@@ -69,42 +81,72 @@ export const usePlayerStartupCoordinator = ({
 		startAttemptRef.current += 1;
 		startInFlightRef.current = false;
 		sourceTokenRef.current = null;
+		engineReadyRef.current = false;
+		startupGatesReadyRef.current = false;
 		clearStartupDeadline();
+		clearSubtitleDeadline();
 		setStatus('waiting-source');
 		setSourceVersion((current) => current + 1);
-	}, [clearStartupDeadline]);
+	}, [clearStartupDeadline, clearSubtitleDeadline]);
 
-	const registerPlaybackSource = useCallback((sourceToken) => {
+	const registerPlaybackSource = useCallback((sourceToken, {engineReady = true} = {}) => {
 		if (!sourceToken || exitInProgressRef.current) return false;
 		sourceTokenRef.current = sourceToken;
+		engineReadyRef.current = engineReady === true;
+		startupGatesReadyRef.current = false;
 		startAttemptRef.current += 1;
 		startInFlightRef.current = false;
 		timeoutHandledRef.current = false;
 		syncPlayReadyRequestedRef.current = false;
 		playbackStartedRef.current = false;
 		clearStartupDeadline();
-		setStatus('waiting-subtitles');
+		clearSubtitleDeadline();
+		setStatus(engineReady ? 'waiting-subtitles' : 'waiting-engine');
 		setSourceVersion((current) => current + 1);
 		appendPlaybackDiagnostic?.({
 			scope: 'startup',
 			stage: 'source-assigned',
-			status: 'ready',
+			status: engineReady ? 'ready' : 'pending',
 			reason: sourceToken.engine,
-			message: `Playback source generation ${sourceToken.generation} is attached.`
+			message: `Playback source generation ${sourceToken.sourceGeneration || sourceToken.generation} is attached.`
 		});
 		return true;
 	}, [
 		appendPlaybackDiagnostic,
 		clearStartupDeadline,
+		clearSubtitleDeadline,
 		exitInProgressRef,
 		playbackStartedRef
 	]);
 
+	const reportPlaybackEngineReady = useCallback((
+		sourceToken = sourceTokenRef.current,
+		signal = 'engine-ready'
+	) => {
+		if (!isTokenCurrent(sourceToken) || engineReadyRef.current) return false;
+		engineReadyRef.current = true;
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'engine-ready',
+			status: 'ready',
+			reason: signal,
+			message: `Playback engine ${sourceToken.engine} is ready for source generation ${sourceToken.sourceGeneration || sourceToken.generation}.`
+		});
+		setSourceVersion((current) => current + 1);
+		return true;
+	}, [appendPlaybackDiagnostic, isTokenCurrent]);
+
 	const commitPlaybackStarted = useCallback((signal = 'unknown', sourceToken = sourceTokenRef.current) => {
-		if (!isTokenCurrent(sourceToken) || playbackStartedRef.current) return false;
+		if (
+			!isTokenCurrent(sourceToken) ||
+			!engineReadyRef.current ||
+			!startInFlightRef.current ||
+			playbackStartedRef.current
+		) return false;
 		playbackStartedRef.current = true;
 		startInFlightRef.current = false;
 		clearStartupDeadline();
+		clearSubtitleDeadline();
 		setStatus('started');
 		setLoading(false);
 		setPlaying(true);
@@ -125,6 +167,7 @@ export const usePlayerStartupCoordinator = ({
 	}, [
 		appendPlaybackDiagnostic,
 		clearStartupDeadline,
+		clearSubtitleDeadline,
 		isTokenCurrent,
 		pendingOverrideClearRef,
 		playbackOverrideRef,
@@ -186,6 +229,8 @@ export const usePlayerStartupCoordinator = ({
 		const sourceToken = sourceTokenRef.current;
 		if (
 			!isTokenCurrent(sourceToken) ||
+			!engineReadyRef.current ||
+			!startupGatesReadyRef.current ||
 			playbackStartedRef.current ||
 			startInFlightRef.current
 		) return false;
@@ -263,6 +308,43 @@ export const usePlayerStartupCoordinator = ({
 		commitPlaybackStarted(signal, sourceToken)
 	), [commitPlaybackStarted]);
 
+	const getSubtitleDeadlineKey = useCallback((sourceToken, selectedTrack) => {
+		if (!sourceToken || !Number.isInteger(selectedTrack) || selectedTrack < 0) return '';
+		return [
+			sourceToken.generation,
+			sourceToken.sourceGeneration,
+			sourceToken.itemId,
+			sourceToken.mediaSourceId,
+			selectedTrack
+		].join(':');
+	}, []);
+
+	const getSubtitleStartupContext = useCallback((sourceToken) => {
+		const runtimeContext = sourceToken?.runtimeContext;
+		const selectedTrack = Number.isInteger(runtimeContext?.selectedSubtitleTrack)
+			? runtimeContext.selectedSubtitleTrack
+			: currentSubtitleTrack;
+		const policy = runtimeContext?.subtitlePolicy || subtitleRendererPolicy;
+		const expectedRendererKey = (
+			runtimeContext?.itemId &&
+			runtimeContext?.mediaSourceId &&
+			Number.isInteger(selectedTrack) &&
+			selectedTrack >= 0
+		)
+			? `${runtimeContext.itemId}:${runtimeContext.mediaSourceId}:${runtimeContext.generation}:${selectedTrack}`
+			: '';
+		const readyRendererKey = String(subtitleRendererState?.debug?.cacheKey || '');
+		return {
+			selectedTrack,
+			policy,
+			readyForSource: !expectedRendererKey || readyRendererKey === expectedRendererKey
+		};
+	}, [
+		currentSubtitleTrack,
+		subtitleRendererPolicy,
+		subtitleRendererState?.debug?.cacheKey
+	]);
+
 	useEffect(() => {
 		if (!syncPlayStartupBridge) return undefined;
 		return syncPlayStartupBridge.registerStartupHandler(requestPlaybackStart);
@@ -273,30 +355,32 @@ export const usePlayerStartupCoordinator = ({
 		if (!isTokenCurrent(sourceToken) || playbackStartedRef.current || startInFlightRef.current) {
 			return undefined;
 		}
+		const subtitleStartup = getSubtitleStartupContext(sourceToken);
 		const nextStatus = getPlayerStartupState({
 			sourceAttached: true,
-			currentSubtitleTrack,
-			subtitleRendererPolicy,
-			subtitleRendererStatus: subtitleRendererState?.status
+			engineReady: engineReadyRef.current,
+			currentSubtitleTrack: subtitleStartup.selectedTrack,
+			subtitleRendererPolicy: subtitleStartup.policy,
+			subtitleRendererStatus: subtitleRendererState?.status,
+			subtitleRendererReadyForSource: subtitleStartup.readyForSource
 		});
+		startupGatesReadyRef.current = nextStatus === 'starting';
 		setStatus(nextStatus);
+
+		if (nextStatus === 'waiting-engine') {
+			setLoading(true);
+			setLoadingStatusMessage(
+				sourceToken.serverBurnIn
+					? 'Preparing server subtitle transcode...'
+					: 'Preparing video stream...'
+			);
+			return undefined;
+		}
 
 		if (nextStatus === 'waiting-subtitles') {
 			setLoading(true);
 			setLoadingStatusMessage('Preparing subtitles...');
-			const timeoutId = setTimeout(() => {
-				if (
-					!isTokenCurrent(sourceToken) ||
-					playbackStartedRef.current ||
-					timeoutHandledRef.current
-				) return;
-				timeoutHandledRef.current = true;
-				setStatus('timed-out');
-				Promise.resolve(onSubtitleTimeout?.()).catch((error) => {
-					console.warn('Failed to apply subtitle startup timeout fallback:', error);
-				});
-			}, PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS);
-			return () => clearTimeout(timeoutId);
+			return undefined;
 		}
 
 		if (nextStatus !== 'starting') return undefined;
@@ -317,7 +401,7 @@ export const usePlayerStartupCoordinator = ({
 		requestPlaybackStart();
 		return undefined;
 	}, [
-		currentSubtitleTrack,
+		getSubtitleStartupContext,
 		isTokenCurrent,
 		onSubtitleTimeout,
 		playbackStartedRef,
@@ -325,20 +409,75 @@ export const usePlayerStartupCoordinator = ({
 		setLoading,
 		setLoadingStatusMessage,
 		sourceVersion,
-		subtitleRendererPolicy,
 		subtitleRendererState?.status,
 		syncPlayStartupBridge
+	]);
+
+	useEffect(() => {
+		const sourceToken = sourceTokenRef.current;
+		const subtitleStartup = getSubtitleStartupContext(sourceToken);
+		const subtitleGateState = getPlayerStartupState({
+			sourceAttached: true,
+			engineReady: true,
+			currentSubtitleTrack: subtitleStartup.selectedTrack,
+			subtitleRendererPolicy: subtitleStartup.policy,
+			subtitleRendererStatus: subtitleRendererState?.status,
+			subtitleRendererReadyForSource: subtitleStartup.readyForSource
+		});
+		if (
+			!isTokenCurrent(sourceToken) ||
+			subtitleGateState !== 'waiting-subtitles' ||
+			playbackStartedRef.current ||
+			timeoutHandledRef.current
+		) {
+			clearSubtitleDeadline();
+			return undefined;
+		}
+		const deadlineKey = getSubtitleDeadlineKey(sourceToken, subtitleStartup.selectedTrack);
+		if (
+			subtitleDeadlineRef.current.key === deadlineKey &&
+			subtitleDeadlineRef.current.timer
+		) {
+			return undefined;
+		}
+		clearSubtitleDeadline();
+		const timeoutId = setTimeout(() => {
+			if (subtitleDeadlineRef.current.key !== deadlineKey) return;
+			subtitleDeadlineRef.current = {key: '', timer: null};
+			if (
+				!isTokenCurrent(sourceToken) ||
+				playbackStartedRef.current ||
+				timeoutHandledRef.current
+			) return;
+			timeoutHandledRef.current = true;
+			setStatus('timed-out');
+			Promise.resolve(subtitleTimeoutCallbackRef.current?.()).catch((error) => {
+				console.warn('Failed to apply subtitle startup timeout fallback:', error);
+			});
+		}, PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS);
+		subtitleDeadlineRef.current = {key: deadlineKey, timer: timeoutId};
+		return undefined;
+	}, [
+		clearSubtitleDeadline,
+		getSubtitleDeadlineKey,
+		getSubtitleStartupContext,
+		isTokenCurrent,
+		playbackStartedRef,
+		sourceVersion,
+		subtitleRendererState?.status
 	]);
 
 	useEffect(() => () => {
 		startAttemptRef.current += 1;
 		clearStartupDeadline();
-	}, [clearStartupDeadline]);
+		clearSubtitleDeadline();
+	}, [clearStartupDeadline, clearSubtitleDeadline]);
 
 	return {
 		status,
 		registerPlaybackSource,
 		invalidatePlaybackSource,
+		reportPlaybackEngineReady,
 		reportPlaybackEvidence,
 		requestPlaybackStart
 	};

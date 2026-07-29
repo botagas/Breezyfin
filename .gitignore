@@ -42,5 +42,6 @@ yarn-error.log*
 .env
 .env.local
 .env.*
+.breezyfin-hygiene.local.json
 breezyfin-webos.code-workspace
 .webosstudio.config

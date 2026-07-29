@@ -1,6 +1,6 @@
 # Breezyfin Quality Tooling Notes
 
-Last reviewed: 2026-07-12.
+Last reviewed: 2026-07-30.
 
 This document records the current lint/test/audit posture and the evidence-backed adoption path for external quality tools. It is intentionally practical: only add a tool when it covers a real gap without fighting Enact, React, webOS packaging, or the existing custom audits.
 
@@ -10,8 +10,9 @@ This document records the current lint/test/audit posture and the evidence-backe
 - Enact builds use the CLI's supported `--no-linting` option only to avoid CLI 7's embedded React 19 compiler-rule configuration. Standalone lint remains mandatory before builds and is enforced by CI/release workflows.
 - Unit tests run through `npm run test -- --watch=false --runInBand`.
 - Repository-specific checks run through `npm run audit`.
-- Current app-owned style surface is large: `src/` contains 207 CSS/LESS files.
-- Current app-owned JS surface is large: `src/` contains 246 JS/JSX files.
+- Current app-owned style surface is large: `src/` contains 217 CSS/LESS files.
+- Current app-owned JavaScript surface contains 341 production modules plus 118
+  test/test-support modules.
 - Rendered integration tests use Testing Library through `src/testUtils/renderWithBreezyfin.js`, which installs the Breezyfin Sandstone theme and Spotlight root. Prefer pure view-model/helper seams for isolated policy coverage, then use rendered tests for Popup lifecycle, Spotlight focus, and virtual-grid contracts.
 
 ## Current Custom Audit Coverage
@@ -26,7 +27,7 @@ The custom audit suite covers repo-specific invariants that generic tools do not
 - runtime debug statement leaks
 - portability/privacy leaks
 - sensitive runtime logging and raw playback URL logging
-- private references, backup artifacts, and test-media names outside intentional README attribution
+- repository backup/temporary artifacts and optional local-only reference checks
 - production Enact/React generation drift
 - generated third-party notice drift
 - Jellyfin service-boundary violations
@@ -126,6 +127,8 @@ Recommended adoption path:
 
 - `npm run audit:runtime-deps` validates the production closure remains on Enact 4, Sandstone 2, and React 18 without mixed runtime generations. It also verifies that Enact CLI resolves its build-time `react-is` alias to Breezyfin's pinned React 18-compatible root package instead of leaking the CLI's React 19 element checks into development bundles.
 - `npm run audit:licenses` validates the generated `THIRD_PARTY_NOTICES.txt`, including copied subtitle-engine and Museo font licenses.
-- `npm run audit:private-refs` rejects external-client implementation references, private test-media names, and backup artifacts outside intentional README attribution.
+- `npm run audit:repository-hygiene` rejects backup and temporary artifacts. Contributors may add an ignored
+  `.breezyfin-hygiene.local.json` file, or set `BREEZYFIN_HYGIENE_PATTERNS_FILE`, to apply private literal
+  checks locally if needed.
 - `npm run report:package-size` groups packaged bytes into app bundles, iLib, subtitle engines, fonts, source maps/declarations, and other files.
 - Production packages omit subtitle-engine declarations and source maps; develop packages retain useful source maps for diagnostics.

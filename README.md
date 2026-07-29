@@ -31,10 +31,10 @@ In case of an issue, please report it on GitHub in as much detail as possible.
 - Elegant (default) and Classic navigation themes
 - Performance Mode and Performance+ Mode (animation reduction options)
 - Configurable inactivity screensaver for authenticated browsing views
-- Playback that adapts to TV/media compatibility (Direct Play / Direct Stream / Transcode, DV -> HDR -> SDR)
+- Playback that adapts to TV/media compatibility through Direct Play, Direct Stream, or Transcode, with explicit consent before Dolby Vision/HDR quality downgrades
 - Smart subtitle and audio handling, including configurable client-rendered text and experimental bitmap subtitles where possible to preserve video quality
 - Adaptive image loading (WebP when supported, with automatic fallback on load failure)
-- Optional Breezyfin plugin Home sections with built-in Home fallback
+- Optional Breezyfin plugin Home sections, with built-in Home fallback when the server Home provider is unavailable
 - Native Jellyfin Likes Watchlist with optional plugin-backed progress, history, and statistics
 - HSS-controlled Discovery feeds and a Calendar view when advertised by the Breezyfin plugin
 - App-coordinated native Jellyfin SyncPlay and authenticated JellyWatchParty rooms
@@ -104,7 +104,7 @@ For implementation and workflow details, use:
 - [`WORKAROUNDS.md`](./WORKAROUNDS.md) for active upstream/runtime workarounds, their validation, and removal conditions
 - [`HELPERS.md`](./HELPERS.md), [`THEMES.md`](./THEMES.md), [`COMPONENTS.md`](./COMPONENTS.md), [`VIEWS.md`](./VIEWS.md) for focused references
 - [`CHECKS.md`](./CHECKS.md) for recurring validation and pre-release verification
-- [`TODOS.md`](./TODOS.md) for prioritized planned work
+- [`TODOS.md`](./TODOS.md) for planned work grouped by implementation scale
 
 ## Diagnostics and debug
 
@@ -177,7 +177,7 @@ No. As of now, webOS has too many quirks that will not be applicable to other pl
 <summary>
 <b>Is the app vibecoded?</b>
 </summary>
-I would say the current state of it is. While the initial versions where mostly me speeding up the workflow, my current circumstances lack the time and mental capacity to do manual labor on the app.
+I would say the current state of it is. While the initial versions were mostly me speeding up the workflow, my current circumstances lack the time and mental capacity to do manual labor on the app.
 My current workflow consists of making sure the app is not monolithic so I could edit and track changes more easily. I've established strict guidelines for myself and anyone else (including agents) that may interact with the repository, because I know how I want the app to work, what the structure should be, and what kind of code and design decisions should be made (if possible) within webOS constraints. This is my first and only webOS project. Based on the amount of experience I've gained while working on this I can tell that webOS has many situations that need to be accounted for. Sometimes, it is a tad bit too much and I am glad I focus only on webOS releases in this project without broadening the scope.
 </details>
 

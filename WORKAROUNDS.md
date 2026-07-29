@@ -198,3 +198,41 @@ base path reliable.
 
 **Validation:** Run the style audits and the legacy checks in `CHECKS.md`, then verify
 Classic/Elegant layout, popups, rows, and virtual grids on the affected TV generation.
+
+## WA-008: Split native and HLS.js startup evidence
+
+**Status:** Active for supported webOS media runtimes.
+
+**Constraint:** Native webOS playback may not emit `canplay` until `video.play()` is
+requested, while HLS.js must exclusively own its attached MediaSource and can buffer
+while playback remains paused. Calling native `video.load()` after HLS.js attachment can
+detach or reset that MediaSource. Cold Jellyfin subtitle burn-in can also take longer
+than the normal post-`play()` progress deadline before producing its first segment.
+
+**Implementation:**
+
+- `src/views/player-panel/hooks/usePlayerSourcePipeline.js` assigns native sources and
+  calls `video.load()` once. It resets native media before HLS.js attachment, does not
+  call native lifecycle methods while HLS.js owns the attached MediaSource, and destroys
+  HLS.js before resetting media during teardown.
+- Native playback becomes engine-ready immediately and requests playback without waiting
+  for `canplay`.
+- HLS.js becomes engine-ready only after the first current-generation `FRAG_BUFFERED`
+  event and uses a separate 30-second bootstrap deadline.
+- `src/views/player-panel/hooks/usePlayerStartupCoordinator.js` starts the 12-second
+  no-progress deadline only after `video.play()` is requested; its 15-second client
+  subtitle deadline remains independent and is not restarted by readiness rerenders.
+- Startup evidence is ignored until the current engine is ready and its `play()` request
+  has been issued. Media events created before the active source attachment are rejected,
+  and HLS.js media errors stay on its generation-bound callback path.
+
+**Removal condition:** Revisit only when all supported webOS generations provide a
+consistent pre-play native readiness signal and the selected HLS.js integration can
+prove that native media lifecycle calls after attachment no longer reset its
+MediaSource. Keep separate engine and playback deadlines unless both adapters expose an
+equivalent readiness contract.
+
+**Validation:** Run the source-pipeline/startup tests, then test cold and warm server ASS
+burn-in in the Simulator and native DirectPlay/DirectStream/native-HLS on TV. Confirm
+HLS.js waits for one buffered fragment, native playback does not wait for `canplay`, and
+Back/replacement cannot leave stale HLS callbacks or background audio active.

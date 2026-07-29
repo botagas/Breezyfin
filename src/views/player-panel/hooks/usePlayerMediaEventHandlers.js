@@ -13,7 +13,7 @@ import {
 	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
 	SERVER_TRANSCODING_FAILURE_MESSAGE
 } from '../utils/playerRecoveryPolicy';
-import {isNativePlaybackSourceTokenCurrent} from '../utils/playbackRuntimeContext';
+import {isPlaybackSourceMediaEventCurrent} from '../utils/playbackRuntimeContext';
 
 const isImageSubtitleBurnInPlaybackPath = ({video, mediaSourceData, currentSubtitleTrack}) => {
 	const values = [
@@ -67,12 +67,12 @@ export const usePlayerMediaEventHandlers = ({
 	playbackGenerationRef
 }) => {
 	const isCurrentNativeEvent = useCallback((event, sourceToken = nativeSourceTokenRef.current) => (
-		isNativePlaybackSourceTokenCurrent({
+		isPlaybackSourceMediaEventCurrent({
+			event,
 			sourceToken,
 			activeSourceToken: nativeSourceTokenRef.current,
 			activeRuntimeContext: playbackRuntimeContextRef.current,
 			generation: playbackGenerationRef.current,
-			eventTarget: event?.currentTarget || event?.target || null,
 			exitInProgress: exitInProgressRef.current
 		})
 	), [

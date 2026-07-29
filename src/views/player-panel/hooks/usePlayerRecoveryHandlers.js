@@ -1,6 +1,5 @@
 import {useCallback} from 'react';
 import Hls from 'hls.js';
-import {createHlsPlayerConfig} from '../constants';
 import {getDynamicRangeInfo, normalizeDynamicRangeCap} from '../../../utils/playbackDynamicRange';
 import {
 	buildPlaybackOverride,
@@ -31,7 +30,6 @@ export const usePlayerRecoveryHandlers = ({
 	maxHlsNetworkRecoveryAttempts,
 	maxHlsMediaRecoveryAttempts,
 	maxPlaySessionRebuildAttempts,
-	hlsConfig,
 	clearStartupDeadline,
 	playbackOptions,
 	setToastMessage,
@@ -47,7 +45,6 @@ export const usePlayerRecoveryHandlers = ({
 	hlsNetworkRecoveryAttemptsRef,
 	hlsMediaRecoveryAttemptsRef,
 	hlsRef,
-	nativeHlsFallbackCleanupRef,
 	reloadAttemptedRef,
 	playSessionRebuildAttemptsRef,
 	videoRef,
@@ -68,7 +65,7 @@ export const usePlayerRecoveryHandlers = ({
 	playbackGenerationRef,
 	playbackRuntimeContextRef,
 	nativeSourceTokenRef,
-	onPlaybackSourceInvalidated
+	detachPlaybackSource
 }) => {
 	const resetRecoveryGuards = useCallback(() => {
 		playbackFailureLockedRef.current = false;
@@ -83,22 +80,12 @@ export const usePlayerRecoveryHandlers = ({
 	]);
 
 	const stopHlsRecoveryLoop = useCallback(() => {
-		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
-			nativeHlsFallbackCleanupRef.current();
-		}
-		if (!hlsRef.current) return;
-		try {
-			hlsRef.current.stopLoad?.();
-		} catch (err) {
-			console.warn('Error stopping HLS load:', err);
-		}
-		try {
-			hlsRef.current.destroy();
-		} catch (err) {
-			console.warn('Error destroying HLS instance during failure handling:', err);
-		}
-		hlsRef.current = null;
-	}, [hlsRef, nativeHlsFallbackCleanupRef]);
+		detachPlaybackSource?.({
+			clearRuntimeContext: false,
+			resetVideo: true,
+			reason: 'recovery-stop'
+		});
+	}, [detachPlaybackSource]);
 
 	const attemptPlaybackSessionRebuild = useCallback((reason, options = {}) => {
 		const {
@@ -171,27 +158,11 @@ export const usePlayerRecoveryHandlers = ({
 		});
 
 		clearStartupDeadline();
-		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
-			nativeHlsFallbackCleanupRef.current();
-		}
-
-		if (hlsRef.current) {
-			try {
-				hlsRef.current.destroy();
-			} catch (destroyErr) {
-				console.warn('Failed to destroy HLS instance during session rebuild:', destroyErr);
-			}
-			hlsRef.current = null;
-		}
-		if (videoRef.current) {
-			try {
-				videoRef.current.pause();
-			} catch (_) {
-				// Ignore pause failures while recovering.
-			}
-			videoRef.current.removeAttribute('src');
-			videoRef.current.load();
-		}
+		detachPlaybackSource?.({
+			clearRuntimeContext: false,
+			resetVideo: true,
+			reason: 'session-rebuild'
+		});
 
 		playbackOverrideRef.current = buildPlaybackOverride({
 			baseOptions: playbackOptions,
@@ -232,11 +203,10 @@ export const usePlayerRecoveryHandlers = ({
 		clearStartupDeadline,
 		currentAudioTrackRef,
 		currentSubtitleTrackRef,
-		hlsRef,
+		detachPlaybackSource,
 		loadVideoRef,
 		maxPlaySessionRebuildAttempts,
 		mediaSourceData,
-		nativeHlsFallbackCleanupRef,
 		playSessionRebuildAttemptsRef,
 		exitInProgressRef,
 		playbackFailureLockedRef,
@@ -257,23 +227,11 @@ export const usePlayerRecoveryHandlers = ({
 
 	const showPlaybackError = useCallback((message, {detachMedia = false} = {}) => {
 		playbackFailureLockedRef.current = true;
-		stopHlsRecoveryLoop();
-		try {
-			videoRef.current?.pause();
-		} catch (_) {
-			// Ignore native media teardown failures while presenting the terminal error.
-		}
-		if (detachMedia && videoRef.current) {
-			try {
-				videoRef.current.removeAttribute('src');
-				videoRef.current.load();
-			} catch (_) {
-				// Ignore native detach failures while presenting the terminal error.
-			}
-			nativeSourceTokenRef.current = null;
-			playbackRuntimeContextRef.current = null;
-			onPlaybackSourceInvalidated?.();
-		}
+		detachPlaybackSource?.({
+			clearRuntimeContext: detachMedia,
+			resetVideo: true,
+			reason: detachMedia ? 'terminal-startup-error' : 'terminal-playback-error'
+		});
 		const errorMessage = message || 'Failed to play video';
 		setError(errorMessage);
 		setToastMessage('');
@@ -282,7 +240,7 @@ export const usePlayerRecoveryHandlers = ({
 		setPlaying(false);
 		setLoadingStatusMessage('Loading...');
 		clearStartupDeadline();
-	}, [clearStartupDeadline, nativeSourceTokenRef, onPlaybackSourceInvalidated, playbackFailureLockedRef, playbackRuntimeContextRef, setError, setLoading, setLoadingStatusMessage, setPlaying, setShowControls, setToastMessage, stopHlsRecoveryLoop, videoRef]);
+	}, [clearStartupDeadline, detachPlaybackSource, playbackFailureLockedRef, setError, setLoading, setLoadingStatusMessage, setPlaying, setShowControls, setToastMessage]);
 
 	const collectSubtitleErrorValues = useCallback((errorData, sourceData = mediaSourceData) => {
 		const fromMessage = typeof errorData === 'string' ? errorData : '';
@@ -708,7 +666,10 @@ export const usePlayerRecoveryHandlers = ({
 		videoRef
 	]);
 
-	const isHlsRuntimeActive = useCallback((hls, runtimeContext = null) => {
+	const isHlsRuntimeActive = useCallback((hls, runtimeContext = null, sourceToken = null) => {
+		if (sourceToken && nativeSourceTokenRef.current !== sourceToken) {
+			return false;
+		}
 		if (!runtimeContext) {
 			return !exitInProgressRef.current && hlsRef.current === hls;
 		}
@@ -723,6 +684,7 @@ export const usePlayerRecoveryHandlers = ({
 	}, [
 		exitInProgressRef,
 		hlsRef,
+		nativeSourceTokenRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef
 	]);
@@ -827,68 +789,87 @@ export const usePlayerRecoveryHandlers = ({
 		showPlaybackError
 	]);
 
-	const attachHlsPlayback = useCallback((
-		video,
-		sourceUrl,
+	const handleHlsRuntimeError = useCallback(async ({
+		hls,
+		data,
 		sourceLabel = 'HLS.js',
-		runtimeContext = null
-	) => {
-		const hls = new Hls(createHlsPlayerConfig(hlsConfig));
-		hlsRef.current = hls;
-		hls.loadSource(sourceUrl);
-		hls.attachMedia(video);
-
-		hls.on(Hls.Events.ERROR, (event, data) => {
-			if (!isHlsRuntimeActive(hls, runtimeContext)) return;
-			const hlsError = classifyHlsError(data);
-			const errorSummary = buildHlsErrorSummary(data);
-			if (hlsError.severity === 'error') {
-				console.error(`${sourceLabel} error:`, errorSummary);
-			} else if (hlsError.severity === 'warning') {
-				console.warn(`${sourceLabel} warning:`, errorSummary);
-			} else {
-				console.info(`${sourceLabel} recovered:`, errorSummary);
-			}
-			appendPlaybackDiagnostic?.({
-				scope: 'hls-runtime',
-				stage: hlsError.category,
-				status: hlsError.fatal ? 'fatal' : hlsError.severity,
-				reason: hlsError.reason,
-				message: `HLS ${hlsError.category} (${hlsError.reason}) after subtitle fallback=${currentSubtitleTrackRef.current === -1 ? 'yes' : 'no'}; engine=${sourceLabel}; playMethod=${runtimeContext?.playMethod || mediaSourceData?.__selectedPlayMethod || '-'}.`
-			});
-			if (
-				isSubtitleCompatibilityError(data, runtimeContext?.mediaSourceData) &&
-				playbackSettingsRef.current.strictTranscodingMode
-			) {
-				showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
-				return;
-			}
-			if (hlsError.subtitleCandidate) {
-				attemptSubtitleCompatibilityFallback(data, runtimeContext).then((handled) => {
-					if (!isHlsRuntimeActive(hls, runtimeContext)) return;
-					if (!handled && hlsError.fatal) {
-						attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
-					}
-				});
-				return;
-			}
-			if (hlsError.fatal) {
+		runtimeContext = null,
+		sourceToken = null
+	}) => {
+		if (!isHlsRuntimeActive(hls, runtimeContext, sourceToken)) return false;
+		const hlsError = classifyHlsError(data);
+		const errorSummary = buildHlsErrorSummary(data);
+		if (hlsError.severity === 'error') {
+			console.error(`${sourceLabel} error:`, errorSummary);
+		} else if (hlsError.severity === 'warning') {
+			console.warn(`${sourceLabel} warning:`, errorSummary);
+		} else {
+			console.info(`${sourceLabel} recovered:`, errorSummary);
+		}
+		appendPlaybackDiagnostic?.({
+			scope: 'hls-runtime',
+			stage: hlsError.category,
+			status: hlsError.fatal ? 'fatal' : hlsError.severity,
+			reason: hlsError.reason,
+			message: `HLS ${hlsError.category} (${hlsError.reason}) after subtitle fallback=${currentSubtitleTrackRef.current === -1 ? 'yes' : 'no'}; engine=${sourceLabel}; playMethod=${runtimeContext?.playMethod || mediaSourceData?.__selectedPlayMethod || '-'}.`
+		});
+		if (
+			isSubtitleCompatibilityError(data, runtimeContext?.mediaSourceData) &&
+			playbackSettingsRef.current.strictTranscodingMode
+		) {
+			showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
+			return true;
+		}
+		if (hlsError.subtitleCandidate) {
+			const handled = await attemptSubtitleCompatibilityFallback(data, runtimeContext);
+			if (!isHlsRuntimeActive(hls, runtimeContext, sourceToken)) return true;
+			if (!handled && hlsError.fatal) {
 				attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
 			}
-		});
-
-		return hls;
+			return handled || hlsError.fatal;
+		}
+		if (hlsError.fatal) {
+			return attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
+		}
+		return false;
 	}, [
 		attemptHlsFatalRecovery,
 		attemptSubtitleCompatibilityFallback,
 		appendPlaybackDiagnostic,
 		currentSubtitleTrackRef,
-		hlsConfig,
-		hlsRef,
 		isHlsRuntimeActive,
 		isSubtitleCompatibilityError,
 		mediaSourceData,
 		playbackSettingsRef,
+		showPlaybackError
+	]);
+
+	const handleHlsBootstrapTimeout = useCallback(async ({
+		hls,
+		runtimeContext = null,
+		sourceToken = null
+	}) => {
+		if (!isHlsRuntimeActive(hls, runtimeContext, sourceToken)) return false;
+		const rebuilt = attemptPlaybackSessionRebuild(
+			'HLS.js did not buffer a media fragment before startup',
+			{runtimeContext}
+		);
+		if (rebuilt) return true;
+		if (runtimeContext?.playMethod !== 'Transcode') {
+			const fellBack = await attemptTranscodeFallback('hls-engine-no-fragment');
+			if (fellBack || !isHlsRuntimeActive(hls, runtimeContext, sourceToken)) {
+				return fellBack;
+			}
+		}
+		showPlaybackError(
+			'The video stream did not begin buffering. Please retry or go back.',
+			{detachMedia: true}
+		);
+		return true;
+	}, [
+		attemptPlaybackSessionRebuild,
+		attemptTranscodeFallback,
+		isHlsRuntimeActive,
 		showPlaybackError
 	]);
 
@@ -901,6 +882,7 @@ export const usePlayerRecoveryHandlers = ({
 		attemptTranscodeFallback,
 		isSubtitleCompatibilityError,
 		attemptSubtitleCompatibilityFallback,
-		attachHlsPlayback
+		handleHlsRuntimeError,
+		handleHlsBootstrapTimeout
 	};
 };

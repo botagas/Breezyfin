@@ -23,8 +23,10 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize PlayerPanel remote/media-key handling | `usePlayerKeyboardShortcuts` |
 | Centralize PlayerPanel external/internal controls-visibility synchronization | `usePlayerVisibilitySync` |
 | Reveal PlayerPanel controls from wheel/pointer-edge interaction | `usePlayerInteractionReveal` |
-| Centralize PlayerPanel video loading/session selection flow | `usePlayerVideoLoader` |
-| Gate Player startup until video and selected client subtitles are ready | `usePlayerStartupCoordinator` |
+| Centralize PlayerPanel playback negotiation and resolved-source descriptor creation | `usePlayerVideoLoader` |
+| Own native/native-HLS/HLS.js source attachment, engine readiness, and teardown | `usePlayerSourcePipeline` |
+| Gate Player startup until the source engine, selected client subtitles, and SyncPlay authority are ready | `usePlayerStartupCoordinator` |
+| Reject pre-attachment media events and keep HLS.js errors on its generation-bound callback path | `isPlaybackSourceMediaEventCurrent` |
 | Centralize PlayerPanel playback option/session-context builders | `usePlayerPlaybackContext` |
 | Centralize PlayerPanel skip overlay + next-episode prompt state machine | `usePlayerSkipOverlayState` |
 | Select enabled/displayable server Home rows, bound progressive loading, and decide mounted-content revalidation | `src/utils/serverHomeRows.js` |
@@ -445,30 +447,50 @@ usePlayerInteractionReveal({
 
 ### `usePlayerVideoLoader`
 - File: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
-- Purpose: encapsulate the PlayerPanel playback load pipeline:
+- Purpose: encapsulate PlayerPanel playback negotiation:
   - settings + playback profile resolution (including subtitle burn-in format policy)
   - media source/session selection
   - audio/subtitle initialization
   - stream URL construction (direct/hls/transcode)
-  - immutable playback runtime/source registration before `video.load()`
+  - immutable playback runtime context and resolved source descriptor creation
   - bounded video-element mount retry
 
-  Loader code must not own generic startup watchdogs. Source startup and its single
-  post-`play()` deadline belong to `usePlayerStartupCoordinator`.
+  Loader code must not assign `video.src`, attach HLS.js, call `video.load()`, or own
+  startup watchdogs. It hands the resolved descriptor to `usePlayerSourcePipeline`.
+
+### `usePlayerSourcePipeline`
+- File: `src/views/player-panel/hooks/usePlayerSourcePipeline.js`
+- Purpose:
+  - own native DirectPlay/DirectStream and native-HLS source assignment
+  - reset the native media element before HLS.js attachment and only after destroying
+    HLS.js during teardown/replacement
+  - own HLS.js creation, listeners, first-fragment readiness, and destruction
+  - replace native-HLS with a new generation-bound HLS.js source token when needed
+  - own the independent 30-second HLS.js engine bootstrap deadline
+  - invalidate the active source token before replacement, terminal failure, Back, or
+    unmount
+
+  Recovery hooks classify failures and choose policy actions, but must invoke this
+  pipeline for source teardown/replacement rather than mutating the video element or
+  constructing an initial HLS.js instance.
 
 ### `usePlayerStartupCoordinator`
 - File: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
 - Purpose:
-  - register and invalidate generation-bound native source tokens
-  - request normal playback after source assignment and selected client-subtitle readiness,
-    without waiting for `canplay`
+  - register and invalidate generation-bound source tokens
+  - combine source-engine, generation-matched client-subtitle, and SyncPlay readiness
+  - request native playback after assignment without waiting for `canplay`
+  - request HLS.js playback only after the first current-generation fragment is buffered
   - keep SyncPlay paused until its authoritative `Unpause`
-  - accept `play()` resolution, `playing`, or genuine timeline movement as startup evidence
+  - accept `play()` resolution, `playing`, or genuine timeline movement only after the
+    current engine is ready and its `play()` request has been issued
   - own the single post-`play()` startup deadline and DirectPlay fallback
   - finalize loading/reporting exactly once
 
-  Client-rendered subtitle preparation has its own 15-second timeout and enters the
-  existing explicit fallback/consent flow rather than silently starting without subtitles.
+  HLS engine bootstrap, client-rendered subtitle preparation, and post-`play()` progress
+  use independent 30-, 15-, and 12-second deadlines. Server burn-in bypasses the client
+  subtitle gate, the 15-second deadline remains fixed across readiness rerenders, and a
+  previous source's renderer-ready state cannot satisfy a replacement source.
 
 ### `usePlayerPlaybackReporter`
 - File: `src/views/player-panel/hooks/usePlayerPlaybackReporter.js`
@@ -962,9 +984,13 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/hooks/usePlayerInteractionReveal.js`
   - centralizes wheel and pointer-edge PlayerPanel controls reveal behavior without focus/playback side effects.
 - `src/views/player-panel/hooks/usePlayerVideoLoader.js`
-  - centralizes playback source/session selection and video load orchestration.
+  - centralizes playback source/session negotiation and emits a resolved source descriptor.
+- `src/views/player-panel/hooks/usePlayerSourcePipeline.js`
+  - exclusively owns native/native-HLS/HLS.js attachment, source tokens, engine bootstrap,
+    native-HLS fallback, and teardown.
 - `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
-  - gates startup on video/client-subtitle readiness and owns the bounded subtitle preparation timeout.
+  - gates startup on engine/client-subtitle/SyncPlay readiness and owns the independent
+    subtitle and post-play deadlines.
 - `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
   - centralizes playback option/session-context derivation and selected-track ref synchronization.
 - `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`

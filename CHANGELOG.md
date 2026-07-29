@@ -6,13 +6,32 @@ All notable changes to Breezyfin are documented in this file.
 
 ## 0.2.1
 
+### Changed
+
+- Migrated successful authentication and session restoration to the managed multi-server
+  store while retaining the bounded legacy-session migration path for older installs.
+- Hardened generated managed-server identifiers with Web Crypto when available and a
+  uniqueness-only fallback for legacy webOS runtimes.
+- Made selected audio, subtitle, and filter options use one persistent Selected marker
+  and consistent active styling.
+
 ### Fixed
 
-- Fixed native webOS DirectPlay startup waiting for `canplay` before requesting playback.
-- Unified Player startup timeouts and bounded automatic DirectPlay-to-transcode recovery.
-- Isolated native media events and recovery callbacks by playback source generation.
+- Fixed native webOS DirectPlay startup waiting for `canplay` before requesting playback,
+  with one communicated DirectPlay-to-transcode recovery attempt when startup makes no
+  progress.
+- Separated native and HLS.js source ownership so HLS.js is not reset after attachment,
+  waits for a current buffered fragment, and gives cold server subtitle transcodes an
+  independent bootstrap deadline.
+- Isolated native media events, HLS.js events, timers, and recovery callbacks by playback
+  source generation.
 - Serialized Jellyfin playback start, progress, pause, seek, and stop reporting.
 - Kept PlaybackInfo-selected audio and subtitle tracks authoritative through Player startup.
+- Allowed SyncPlay readiness after source preparation without waiting for native media
+  readiness events that may require authoritative group playback to begin first.
+- Replaced ambiguous startup format errors on confirmed transcodes with bounded
+  server-transcoding guidance and optional systemd/FFmpeg diagnostics.
+- Aligned Watchlist loading and empty states across native and plugin-backed tabs.
 
 ## 0.2.0
 

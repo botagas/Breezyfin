@@ -20,7 +20,9 @@ const createProps = () => {
 		runtimeContext,
 		video,
 		sourceUrl: 'video.mkv',
-		engine: 'native'
+		engine: 'native',
+		attachedAtEpochMs: 2000,
+		attachedAtEventTime: 200
 	});
 	return {
 		video,
@@ -91,5 +93,55 @@ describe('usePlayerMediaEventHandlers', () => {
 		});
 		expect(view.props.setPlaying).not.toHaveBeenCalled();
 		expect(view.props.onPlaybackEvidence).not.toHaveBeenCalled();
+	});
+
+	it('ignores queued events created before the active source was attached', async () => {
+		const view = createProps();
+		const {result} = renderHook(() => usePlayerMediaEventHandlers(view.props));
+
+		view.video.paused = false;
+		view.video.currentTime = 12;
+		await act(async () => {
+			result.current.handleVideoPlaying({
+				type: 'playing',
+				currentTarget: view.video,
+				timeStamp: 199
+			});
+			result.current.handleTimeUpdate({
+				type: 'timeupdate',
+				currentTarget: view.video,
+				timeStamp: 199
+			});
+			await result.current.handleVideoError({
+				type: 'error',
+				currentTarget: view.video,
+				timeStamp: 199
+			});
+		});
+
+		expect(view.props.setPlaying).not.toHaveBeenCalled();
+		expect(view.props.setCurrentTime).not.toHaveBeenCalled();
+		expect(view.props.onPlaybackEvidence).not.toHaveBeenCalled();
+		expect(view.props.attemptSubtitleCompatibilityFallback).not.toHaveBeenCalled();
+		expect(view.props.attemptTranscodeFallback).not.toHaveBeenCalled();
+	});
+
+	it('leaves HLS.js media errors to the generation-bound HLS error handler', async () => {
+		const view = createProps();
+		view.sourceToken = Object.freeze({...view.sourceToken, engine: 'hls.js'});
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		const {result} = renderHook(() => usePlayerMediaEventHandlers(view.props));
+
+		await act(async () => {
+			await result.current.handleVideoError({
+				type: 'error',
+				currentTarget: view.video,
+				timeStamp: 201
+			});
+		});
+
+		expect(view.props.attemptSubtitleCompatibilityFallback).not.toHaveBeenCalled();
+		expect(view.props.attemptTranscodeFallback).not.toHaveBeenCalled();
+		expect(view.props.showPlaybackError).not.toHaveBeenCalled();
 	});
 });

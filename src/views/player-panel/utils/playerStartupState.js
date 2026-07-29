@@ -1,5 +1,6 @@
 export const PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS = 15000;
 export const PLAYER_PLAYBACK_START_TIMEOUT_MS = 12000;
+export const PLAYER_HLS_ENGINE_STARTUP_TIMEOUT_MS = 30000;
 
 export const isInterruptedPlaybackStartError = (error) => {
 	if (!error) return false;
@@ -18,13 +19,16 @@ const rendererNeedsStartupGate = ({currentSubtitleTrack, subtitleRendererPolicy}
 
 export const getPlayerStartupState = ({
 	sourceAttached = false,
+	engineReady = true,
 	currentSubtitleTrack = -1,
 	subtitleRendererPolicy = null,
-	subtitleRendererStatus = 'off'
+	subtitleRendererStatus = 'off',
+	subtitleRendererReadyForSource = true
 } = {}) => {
 	if (!sourceAttached) return 'waiting-source';
+	if (!engineReady) return 'waiting-engine';
 	if (!rendererNeedsStartupGate({currentSubtitleTrack, subtitleRendererPolicy})) return 'starting';
-	if (subtitleRendererStatus === 'ready') return 'starting';
+	if (subtitleRendererStatus === 'ready' && subtitleRendererReadyForSource) return 'starting';
 	if (subtitleRendererStatus === 'timed-out') return 'timed-out';
 	if (
 		subtitleRendererStatus === 'failed' ||

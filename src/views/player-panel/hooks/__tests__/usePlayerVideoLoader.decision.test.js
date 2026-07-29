@@ -5,6 +5,7 @@ import {usePlayerVideoLoader} from '../usePlayerVideoLoader';
 jest.mock('../../../../services/jellyfinService', () => ({
 	__esModule: true,
 	default: {
+		serverUrl: 'https://example.test',
 		getPlaybackInfo: jest.fn()
 	}
 }));
@@ -23,8 +24,6 @@ const createProps = () => {
 		props: {
 			item: {Id: 'item-1', RunTimeTicks: 10000000},
 			videoRef: {current: video},
-			hlsRef: {current: null},
-			nativeHlsFallbackCleanupRef: {current: null},
 			loadVideoRef: {current: null},
 			loadRequestIdRef: {current: 0},
 			playbackStartedRef: {current: false},
@@ -49,7 +48,8 @@ const createProps = () => {
 			pickPreferredSubtitle: jest.fn(() => -1),
 			setCurrentAudioTrack: jest.fn(),
 			setCurrentSubtitleTrack: jest.fn(),
-			attachHlsPlayback: jest.fn(),
+			attachPlaybackSource: jest.fn(),
+			detachPlaybackSource: jest.fn(),
 			pendingOverrideClearRef: {current: false},
 			showPlaybackError: jest.fn(),
 			playbackSessionRef: {current: null},
@@ -58,10 +58,7 @@ const createProps = () => {
 			exitInProgressRef: {current: false},
 			playbackGenerationRef: {current: 0},
 			playbackRuntimeContextRef: {current: null},
-			nativeSourceTokenRef: {current: null},
 			videoMountRetryTimerRef: {current: null},
-			onPlaybackSourceAttached: jest.fn(),
-			onPlaybackSourceInvalidated: jest.fn(),
 			setPlaybackGeneration: jest.fn()
 		}
 	};
@@ -107,7 +104,10 @@ describe('usePlayerVideoLoader blocking playback decisions', () => {
 		}));
 		expect(video.src).toBe('');
 		expect(video.load).not.toHaveBeenCalled();
-		expect(props.attachHlsPlayback).not.toHaveBeenCalled();
+		expect(props.attachPlaybackSource).not.toHaveBeenCalled();
+		expect(props.detachPlaybackSource).toHaveBeenCalledWith(expect.objectContaining({
+			reason: 'new-playback-load'
+		}));
 		expect(props.playbackSessionRef.current).toEqual(expect.objectContaining({
 			playSessionId: 'session-1'
 		}));
@@ -115,5 +115,50 @@ describe('usePlayerVideoLoader blocking playback decisions', () => {
 			scope: 'dynamic-range',
 			stage: 'required-decision'
 		}));
+	});
+
+	it('hands a resolved HLS burn-in source to the source pipeline without loading media itself', async () => {
+		const {props, video} = createProps();
+		props.attachPlaybackSource.mockReturnValue({sourceGeneration: 1});
+		jellyfinService.getPlaybackInfo.mockResolvedValue({
+			PlaySessionId: 'session-1',
+			MediaSources: [{
+				Id: 'source-1',
+				RunTimeTicks: 10000000,
+				SupportsTranscoding: true,
+				TranscodingUrl: '/Videos/item-1/master.m3u8?SubtitleMethod=Encode',
+				MediaStreams: [
+					{Type: 'Video', Codec: 'h264', VideoRangeType: 'SDR'},
+					{Type: 'Audio', Index: 0, Codec: 'aac'},
+					{Type: 'Subtitle', Index: 3, Codec: 'ass'}
+				]
+			}],
+			__breezyfin: {
+				playMethod: 'Transcode',
+				selectedAudioStreamIndex: 0,
+				selectedSubtitleStreamIndex: 3,
+				subtitlePolicy: {
+					requiresBurnIn: true,
+					clientRender: false
+				}
+			}
+		});
+		const {result} = renderHook(() => usePlayerVideoLoader(props));
+
+		await act(async () => {
+			await result.current();
+		});
+
+		expect(props.attachPlaybackSource).toHaveBeenCalledWith(expect.objectContaining({
+			url: expect.stringContaining('master.m3u8'),
+			isHls: true,
+			playMethod: 'Transcode',
+			serverBurnIn: true,
+			runtimeContext: expect.objectContaining({
+				generation: 1,
+				mediaSourceId: 'source-1'
+			})
+		}));
+		expect(video.load).not.toHaveBeenCalled();
 	});
 });

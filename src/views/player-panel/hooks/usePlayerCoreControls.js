@@ -6,14 +6,10 @@ import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 export const usePlayerCoreControls = ({
 	item,
 	videoRef,
-	hlsRef,
-	nativeHlsFallbackCleanupRef,
 	playbackSessionRef,
 	startupDeadlineTimerRef,
 	videoMountRetryTimerRef,
-	nativeSourceTokenRef,
-	playbackRuntimeContextRef,
-	onPlaybackSourceInvalidated,
+	detachPlaybackSource,
 	stopProgressReporting,
 	reportPlaybackStopped,
 	skipFocusRetryTimerRef,
@@ -94,31 +90,11 @@ export const usePlayerCoreControls = ({
 		}
 		stopProgressReporting();
 		clearStartupDeadline();
-		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
-			nativeHlsFallbackCleanupRef.current();
-		}
-
-		if (hlsRef.current) {
-			try {
-				hlsRef.current.destroy();
-			} catch (error) {
-				console.warn('Error destroying HLS instance:', error);
-			}
-			hlsRef.current = null;
-		}
-
-		if (video) {
-			try {
-				video.pause();
-			} catch (_) {
-				// Ignore native pause failures during teardown.
-			}
-			video.removeAttribute('src');
-			video.load();
-		}
-		nativeSourceTokenRef.current = null;
-		playbackRuntimeContextRef.current = null;
-		onPlaybackSourceInvalidated?.();
+		detachPlaybackSource?.({
+			clearRuntimeContext: true,
+			resetVideo: true,
+			reason: 'player-stop'
+		});
 		if (item) {
 			reportPlaybackStopped({positionTicks});
 		}
@@ -129,13 +105,9 @@ export const usePlayerCoreControls = ({
 		};
 	}, [
 		clearStartupDeadline,
-		hlsRef,
+		detachPlaybackSource,
 		item,
-		nativeSourceTokenRef,
-		nativeHlsFallbackCleanupRef,
-		onPlaybackSourceInvalidated,
 		playbackSessionRef,
-		playbackRuntimeContextRef,
 		reportPlaybackStopped,
 		stopProgressReporting,
 		videoMountRetryTimerRef,

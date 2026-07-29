@@ -62,7 +62,7 @@ const createProps = () => {
 			playbackGenerationRef: {current: 3},
 			playbackRuntimeContextRef: {current: runtimeContext},
 			nativeSourceTokenRef: {current: {}},
-			onPlaybackSourceInvalidated: jest.fn()
+			detachPlaybackSource: jest.fn()
 		}
 	};
 };
@@ -105,7 +105,7 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
 	});
 
-	it('pauses active native media before presenting a terminal playback error', () => {
+	it('routes terminal playback teardown through the source pipeline', () => {
 		const {props} = createProps();
 		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
 
@@ -113,7 +113,10 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 			result.current.showPlaybackError('Playback failed');
 		});
 
-		expect(props.videoRef.current.pause).toHaveBeenCalledTimes(1);
+		expect(props.detachPlaybackSource).toHaveBeenCalledWith(expect.objectContaining({
+			clearRuntimeContext: false,
+			reason: 'terminal-playback-error'
+		}));
 		expect(props.setPlaying).toHaveBeenCalledWith(false);
 		expect(props.setError).toHaveBeenCalledWith('Playback failed');
 	});
@@ -126,10 +129,11 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 			result.current.showPlaybackError('Playback failed', {detachMedia: true});
 		});
 
-		expect(props.videoRef.current.removeAttribute).toHaveBeenCalledWith('src');
-		expect(props.nativeSourceTokenRef.current).toBeNull();
-		expect(props.playbackRuntimeContextRef.current).toBeNull();
-		expect(props.onPlaybackSourceInvalidated).toHaveBeenCalledTimes(1);
+		expect(props.detachPlaybackSource).toHaveBeenCalledWith(expect.objectContaining({
+			clearRuntimeContext: true,
+			resetVideo: true,
+			reason: 'terminal-startup-error'
+		}));
 	});
 
 	it('reports an exhausted initial transcode fragment failure as a server startup failure', () => {

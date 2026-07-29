@@ -4,8 +4,9 @@
  * Conservative portability/privacy audit for repository text.
  *
  * This intentionally avoids broad `/Users/...` matching because Jellyfin API
- * routes use `/Users/{id}`. It focuses on local filesystem path shapes and
- * known private-host examples that should not be committed.
+ * routes use `/Users/{id}`. It focuses on generic local filesystem path shapes
+ * and unredacted credential literals. Project-specific checks belong in the
+ * ignored local repository-hygiene configuration.
  */
 
 const {
@@ -65,10 +66,6 @@ const CHECKS = [
 	{
 		name: 'Windows user home path',
 		pattern: /[A-Z]:\\Users\\[^\\\s"'`]+\\/g
-	},
-	{
-		name: 'private Jellyfin host example',
-		pattern: /\b(?:jelly\.mediateka|mediateka\.test|yunohost\.multimedia)\b/gi
 	},
 	{
 		name: 'unredacted bearer token literal',
