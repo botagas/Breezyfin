@@ -26,6 +26,7 @@ jest.mock('../BreezyButton', () => function TestButton(props) {
 			className={props.className}
 			data-filter-id={props['data-filter-id']}
 			data-selected={props.selected ? 'true' : 'false'}
+			aria-pressed={props['aria-pressed']}
 			onClick={props.onClick}
 		>
 			{props.children}
@@ -89,5 +90,15 @@ describe('MediaFilterControls lifecycle', () => {
 
 		await waitFor(() => expect(screen.queryByTestId('filter-popup')).toBeNull());
 		expect(onApplyFilters).not.toHaveBeenCalled();
+	});
+
+	it('uses the persistent selected marker alongside Sandstone selection state', () => {
+		renderWithBreezyfin(<FilterHarness onApplyFilters={jest.fn()} />);
+
+		fireEvent.click(screen.getByLabelText('Library filters'));
+
+		expect(screen.getByText('Selected')).toBeTruthy();
+		expect(screen.getByText('All').closest('button')?.getAttribute('data-selected')).toBe('true');
+		expect(screen.getByText('All').closest('button')?.getAttribute('aria-pressed')).toBe('true');
 	});
 });

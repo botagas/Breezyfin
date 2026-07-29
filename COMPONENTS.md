@@ -41,6 +41,9 @@ This guide covers shared UI components in `src/components/`.
   `BreezyButton` is the low-level Sandstone chrome reset; it does not provide a visible
   surface on its own. `PanelActionButton` adds the shared theme-token border, surface,
   hover, focus, disabled, and non-scaling TV behavior.
+- Use `SelectionOptionContent` inside audio/subtitle and filter picker controls so they
+  retain Sandstone's selected state while sharing the same persistent Selected marker
+  and complete rounded active surface instead of relying on focus alone.
 - Generic buttons use the shared `--bf-theme-button-fg*` text-state tokens so pointer
   hover and Spotlight focus do not change labels/icons to an unrelated accent color.
   Keep accent, danger, warning, favorite, and text-on-light colors for explicit

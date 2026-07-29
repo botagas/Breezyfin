@@ -502,8 +502,6 @@ const PlayerPanel = ({
 		reportPlaybackEvidence,
 		requestPlaybackStart
 	} = usePlayerStartupCoordinator({
-		item,
-		playbackGeneration,
 		videoRef,
 		nativeSourceTokenRef,
 		playbackRuntimeContextRef,

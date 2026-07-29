@@ -77,6 +77,8 @@ Run these before packaging a release candidate:
   while startup is pending to confirm old native/HLS events cannot restart recovery.
 - During pause, resume, seek, and regular progress ticks, confirm Jellyfin receives one
   serialized reporting request at a time and resume does not send another PlaybackStart.
+- Open audio and subtitle pickers in both Media Details and Player. Confirm the active
+  track retains its accent surface and visible Selected marker in pointer and 5-way modes.
 
 ### Navigation/focus validation
 

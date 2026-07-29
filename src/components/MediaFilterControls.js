@@ -2,6 +2,7 @@ import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
 import Button from './BreezyButton';
 import MediaBrowseControls from './MediaBrowseControls';
+import SelectionOptionContent, {selectionOptionSelectedClass} from './SelectionOptionContent';
 import {MEDIA_FILTER_OPTIONS} from '../utils/mediaFilters';
 import {popupShellCss} from '../styles/popupStyles';
 
@@ -47,46 +48,52 @@ const MediaFilterControls = ({
 			filterLabel={`${title} filters`}
 		/>
 		<Popup open={filterPopupOpen} onClose={onClose} onHide={onHide} css={popupShellCss}>
-				<div
-					ref={filterPopupContentRef}
-					className={`${popupStyles.popupSurface} ${browseCss.filterPopupContent}`}
-					data-popup-focus-scope="true"
-					role="dialog"
-					aria-label={`${title} filters`}
-				>
+			<div
+				ref={filterPopupContentRef}
+				className={`${popupStyles.popupSurface} ${browseCss.filterPopupContent}`}
+				data-popup-focus-scope="true"
+				role="dialog"
+				aria-label={`${title} filters`}
+			>
 					<BodyText className={browseCss.filterPopupTitle}>{title} Filters</BodyText>
 					<div className={browseCss.filterPopupActions}>
-					<Button
-						size="small"
-						spotlightId={`${triggerSpotlightId}-reset`}
-						onClick={onReset}
-						className={browseCss.filterPopupActionButton}
-					>
+						<Button
+							size="small"
+							spotlightId={`${triggerSpotlightId}-reset`}
+							onClick={onReset}
+							className={browseCss.filterPopupActionButton}
+						>
 							Reset
 						</Button>
-					<Button
-						size="small"
-						spotlightId={`${triggerSpotlightId}-apply`}
-						onClick={onApply}
-						className={browseCss.filterPopupActionButton}
-					>
+						<Button
+							size="small"
+							spotlightId={`${triggerSpotlightId}-apply`}
+							onClick={onApply}
+							className={browseCss.filterPopupActionButton}
+						>
 							Done
 						</Button>
 					</div>
 					<div className={browseCss.filterPopupOptions}>
-						{filterOptions.map((option) => (
-							<Button
-								key={option.id}
-								spotlightId={`${triggerSpotlightId}-option-${option.id}`}
-								data-filter-id={option.id}
-							selected={draftFilterIds.includes(option.id)}
-							onClick={onDraftSelect}
-							className={`${browseCss.filterPopupOptionButton} ${draftFilterIds.includes(option.id) ? browseCss.filterPopupOptionButtonSelected : ''}`}
-						>
-							{option.label}
-						</Button>
-					))}
-				</div>
+						{filterOptions.map((option) => {
+							const selected = draftFilterIds.includes(option.id);
+							return (
+								<Button
+									key={option.id}
+									spotlightId={`${triggerSpotlightId}-option-${option.id}`}
+									data-filter-id={option.id}
+									selected={selected}
+									aria-pressed={selected}
+									onClick={onDraftSelect}
+									className={`${browseCss.filterPopupOptionButton} ${selected ? selectionOptionSelectedClass : ''}`}
+								>
+									<SelectionOptionContent selected={selected}>
+										{option.label}
+									</SelectionOptionContent>
+								</Button>
+							);
+						})}
+					</div>
 			</div>
 		</Popup>
 	</>

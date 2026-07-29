@@ -10,8 +10,6 @@ import {
 import {isNativePlaybackSourceTokenCurrent} from '../utils/playbackRuntimeContext';
 
 export const usePlayerStartupCoordinator = ({
-	item,
-	playbackGeneration,
 	videoRef,
 	nativeSourceTokenRef,
 	playbackRuntimeContextRef,
@@ -137,6 +135,21 @@ export const usePlayerStartupCoordinator = ({
 		startProgressReporting
 	]);
 
+	const attemptSafeTranscodeFallback = useCallback(async (reason) => {
+		try {
+			return await attemptTranscodeFallback(reason);
+		} catch {
+			appendPlaybackDiagnostic?.({
+				scope: 'startup',
+				stage: 'transcode-fallback',
+				status: 'failed',
+				reason: 'request-failed',
+				message: 'The server transcoding retry could not be started.'
+			});
+			return false;
+		}
+	}, [appendPlaybackDiagnostic, attemptTranscodeFallback]);
+
 	const handleStartupTimeout = useCallback(async (sourceToken, startAttempt) => {
 		if (
 			startAttemptRef.current !== startAttempt ||
@@ -152,7 +165,7 @@ export const usePlayerStartupCoordinator = ({
 			message: 'Playback made no progress after the play request.'
 		});
 		if (!isCurrentTranscoding) {
-			const didFallback = await attemptTranscodeFallback('startup-no-progress');
+			const didFallback = await attemptSafeTranscodeFallback('startup-no-progress');
 			if (didFallback || !isTokenCurrent(sourceToken)) return didFallback;
 		}
 		showPlaybackError(
@@ -162,7 +175,7 @@ export const usePlayerStartupCoordinator = ({
 		return false;
 	}, [
 		appendPlaybackDiagnostic,
-		attemptTranscodeFallback,
+		attemptSafeTranscodeFallback,
 		isCurrentTranscoding,
 		isTokenCurrent,
 		playbackStartedRef,
@@ -193,7 +206,14 @@ export const usePlayerStartupCoordinator = ({
 		clearStartupDeadline();
 		startupDeadlineTimerRef.current = setTimeout(() => {
 			startupDeadlineTimerRef.current = null;
-			handleStartupTimeout(sourceToken, startAttempt);
+			handleStartupTimeout(sourceToken, startAttempt).catch(() => {
+				if (!isTokenCurrent(sourceToken)) return;
+				setStatus('failed');
+				showPlaybackError(
+					'The media did not begin loading or playing. Please retry or go back.',
+					{detachMedia: true}
+				);
+			});
 		}, PLAYER_PLAYBACK_START_TIMEOUT_MS);
 
 		try {
@@ -211,7 +231,7 @@ export const usePlayerStartupCoordinator = ({
 			startInFlightRef.current = false;
 			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
 			if (isFatalPlaybackError(playError) && !isCurrentTranscoding) {
-				const didFallback = await attemptTranscodeFallback(errorMessage);
+				const didFallback = await attemptSafeTranscodeFallback(errorMessage);
 				if (didFallback || !isTokenCurrent(sourceToken)) return false;
 			}
 			if (isFatalPlaybackError(playError)) {
@@ -224,7 +244,7 @@ export const usePlayerStartupCoordinator = ({
 		}
 	}, [
 		appendPlaybackDiagnostic,
-		attemptTranscodeFallback,
+		attemptSafeTranscodeFallback,
 		clearStartupDeadline,
 		commitPlaybackStarted,
 		handleStartupTimeout,
@@ -242,12 +262,6 @@ export const usePlayerStartupCoordinator = ({
 	const reportPlaybackEvidence = useCallback((signal, sourceToken = sourceTokenRef.current) => (
 		commitPlaybackStarted(signal, sourceToken)
 	), [commitPlaybackStarted]);
-
-	useEffect(() => {
-		invalidatePlaybackSource();
-		timeoutHandledRef.current = false;
-		syncPlayReadyRequestedRef.current = false;
-	}, [invalidatePlaybackSource, item?.Id, playbackGeneration]);
 
 	useEffect(() => {
 		if (!syncPlayStartupBridge) return undefined;

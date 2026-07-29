@@ -41,8 +41,6 @@ const createCoordinatorProps = ({syncPlayStartupBridge = createSyncPlayStartupBr
 		video,
 		sourceToken,
 		props: {
-			item: {Id: 'item-1'},
-			playbackGeneration: 1,
 			videoRef: {current: video},
 			nativeSourceTokenRef: {current: sourceToken},
 			playbackRuntimeContextRef: {current: runtimeContext},
@@ -200,6 +198,35 @@ describe('usePlayerStartupCoordinator state', () => {
 		expect(view.props.attemptTranscodeFallback).toHaveBeenCalledTimes(1);
 		expect(view.props.attemptTranscodeFallback).toHaveBeenCalledWith('startup-no-progress');
 		expect(view.props.showPlaybackError).not.toHaveBeenCalled();
+	});
+
+	it('contains rejected DirectPlay fallback requests and shows one terminal error', async () => {
+		jest.useFakeTimers();
+		const deferredPlay = createDeferred();
+		const view = createCoordinatorProps();
+		view.video.play.mockReturnValue(deferredPlay.promise);
+		view.props.attemptTranscodeFallback.mockRejectedValue(new Error('fallback failed'));
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		await act(async () => {
+			jest.advanceTimersByTime(PLAYER_PLAYBACK_START_TIMEOUT_MS);
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(view.props.attemptTranscodeFallback).toHaveBeenCalledTimes(1);
+		expect(view.props.showPlaybackError).toHaveBeenCalledTimes(1);
+		expect(view.props.showPlaybackError).toHaveBeenCalledWith(
+			'The media did not begin loading or playing. Please retry or go back.',
+			{detachMedia: true}
+		);
 	});
 
 	it('waits for authoritative SyncPlay start and completes playback exactly once', async () => {
