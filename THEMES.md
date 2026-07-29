@@ -65,6 +65,9 @@ Version/capability detection is implemented in `src/utils/platformCapabilities.j
   - webOS 6 popup fallback behaviors (solid-surface compatibility path).
 - `src/styles/panelLayoutMixins.less`
   - Shared panel fill container mixin.
+- `src/styles/surfaceMixins.less`
+  - Shared popup/button surface behavior and the tokenized panel scrollbar used by
+    bounded native overflow regions.
 - `src/styles/compatMixins.less`
   - Shared compatibility mixins (gap fallbacks, scroll metric stabilization).
 
@@ -91,6 +94,8 @@ Examples:
 - `src/components/toolbar-styles/_toolbar-compat-webos6.less`
 - `src/components/HeroBanner.module.less`
 - `src/components/hero-banner-styles/_hero-banner-compat-webos6.less`
+- `src/components/BreezyLoadingOverlay.module.less`
+- `src/components/PosterMediaCard.module.less`
 - `src/components/MediaRow.module.less`
 - `src/components/media-row-styles/_media-row-compat-webos6.less`
 
@@ -104,7 +109,7 @@ Examples:
 
 ### Elegant
 
-- Uses liquid/glass layers for navbar, popups, and selected surfaces.
+- Uses the compact pill header across shared-toolbar panels, plus liquid/glass layers for popups and selected surfaces.
 - Stronger tokenized gradients and blur/saturation behavior.
 - Elegant toolbar can use SVG distortion when supported.
 
@@ -113,6 +118,10 @@ Examples:
 - Reduces expensive transforms/animations.
 - Keeps readability and key visual structure.
 - Selective blur reductions happen in global and panel-specific shared tails.
+- The compact Elegant header keeps its backdrop blur but disables SVG distortion; Performance+ and webOS 6 use the static non-blurred fallback.
+- The shared Breezyfin wind loading mark remains animated; only Performance+ makes it static.
+
+Shared Hero backdrop, media-panel atmosphere, text-fallback contrast, Elegant liquid-glass specular, card-placeholder, and loading colors are defined as semantic tokens in `src/styles/global-styles/_global-root.css` and the Classic/Elegant token packs rather than repeated in component styles. Media-panel backdrops use low-resolution Jellyfin-preblurred representative artwork with darkening in Normal mode, a smaller/lighter pre-blurred image in Performance mode, and a lower-opacity unblurred image in Performance+; authenticated plugin artwork requests the equivalent width/quality/blur variant from the plugin. Full-screen CSS blur is intentionally avoided.
 
 ### Performance+ Mode (`data-bf-all-animations='off'`)
 
@@ -123,6 +132,8 @@ Examples:
 ## 6) Compatibility patches
 
 Compatibility is capability-driven and scoped by root attributes.
+The active legacy-style rationale, removal conditions, and validation contract are tracked
+as WA-007 in `WORKAROUNDS.md`.
 
 ### webOS 6 compatibility
 
@@ -150,7 +161,6 @@ Key files:
 
 - `src/views/search-panel-styles/_search-panel-compat-webos22.less`
 - `src/views/favorites-panel-styles/_favorites-panel-compat-webos22.less`
-- `src/views/library-panel-styles/_library-panel-compat-webos22.less`
 
 ## 7) Settings storage
 
@@ -190,6 +200,11 @@ Before merging theme changes, test:
 Also verify:
 
 - Focus/hover states are operational in both pointer and 5-way input.
+- Generic button text and icons use the theme accent on hover/focus/active states. Primary,
+  warning, danger, and favorite actions keep their semantic foreground overrides.
+  The shared behavior is controlled through `--bf-theme-button-fg`,
+  `--bf-theme-button-fg-hover`, and `--bf-theme-button-fg-active`; use explicit semantic
+  overrides for actions that must not inherit the generic accent.
 - Popup surfaces and toasts still use tokenized colors.
 - No panel uses fixed offsets that bypass shared layout tokens.
 - `npm run audit:style-imports` passes so split style imports do not drift.

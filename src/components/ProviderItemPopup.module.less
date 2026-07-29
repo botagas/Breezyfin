@@ -1,0 +1,68 @@
+@import (reference) '../styles/surfaceMixins.less';
+
+.content {
+	box-sizing: border-box;
+	width: min(42rem, 92vw);
+}
+
+.summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	margin: 0.35rem 0 0.75rem;
+	color: var(--bf-theme-text-primary);
+	font-size: 0.8rem;
+
+	> span {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.22rem;
+		padding: 0.24rem 0.58rem;
+		border: 0.06rem solid var(--bf-theme-surface-border);
+		border-radius: 999px;
+		background: var(--bf-theme-card-filter-chip-bg);
+	}
+}
+
+.ratingIcon {
+	display: inline-block !important;
+	width: 0.86em !important;
+	min-width: 0.86em !important;
+	height: 0.86em !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	background: transparent !important;
+	color: var(--bf-theme-rating-star) !important;
+	font-size: 0.86em !important;
+	line-height: 0.86em !important;
+	text-align: center;
+}
+
+.metadataLine {
+	margin: 0.35rem 0;
+	color: var(--bf-theme-muted-text);
+	font-size: 0.82rem;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+
+	strong {
+		color: var(--bf-theme-text-primary);
+	}
+}
+
+.detail {
+	max-height: 48vh;
+	margin: 0.8rem 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	.panelScrollbar();
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+}

@@ -1,0 +1,44 @@
+.feedState,
+.warning,
+.section {
+	position: relative;
+	z-index: 1;
+}
+
+.feedState {
+	min-height: 10rem;
+	padding: 1rem 0 2rem;
+}
+
+.emptyState {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	color: var(--bf-theme-muted-text);
+}
+
+.emptyState :global(.BodyText) {
+	margin: 0;
+	text-align: center;
+}
+
+.sectionTitle {
+	margin: 0 0 0.75rem;
+	color: var(--bf-theme-text-primary);
+	font-weight: 600;
+}
+
+.warning {
+	margin: 0.5rem 0 1rem;
+	color: var(--bf-theme-warning-text, var(--bf-theme-accent));
+}
+
+.section {
+	max-width: 80rem;
+	padding: 1rem 0 2rem;
+}
+
+.section :global(.bf-button) {
+	margin: 0.4rem 0.5rem 0.4rem 0;
+}

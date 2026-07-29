@@ -18,12 +18,13 @@ const aggregateAudit = scripts.audit || '';
 const auditScriptNames = Object.keys(scripts)
 	.filter((scriptName) => scriptName.startsWith('audit:'))
 	.sort((a, b) => a.localeCompare(b));
+const aggregateAuditScriptNames = auditScriptNames.filter((scriptName) => !scriptName.endsWith(':update'));
 
 const documentedSource = fs.existsSync(DEVELOPING_DOC)
 	? fs.readFileSync(DEVELOPING_DOC, 'utf8')
 	: '';
 
-const aggregateMissing = auditScriptNames.filter((scriptName) => (
+const aggregateMissing = aggregateAuditScriptNames.filter((scriptName) => (
 	!aggregateAudit.includes(`npm run ${scriptName}`)
 ));
 
@@ -31,7 +32,10 @@ const docsMissing = auditScriptNames.filter((scriptName) => (
 	!documentedSource.includes(`npm run ${scriptName}`)
 ));
 
-console.log(`Checked ${auditScriptNames.length} targeted audit scripts for aggregate/docs drift.`);
+console.log(
+	`Checked ${aggregateAuditScriptNames.length} audit gates and ` +
+	`${auditScriptNames.length - aggregateAuditScriptNames.length} documented maintenance commands for aggregate/docs drift.`
+);
 
 let hasFailure = false;
 

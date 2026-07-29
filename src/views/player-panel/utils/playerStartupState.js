@@ -1,0 +1,35 @@
+export const PLAYER_SUBTITLE_STARTUP_TIMEOUT_MS = 15000;
+
+export const isInterruptedPlaybackStartError = (error) => {
+	if (!error) return false;
+	if (error.name === 'AbortError') return true;
+	const message = String(error.message || error).toLowerCase();
+	return message.includes('play() request was interrupted') ||
+		message.includes('media was removed from the document') ||
+		message.includes('new load request');
+};
+
+const rendererNeedsStartupGate = ({currentSubtitleTrack, subtitleRendererPolicy}) => (
+	Number.isInteger(currentSubtitleTrack) &&
+	currentSubtitleTrack >= 0 &&
+	subtitleRendererPolicy?.clientRender === true
+);
+
+export const getPlayerStartupState = ({
+	videoReady = false,
+	currentSubtitleTrack = -1,
+	subtitleRendererPolicy = null,
+	subtitleRendererStatus = 'off'
+} = {}) => {
+	if (!videoReady) return 'waiting-video';
+	if (!rendererNeedsStartupGate({currentSubtitleTrack, subtitleRendererPolicy})) return 'ready';
+	if (subtitleRendererStatus === 'ready') return 'ready';
+	if (subtitleRendererStatus === 'timed-out') return 'timed-out';
+	if (
+		subtitleRendererStatus === 'failed' ||
+		subtitleRendererStatus === 'fetch-failed' ||
+		subtitleRendererStatus === 'unsupported-payload' ||
+		subtitleRendererStatus === 'empty-events'
+	) return 'failed';
+	return 'waiting-subtitles';
+};

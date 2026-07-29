@@ -19,7 +19,9 @@ const {
 
 const RUNTIME_STYLE_VARS = new Set([
 	'--bf-player-subtitle-absolute-x',
-	'--bf-player-subtitle-absolute-y'
+	'--bf-player-subtitle-absolute-y',
+	'--bf-player-subtitle-absolute-max-width',
+	'--bf-player-subtitle-absolute-max-height'
 ]);
 
 const findVarExpressionEnd = (source, startIndex) => {

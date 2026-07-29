@@ -1,8 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import {memo} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
-import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
-import imageLoadCss from './ImageLoadReveal.module.less';
+import {
+	POSTER_MEDIA_CARD_VARIANTS,
+	normalizePosterMediaCardVariant
+} from '../utils/posterMediaCardVariants';
+import MediaCardStatusOverlay from './MediaCardStatusOverlay';
+import MediaCardImage from './MediaCardImage';
+import css from './PosterMediaCard.module.less';
 
 const SpottableDiv = Spottable('div');
 
@@ -13,14 +18,10 @@ const PosterMediaCard = ({
 	title,
 	subtitle,
 	imageUrl,
+	imageCandidates = null,
 	imageAlt,
 	className,
-	imageClassName,
-	placeholderClassName,
-	placeholderInnerClassName,
-	infoClassName,
-	titleClassName,
-	subtitleClassName,
+	variant = POSTER_MEDIA_CARD_VARIANTS.POSTER_GRID,
 	onClick,
 	onKeyDown,
 	onFocus,
@@ -28,43 +29,34 @@ const PosterMediaCard = ({
 	onMouseDown,
 	spotlightDisabled = false,
 	overlayContent = null,
-	placeholderText = '?',
-	usePlaceholderClassWhenNoImage = false,
+	showWatched = false,
+	watchedContent = '\u2713',
+	watchedVariant = 'watched',
+	progressPercent = null,
+	contextBadge = '',
+	contextBadgeExtras = null,
+	ariaLabel,
+	placeholderText = 'No Image',
 	spottable = true,
 	...rest
 }) => {
-	const [imageLoaded, setImageLoaded] = useState(false);
-	const [imageFailed, setImageFailed] = useState(false);
-	const hasImage = Boolean(imageUrl);
-
-	useEffect(() => {
-		setImageLoaded(false);
-		setImageFailed(false);
-	}, [imageUrl]);
-
-	const handleImageLoad = useCallback(() => {
-		setImageLoaded(true);
-	}, []);
-
-	const handleImageError = useCallback((event) => {
-		if (applyImageFormatFallbackFromEvent(event)) {
-			setImageLoaded(false);
-			return;
-		}
-		setImageLoaded(false);
-		setImageFailed(true);
-	}, []);
-
-	const showImage = hasImage && !imageFailed;
-	const showLoadingHint = showImage && !imageLoaded;
+	const resolvedImageCandidates = Array.isArray(imageCandidates)
+		? imageCandidates
+		: imageUrl ? [imageUrl] : [];
+	const normalizedVariant = normalizePosterMediaCardVariant(variant);
+	const variantClassName = normalizedVariant === POSTER_MEDIA_CARD_VARIANTS.LANDSCAPE_GRID
+		? css.landscapeGrid
+		: css.posterGrid;
 	const imageContainerClassName = joinClasses(
-		imageClassName,
-		((!hasImage && usePlaceholderClassWhenNoImage) || imageFailed) && placeholderClassName
+		css.image,
+		resolvedImageCandidates.length === 0 && css.placeholder
 	);
 	const RootComponent = spottable ? SpottableDiv : 'div';
 	const rootProps = {
 		'data-item-id': itemId,
-		className,
+		'data-card-variant': normalizedVariant,
+		'aria-label': ariaLabel || [title, subtitle, typeof contextBadge === 'string' ? contextBadge : ''].filter(Boolean).join(' - '),
+		className: joinClasses(css.card, variantClassName, className),
 		onClick,
 		onKeyDown,
 		onFocus,
@@ -79,46 +71,41 @@ const PosterMediaCard = ({
 	return (
 		<RootComponent {...rootProps}>
 			<div className={imageContainerClassName}>
-				{showImage ? (
-					<img
-						src={imageUrl}
-						alt={imageAlt || title}
-						className={joinClasses(
-							imageLoadCss.imageReveal,
-							imageLoaded && imageLoadCss.imageRevealLoaded
-						)}
-						onLoad={handleImageLoad}
-						onError={handleImageError}
-						loading="lazy"
-						decoding="async"
-						draggable={false}
-					/>
-				) : placeholderInnerClassName ? (
-					<div className={placeholderInnerClassName}>
-						<BodyText>{placeholderText}</BodyText>
-					</div>
-				) : null}
-				{showLoadingHint ? (
-					<div
-						className={imageLoadCss.imageLoadingHint}
-						aria-hidden="true"
-					/>
-				) : null}
-				{overlayContent}
+				<MediaCardImage
+					candidates={resolvedImageCandidates}
+					alt={imageAlt || title}
+					width={normalizedVariant === POSTER_MEDIA_CARD_VARIANTS.LANDSCAPE_GRID ? 640 : 400}
+					height={normalizedVariant === POSTER_MEDIA_CARD_VARIANTS.LANDSCAPE_GRID ? 360 : 600}
+					loading="eager"
+					placeholder={(
+						<div className={css.placeholderInner}>
+							<BodyText>{placeholderText}</BodyText>
+						</div>
+					)}
+				/>
+				<MediaCardStatusOverlay
+					showWatched={showWatched}
+					watchedContent={watchedContent}
+					watchedClassName={watchedVariant === 'progress' ? css.progressBadge : css.watchedBadge}
+					progressPercent={progressPercent}
+					progressBarClassName={css.progressBar}
+					progressClassName={css.progress}
+				>
+					{contextBadge || contextBadgeExtras ? (
+							<div className={css.contextBadgeStack}>
+								{contextBadge ? <span className={css.contextBadge}>{contextBadge}</span> : null}
+								{contextBadgeExtras}
+							</div>
+					) : null}
+					{overlayContent}
+				</MediaCardStatusOverlay>
 			</div>
-			{infoClassName ? (
-				<div className={infoClassName}>
-					{title ? <BodyText className={titleClassName}>{title}</BodyText> : null}
-					{subtitle ? <BodyText className={subtitleClassName}>{subtitle}</BodyText> : null}
-				</div>
-			) : (
-				<>
-					{title ? <BodyText className={titleClassName}>{title}</BodyText> : null}
-					{subtitle ? <BodyText className={subtitleClassName}>{subtitle}</BodyText> : null}
-				</>
-			)}
+			<div className={css.info}>
+				{title ? <BodyText className={css.title}>{title}</BodyText> : null}
+				{subtitle ? <BodyText className={css.subtitle}>{subtitle}</BodyText> : null}
+			</div>
 		</RootComponent>
 	);
 };
 
-export default PosterMediaCard;
+export default memo(PosterMediaCard);

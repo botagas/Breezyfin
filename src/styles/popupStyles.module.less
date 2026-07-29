@@ -67,13 +67,8 @@
 
 :global([data-bf-nav-theme='elegant']) .popupSurface::after {
 	z-index: 2;
-	background:
-		radial-gradient(170% 130% at 15% -65%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 58%),
-		radial-gradient(130% 120% at 88% -55%, rgba(232, 245, 255, 0.14), rgba(232, 245, 255, 0) 54%),
-		linear-gradient(180deg, rgba(12, 18, 28, 0.24), rgba(10, 16, 24, 0.34));
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.2),
-		inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+	background: var(--bf-theme-liquid-specular-bg);
+	box-shadow: var(--bf-theme-liquid-specular-shadow);
 }
 
 :global([data-bf-all-animations='off']) .popupSurface {

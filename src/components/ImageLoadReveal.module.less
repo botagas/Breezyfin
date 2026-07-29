@@ -1,26 +1,37 @@
 .imageReveal {
 	opacity: 0;
-	filter: blur(var(--bf-image-load-blur-radius));
-	transition: opacity 220ms ease-out, filter 260ms ease-out, transform 340ms ease;
-	will-change: opacity, filter;
+	transition: opacity 180ms ease-out;
 }
 
 .imageRevealLoaded {
 	opacity: 1;
-	filter: none;
 }
 
 .imageLoadingHint {
 	position: absolute;
 	inset: 0;
 	background: var(--bf-theme-image-loading-surface);
-	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
 	opacity: 1;
 	visibility: visible;
 	transition: opacity 180ms ease-out, visibility 0s linear 180ms;
 	pointer-events: none;
 	z-index: 2;
+}
+
+.imagePlaceholder {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 1;
+	visibility: visible;
+}
+
+.imagePlaceholderHidden {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
 }
 
 .imageLoadingHintHidden {

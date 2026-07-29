@@ -1,6 +1,7 @@
 import {
 	ASS_SUBTITLE_RENDERER_OPTIONS,
 	ASS_SUBTITLE_RENDERER_STABLE_OPTIONS,
+	BITMAP_SUBTITLE_RENDERER_OPTIONS,
 	DEFAULT_SETTINGS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
@@ -20,6 +21,7 @@ describe('subtitle appearance settings', () => {
 	it('uses readable defaults for the lightweight subtitle renderer', () => {
 		expect(DEFAULT_SETTINGS.smartSubtitleTranscoding).toBe(true);
 		expect(DEFAULT_SETTINGS.assSubtitleRenderer).toBe('auto');
+		expect(DEFAULT_SETTINGS.bitmapSubtitleRenderer).toBe('auto');
 		expect(DEFAULT_SETTINGS.subtitleOverlayFontSizePx).toBe('36');
 		expect(DEFAULT_SETTINGS.subtitleOverlayWeight).toBe('bold');
 		expect(DEFAULT_SETTINGS.subtitleOverlayTextColor).toBe('white');
@@ -42,6 +44,8 @@ describe('subtitle appearance settings', () => {
 			.toEqual(['auto', 'lightweight', 'libass', 'libass-manual', 'jassub', 'jassub-manual', 'assjs', 'burn-in']);
 		expect(getAssSubtitleRendererOptions(true).map((option) => option.value))
 			.toEqual(['auto', 'lightweight', 'libass', 'libass-manual', 'jassub', 'jassub-manual', 'assjs', 'burn-in']);
+		expect(BITMAP_SUBTITLE_RENDERER_OPTIONS.map((option) => option.value))
+			.toEqual(['auto', 'libbitsub', 'libpgs', 'burn-in']);
 		expect(SUBTITLE_OVERLAY_WEIGHT_OPTIONS).toEqual([
 			{value: 'regular', label: 'Regular'},
 			{value: 'bold', label: 'Bold (Default)'},

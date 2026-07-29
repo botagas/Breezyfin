@@ -60,7 +60,8 @@ export const supportsAssJsRenderer = () => supportsAssJsRuntime();
 export const initAssJsRenderer = async ({
 	videoElement,
 	containerElement,
-	subtitleContent
+	subtitleContent,
+	diagnosticsEnabled = false
 }) => {
 	if (!containerElement) return {instance: null, debug: {engine: 'assjs', status: 'missing-container'}};
 	clearContainer(containerElement);
@@ -83,11 +84,11 @@ export const initAssJsRenderer = async ({
 			resampling: ASS_JS_OPTIONS.resampling,
 			timing: rendererResult.disabled ? 'raf-forced' : 'native-or-raf',
 			containerChildren: containerElement.childNodes.length,
-			...collectExternalRendererDiagnostics({
+			...(diagnosticsEnabled ? collectExternalRendererDiagnostics({
 				containerElement,
 				renderer,
 				videoElement
-			})
+			}) : {})
 		}
 	};
 };

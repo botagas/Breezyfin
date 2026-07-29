@@ -1,0 +1,39 @@
+.backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	overflow: hidden;
+	pointer-events: none;
+	background: var(--bf-theme-panel-bg);
+}
+
+.image {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.72;
+	filter: none;
+}
+
+.scrim {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(
+			to bottom,
+			rgba(var(--bf-theme-backdrop-shadow-rgb), 0.2) 0%,
+			rgba(var(--bf-theme-backdrop-shadow-rgb), 0.4) 48%,
+			rgba(var(--bf-theme-backdrop-panel-rgb), 0.72) 100%
+		);
+}
+
+:global([data-bf-animations='off']) .image {
+	opacity: 0.58;
+}
+
+:global([data-bf-all-animations='off']) .image {
+	opacity: 0.32;
+	filter: none;
+}

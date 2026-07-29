@@ -6,10 +6,11 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 
 | Need | Preferred Helper |
 |---|---|
-| Save/restore panel scroll + cache scrollTop | `usePanelScrollState` |
+| Save/restore non-virtual panel scroll + cache scrollTop | `usePanelScrollState` |
+| Render paged uniform media grids with Enact-owned virtualization, focus restoration, visible-index prefetch, and overscroll disabled by default | `MediaVirtualGrid` |
 | Library panel paged data loading (first page + incremental load-more) | `useLibraryPagination` |
-| Library panel native-scroll persistence + progressive deep restore | `useLibraryScrollPersistence` |
 | Manage shared Library/Home Section media filter popup state | `useMediaFilterState` |
+| Manage collapsible, debounced Library/Favorites search input state | `useCollapsibleBrowseSearch` |
 | Apply shared media filter semantics | `MEDIA_FILTER_OPTIONS` / `buildMediaFilterState` / `mediaItemMatchesFilters` |
 | Wire panel back handling | `usePanelBackHandler` |
 | Wire toolbar callbacks + layered panel back flow | `usePanelToolbarActions` |
@@ -23,12 +24,15 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize PlayerPanel external/internal controls-visibility synchronization | `usePlayerVisibilitySync` |
 | Reveal PlayerPanel controls from wheel/pointer-edge interaction | `usePlayerInteractionReveal` |
 | Centralize PlayerPanel video loading/session selection flow | `usePlayerVideoLoader` |
+| Gate Player startup until video and selected client subtitles are ready | `usePlayerStartupCoordinator` |
 | Centralize PlayerPanel playback option/session-context builders | `usePlayerPlaybackContext` |
 | Centralize PlayerPanel skip overlay + next-episode prompt state machine | `usePlayerSkipOverlayState` |
+| Select enabled/displayable server Home rows, bound progressive loading, and decide mounted-content revalidation | `src/utils/serverHomeRows.js` |
 | Centralize PlayerPanel seek + track-switching flow | `usePlayerSeekAndTrackSwitching` |
 | Centralize PlayerPanel track-popup `data-track-index` click handlers | `usePlayerTrackPopupHandlers` |
 | Centralize PlayerPanel play/pause/retry/end command handlers | `usePlayerPlaybackCommands` |
 | Centralize PlayerPanel stop/focus control handlers | `usePlayerCoreControls` |
+| Centralize blocking Player decisions for unsupported audio switches, staged DV-to-HDR/SDR fallback, subtitle burn-in, and no-subtitle fallback | `usePlayerPlaybackDecision` |
 | Centralize PlayerPanel layered back handling decisions | `usePlayerBackNavigation` |
 | Centralize PlayerPanel audio/subtitle popup disclosure wiring | `usePlayerDisclosures` |
 | Centralize PlayerPanel adjacent-episode checks + progress reporting ticker | `usePlayerEpisodeProgress` |
@@ -49,19 +53,28 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize Media Details per-item bootstrap effect (data load + selection reset) | `useMediaDetailsItemBootstrap` |
 | Keep app input mode (`pointer`/`5way`) in sync | `useInputMode` |
 | Keep component state synced to settings changes | `useBreezyfinSettingsSync` |
+| Resolve the current Normal / Performance / Performance+ rendering profile | `usePerformanceMode` |
 | Gate settings-sync and other panel-scoped side effects behind `isActive` | pass `enabled: isActive` to `useBreezyfinSettingsSync` and similar effect hooks |
 | Persist crash recovery action/context across ErrorBoundary remounts | `src/utils/crashRecovery.js` helpers |
 | Fast lookup of items by id/key | `useMapById` |
 | Fetch item metadata with cancel-safe effect | `useItemMetadata` |
 | Reusable toast lifecycle | `useToastMessage` |
-| Reusable image fallback behavior | `useImageErrorFallback` |
+| Reusable image fallback behavior, including ordered URL candidates | `useImageErrorFallback` |
 | Manage App-level panel history snapshots | `usePanelHistory` |
 | Register and run App-level panel back handlers | `usePanelBackHandlerRegistry` |
+| Run authenticated non-player inactivity handling while preserving Spotlight ownership | `useAppScreensaver` |
+| Run paused-player inactivity handling with wake/resume semantics | `usePlayerPausedScreensaver` |
+| Keep bounded Player runtime diagnostic state dormant behind the master setting | `usePlayerRuntimeDiagnostics` |
+| Read the app-wide optional diagnostics collection state and clear shared metric state on disable | `RuntimeDiagnosticsProvider` / `useRuntimeDiagnosticsEnabled` |
+| Track inactivity through one extendable deadline instead of recreating timers on input | `useInactivityDeadline` |
+| Suspend covered App/Player runtime work with shared reason ownership | `useRuntimeSuspended` / `setRuntimeSuspension` |
 | Build shared Jellyfin image URLs without panel/service coupling | `buildItemImageUrl` / `buildUserPrimaryImageUrl` |
+| Resolve ordered card and panel artwork fallbacks, preserving authenticated provider candidates before generated Jellyfin URLs | `mergeMediaItemImageCandidates` / `getPosterCardImageUrls` / `getLandscapeCardImageUrls` / `getMediaPanelBackdropUrls` |
+| Apply mode-aware width, quality, and server blur to authenticated plugin image URLs | `buildExternalImageVariantUrl` |
 | Build duplicate-safe media list React keys | `buildMediaListItemKey` |
-| Centralize LoginPanel rotating backdrop state and load/error handling | `useLoginBackdrops` |
+| Centralize LoginPanel rotating backdrop state, startup-restore deferral, and load/error handling | `useLoginBackdrops` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
-| Match Jellyfin, HLS, and native media tracks with duplicate-language safety | `resolveRuntimeTrackIndex` / `applyNativeAudioTrackSelection` |
+| Match Jellyfin, HLS, native media tracks, and cross-episode audio/subtitle intents with duplicate-language safety | `resolveRuntimeTrackIndex` / `resolveAudioTrackIndex` / `resolveSubtitleTrackIndex` / `applyNativeAudioTrackSelection` |
 | Derive Settings runtime capability labels from capability snapshot | `useRuntimeCapabilityLabels` |
 | Centralize Settings bootstrap data loading/effects | `useSettingsBootstrap` |
 | Centralize Settings panel disclosure/open-close wiring | `useSettingsDisclosures` |
@@ -73,20 +86,26 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Keep Settings tab visibility, subtitle control enablement, popup selected states, and destructive-action copy testable | `settingsViewModel` helpers |
 | Runtime playback/platform capability snapshot + cache controls | `getRuntimePlatformCapabilities` / `setRuntimeCapabilityProbeRefreshDays` / `refreshRuntimePlatformCapabilities` / `refreshRuntimePlatformCapabilitiesWithLuna` |
 | Render shared Library-like poster grid cards | `PanelPosterMediaCard` |
-| Map Library-like CSS module classes for shared poster grid cards | `getPanelPosterCardClassProps` |
-| Keep focused grid cards visible and trigger load-more prefetch | `shouldLoadMoreFromGridFocus` |
+| Keep focused grid cards visible, restore grid focus after popup/filter changes, use row geometry for directional movement, and trigger load-more prefetch | `shouldLoadMoreFromGridFocus` / `focusRestoredOrFallbackGridCard` / `findDirectionalGridTarget` |
+| Render shared browse input and filter trigger visuals | `MediaBrowseControls` |
+| Position browse controls above results using the Search panel overlay contract | `MediaBrowseOverlay` + `MediaBrowseControls.module.less` panel classes |
 | Route right-most grid-card focus to adjacent filter controls | `focusTargetFromRightMostGridItem` |
 | Resolve current Jellyfin username for request/tag matching | `getJellyfinUsername` |
 | Decide Smart/manual subtitle burn-in policy | `getSubtitleTranscodePolicy` |
 | Build structured playback/player diagnostic entries | `createPlaybackDiagnostic` / `appendPlaybackDiagnostic` / `buildMediaSegmentsLoadDiagnostic` |
 | Build consistent playback restart/reload overrides | `buildPlaybackOverride` / `resolveVideoSeekSeconds` |
+| Create mutable per-instance HLS.js config and classify/redact runtime errors before recovery/fallback handling | `createHlsPlayerConfig` / `classifyHlsError` / `getHlsErrorHttpStatus` / `buildHlsErrorSummary` |
+| Redact sensitive URLs, headers, errors, values, and console arguments before output or storage | `redactSensitiveUrl` / `redactSensitiveText` / `sanitizeSensitiveValue` / `sanitizeConsoleArgs` |
+| Classify Player subtitle/burn-in recovery without side effects | `playerRecoveryPolicy` helpers |
 | Keep PlayerPanel loader decisions pure/testable | `buildPlayerPlaybackSettingsSnapshot` / `resolveInitialTrackSelection` / `resolvePlaybackVideoUrl` / `selectHlsEnginePreference` |
-| Normalize PlayerPanel subtitle renderer failure and fallback status names | `normalizeSubtitleRendererFailureReason` / `getSubtitleBurnInFallbackStatus` |
-| Fetch subtitle event/raw text payloads for client-side rendering | `getSubtitleTrackEvents` / `getSubtitleTrackText` / `buildSubtitleStreamUrl` |
+| Normalize PlayerPanel subtitle renderer failure and fallback status names, and route renderer failures into burn-in/no-subtitle consent decisions | `normalizeSubtitleRendererFailureReason` / `getSubtitleBurnInFallbackStatus` / `runSubtitleBurnInFallbackDecision` |
+| Resolve raw subtitle fetch format priority from Jellyfin subtitle codecs | `getRawSubtitleFormats` |
+| Fetch subtitle event/raw text/binary payloads and resolve bitmap delivery candidates for client-side rendering | `getSubtitleTrackEvents` / `getSubtitleTrackText` / `getSubtitleTrackBinary` / `getBitmapSubtitleDeliveryCandidates` / `buildSubtitleStreamUrl` |
 | Fetch, normalize, place, cache, and render PlayerPanel subtitle cues, including safe SRT/VTT inline formatting, escaped safe subtitle tags, long-running overlapping cue lookup, ASS layer/source render ordering, lightweight ASS/SSA alignment including legacy `\a` codes, margins, wrap style, `\pos(x,y)` / `\move(...)` placement, `\org(x,y)` transform origins for absolute transformed cues, bounded rectangular `\clip(x1,y1,x2,y2)` / `\iclip(x1,y1,x2,y2)`, common vector `\clip(...)` / `\iclip(...)` masks for SVG drawing cues, source-authored absolute/relative font size, colors, fonts, borders, shadows, blur, simple/complex fades, basic karaoke timing/color states, active `\K`/`\kf` sweep approximation, common `\p` vector drawing paths including B-spline `s`/`p` conversion and `\pbo` baseline offsets, style reset, scale, spacing, rotation/skew, and interpolated numeric/color `\t(...)` transforms | `normalizeSubtitleEvents` / `normalizeSubtitleText` / `findActiveSubtitleCues` / `subtitleRendererAss` / `subtitleRendererAssAlignment` / `subtitleRendererAssClip` / `subtitleRendererAssDimensions` / `subtitleRendererAssDrawing` / `subtitleRendererAssFontSize` / `subtitleRendererAssOrigin` / `subtitleRendererAssPosition` / `subtitleRendererAssTransform` / `usePlayerSubtitleRenderer` |
 | Normalize numeric Breezyfin subtitle appearance settings shared by Settings and Player overlay | `normalizeNumericSetting` / `adjustNumericSetting` / `SUBTITLE_OVERLAY_FONT_SIZE_RANGE` / `SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE` |
-| Render ASS/SSA through stable-visible experimental external renderers using app-fetched subtitle content when Smart Subtitle Handling selects them; Auto still resolves to Breezyfin lightweight rendering, while explicit libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in options remain selectable in every release channel; packaging prepares JASSUB assets, applies a version-guarded webOS Canvas2D worker patch because the JASSUB WebGL path is unreliable on webOS, preserves external-renderer chunks/assets in stable and develop builds, validates marker-bearing development JASSUB chunks and minified production JASSUB chunks for the forced Canvas2D path, transpiles ASS.js/JASSUB renderer chunks for webOS CLI packaging, renames generated `chunk.jassub-worker.*.js` to `.worker`, patches the Webpack runtime to load that worker extension, and removes generated `chunk.em-pthread.*` files; external renderer init waits for an attached video source, libass and JASSUB can also run in manual caller-owned canvas diagnostic modes, and renderer-layer diagnostics report playback phase, video state, external layer/canvas/ASS.js box visibility, hit-test target, dimensions, JASSUB backend, active DOM node counts, canvas pixel probe state, manual sync counters, and renderer update counters for real-TV debugging | `subtitle-renderers/subtitleRendererRegistry.js` plus `libassRenderer`, `jassubRenderer`, `assJsRenderer`, `manualCanvasLayout`, `videoSourceReady`, and `rendererDiagnostics`; `scripts/prepare-subtitle-package-assets.cjs`; `scripts/copy-subtitle-assets.cjs`; `scripts/subtitle-assets/jassubCanvas2dPatch.cjs` |
-| Normalize PlayerPanel subtitle overlay appearance, cue grouping, rectangular clip layer styles, and SVG drawing clip paths | `getSubtitleOverlayAttributes` / `groupSubtitleCuesByPlacement` / `getSubtitleClipLayerStyle` / `getSubtitleDrawingClipPath` |
+| Render ASS/SSA through stable-visible experimental external renderers using app-fetched subtitle content when Smart Subtitle Handling selects them; Auto still resolves to Breezyfin lightweight rendering, while explicit libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in options remain selectable in every release channel; packaging prepares JASSUB static assets, applies version-guarded webOS patches that force Canvas2D and require explicit worker/WASM/font URLs, preserves external-renderer chunks/assets in stable and develop builds, transpiles ASS.js/JASSUB renderer chunks for webOS packaging, validates copied JASSUB static assets, and fails if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` chunks reappear; external renderer init waits for an attached video source, libass and JASSUB can also run in manual caller-owned canvas diagnostic modes, their intervals share `rendererRuntimeSuspension`, and renderer-layer diagnostics report playback phase, video state, external layer/canvas/ASS.js box visibility, hit-test target, dimensions, JASSUB backend, active DOM node counts, canvas pixel probe state, manual sync counters, and renderer update counters for real-TV debugging | `subtitle-renderers/subtitleRendererRegistry.js` plus `libassRenderer`, `jassubRenderer`, `assJsRenderer`, `manualCanvasLayout`, `rendererRuntimeSuspension`, `videoSourceReady`, and `rendererDiagnostics`; `scripts/prepare-subtitle-package-assets.cjs`; `scripts/copy-subtitle-assets.cjs`; `scripts/subtitle-assets/jassubCanvas2dPatch.cjs` |
+| Render PGS/PGSSUB bitmap subtitles through Smart Subtitle Handling before burn-in fallback; image subtitles are detached from Jellyfin playback requests, the selected subtitle index is preserved for client rendering, Auto tries libbitsub first and then libpgs using DeliveryUrl/raw URL candidates before optional binary preflight, and renderer disposal, bitmap diagnostics, warning-gated image subtitle burn-in, and no-subtitle fallback consent stay explicit | `src/utils/bitmapSubtitleRenderers.js`; `subtitle-renderers/libbitsubRenderer.js`; `subtitle-renderers/libpgsRenderer.js`; `getSubtitleTranscodePolicy`; `getBitmapSubtitleDeliveryCandidates`; `getSubtitleTrackBinary`; `PlayerPlaybackDecisionPrompt` |
+| Normalize PlayerPanel subtitle overlay appearance, map ASS coordinates onto the visible video stage, preserve authored placement, contain only managed multiline text boxes, group region cues by ASS layer, and apply full-stage rectangular/inverse/vector clips | `getSubtitleOverlayAttributes` / `getSubtitleVideoStageGeometry` / `getAssCoordinatePlane` / `getAssCueContainmentPolicy` / `getAssCueContainment` / `groupSubtitleCuesByPlacement` / `groupSubtitleCuesByLayer` / `getSubtitleAbsolutePositionStyle` / `getSubtitleClipLayerStyle` |
 
 ---
 
@@ -94,7 +113,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 
 ### `usePanelScrollState`
 - File: `src/hooks/usePanelScrollState.js`
-- Purpose: one-stop panel scroll memory hook; combines normalized `scrollTop`, `Scroller` restore wiring, and optional cache persistence callbacks.
+- Purpose: one-stop panel scroll memory hook; combines normalized `scrollTop`, measured `Scroller` restore wiring, and optional cache persistence callbacks.
 - Signature:
 ```js
 usePanelScrollState({
@@ -102,31 +121,39 @@ usePanelScrollState({
   isActive = false,
   onCacheState = null,
   cacheKey = null,
-  requireCacheKey = false
+  requireCacheKey = false,
+  restoreAnimated = false,
+  restoreReady = true,
+  onRestoreComplete = null
 })
 ```
 - Returns:
   - `scrollTop`
-  - `setScrollTop`
+  - `setScrollTop(rawTop)` for an explicit programmatic reset/restore request
   - `commitScrollTop(rawTop)` for explicitly flushing the latest scroll position before navigation/back
+  - `commitLatestScrollTop()` for synchronously persisting the most recent continuously tracked Sandstone position
+  - `cancelScrollRestore()` for user-input interruption
   - `captureScrollTo` (pass to `Scroller` `cbScrollTo`)
+  - `handleScroll` (pass to `Scroller` `onScroll` without triggering React state updates)
   - `handleScrollStop` (pass to `Scroller` `onScrollStop`)
 - Use when:
   - panel has cached state and should restore scroll on return.
   - panel wants keyed cache (`cacheKey`), e.g. per library id/item id.
   - panel must persist scroll before leaving, e.g. Back/item navigation can happen before `onScrollStop`.
+- Sandstone note: normal `onScroll`/`onScrollStop` commits never schedule another restore. Restore completion is reported only after the measured scroller position reaches the cached target, or after bounded retries establish the reachable clamped position.
+- Do not wrap `MediaVirtualGrid` with this hook merely to duplicate Enact virtualization behavior. Uniform grids cache query, filters, loaded pages, pagination cursors, and focused item ID while `MediaVirtualGrid` owns rendered-item virtualization and focus restoration.
+- `MediaVirtualGrid` disables Sandstone boundary overscroll and focus zoom by default. It uses two overhang rows in Normal mode and one in Performance/Performance+; override either behavior only for a measured panel-specific requirement. Focus restoration is captured only when a query becomes active, so focus changes observed during scrolling or pagination cannot become late restore commands.
 - Example:
 ```js
 const {
   captureScrollTo,
+  handleScroll,
   handleScrollStop,
-  commitScrollTop
+  commitLatestScrollTop
 } = usePanelScrollState({
   cachedState,
   isActive,
-  onCacheState,
-  cacheKey: library?.Id,
-  requireCacheKey: true
+  onCacheState
 });
 ```
 
@@ -140,23 +167,14 @@ const {
 - Use when:
   - Library panel needs deterministic paged loading behavior without regrowing panel orchestrator logic.
 
-### `useLibraryScrollPersistence`
-- File: `src/views/library-panel/hooks/useLibraryScrollPersistence.js`
-- Purpose: panel-local native scroller persistence for Library:
-  - debounced `scrollTop` cache commits
-  - flush on deactivation/unmount/item selection
-  - progressive restore for deep positions (load more until target position is reachable)
-- Use when:
-  - Library panel uses native scrolling and needs deterministic restore across panel transitions.
-
 ### `useMediaFilterState`
 - File: `src/hooks/useMediaFilterState.js`
 - Purpose: shared state controller for Library-like media filters:
   - cached active filter ids
   - popup draft filter ids
-  - popup first focus
-  - apply/reset/close behavior
-  - cached-state wrapping for panels that persist filters with scroll state
+	  - popup first focus
+	  - staged apply/reset/close behavior, committing changed filters only after Popup `onHide`
+	  - cached-state wrapping for panels that persist filters with scroll state
 - Use with:
   - `MediaFilterControls` for the trigger/popup UI.
   - `MEDIA_FILTER_OPTIONS` and `mediaItemMatchesFilters` for shared filter semantics.
@@ -174,11 +192,25 @@ const {
   - a panel needs consistent `All`, `Unplayed`, `Played`, `Favorites`, or `My Requests` filtering.
   - filter state must be normalized before caching or comparison.
 
+### Home Section Paging Utilities
+- Files:
+  - `src/views/home-section-panel/utils/homeSectionPaging.js`
+  - `src/views/home-section-panel/utils/homeSectionSource.js`
+- Purpose:
+  - normalize legacy array pages and plugin paging envelopes without losing server cursors;
+  - collect a bounded page of locally filtered Home View More results;
+  - preserve continuation when a scan window contains no matching items;
+  - route semantic HSS My Requests View More sections through authoritative
+    `/Breezyfin/MyRequests` paging while leaving their Home preview on HSS.
+- Use when:
+  - Home View More consumes a section whose server response may be either an array or a
+    structured `{items, nextStartIndex, hasMore}` page.
+
 ### `useScrollerScrollMemory` and `useCachedScrollTopState`
 - File: `src/hooks/useScrollerScrollMemory.js`
 - Purpose:
   - `useCachedScrollTopState`: normalizes persisted `scrollTop` and keeps state stable.
-  - `useScrollerScrollMemory`: low-level restore/capture primitives.
+  - `useScrollerScrollMemory`: low-level continuous tracking, synchronous commit, measured/cancellable smooth restore with bounded retries, and cleanup primitives.
 - Use when:
   - panel has special behavior not covered by `usePanelScrollState`.
 
@@ -198,6 +230,7 @@ usePanelBackHandler(registerBackHandler, handler, { enabled = true })
   - `useToolbarActions` callback bundling
   - `useToolbarBackHandler` bridge
   - `usePanelBackHandler` layered back registration
+  - the visible Toolbar `onBack` action, so pointer/ENTER and remote Back use the same layer order
 - Signature:
 ```js
 usePanelToolbarActions({
@@ -233,6 +266,44 @@ usePanelToolbarActions({
   - adding a new top-level panel with local layered back behavior.
   - changing App back-routing behavior.
 
+### `useIntegrationPanelCache`
+
+- File: `src/App/hooks/useIntegrationPanelCache.js`
+- Purpose: own Watchlist, Calendar, SyncPlay, and WatchParty panel snapshots,
+  normalized cache actions, explicit section clears, session resets, and shared
+  `UserDataChanged` invalidation without regrowing `App.js`. Provider panels may cache
+  bounded result pages, cursors, warnings, and scroll state, but never provider secrets.
+
+### `useAppScreensaver`
+- File: `src/App/hooks/useAppScreensaver.js`
+- Purpose: own authenticated non-player inactivity handling:
+	- normalizes the configured timeout and extends a shared inactivity deadline on key, pointer, mouse fallback, click, wheel, view, and setting activity.
+	- pauses Spotlight only when Breezyfin owns the pause, remembers the focused control, and restores both safely after wake.
+	- consumes the first wake interaction so the underlying control is not activated.
+	- publishes App runtime suspension while the opaque screensaver covers the app.
+	- disables and cleans up automatically on Player/Login/session transitions and unmount.
+- Pure timeout, eligibility, Spotlight-ownership, clamp, bounce, smooth-heading, and bounded random-message helpers live in `src/utils/screensaver.js`.
+
+### `useInactivityDeadline`
+- File: `src/hooks/useInactivityDeadline.js`
+- Purpose: maintain one inactivity deadline and one scheduled check. High-frequency activity updates the deadline timestamp without clearing/recreating the timer.
+- Use for App/Player inactivity surfaces; do not add per-event timeout-reset loops.
+
+### `useRuntimeSuspended`
+- File: `src/hooks/useRuntimeSuspension.js`
+- Purpose: expose shared, reason-owned runtime suspension for opaque App/Player screensavers.
+- `setRuntimeSuspension(reason, true|false)` adds/removes one owner's reason; work resumes only after every owner clears its reason.
+- Covered optional loops should subscribe through `useRuntimeSuspended()`. Non-React operational checks may use `getRuntimeSuspended()`.
+
+### `usePlayerPausedScreensaver`
+- File: `src/views/player-panel/hooks/usePlayerPausedScreensaver.js`
+- Purpose: own the separate paused-playback inactivity flow:
+  - activates only after playback has started and remains paused for the configured screensaver timeout.
+  - consumes the first wake input so controls underneath are not activated; Player keyboard and interaction-reveal hooks must defer while it is active.
+  - resumes playback only for ENTER/OK/Space; pointer, wheel, directional, and Back inputs wake to paused controls.
+  - remains disabled while loading, errors, track popups, subtitle decisions, skip prompts, or debug overlays are active.
+- Reuses `ScreensaverOverlay` for presentation but intentionally does not share App-shell Spotlight/session behavior.
+
 ### `useToolbarActions`
 - File: `src/hooks/useToolbarActions.js`
 - Purpose: builds stable toolbar callback bundle for `Toolbar`/`SettingsToolbar`.
@@ -243,7 +314,8 @@ useToolbarActions({
   onSwitchUser,
   onLogout,
   onExit,
-  registerBackHandler
+  registerBackHandler,
+  onBack
 })
 ```
 - Use when:
@@ -333,7 +405,8 @@ usePlayerKeyboardShortcuts({
   controlsRef,
   skipOverlayRef,
   focusSkipOverlayAction,
-  isProgressSliderTarget
+  isProgressSliderTarget,
+  screensaverActive
 })
 ```
 
@@ -357,6 +430,7 @@ usePlayerVisibilitySync({
 - Purpose: reveal PlayerPanel controls from non-keyboard interaction without changing focus or playback state:
   - wheel/scroll-wheel always reveals controls
   - pointer/mouse movement reveals controls only near the top or bottom screen edge
+  - an optional `blockedRef` prevents covered surfaces such as the paused-player screensaver from leaking wake input into control visibility
   - passive listeners and `requestAnimationFrame` throttling keep the handler low-risk during playback
 - Signature:
 ```js
@@ -419,10 +493,15 @@ const loadVideo = usePlayerVideoLoader({
 });
 ```
 
+### `usePlayerStartupCoordinator`
+- File: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
+- Purpose: keep attached video paused until its media source and selected client subtitle renderer are ready, then start playback once. Client-rendered subtitle preparation times out after 15 seconds and enters the existing explicit fallback/consent flow rather than silently starting without subtitles.
+
 ### `usePlayerPlaybackContext`
 - File: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
 - Purpose: centralize playback option/session context derivation and current track ref sync:
   - `buildPlaybackOptions()` using selected audio/subtitle track state
+	  - `buildPlaybackOptions({remapTrackIntents: true})` for next/previous/autoplay, carrying semantic audio and subtitle intent without reusing stale raw stream indexes
   - `getPlaybackSessionContext()` for reporting calls
   - keep `currentAudioTrackRef` / `currentSubtitleTrackRef` in sync
 - Returns:
@@ -589,6 +668,7 @@ const loadVideo = usePlayerVideoLoader({
 ### `useInputMode`
 - File: `src/hooks/useInputMode.js`
 - Purpose: track and synchronize app input mode and Spotlight pointer mode (`pointer` vs `5way`) from pointer/keyboard events.
+- Repeated pointer events in the current mode are ref-guarded and must not schedule React or Spotlight updates.
 - Signature:
 ```js
 useInputMode(Spotlight)
@@ -605,6 +685,11 @@ useInputMode(Spotlight)
 ```js
 useBreezyfinSettingsSync(onSettings, { enabled = true, applyOnMount = true })
 ```
+
+### `usePerformanceMode`
+- File: `src/hooks/usePerformanceMode.js`
+- Purpose: expose one normalized `normal`, `performance`, or `performance-plus` profile while staying synchronized with runtime settings.
+- Use when a component must change JavaScript behavior, such as virtual-grid overhang or Jellyfin image request size, rather than only CSS animation behavior.
 
 ### `useMapById`
 - File: `src/hooks/useMapById.js`
@@ -628,26 +713,110 @@ useItemMetadata(itemId, { enabled = true, errorContext = 'item metadata' })
 - File: `src/hooks/useImageErrorFallback.js`
 - Purpose: shared `onError` behavior for images:
   - retry once with downgraded non-WebP URL when preferred WebP path fails
+  - advance through ordered fallback URLs after format fallback is exhausted
   - hide broken image
   - mark container with placeholder class
   - optional callback
 - Signature:
 ```js
-useImageErrorFallback(placeholderClassName, { onError })
+useImageErrorFallback(placeholderClassName, {
+  fallbackUrls,
+  onCandidateChange,
+  onError,
+  resetKey
+})
 ```
 
 ### `useToastMessage`
 - File: `src/hooks/useToastMessage.js`
-- Purpose: standard toast lifecycle with optional fade-out staging.
+- Purpose: standard toast lifecycle with optional fade-out staging and opt-in stacking for player diagnostics.
 - Signature:
 ```js
-useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
+useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 1 })
 ```
 - Returns:
   - `toastMessage`
   - `toastVisible`
+  - `toastMessages`
   - `setToastMessage`
   - `clearToast`
+
+### `usePluginMediaItemActivation`
+
+- File: `src/hooks/usePluginMediaItemActivation.js`
+- Purpose: share linked Jellyfin-item navigation and external provider-details
+  activation between HSS Discovery rows and Calendar without weakening the service facade.
+  Pass panel `isActive`; the hook invalidates pending lookups on deactivation/unmount
+  and lets only the latest activation navigate.
+- `src/hooks/usePluginMediaItemPopup.js` composes this activation with the standard
+  external-item Popup state used by Home and Home View More. It enriches external
+  Discovery records on demand; keep Home feed records compact because genres and
+  credits are requested only after the popup opens.
+
+### `useAppSyncPlayCoordinator`
+
+- File: `src/App/hooks/useAppSyncPlayCoordinator.js`
+- App composition: `src/App/hooks/useAppSyncPlayNavigation.js`
+- Context: `src/contexts/SyncPlayContext.js`
+- Purpose: own authenticated SyncPlay group membership, authoritative queue snapshots,
+  reconnect verification, suspended/following state, queue replacement consent, and
+  cross-item Player navigation. Keep current-video timing in `useNativeSyncPlay`.
+- All group and queue changes must use the coordinator commit path so React state and
+  `groupRef` / `queueRef` change synchronously. Reconnect completions must match the
+  current coordinator generation, authenticated session, requested group, and active
+  membership before they can commit.
+- Queue identity and playback revision are separate: play/pause/position changes can
+  notify a suspended client without causing duplicate cross-item navigation. App-level
+  `SyncPlayCommand` handling surfaces remote changes while browsing; `useNativeSyncPlay`
+  deduplicates current-item commands and uses `syncPlayStartupBridge` to hold the source
+  paused until video, subtitle, and Jellyfin clock readiness are available. Reporting
+  Ready never calls `video.play()`; only the authoritative Unpause completes startup.
+- Following and suspended modes must also update Jellyfin `IgnoreWait`: following clients
+  participate in the group readiness barrier, while suspended clients remain in the
+  group without blocking other participants.
+- Queue replacement follows Jellyfin's Waiting/Ready contract and must not send an
+  immediate Unpause. `startGroupPlayback` is an explicit troubleshooting override for a
+  group that remains visibly stuck in Waiting; it must never run automatically.
+- Preserve both `StateUpdate` and full `GroupUpdate` WebSocket messages so participant,
+  state, and readiness diagnostics do not become stale while playback commands continue.
+- Queue replacement waits must consult the live service snapshot before registering and
+  must reject pending waiters on logout/unmount so early WebSocket updates and stale
+  async continuations cannot create false timeouts.
+- `useAppSyncPlayNavigation` binds the coordinator to App history, Player entry, normal
+  Play interception, and local Player-Back suspension without regrowing `App.js`.
+
+### Watchlist data helpers
+
+- `src/services/jellyfin/watchlistApi.js` pages the native Jellyfin Likes source by item
+  type and title without building a whole-library client snapshot.
+- `src/services/jellyfin/watchlistInsightsApi.js` consumes capability-gated plugin pages
+  for progress/completion, movie history, and statistics. Statistics tolerate older
+  plugin responses without `TopMovies`, while validating the field when present.
+- `src/views/watchlist-panel/hooks/useWatchlistInsights.js` owns separate 60-second
+  client cache entries for each advanced Watchlist tab, stale-while-refresh behavior,
+  in-flight request deduplication, active-tab pagination, sequential first-page warming,
+  and user-data invalidation. Background warming stops when the panel becomes inactive
+  and never fetches later pages.
+- `src/utils/discoveryMediaItems.js` normalizes provider records for HSS Home rows while
+  preserving linked Jellyfin IDs and authenticated provider artwork.
+- `src/utils/providerItemMetadata.js` normalizes optional provider summary fields for
+  `ProviderItemPopup`. Compact feeds may provide only type/year/rating; genres and
+  director/writer credits render only when the provider contract supplies them.
+
+### `useProviderPanelShell`
+
+- File: `src/hooks/useProviderPanelShell.js`
+- Purpose: share provider-panel external-details state, generation guard, scroll
+  restoration, merge-safe cache writes, toolbar actions, and Popup-first Back handling.
+  Keep the Popup mounted until `onHide` clears its item so Sandstone can release
+  Spotlight ownership normally.
+- `reportProviderFailure(scope, failure)` records only bounded structured provider
+  fields (`provider`, `operation`, `reason`, `upstreamStatus`, and `failedPage`) and
+  is dormant unless the runtime Diagnostics master setting is enabled. Do not log
+  raw provider responses or authenticated upstream URLs from panel code.
+- `reportProviderDiagnostic(scope, diagnostic)` records bounded successful-empty and
+  filtering summaries only while Diagnostics is enabled. Use it to distinguish an
+  empty provider result from transport failure without logging payloads or URLs.
 
 ### `useTrackPreferences`
 - File: `src/hooks/useTrackPreferences.js`
@@ -663,9 +832,9 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 
 ## Utility Helpers
 
-### `getPosterCardClassProps`
-- File: `src/utils/posterCardClassProps.js`
-- Purpose: map common card class names from a CSS module into props for `PosterMediaCard`.
+### Poster card variants
+- File: `src/utils/posterMediaCardVariants.js`
+- Purpose: normalize `PosterMediaCard` semantic skins (`poster-grid` and `landscape-grid`) without coupling shared card markup to panel CSS-module maps.
 
 ### `focusToolbarSpotlightTargets`
 - File: `src/utils/toolbarFocus.js`
@@ -685,9 +854,13 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 
 ### `scrollElementIntoHorizontalView`
 - File: `src/utils/horizontalScroll.js`
-- Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer.
+- Purpose: keep focused cards visible in horizontal scrollers with configurable edge buffer. `getHorizontalScrollAdjustment()` is the pure offset-based decision helper; Home rows cache row-level viewport metrics, invalidate them on resize/layout changes, and coalesce immediate focus corrections through one animation frame rather than measuring rectangles or queuing smooth scrolls for every focus event.
 
 ### Player and media detail helpers
+
+- `src/utils/syncTiming.js`
+  - median bounded server-clock offset sampling and shared 250 ms/two-second drift
+    correction policy for native SyncPlay and JellyWatchParty.
 - `src/utils/imageUrls.js`
   - shared image URL builders for item/user image URLs with preferred image format handling.
 - `src/utils/reactKeys.js`
@@ -701,12 +874,23 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/player-panel/utils/episodeNavigation.js`
   - `getNextEpisodeForItem(service, item)`
   - `getPreviousEpisodeForItem(service, item)`
-- `src/services/jellyfin/playback-api/diagnostics.js`
-  - `createPlaybackDiagnostic(entry)`
-  - `appendPlaybackDiagnostic(diagnostics, entry)`
+- `src/utils/playbackDiagnostics.js`
+	- `createPlaybackDiagnostic(entry)`
+	- `appendPlaybackDiagnostic(diagnostics, entry)`
+	- optional diagnostic trails are created only when the persisted `enableDiagnostics` master setting is active; operational playback metadata remains separate.
+- `src/utils/appLogger.js`
+	- `configureAppDiagnostics({enabled, verbose})` applies the runtime master and restores native console methods when disabled.
+	- `appendAppLog(...)` buffers ordinary diagnostic records; `appendCriticalAppLog(...)` / `logCriticalAppError(...)` persist bounded critical failures immediately when build capability exists.
+	- `REACT_APP_ENABLE_PERSISTENT_LOGS=1` supplies capability only; `REACT_APP_DISABLE_PERSISTENT_LOGS=1` disables all persistence.
+- `src/utils/playbackSelection.js`
+	- pure media-source, audio, dynamic-range, and subtitle-policy selection shared by Jellyfin negotiation and Player runtime hooks.
+- `src/services/jellyfin/playback-api/subtitleBurnIn.js`
+  - `getSubtitleBurnInDiagnosticMessage(subtitlePolicy)` and `validateSubtitleBurnInTranscodingUrl(mediaSource, subtitleStreamIndex)` keep burn-in diagnostics and URL validation out of the main PlaybackInfo orchestrator.
 - `src/views/player-panel/utils/playbackOverride.js`
   - `buildPlaybackOverride(options)`
   - `resolveVideoSeekSeconds(video, seekOffset?)`
+- `src/views/player-panel/utils/hlsErrorClassification.js`
+  - `classifyHlsError(errorData)` separates fragment-load, buffer-pressure, append-buffer, gap/stall, and unknown HLS.js runtime failures before recovery/fallback handling.
 - `src/views/player-panel/utils/playerVideoLoaderHelpers.js`
   - `buildPlayerPlaybackSettingsSnapshot({settings, playbackOptions, playbackOverride, forceTranscodeOverride})`
   - `resolveInitialTrackSelection({audioStreams, subtitleStreams, playbackOptions, playbackOverride, pickPreferredAudio, pickPreferredSubtitle})`
@@ -721,7 +905,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - `normalizeSubtitleEvents(events)` and `normalizeSubtitleText(text, options)` normalize event/raw subtitle payloads into cue objects for the Player overlay. Keep SRT/VTT sanitization and public subtitle APIs here.
   - `findActiveSubtitleCues(events, currentTimeSeconds)` returns normalized active cues for overlay rendering, preserving long-running overlapping cues and sorting active output by ASS layer/source order so higher layers render above lower layers.
 - `src/views/player-panel/utils/subtitleRendererAss.js`
-  - Lightweight ASS/SSA parsing and active-cue decoration, including placement, alignment, margins, wrapping, `\pos(x,y)`, `\move(...)`, `\org(x,y)` transform origins for absolute transformed cues, source-authored absolute/relative font size, source colors/fonts/borders/shadows/blur, simple and complex fades, active `\K`/`\kf` sweep approximation, common vector drawing paths, drawing-cue vector clip masks, `\pbo` drawing baseline offsets, style reset, scale, spacing, rotation/skew, and interpolated numeric/color `\t(...)` transforms. It is still an approximation layer, not full ASS parity for advanced vector drawing edge cases, advanced karaoke collision/outline behavior, arbitrary text vector masks, mixed inline `\org` transform-origin cases, collision resolution, or vertical text layout.
+  - Lightweight ASS/SSA parsing and active-cue decoration, including placement, alignment, margins, wrapping, `\pos(x,y)`, `\move(...)`, `\org(x,y)` transform origins for absolute transformed cues, `@font` vertical-writing intent, source-authored absolute/relative font size, source colors/fonts/borders/shadows/blur, simple and complex fades, active `\K`/`\kf` sweep approximation, common vector drawing paths, drawing-cue vector clip masks, `\pbo` drawing baseline offsets, style reset, scale, spacing, rotation/skew, and interpolated numeric/color `\t(...)` transforms. It is still an approximation layer, not full ASS parity for advanced vector drawing edge cases, advanced karaoke collision/outline behavior, arbitrary text vector masks, mixed inline `\org` transform-origin cases, collision resolution, or advanced vertical layout/collision behavior.
 - `src/views/player-panel/utils/subtitleRendererAssAlignment.js`
   - ASS/SSA alignment normalization helpers, including ASS numpad `\an1`-`\an9` alignment and legacy SSA `\a` alignment mapping.
 - `src/views/player-panel/utils/subtitleRendererAssColors.js`
@@ -745,6 +929,10 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 - `src/views/player-panel/utils/subtitleOverlaySettings.js`
   - `getSubtitleOverlayAttributes(settings, controlsVisible)` normalizes subtitle appearance settings into overlay `data-*` attributes.
   - `groupSubtitleCuesByPlacement(cues)` groups active cues into top/middle/bottom and left/center/right render buckets.
+  - `getSubtitleAbsolutePositionStyle(cue)` preserves source-authored ASS anchors, including intentional off-screen placement, while the subtitle stage clips output to the visible video surface.
+- `src/views/player-panel/utils/subtitleRendererAssStage.js`
+  - Maps `PlayResX/Y` coordinates independently across the contained video stage, uses valid `LayoutResX/Y` only for source-layout and pixel-aspect metadata, and classifies cue geometry before bounded containment. Explicit positions, clips, drawings, motion, transform origins, transforms, and intentionally off-screen positions preserve authored behavior; only ordinary unpositioned text boxes receive the bounded initial/font-ready fit.
+  - `subtitleTextLoader.js` prefers raw ASS/SSA documents for Breezyfin Lightweight so PlayRes, style tables, and inline geometry survive delivery. It retains event-first loading for SRT/VTT and falls back to Jellyfin `Stream.js` only when raw ASS/SSA delivery is unavailable.
 - `src/views/media-details-panel/utils/mediaDetailsHelpers.js`
   - language display mapping, track summary labels
   - season/episode image fallback resolution
@@ -753,6 +941,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
 ### Login panel local hooks
 - `src/views/login-panel/hooks/useLoginBackdrops.js`
   - centralizes saved-server backdrop loading, saved-user fallback backdrops, rotation timers, transition state, and image fallback/error handling.
+  - `deferLoading` suppresses saved-account network work only while App validates automatic startup restoration; normal Login and Switch User views leave it disabled.
 
 ### Player panel local components
 - `src/views/player-panel/components/PlayerErrorPopup.js`
@@ -765,12 +954,26 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - transient seek feedback label overlay.
 - `src/views/player-panel/components/PlayerSkipOverlay.js`
   - skip-intro/next-episode pill overlay shell.
+- `src/views/player-panel/components/PlayerPlaybackDecisionPrompt.js`
+  - shared themed, first-focus popup for blocking audio, dynamic-range, subtitle
+    burn-in, and no-subtitle playback decisions.
+  - bitrate-limited Dolby Vision exposes original-quality/video-copy playback and
+    lower-bitrate SDR transcoding as separate explicit actions.
+  - HDR is offered only after a bounded PlaybackInfo preflight finds DirectPlay,
+    DirectStream, or audio-only transcoding with video copy.
 - `src/views/player-panel/components/PlayerToast.js`
   - lightweight player toast shell.
 - `src/views/player-panel/components/PlayerControlsOverlay.js`
   - top/bottom player controls shell (back, progress, transport, tracks, volume).
+- `src/views/player-panel/components/PlayerSyncPlayPopup.js`
+  - native SyncPlay participants, connection, and group status surface.
+- `src/views/player-panel/components/PlayerWatchPartyPopup.js`
+  - authenticated room participants, ready state, and bounded chat surface.
 
 ### Player panel local hooks
+- `src/views/player-panel/hooks/usePlayerGroupSessions.js`
+  - composes native SyncPlay and JellyWatchParty hooks, their mutual player-command
+    precedence, layered popup Back handling, controls state, and popup props.
 - `src/views/player-panel/hooks/usePlayerKeyboardShortcuts.js`
   - centralizes player keyboard/media key handling with seek/context guards.
 - `src/views/player-panel/hooks/usePlayerVisibilitySync.js`
@@ -779,6 +982,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes wheel and pointer-edge PlayerPanel controls reveal behavior without focus/playback side effects.
 - `src/views/player-panel/hooks/usePlayerVideoLoader.js`
   - centralizes playback source/session selection and video load orchestration.
+- `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
+  - gates startup on video/client-subtitle readiness and owns the bounded subtitle preparation timeout.
 - `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
   - centralizes playback option/session-context derivation and selected-track ref synchronization.
 - `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
@@ -791,6 +996,12 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes player command handlers (`play/pause/retry/end/back`) above low-level stop/recovery.
 - `src/views/player-panel/hooks/usePlayerCoreControls.js`
   - centralizes stop lifecycle, startup-watch timer cleanup, and skip-overlay focus targeting.
+- `src/views/player-panel/hooks/usePlayerPlaybackDecision.js`
+  - centralizes generation-bound, serialized playback decision state and one-shot
+    reloads for audio replacement, the bitrate-only DV original-quality attempt,
+    staged dynamic-range fallback, subtitle burn-in, and user-confirmed no-subtitle
+    playback. Its synchronous reservation prevents concurrent runtime callbacks from
+    replacing an active or teardown-pending prompt.
 - `src/views/player-panel/hooks/usePlayerBackNavigation.js`
   - centralizes layered PlayerPanel back handling (track popups -> skip overlay -> controls).
 - `src/views/player-panel/hooks/usePlayerDisclosures.js`
@@ -803,8 +1014,27 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0 })
   - centralizes episode navigation plus video surface/volume/mute/error UI handlers.
 - `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
   - centralizes playback recovery/session rebuild + fallback/transcode/HLS fatal recovery logic.
+  - receives an immutable `playbackRuntimeContext` captured before source attachment.
+    HLS callbacks and asynchronous fallback continuations must verify both their bound
+    HLS instance and playback generation before changing playback.
 - `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
   - centralizes player lifecycle effects (item bootstrap, control hide timers, stall watchdog, focus/cleanup timers).
+- `src/views/player-panel/hooks/useNativeSyncPlay.js`
+  - timing-only adapter for the currently attached video; app-level membership, queue,
+    navigation, suspension, and replacement decisions live in
+    `src/App/hooks/useAppSyncPlayCoordinator.js` and `src/contexts/SyncPlayContext.js`.
+  - maps native group updates/commands to the player, queues commands until server-clock
+    synchronization is available, reports readiness through `syncPlayStartupBridge`,
+    and starts only on authoritative Unpause before applying the shared 250 ms correction
+    and two-second hard-seek thresholds.
+  - reports Buffering only after a continuous three-second wait and reports Ready when
+    playback recovers, matching Jellyfin's tolerance for transient media stalls.
+  - applies at most one hard seek for each authoritative SyncPlay command; later drift
+    for that command converges through bounded playback-rate correction so buffering
+    cannot create a repeated seek loop.
+- `src/views/player-panel/hooks/useJellyWatchParty.js`
+  - maps isolated room events to host/guest player control, readiness, reconnect,
+    clock-offset, drift-correction, and chat behavior.
 
 ### Media details panel local hooks
 - `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`

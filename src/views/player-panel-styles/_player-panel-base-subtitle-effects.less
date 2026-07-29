@@ -1,0 +1,59 @@
+.subtitleRun {
+	position: relative;
+	z-index: 0;
+	--bf-player-subtitle-current-shadow-blur: 0px;
+	.bfSubtitleTextEffectVariables();
+}
+
+.subtitleRunLine {
+	display: grid;
+}
+
+.subtitleRunLineLayer {
+	grid-area: 1 / 1;
+	min-width: 0;
+}
+
+.subtitleRunEffects {
+	display: none;
+	z-index: 0;
+}
+
+.subtitleRunContent {
+	z-index: 1;
+}
+
+.subtitleRun[data-ass-effects='true'] {
+	text-shadow: none;
+}
+
+.subtitleRun[data-ass-outline='true'] {
+	text-shadow: var(--bf-player-subtitle-current-outline);
+}
+
+.subtitleRun[data-ass-shadow='true'] {
+	text-shadow: var(--bf-player-subtitle-current-shadow);
+}
+
+.subtitleRun[data-ass-outline='true'][data-ass-shadow='true'] {
+	text-shadow: var(--bf-player-subtitle-current-outline), var(--bf-player-subtitle-current-shadow);
+}
+
+@supports (-webkit-text-stroke: 1px transparent) {
+	.subtitleRun[data-ass-effects='true'] {
+		text-shadow: none;
+	}
+
+	.subtitleRunEffects {
+		display: block;
+	}
+
+	.subtitleRunEffect[data-ass-outline='true'] {
+		-webkit-text-stroke: var(--bf-player-subtitle-current-outline-size)
+			var(--bf-player-subtitle-current-border-color);
+	}
+
+	.subtitleRunEffect[data-ass-shadow='true'] {
+		text-shadow: var(--bf-player-subtitle-current-shadow);
+	}
+}

@@ -1,33 +1,21 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import {memo, useRef, useCallback, useEffect} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
-import Spinner from '@enact/sandstone/Spinner';
 import Icon from '@enact/sandstone/Icon';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
 import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
-import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
-import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
+import {getEpisodeLocator} from '../utils/mediaItemUtils';
 import {buildMediaListItemKey} from '../utils/reactKeys';
+import MediaCardImage from './MediaCardImage';
+import BreezyLoadingOverlay from './BreezyLoadingOverlay';
 
 import css from './MediaRow.module.less';
-import imageLoadCss from './ImageLoadReveal.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown, ...rest }) => {
-	const [imageError, setImageError] = useState(false);
-	const [imageLoaded, setImageLoaded] = useState(false);
-	const [useEpisodeSeriesFallback, setUseEpisodeSeriesFallback] = useState(false);
-
-	const episodeSeriesFallbackUrl = useMemo(() => {
-		if (item.Type !== 'Episode' || !item.SeriesId || !imageUrl) return '';
-		return String(imageUrl).replace(String(item.Id), String(item.SeriesId));
-	}, [imageUrl, item.Id, item.SeriesId, item.Type]);
-	const canUseEpisodeSeriesFallback = Boolean(episodeSeriesFallbackUrl && episodeSeriesFallbackUrl !== imageUrl);
-	const resolvedImageUrl = useEpisodeSeriesFallback ? episodeSeriesFallbackUrl : imageUrl;
-
+const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred, onClick, showEpisodeProgress, onCardKeyDown, variant, ...rest}) {
 	const handleCardClick = useCallback(() => {
 		onClick(item);
 	}, [item, onClick]);
@@ -47,26 +35,6 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 		}
 	}, [item, onCardKeyDown]);
 
-	const handleImageError = useCallback((event) => {
-		if (applyImageFormatFallbackFromEvent(event)) return;
-		if (canUseEpisodeSeriesFallback && !useEpisodeSeriesFallback) {
-			setUseEpisodeSeriesFallback(true);
-			setImageLoaded(false);
-			return;
-		}
-		setImageError(true);
-	}, [canUseEpisodeSeriesFallback, useEpisodeSeriesFallback]);
-
-	const handleImageLoad = useCallback(() => {
-		setImageLoaded(true);
-	}, []);
-
-	useEffect(() => {
-		setImageError(false);
-		setImageLoaded(false);
-		setUseEpisodeSeriesFallback(false);
-	}, [imageUrl, item.Id, item.SeriesId, item.Type]);
-
 	const getDisplayTitle = () => {
 		if (item.Type === 'Episode') {
 			return item.SeriesName || item.Name;
@@ -76,9 +44,7 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 
 	const getSubtitle = () => {
 		if (item.Type === 'Episode') {
-			const season = item.ParentIndexNumber || 1;
-			const episode = item.IndexNumber || 1;
-			return `S${season}:E${episode}`;
+			return getEpisodeLocator(item) || null;
 		}
 		return null;
 	};
@@ -117,38 +83,27 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 	const showWatchedStatusBadge = showEpisodeProgress && cardUnwatchedCount !== null;
 	const isCompletedWatchBadge = showWatchedStatusBadge && cardUnwatchedCount === 0;
 	const remainingCount = getRemainingCount();
-	const showImage = Boolean(resolvedImageUrl) && !imageError;
-
 	return (
 		<SpottableDiv
-			className={css.card}
+			className={`${css.card} ${variant === 'cinematic' ? css.cardCinematic : ''}`}
 			onClick={handleCardClick}
 			onKeyDown={handleCardKeyDown}
 			{...rest}
 		>
 			<div className={css.cardImage}>
-				{showImage ? (
-					<img
-						src={resolvedImageUrl}
-						alt={item.Name}
-						className={`${imageLoadCss.imageReveal} ${imageLoaded ? imageLoadCss.imageRevealLoaded : ''}`}
-						onLoad={handleImageLoad}
-						onError={handleImageError}
-						loading="lazy"
-						decoding="async"
-						draggable={false}
-					/>
-				) : (
-					<div className={css.placeholder}>
-						<BodyText>{getDisplayTitle()}</BodyText>
-					</div>
-				)}
-				{showImage ? (
-					<div
-						className={`${imageLoadCss.imageLoadingHint} ${imageLoaded ? imageLoadCss.imageLoadingHintHidden : ''}`}
-						aria-hidden="true"
-					/>
-				) : null}
+				<MediaCardImage
+					candidates={imageCandidates}
+					alt={item.Name}
+					width={640}
+					height={360}
+					loading="eager"
+					deferred={imageDeferred}
+					placeholder={(
+						<div className={css.placeholder}>
+							<BodyText>{getDisplayTitle()}</BodyText>
+						</div>
+					)}
+				/>
 				{showWatchedStatusBadge ? (
 					<div className={isCompletedWatchBadge ? css.watchedBadge : css.progressBadge}>
 						{isCompletedWatchBadge ? '✓' : cardUnwatchedCount}
@@ -181,7 +136,7 @@ const MediaCard = ({ item, imageUrl, onClick, showEpisodeProgress, onCardKeyDown
 			</div>
 		</SpottableDiv>
 	);
-};
+});
 
 const Container = createLastFocusedSpotlightContainer('div', {
 	restrict: 'self-only'
@@ -191,14 +146,22 @@ const MediaRow = ({
 	title,
 	items,
 	loading,
+	status,
+	errorMessage,
+	onRetry,
 	onItemClick,
 	getImageUrl,
+	getImageCandidates,
+	imagesActive = true,
+	onRowVisible,
+	onRowFocus,
 	showEpisodeProgress = false,
 	rowIndex = 0,
 	onCardKeyDown,
 	onMoreClick,
 	moreSpotlightId,
 	sectionKey,
+	variant = 'current',
 	...rest
 }) => {
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
@@ -206,52 +169,112 @@ const MediaRow = ({
 		|| runtimeCapabilities.legacyWebOS
 		|| (!runtimeCapabilities.supportsAspectRatio && !runtimeCapabilities.supportsFlexGap);
 	const scrollerRef = useRef(null);
-	const focusDebounceTimeoutRef = useRef(null);
+	const rowRef = useRef(null);
+	const focusAnimationFrameRef = useRef(0);
+	const horizontalMetricsRef = useRef(null);
 
 	useEffect(() => {
 		return () => {
-			if (focusDebounceTimeoutRef.current) {
-				window.clearTimeout(focusDebounceTimeoutRef.current);
-				focusDebounceTimeoutRef.current = null;
-			}
+			window.cancelAnimationFrame(focusAnimationFrameRef.current);
 		};
 	}, []);
 
+	useEffect(() => {
+		const resetHorizontalMetrics = () => {
+			horizontalMetricsRef.current = null;
+		};
+		resetHorizontalMetrics();
+		window.addEventListener('resize', resetHorizontalMetrics);
+		return () => window.removeEventListener('resize', resetHorizontalMetrics);
+	}, [items?.length, variant]);
+
+	useEffect(() => {
+		if (imagesActive || typeof onRowVisible !== 'function' || !rowRef.current) return undefined;
+		if (typeof window.IntersectionObserver !== 'function') return undefined;
+		const observer = new window.IntersectionObserver((entries) => {
+			if (!entries.some((entry) => entry.isIntersecting)) return;
+			onRowVisible(rowIndex);
+			observer.disconnect();
+		}, {rootMargin: '65% 0px'});
+		observer.observe(rowRef.current);
+		return () => observer.disconnect();
+	}, [imagesActive, onRowVisible, rowIndex]);
+
 	const handleFocus = useCallback((e) => {
+		onRowVisible?.(rowIndex);
+		onRowFocus?.(rowIndex, rowRef.current);
 		if (scrollerRef.current && scrollerRef.current.contains(e.target)) {
 			const scroller = scrollerRef.current;
 			const element = e.target.closest('.' + css.card);
 			if (element) {
-				if (focusDebounceTimeoutRef.current) {
-					window.clearTimeout(focusDebounceTimeoutRef.current);
-				}
-				focusDebounceTimeoutRef.current = window.setTimeout(() => {
-					scrollElementIntoHorizontalView(scroller, element, {minBuffer: 60, edgeRatio: 0.10, padding: 20});
-					ensureFocusTargetVisibleWithTopChrome(element, {
-						topPadding: 12,
-						bottomPadding: 16,
+				window.cancelAnimationFrame(focusAnimationFrameRef.current);
+				focusAnimationFrameRef.current = window.requestAnimationFrame(() => {
+					if (!horizontalMetricsRef.current) {
+						horizontalMetricsRef.current = {
+							viewportWidth: scroller.clientWidth,
+							scrollWidth: scroller.scrollWidth
+						};
+					}
+					scrollElementIntoHorizontalView(scroller, element, {
+						...horizontalMetricsRef.current,
+						minBuffer: 60,
+						edgeRatio: 0.10,
+						padding: 20,
 						behavior: 'auto'
 					});
-					focusDebounceTimeoutRef.current = null;
-				}, 45);
+					focusAnimationFrameRef.current = 0;
+				});
 			}
 		}
-	}, []);
+	}, [onRowFocus, onRowVisible, rowIndex]);
 
 	const handleMoreClick = useCallback(() => {
 		if (typeof onMoreClick === 'function') {
 			onMoreClick(sectionKey);
 		}
 	}, [onMoreClick, sectionKey]);
+	const handleRetryClick = useCallback(() => {
+		onRetry?.(sectionKey);
+	}, [onRetry, sectionKey]);
+	const resolvedStatus = status || (loading ? 'loading' : 'ready');
 
-	if (loading) {
+	if (['pending', 'loading', 'empty', 'error'].includes(resolvedStatus)) {
 		return (
-			<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
+			<div
+				className={`${css.row} ${css.stateRow} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`}
+				data-bf-home-row-status={resolvedStatus}
+				onFocus={handleFocus}
+				ref={rowRef}
+				{...rest}
+			>
 				<div className={css.rowHeader}>
 					<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
 				</div>
-				<div className={css.loading}>
-					<Spinner />
+				<div className={css.rowStateContent}>
+					{['pending', 'loading'].includes(resolvedStatus) ? (
+						<BreezyLoadingOverlay label={`Loading ${title}...`} />
+					) : null}
+					{resolvedStatus === 'empty' ? (
+						<BodyText className={css.rowStateMessage}>No items are available in this section.</BodyText>
+					) : null}
+					{resolvedStatus === 'error' ? (
+						<>
+							<BodyText className={css.rowStateMessage}>
+								{errorMessage || 'This Home section could not be loaded.'}
+							</BodyText>
+							{typeof onRetry === 'function' ? (
+								<SpottableDiv
+									aria-label={`Retry ${title}`}
+									className={css.rowRetryButton}
+									onClick={handleRetryClick}
+									role="button"
+									spotlightId={`home-row-retry-${sectionKey}`}
+								>
+									Retry
+								</SpottableDiv>
+							) : null}
+						</>
+					) : null}
 				</div>
 			</div>
 		);
@@ -262,7 +285,11 @@ const MediaRow = ({
 	}
 
 	return (
-		<div className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''}`} {...rest}>
+		<div
+			ref={rowRef}
+			className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''} ${variant === 'cinematic' ? css.rowCinematic : ''} ${variant === 'cinematic' && rowIndex === 0 ? css.rowCinematicFirst : ''}`}
+			{...rest}
+		>
 			<div className={css.rowHeader}>
 				<BodyText className={`${css.rowTitle} ${isLegacyCompactLayout ? css.rowTitleCompactWebos6 : ''}`}>{title}</BodyText>
 				{typeof onMoreClick === 'function' ? (
@@ -287,13 +314,17 @@ const MediaRow = ({
 						<MediaCard
 							key={buildMediaListItemKey(`home-row-${sectionKey || title}`, item, index)}
 							item={item}
-							imageUrl={getImageUrl(item.Id, item)}
+							imageCandidates={imagesActive
+								? (getImageCandidates?.(item.Id, item) || (getImageUrl ? [getImageUrl(item.Id, item)] : []))
+								: []}
+							imageDeferred={!imagesActive}
 							onClick={onItemClick}
 							showEpisodeProgress={showEpisodeProgress}
 							spotlightId={`${title}-${index}`}
 							data-row-index={rowIndex}
 							data-card-index={index}
 							onCardKeyDown={onCardKeyDown}
+							variant={variant}
 						/>
 					))}
 				</div>
@@ -302,4 +333,4 @@ const MediaRow = ({
 	);
 };
 
-export default MediaRow;
+export default memo(MediaRow);

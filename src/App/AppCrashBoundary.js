@@ -2,12 +2,14 @@ import {Component} from 'react';
 import Button from '../components/BreezyButton';
 import BodyText from '@enact/sandstone/BodyText';
 import Heading from '@enact/sandstone/Heading';
+import Spotlight from '@enact/spotlight';
 
 import {getCrashErrorMessage} from '../utils/errorMessages';
-import {appendAppLog} from '../utils/appLogger';
+import {appendAppLog, logCriticalAppError} from '../utils/appLogger';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
-import {isBackKey} from '../utils/keyCodes';
+import {KeyCodes, isBackKey} from '../utils/keyCodes';
 import {CRASH_RECOVERY_ACTIONS, queueCrashRecoveryAction} from '../utils/crashRecovery';
+import {getCrashActionFromElement} from './utils/crashActions';
 
 import css from './AppCrashBoundary.module.less';
 
@@ -36,8 +38,7 @@ class AppCrashBoundary extends Component {
 	}
 
 	componentDidCatch(error, info) {
-		console.error('[AppCrashBoundary] React render error:', error, info);
-		appendAppLog('error', '[AppCrashBoundary] componentDidCatch', error, info?.componentStack || '');
+		logCriticalAppError('[AppCrashBoundary] React render error:', error, info?.componentStack || '');
 		this.setState({error});
 	}
 
@@ -59,8 +60,7 @@ class AppCrashBoundary extends Component {
 			return;
 		}
 		const error = event?.error || new Error(event?.message || 'Unexpected runtime error');
-		console.error('[AppCrashBoundary] Global error event:', error);
-		appendAppLog('error', '[AppCrashBoundary] window.error', error);
+		logCriticalAppError('[AppCrashBoundary] Global error event:', error);
 		this.setState({error});
 	};
 
@@ -71,8 +71,7 @@ class AppCrashBoundary extends Component {
 			return;
 		}
 		const error = reason instanceof Error ? reason : new Error(String(reason || 'Unhandled promise rejection'));
-		console.error('[AppCrashBoundary] Unhandled promise rejection:', error);
-		appendAppLog('error', '[AppCrashBoundary] unhandledrejection', error);
+		logCriticalAppError('[AppCrashBoundary] Unhandled promise rejection:', error);
 		this.setState({error});
 	};
 
@@ -91,11 +90,30 @@ class AppCrashBoundary extends Component {
 	handleCrashKeyDown = (event) => {
 		if (!this.state?.error) return;
 		const code = event?.keyCode || event?.which;
-		if (!isBackKey(code)) return;
+		const key = String(event?.key || '').toLowerCase();
+		if (isBackKey(code)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			event.stopImmediatePropagation?.();
+			this.handleRecoverWithAction(CRASH_RECOVERY_ACTIONS.BACK);
+			return;
+		}
+		const isActivationKey =
+			code === KeyCodes.ENTER ||
+			code === KeyCodes.OK ||
+			code === KeyCodes.SPACE ||
+			key === 'enter' ||
+			key === ' ' ||
+			key === 'spacebar';
+		if (!isActivationKey) return;
+		const action = getCrashActionFromElement(Spotlight.getCurrent?.()) ||
+			getCrashActionFromElement(document.activeElement) ||
+			getCrashActionFromElement(event?.target);
+		if (!action) return;
 		event.preventDefault?.();
 		event.stopPropagation?.();
 		event.stopImmediatePropagation?.();
-		this.handleRecoverWithAction(CRASH_RECOVERY_ACTIONS.BACK);
+		this.handleRecoverWithAction(action);
 	};
 
 	handleRecoverBack = () => {
@@ -119,10 +137,23 @@ class AppCrashBoundary extends Component {
 							{getCrashErrorMessage(error)}
 						</BodyText>
 						<div className={`${css.crashActions} bf-error-actions`}>
-							<Button size="large" onClick={this.handleRecoverBack} autoFocus className="bf-error-action-button">
+							<Button
+								size="large"
+								onClick={this.handleRecoverBack}
+								autoFocus
+								spotlightId="crash-action-back"
+								data-crash-action={CRASH_RECOVERY_ACTIONS.BACK}
+								className="bf-error-action-button"
+							>
 								Back
 							</Button>
-							<Button size="large" onClick={this.handleRecoverToHome} className="bf-error-action-button">
+							<Button
+								size="large"
+								onClick={this.handleRecoverToHome}
+								spotlightId="crash-action-home"
+								data-crash-action={CRASH_RECOVERY_ACTIONS.HOME}
+								className="bf-error-action-button"
+							>
 								Return Home
 							</Button>
 						</div>

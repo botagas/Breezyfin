@@ -10,6 +10,7 @@ import imageLoadCss from '../ImageLoadReveal.module.less';
 const ToolbarElegantLayout = ({
 	SpottableDiv,
 	glassFilterId,
+	glassDistortionScale = 77,
 	shouldRenderElegantDistortion,
 	isHomeSection,
 	elegantPanelTitle,
@@ -18,6 +19,14 @@ const ToolbarElegantLayout = ({
 	handleNavigateFavorites,
 	handleNavigateSearch,
 	handleNavigateSettings,
+	handleNavigateWatchlist,
+	handleNavigateCalendar,
+	handleNavigateSyncPlay,
+	handleNavigateWatchParty,
+	showWatchlist,
+	showCalendar,
+	showSyncPlay,
+	showWatchParty,
 	activeSection,
 	libraryMenuScopeRef,
 	handleOpenLibrariesPopup,
@@ -25,6 +34,7 @@ const ToolbarElegantLayout = ({
 	libraries,
 	activeLibraryId,
 	handleLibraryPopupSelect,
+	librariesPopupContentRef,
 	userMenuScopeRef,
 	elegantUserContainerProps,
 	handleUserButtonClick,
@@ -62,7 +72,7 @@ const ToolbarElegantLayout = ({
 					<defs>
 						<filter id={glassFilterId}>
 							<feTurbulence type="turbulence" baseFrequency="0.007" numOctaves="2" result="noise" />
-							<feDisplacementMap in="SourceGraphic" in2="noise" scale="77" />
+							<feDisplacementMap in="SourceGraphic" in2="noise" scale={glassDistortionScale} />
 						</filter>
 					</defs>
 				</svg>
@@ -80,7 +90,7 @@ const ToolbarElegantLayout = ({
 								<SpottableDiv
 									onClick={handleElegantBack}
 									className={`${css.iconButton} ${css.elegantBackButton}`}
-									aria-label={`Back to Home from ${elegantPanelTitle}`}
+									aria-label={`Back from ${elegantPanelTitle}`}
 									spotlightId="toolbar-back"
 								>
 									<Icon style={{'--icon-size': '1rem'}}>arrowsmallleft</Icon>
@@ -113,17 +123,58 @@ const ToolbarElegantLayout = ({
 							>
 								Search
 							</Button>
+							{showWatchlist ? (
+								<Button
+									size="small"
+									onClick={handleNavigateWatchlist}
+									className={`${css.tabButton} ${activeSection === 'watchlist' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-watchlist"
+								>
+									Watchlist
+								</Button>
+							) : null}
+							{showCalendar ? (
+								<Button
+									size="small"
+									onClick={handleNavigateCalendar}
+									className={`${css.tabButton} ${activeSection === 'calendar' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-calendar"
+								>
+									Calendar
+								</Button>
+							) : null}
+							{showWatchParty ? (
+								<Button
+									size="small"
+									onClick={handleNavigateWatchParty}
+									className={`${css.tabButton} ${activeSection === 'watchParty' ? css.tabSelected : ''}`}
+									spotlightId="toolbar-watch-party"
+								>
+									Watch Party
+								</Button>
+							) : null}
 						</div>
 
 						<div className={css.elegantActions}>
-							<SpottableDiv
-								onClick={handleNavigateSearch}
-								className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
-								aria-label="Search"
-								spotlightId="toolbar-search-icon"
-							>
-								<Icon size="small">search</Icon>
-							</SpottableDiv>
+							{showSyncPlay ? (
+								<SpottableDiv
+									onClick={handleNavigateSyncPlay}
+									className={`${css.iconButton} ${activeSection === 'syncPlay' ? css.selected : ''}`}
+									aria-label="SyncPlay"
+									spotlightId="toolbar-sync-play"
+								>
+									<Icon size="small">dlna</Icon>
+								</SpottableDiv>
+							) : (
+								<SpottableDiv
+									onClick={handleNavigateSearch}
+									className={`${css.iconButton} ${activeSection === 'search' ? css.selected : ''}`}
+									aria-label="Search"
+									spotlightId="toolbar-search-icon"
+								>
+									<Icon size="small">search</Icon>
+								</SpottableDiv>
+							)}
 							<SpottableDiv
 								onClick={handleNavigateSettings}
 								className={`${css.iconButton} ${activeSection === 'settings' ? css.selected : ''}`}
@@ -149,6 +200,7 @@ const ToolbarElegantLayout = ({
 											activeSection={activeSection}
 											activeLibraryId={activeLibraryId}
 											onLibrarySelect={handleLibraryPopupSelect}
+											contentRef={librariesPopupContentRef}
 										/>
 									</div>
 								)}

@@ -1,0 +1,20 @@
+.container {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+}
+
+.loadingMore {
+	position: absolute;
+	left: 50%;
+	bottom: 0.4rem;
+	transform: translateX(-50%);
+	z-index: 4;
+	pointer-events: none;
+}
+
+.disableFocusScale :global([class*='useThemeVirtualList_scaled']) {
+	transform: none !important;
+	box-shadow: none !important;
+}

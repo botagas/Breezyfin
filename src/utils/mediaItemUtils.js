@@ -4,15 +4,40 @@ const canBuildImageUrl = () => {
 	return Boolean(jellyfinService?.serverUrl && jellyfinService?.accessToken);
 };
 
-const buildPrimaryImageUrl = (itemId, {maxWidth = 400, tag} = {}) => {
-	if (!itemId || !canBuildImageUrl()) return null;
-	return jellyfinService.getImageUrl(itemId, 'Primary', maxWidth, {tag});
+const getJellyfinImageItemId = (item) => {
+	if (!item) return null;
+	if (item.IsDiscoveryItem === true) {
+		return item.JellyfinImageItemId || item.JellyfinItemId || null;
+	}
+	return item.Id || null;
 };
 
-const buildBackdropImageUrl = (itemId, {maxWidth = 400, index = 0} = {}) => {
+const buildPrimaryImageUrl = (itemId, {maxWidth = 400, tag, quality, blur} = {}) => {
 	if (!itemId || !canBuildImageUrl()) return null;
-	return jellyfinService.getBackdropUrl(itemId, index, maxWidth);
+	return jellyfinService.getImageUrl(itemId, 'Primary', maxWidth, {tag, quality, blur});
 };
+
+const buildBackdropImageUrl = (itemId, {maxWidth = 400, index = 0, tag, quality, blur} = {}) => {
+	if (!itemId || !canBuildImageUrl()) return null;
+	return jellyfinService.getBackdropUrl(itemId, index, maxWidth, {tag, quality, blur});
+};
+
+export const uniqueImageCandidates = (candidates = []) => {
+	const unique = [];
+	candidates.forEach((candidate) => {
+		if (typeof candidate !== 'string' || !candidate || unique.includes(candidate)) return;
+		unique.push(candidate);
+	});
+	return unique;
+};
+
+export const mergeMediaItemImageCandidates = (item, generatedCandidates = []) => (
+	uniqueImageCandidates([
+		...(Array.isArray(item?.ImageCandidates) ? item.ImageCandidates : []),
+		item?.AuthenticatedImageUrl,
+		...generatedCandidates
+	])
+);
 
 export const hasStartedWatching = (item) => {
 	const userData = item?.UserData;
@@ -36,10 +61,34 @@ export const getSeriesUnplayedCount = (item) => {
 	return Number.isInteger(count) ? count : null;
 };
 
+const PLAYABLE_VIDEO_ITEM_TYPES = new Set([
+	'Episode',
+	'Movie',
+	'MusicVideo',
+	'Trailer',
+	'Video'
+]);
+
+export const isPlayableMediaItem = (item) => (
+	Boolean(item) && (
+		item.MediaType === 'Video' ||
+		PLAYABLE_VIDEO_ITEM_TYPES.has(item.Type)
+	)
+);
+
+export const getEpisodeLocator = (item, {separator = ':'} = {}) => {
+	const season = item?.ParentIndexNumber;
+	const episode = item?.IndexNumber;
+	if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) return '';
+	return `S${season}${separator}E${episode}`;
+};
+
 export const getMediaItemSubtitle = (item, {includePersonRole = false} = {}) => {
 	switch (item?.Type) {
-		case 'Episode':
-			return `${item.SeriesName || ''} - S${item.ParentIndexNumber || 0}:E${item.IndexNumber || 0}`;
+		case 'Episode': {
+			const parts = [item.SeriesName || '', getEpisodeLocator(item)].filter(Boolean);
+			return parts.join(' - ');
+		}
 		case 'Movie':
 		case 'Series':
 			return item?.ProductionYear ? `${item.ProductionYear}` : '';
@@ -50,59 +99,163 @@ export const getMediaItemSubtitle = (item, {includePersonRole = false} = {}) => 
 	}
 };
 
-export const getPosterCardImageUrl = (item, {maxWidth = 400, personMaxWidth = 200, includeBackdrop = true, includeSeriesFallback = true} = {}) => {
-	if (!item || !canBuildImageUrl()) return null;
+export const getPosterCardImageUrls = (item, {
+	maxWidth = 400,
+	personMaxWidth = 200,
+	includeBackdrop = true,
+	includeSeriesFallback = true,
+	quality = 78
+} = {}) => {
+	if (!item || !canBuildImageUrl()) return [];
+	const imageItemId = getJellyfinImageItemId(item);
+	if (!imageItemId) return [];
+	const candidates = [];
+	const addCandidate = (url) => {
+		if (url) candidates.push(url);
+	};
 
 	if (item.Type === 'Person') {
-		return buildPrimaryImageUrl(item.Id, {
-			maxWidth: personMaxWidth,
-			tag: item.PrimaryImageTag
-		});
-	}
-
-	const taggedPrimary = item?.ImageTags?.Primary
-		? buildPrimaryImageUrl(item.Id, {maxWidth, tag: item.ImageTags.Primary})
-		: null;
-	if (taggedPrimary) return taggedPrimary;
-
-	if (includeBackdrop && Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
-		return buildBackdropImageUrl(item.Id, {maxWidth, index: 0});
-	}
-
-	if (includeSeriesFallback && item?.SeriesId) {
-		const seriesPrimary = buildPrimaryImageUrl(item.SeriesId, {
-			maxWidth,
-			tag: item.SeriesPrimaryImageTag
-		});
-		if (seriesPrimary) return seriesPrimary;
-	}
-
-	return buildPrimaryImageUrl(item.Id, {maxWidth});
-};
-
-export const getLandscapeCardImageUrl = (item, {width = 640, includeSeriesBackdrop = true} = {}) => {
-	if (!item || !canBuildImageUrl()) return '';
-
-	// Prefer episode primary art first for episode-heavy rows.
-	if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
-		return jellyfinService.getImageUrl(item.Id, 'Primary', width);
-	}
-
-	if (Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
-		return jellyfinService.getBackdropUrl(item.Id, 0, width);
-	}
-
-	if (includeSeriesBackdrop && item?.SeriesId && Array.isArray(item?.ParentBackdropImageTags) && item.ParentBackdropImageTags.length > 0) {
-		return jellyfinService.getBackdropUrl(item.SeriesId, 0, width);
+		if (item.PrimaryImageTag) {
+			addCandidate(buildPrimaryImageUrl(imageItemId, {
+				maxWidth: personMaxWidth,
+				tag: item.PrimaryImageTag,
+				quality
+			}));
+		}
+		addCandidate(buildPrimaryImageUrl(imageItemId, {maxWidth: personMaxWidth, quality}));
+		return uniqueImageCandidates(candidates);
 	}
 
 	if (item?.ImageTags?.Primary) {
-		return jellyfinService.getImageUrl(item.Id, 'Primary', width);
+		addCandidate(buildPrimaryImageUrl(imageItemId, {
+			maxWidth,
+			tag: item.ImageTags.Primary,
+			quality
+		}));
+	}
+
+	if (includeBackdrop && Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
+		addCandidate(buildBackdropImageUrl(imageItemId, {
+			maxWidth,
+			index: 0,
+			tag: item.BackdropImageTags[0],
+			quality
+		}));
+	}
+
+	if (includeSeriesFallback && item?.SeriesId) {
+		addCandidate(buildPrimaryImageUrl(item.SeriesId, {
+			maxWidth,
+			tag: item.SeriesPrimaryImageTag,
+			quality
+		}));
+	}
+
+	addCandidate(buildPrimaryImageUrl(imageItemId, {maxWidth, quality}));
+	return uniqueImageCandidates(candidates);
+};
+
+export const getPosterCardImageUrl = (item, options = {}) => (
+	getPosterCardImageUrls(item, options)[0] || null
+);
+
+export const getLandscapeCardImageUrls = (item, {
+	width = 640,
+	includeSeriesBackdrop = true,
+	quality = 76
+} = {}) => {
+	if (!item || !canBuildImageUrl()) return [];
+	const imageItemId = getJellyfinImageItemId(item);
+	if (!imageItemId) return [];
+	const candidates = [];
+	const addCandidate = (url) => {
+		if (url) candidates.push(url);
+	};
+
+	// Prefer episode primary art first for episode-heavy rows.
+	if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
+		addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
+			tag: item.ImageTags.Primary,
+			quality
+		}));
+	}
+
+	if (Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
+		addCandidate(jellyfinService.getBackdropUrl(imageItemId, 0, width, {
+			tag: item.BackdropImageTags[0],
+			quality
+		}));
+	}
+
+	const parentBackdropItemId = item?.ParentBackdropItemId || item?.SeriesId;
+	if (includeSeriesBackdrop && parentBackdropItemId && Array.isArray(item?.ParentBackdropImageTags) && item.ParentBackdropImageTags.length > 0) {
+		addCandidate(jellyfinService.getBackdropUrl(parentBackdropItemId, 0, width, {
+			tag: item.ParentBackdropImageTags[0],
+			quality
+		}));
+	}
+
+	if (item?.Type !== 'Episode' && item?.ImageTags?.Primary) {
+		addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
+			tag: item.ImageTags.Primary,
+			quality
+		}));
 	}
 
 	if (item?.SeriesId) {
-		return jellyfinService.getImageUrl(item.SeriesId, 'Primary', width);
+		addCandidate(jellyfinService.getImageUrl(item.SeriesId, 'Primary', width, {
+			tag: item.SeriesPrimaryImageTag,
+			quality
+		}));
 	}
 
-	return '';
+	addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {quality}));
+	return uniqueImageCandidates(candidates);
+};
+
+export const getLandscapeCardImageUrl = (item, options = {}) => (
+	getLandscapeCardImageUrls(item, options)[0] || ''
+);
+
+export const getMediaPanelBackdropUrls = (item, {
+	width = 960,
+	quality = 70,
+	blur
+} = {}) => {
+	if (!item || !canBuildImageUrl()) return [];
+	const imageItemId = getJellyfinImageItemId(item);
+	if (!imageItemId) return [];
+
+	const candidates = [];
+	const addCandidate = (url) => {
+		if (url && !candidates.includes(url)) candidates.push(url);
+	};
+	const ownBackdropTag = item?.BackdropImageTags?.[0];
+	const parentBackdropTag = item?.ParentBackdropImageTags?.[0];
+	const parentBackdropItemId = item?.ParentBackdropItemId || item?.SeriesId;
+
+	const imageOptions = {quality, blur};
+	addCandidate(jellyfinService.getBackdropUrl(imageItemId, 0, width, {...imageOptions, tag: ownBackdropTag}));
+	if (parentBackdropItemId) {
+		addCandidate(jellyfinService.getBackdropUrl(parentBackdropItemId, 0, width, {...imageOptions, tag: parentBackdropTag}));
+	}
+	if (item?.Type === 'Episode' && item?.ImageTags?.Primary) {
+		addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
+			...imageOptions,
+			tag: item.ImageTags.Primary
+		}));
+	}
+	addCandidate(jellyfinService.getImageUrl(imageItemId, 'Primary', width, {
+		...imageOptions,
+		tag: item?.ImageTags?.Primary || item?.PrimaryImageTag
+	}));
+	if (item?.SeriesId) {
+		addCandidate(jellyfinService.getBackdropUrl(item.SeriesId, 0, width, imageOptions));
+		addCandidate(jellyfinService.getImageUrl(item.SeriesId, 'Primary', width, {
+			...imageOptions,
+			tag: item.SeriesPrimaryImageTag
+		}));
+	}
+
+	return candidates;
 };

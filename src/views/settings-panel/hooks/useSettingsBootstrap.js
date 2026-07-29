@@ -2,13 +2,15 @@ import {useCallback, useEffect, useState} from 'react';
 
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import jellyfinService from '../../../services/jellyfinService';
-import {getAppLogs, isVerboseLoggingEnabled, setVerboseLoggingEnabled} from '../../../utils/appLogger';
+import {configureAppDiagnostics, getAppLogs, isVerboseLoggingEnabled} from '../../../utils/appLogger';
 import {getAppVersion, loadAppVersion} from '../../../utils/appInfo';
 import {readBreezyfinSettings} from '../../../utils/settingsStorage';
 import {setRuntimeCapabilityProbeRefreshDays} from '../../../utils/platformCapabilities';
 import {
 	ASS_SUBTITLE_RENDERER_OPTIONS,
+	BITMAP_SUBTITLE_RENDERER_OPTIONS,
 	DEFAULT_SETTINGS,
+	SCREENSAVER_TIMEOUT_OPTIONS,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
@@ -35,7 +37,8 @@ const normalizeOptionValue = (value, options, fallback) => {
 export const useSettingsBootstrap = ({
 	setSettings,
 	normalizeCapabilityProbeRefreshDaysSetting,
-	assSubtitleRendererOptions = ASS_SUBTITLE_RENDERER_OPTIONS
+	assSubtitleRendererOptions = ASS_SUBTITLE_RENDERER_OPTIONS,
+	bitmapSubtitleRendererOptions = BITMAP_SUBTITLE_RENDERER_OPTIONS
 }) => {
 	const [appVersion, setAppVersion] = useState(getAppVersion());
 	const [serverInfo, setServerInfo] = useState(null);
@@ -66,6 +69,16 @@ export const useSettingsBootstrap = ({
 				parsed.assSubtitleRenderer,
 				assSubtitleRendererOptions,
 				DEFAULT_SETTINGS.assSubtitleRenderer
+			);
+			const bitmapSubtitleRenderer = normalizeOptionValue(
+				parsed.bitmapSubtitleRenderer,
+				bitmapSubtitleRendererOptions,
+				DEFAULT_SETTINGS.bitmapSubtitleRenderer
+			);
+			const screensaverTimeoutMinutes = normalizeOptionValue(
+				String(parsed.screensaverTimeoutMinutes || ''),
+				SCREENSAVER_TIMEOUT_OPTIONS,
+				DEFAULT_SETTINGS.screensaverTimeoutMinutes
 			);
 			const hasEnableFmp4Preference = typeof parsed.enableFmp4HlsContainerPreference === 'boolean';
 			const hasForceFmp4Preference = typeof parsed.forceFmp4HlsContainerPreference === 'boolean';
@@ -144,13 +157,16 @@ export const useSettingsBootstrap = ({
 				DEFAULT_SETTINGS.subtitleOverlayShadowAngle
 			);
 			const verboseAppLogs = parsed.verboseAppLogs === true || isVerboseLoggingEnabled();
-			setVerboseLoggingEnabled(verboseAppLogs);
+			const enableDiagnostics = parsed.enableDiagnostics === true;
+			configureAppDiagnostics({enabled: enableDiagnostics, verbose: verboseAppLogs});
 			setRuntimeCapabilityProbeRefreshDays(capabilityProbeRefreshDays);
 			setSettings({
 				...DEFAULT_SETTINGS,
 				...parsedWithoutLegacyFmp4Preference,
 				capabilityProbeRefreshDays,
 				assSubtitleRenderer,
+				bitmapSubtitleRenderer,
+				screensaverTimeoutMinutes,
 				subtitleBurnInTextCodecs,
 				subtitleOverlaySize,
 				subtitleOverlayFontSizePx,
@@ -167,7 +183,8 @@ export const useSettingsBootstrap = ({
 				subtitleOverlayShadowAngle,
 				enableFmp4HlsContainerPreference,
 				forceFmp4HlsContainerPreference,
-				verboseAppLogs,
+					verboseAppLogs,
+					enableDiagnostics,
 				homeRows: {
 					...DEFAULT_SETTINGS.homeRows,
 					...(parsed.homeRows || {})
@@ -177,7 +194,7 @@ export const useSettingsBootstrap = ({
 		} catch (error) {
 			console.error('Failed to load settings:', error);
 		}
-	}, [assSubtitleRendererOptions, normalizeCapabilityProbeRefreshDaysSetting, setSettings]);
+	}, [assSubtitleRendererOptions, bitmapSubtitleRendererOptions, normalizeCapabilityProbeRefreshDaysSetting, setSettings]);
 
 	const loadServerInfo = useCallback(async () => {
 		setLoading(true);

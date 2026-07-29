@@ -5,142 +5,64 @@
 	.panel-fill-container(var(--bf-theme-panel-bg));
 }
 
-.nativeScroller {
-	flex: 1;
-	min-height: 0;
-	background: var(--bf-theme-panel-bg);
-	overflow-y: auto;
-	overflow-x: hidden;
-	overscroll-behavior: contain;
-}
-
-.homeSectionScroller {
-	scrollbar-width: thin;
-	scrollbar-color: var(--bf-theme-panel-scrollbar-thumb) var(--bf-theme-panel-scrollbar-track);
-
-	&::-webkit-scrollbar {
-		width: 0.55rem;
-	}
-
-	&::-webkit-scrollbar-track {
-		background: var(--bf-theme-panel-scrollbar-track);
-		border-radius: 999px;
-	}
-
-	&::-webkit-scrollbar-thumb {
-		background: var(--bf-theme-panel-scrollbar-thumb);
-		border-radius: 999px;
-	}
-}
-
 .loading {
+	position: absolute;
+	inset: 0;
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	height: 80vh;
-}
-
-.contentFrame {
-	position: relative;
+	z-index: 2;
+	pointer-events: none;
 }
 
 .emptyState {
-	padding: calc(var(--bf-panel-top-offset) + 1rem) 6rem 0 4rem;
-	color: var(--bf-theme-muted-text);
-}
-
-.gridContainer {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
-	gap: 2rem;
-	/* Panel body already sits below native header; offset content by toolbar chrome only. */
-	padding: calc(var(--bf-panel-top-offset) - 0.75rem) 6rem clamp(2rem, var(--bf-panel-content-bottom-padding), 4rem) 4rem;
-	background: var(--bf-theme-panel-bg);
-	.panel-grid-performance();
-}
-
-.filterOverlay {
-	position: sticky;
-	top: calc(var(--bf-panel-top-offset) + 0.5rem);
-	display: flex;
-	justify-content: flex-end;
-	padding-right: 1.2rem;
-	z-index: 6;
-}
-
-.filterOverlayControls {
-	position: relative;
-}
-
-.loadingMore {
-	grid-column: 1 / -1;
+	position: absolute;
+	inset: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 0.5rem 0 2rem;
+	box-sizing: border-box;
+	padding: var(--bf-media-browse-overlay-height) 4rem 2rem;
+	text-align: center;
+	color: var(--bf-theme-muted-text);
+	z-index: 2;
+	pointer-events: none;
+}
+
+.emptyState :global(.BodyText) {
+	display: block;
+	width: 100%;
+	margin: 0 auto;
+	text-align: center;
 }
 
 .gridCard {
-	cursor: pointer;
-	.card-shell();
-	.card-focus-expand-reset();
-
-	&:hover,
-	&:global(.spottable):focus {
-		.card-focus-lift();
-
-		.cardImage {
-			.card-image-focus();
-		}
-	}
+	min-width: 0;
 }
 
-.cardImage {
-	.card-image-shell(16/9);
-	.card-image-overlays();
-
-	&.placeholder {
-		.card-placeholder-surface();
-
-		&::after {
-			.card-placeholder-no-image-label();
-			font-size: 1em;
-		}
-	}
+.gridCard:hover,
+.gridCard:global(.spottable):focus {
+	transform: none !important;
+	filter: none !important;
 }
 
-.progressBadge {
-	position: absolute;
-	top: 0.5rem;
-	right: 0.5rem;
-	padding: 0.35rem 0.5rem;
-	.status-badge-pill();
+.gridCard:hover img,
+.gridCard:global(.spottable):focus img {
+	transform: none !important;
+	filter: none !important;
 }
 
-.watchedBadge {
-	position: absolute;
-	top: 0.5rem;
-	right: 0.5rem;
-	.status-badge-success();
+.virtualGridViewport {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	box-sizing: border-box;
+	background: transparent;
 }
 
-.progressBar {
-	.card-progress-bar-surface();
-}
-
-.progress {
-	.card-progress-bar-fill();
-	transition: width 0.3s ease;
-}
-
-.cardTitle {
-	margin: 0.75rem 0 0 0;
-	.card-title-text();
-	text-align: left;
-}
-
-.cardSubtitle {
-	margin-top: 0.25rem;
-	.card-subtitle-text();
-	text-align: left;
+.virtualGrid {
+	width: 100%;
+	height: 100%;
+	background: transparent;
+	overscroll-behavior: contain;
 }

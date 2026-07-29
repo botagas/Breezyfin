@@ -25,10 +25,13 @@ const MediaDetailsIntroSection = ({
 		writerNames,
 		isFavorite,
 		isWatched,
+		isWatchlisted,
+		showWatchlistAction,
 		hasOverviewText,
 		overviewExpanded,
 		hasOverviewOverflow,
-		overviewPlayLabel
+		overviewPlayLabel,
+		showPlaybackControls
 	} = details;
 	const {
 		audioTracks,
@@ -44,6 +47,7 @@ const MediaDetailsIntroSection = ({
 		onHeaderLogoError,
 		renderCreditNames,
 		onToggleFavorite,
+		onToggleWatchlist,
 		onToggleWatchedMain,
 		onOverviewActivate,
 		onOpenAudioPicker,
@@ -210,6 +214,18 @@ const MediaDetailsIntroSection = ({
 									className={`${css.actionButton} ${css.favoriteAction} ${isFavorite ? css.favoriteActive : ''}`}
 									title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
 								/>
+								{showWatchlistAction ? (
+									<Button
+										size="small"
+										icon="list"
+										onClick={onToggleWatchlist}
+										onKeyDown={onIntroActionKeyDown}
+										css={{icon: css.actionIcon}}
+										spotlightId="details-watchlist-action"
+										className={`${css.actionButton} ${isWatchlisted ? css.favoriteActive : ''}`}
+										title={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+									/>
+								) : null}
 								<Button
 									size="small"
 									icon="check"
@@ -242,7 +258,7 @@ const MediaDetailsIntroSection = ({
 									No description available.
 								</BodyText>
 							)}
-							<div className={css.introControlsRow}>
+							{showPlaybackControls ? <div className={css.introControlsRow}>
 								<MediaTrackSelectorRow
 									audioTracks={audioTracks}
 									subtitleTracks={subtitleTracks}
@@ -266,12 +282,12 @@ const MediaDetailsIntroSection = ({
 									{overviewPlayLabel}
 								</Button>
 								{showSectionHints && (
-									<BodyText className={css.sectionHint}>
+									<div className={css.sectionHint}>
 										More
 										<Icon className={css.sectionHintArrow}>arrowsmalldown</Icon>
-									</BodyText>
+									</div>
 								)}
-							</div>
+							</div> : null}
 						</div>
 					</div>
 				</div>

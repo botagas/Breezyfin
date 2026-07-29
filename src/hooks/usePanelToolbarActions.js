@@ -33,6 +33,7 @@ export const usePanelToolbarActions = ({
 		onSwitchUser,
 		onLogout,
 		onExit,
-		registerBackHandler: registerToolbarBackHandler
+		registerBackHandler: registerToolbarBackHandler,
+		onBack: handleInternalBack
 	});
 };

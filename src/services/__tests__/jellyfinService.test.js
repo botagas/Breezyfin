@@ -65,6 +65,7 @@ describe('jellyfinService', () => {
 	});
 
 	afterEach(() => {
+		jellyfinService.webSocketSession?.stop();
 		errorSpy.mockRestore();
 		warnSpy.mockRestore();
 	});
@@ -101,6 +102,21 @@ describe('jellyfinService', () => {
 		expect(parsedImageUrl.searchParams.get('width')).toBe('320');
 		expect(parsedImageUrl.searchParams.get('tag')).toBe('tag-1');
 		expect(parsedImageUrl.searchParams.get('format')).toBe('Jpg');
+	});
+
+	it('adds optional image quality and server blur parameters', () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'token-123';
+
+		const imageUrl = jellyfinService.getBackdropUrl('item-2', 0, 720, {
+			quality: 62,
+			blur: 8
+		});
+		const parsedImageUrl = new URL(imageUrl);
+
+		expect(parsedImageUrl.searchParams.get('width')).toBe('720');
+		expect(parsedImageUrl.searchParams.get('quality')).toBe('62');
+		expect(parsedImageUrl.searchParams.get('blur')).toBe('8');
 	});
 
 	it('builds user image urls without requiring an image tag', () => {

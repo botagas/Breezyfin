@@ -9,7 +9,8 @@ export const usePlayerInteractionReveal = ({
 	disabled = false,
 	showControls,
 	setShowControls,
-	lastInteractionRef
+	lastInteractionRef,
+	blockedRef = null
 }) => {
 	const showControlsRef = useRef(showControls);
 
@@ -22,6 +23,7 @@ export const usePlayerInteractionReveal = ({
 		let pendingFrame = null;
 
 		const revealControls = () => {
+			if (blockedRef?.current) return;
 			lastInteractionRef.current = Date.now();
 			if (!showControlsRef.current) {
 				setShowControls(true);
@@ -29,6 +31,7 @@ export const usePlayerInteractionReveal = ({
 		};
 
 		const scheduleReveal = () => {
+			if (blockedRef?.current) return;
 			if (pendingFrame !== null) return;
 			pendingFrame = window.requestAnimationFrame(() => {
 				pendingFrame = null;
@@ -60,5 +63,5 @@ export const usePlayerInteractionReveal = ({
 			window.removeEventListener('mousemove', handlePointerMove, listenerOptions);
 			window.removeEventListener('pointermove', handlePointerMove, listenerOptions);
 		};
-	}, [disabled, enabled, lastInteractionRef, setShowControls]);
+	}, [blockedRef, disabled, enabled, lastInteractionRef, setShowControls]);
 };

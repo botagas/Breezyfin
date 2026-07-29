@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
 import {
+	areMediaFilterSelectionsEqual,
 	buildMediaFilterState,
 	mediaItemMatchesFilters
 } from '../../../utils/mediaFilters';
 import {getJellyfinUsername} from '../../../utils/jellyfinUser';
 
-const REQUESTS_FALLBACK_SCAN_MULTIPLIER = 4;
 const REQUESTS_FALLBACK_SCAN_LIMIT = 6;
 
 export const useLibraryPagination = ({
@@ -14,15 +14,25 @@ export const useLibraryPagination = ({
 	activeLibraryCollectionType = null,
 	getItemTypesForLibrary,
 	pageSize = 60,
-	activeFilterIds = ['all']
+	activeFilterIds = ['all'],
+	searchTerm = '',
+	cachedState = null,
+	onStateChange = null
 }) => {
-	const [loading, setLoading] = useState(true);
+	const normalizedSearchTerm = String(searchTerm || '').trim();
+	const canRestoreCachedPage =
+		Array.isArray(cachedState?.items) &&
+		areMediaFilterSelectionsEqual(cachedState?.activeFilterIds, activeFilterIds) &&
+		String(cachedState?.searchTerm || '').trim() === normalizedSearchTerm;
+	const [loading, setLoading] = useState(!canRestoreCachedPage);
 	const [loadingMore, setLoadingMore] = useState(false);
-	const [hasMore, setHasMore] = useState(false);
-	const [items, setItems] = useState([]);
+	const [hasMore, setHasMore] = useState(canRestoreCachedPage && cachedState?.hasMore === true);
+	const [items, setItems] = useState(canRestoreCachedPage ? cachedState.items : []);
 
 	const paginationRef = useRef({
-		nextStartIndex: 0,
+		nextStartIndex: canRestoreCachedPage && Number.isFinite(Number(cachedState?.nextStartIndex))
+			? Math.max(0, Math.trunc(Number(cachedState.nextStartIndex)))
+			: 0,
 		itemTypes: undefined,
 		filterIds: ['all'],
 		requestSource: null,
@@ -38,21 +48,24 @@ export const useLibraryPagination = ({
 	});
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const skipInitialLoadRef = useRef(canRestoreCachedPage);
 
 	const buildFilterState = useCallback((filterIds) => buildMediaFilterState(filterIds), []);
 
 	const fetchRawPage = useCallback(async ({
 		itemTypes,
 		startIndex,
-		filterState
+		filterState,
+		limit
 	}) => {
+		const requestedLimit = Math.max(1, Math.trunc(Number(limit) || pageSize));
 		if (filterState.useMyRequestsSource) {
 			const username = paginationRef.current.username || await getJellyfinUsername(jellyfinService);
 			paginationRef.current.username = username;
 			const myRequestsResult = await jellyfinService.getMyRequests(
 				activeLibraryId,
 				itemTypes,
-				pageSize,
+				requestedLimit,
 				startIndex,
 				username
 			);
@@ -71,17 +84,20 @@ export const useLibraryPagination = ({
 		const libraryResult = await jellyfinService.getLibraryItems(
 			activeLibraryId,
 			itemTypes,
-			pageSize * REQUESTS_FALLBACK_SCAN_MULTIPLIER,
+			requestedLimit,
 			startIndex,
-			{filters: filterState.serverFilters}
+			{
+				filters: filterState.serverFilters,
+				searchTerm: normalizedSearchTerm
+			}
 		);
 		const rawItems = Array.isArray(libraryResult) ? libraryResult : [];
 		return {
 			items: rawItems,
 			scannedCount: rawItems.length,
-			sourceHasMore: rawItems.length >= (pageSize * REQUESTS_FALLBACK_SCAN_MULTIPLIER)
+			sourceHasMore: rawItems.length >= requestedLimit
 		};
-	}, [activeLibraryId, pageSize]);
+	}, [activeLibraryId, normalizedSearchTerm, pageSize]);
 
 	const collectFilteredPage = useCallback(async ({
 		itemTypes,
@@ -94,10 +110,12 @@ export const useLibraryPagination = ({
 		let scans = 0;
 		let sourceHasMore = true;
 		while (collected.length < pageSize && scans < REQUESTS_FALLBACK_SCAN_LIMIT && sourceHasMore) {
+			const remainingCapacity = pageSize - collected.length;
 			const rawPage = await fetchRawPage({
 				itemTypes,
 				startIndex: cursor,
-				filterState
+				filterState,
+				limit: remainingCapacity
 			});
 			if (requestId !== requestIdRef.current) {
 				return {items: [], nextStartIndex: cursor, hasMore: false};
@@ -111,7 +129,9 @@ export const useLibraryPagination = ({
 				break;
 			}
 			cursor += scannedCount;
-			const filteredItems = safeItems.filter((item) => mediaItemMatchesFilters(item, filterState));
+			const filteredItems = safeItems.filter((item) => mediaItemMatchesFilters(item, filterState, {
+				requestMembershipSatisfied: filterState.useMyRequestsSource
+			}));
 			if (filteredItems.length > 0) {
 				collected = [...collected, ...filteredItems];
 			}
@@ -119,7 +139,7 @@ export const useLibraryPagination = ({
 			scans += 1;
 		}
 		return {
-			items: collected.slice(0, pageSize),
+			items: collected,
 			nextStartIndex: cursor,
 			hasMore: sourceHasMore
 		};
@@ -217,9 +237,22 @@ export const useLibraryPagination = ({
 
 	useEffect(() => {
 		if (activeLibraryId) {
+			if (skipInitialLoadRef.current) {
+				skipInitialLoadRef.current = false;
+				return;
+			}
 			loadLibraryItems();
 		}
 	}, [activeLibraryId, loadLibraryItems]);
+
+	useEffect(() => {
+		if (loading || typeof onStateChange !== 'function') return;
+		onStateChange({
+			items,
+			hasMore,
+			nextStartIndex: paginationRef.current.nextStartIndex
+		});
+	}, [hasMore, items, loading, onStateChange]);
 
 	return {
 		loading,

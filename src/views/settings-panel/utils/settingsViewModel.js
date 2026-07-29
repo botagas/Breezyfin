@@ -44,6 +44,14 @@ export const getAssSubtitleRendererControlState = (settings, enabledLabel) => {
 	};
 };
 
+export const getBitmapSubtitleRendererControlState = (settings, enabledLabel) => {
+	const enabled = isSmartSubtitleHandlingEnabled(settings);
+	return {
+		enabled,
+		label: enabled ? enabledLabel : 'Manual mode'
+	};
+};
+
 export const getSubtitleBurnInFormatsControlState = (settings, enabledLabel) => {
 	if (isSmartSubtitleHandlingEnabled(settings)) {
 		return {

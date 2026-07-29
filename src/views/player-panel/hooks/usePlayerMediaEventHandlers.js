@@ -1,9 +1,33 @@
 import {useCallback} from 'react';
+import {redactSensitiveUrl} from '../../../utils/sensitiveData';
 
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
-import jellyfinService from '../../../services/jellyfinService';
-import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
 import {applyNativeAudioTrackSelection} from '../../../utils/trackMatching';
+import {
+	getSubtitleStreamByIndex,
+	isBitmapSubtitleCodec,
+	normalizeSubtitleCodec
+} from '../../../utils/playbackSelection';
+
+const isImageSubtitleBurnInPlaybackPath = ({video, mediaSourceData, currentSubtitleTrack}) => {
+	const values = [
+		video?.currentSrc,
+		video?.src,
+		mediaSourceData?.TranscodingUrl,
+		mediaSourceData?.DirectStreamUrl,
+		mediaSourceData?.__debugVideoUrl
+	].filter(Boolean).join(' ').toLowerCase();
+	const hasEncodeSubtitlePath = values.includes('subtitlemethod=encode') ||
+		values.includes('subtitlemethod%3dencode');
+	const subtitlePolicy = mediaSourceData?.__debugSubtitlePolicy || {};
+	const hasEncodedSubtitleIndex = /[?&]subtitlestreamindex=(?!-1(?:&|$))\d+/i.test(values) ||
+		/subtitlestreamindex%3d(?!-1(?:%26|$))\d+/i.test(values);
+	const subtitleStream = getSubtitleStreamByIndex(mediaSourceData, currentSubtitleTrack);
+	const codec = subtitlePolicy.codec || normalizeSubtitleCodec(subtitleStream);
+	const burnInRequested = subtitlePolicy.forceBurnIn === true || subtitlePolicy.requiresBurnIn === true;
+	return (burnInRequested || (hasEncodeSubtitlePath && hasEncodedSubtitleIndex)) &&
+		isBitmapSubtitleCodec(codec);
+};
 
 export const usePlayerMediaEventHandlers = ({
 	item,
@@ -12,16 +36,7 @@ export const usePlayerMediaEventHandlers = ({
 	playbackStartedRef,
 	playbackOverrideRef,
 	setCurrentTime,
-	setLoading,
 	showPlaybackError,
-	setPlaying,
-	pendingOverrideClearRef,
-	clearStartWatch,
-	startupFallbackTimerRef,
-	getPlaybackSessionContext,
-	startProgressReporting,
-	setToastMessage,
-	tryPlaybackFallbackOnCanPlayError,
 	checkSkipSegments,
 	seekOffsetRef,
 	lastProgressRef,
@@ -37,7 +52,9 @@ export const usePlayerMediaEventHandlers = ({
 	currentAudioTrack,
 	currentSubtitleTrack,
 	appendPlaybackDiagnostic,
-	onNativeAudioSwitchFallback
+	onNativeAudioSwitchFallback,
+	onVideoCanPlay,
+	exitInProgressRef
 }) => {
 	const applyInitialNativeAudioSelection = useCallback((phase) => {
 		const defaultAudioTrack = Number.isInteger(mediaSourceData?.DefaultAudioStreamIndex)
@@ -117,62 +134,15 @@ export const usePlayerMediaEventHandlers = ({
 		};
 	}, [lastProgressRef, loading, videoRef]);
 
-	const handleCanPlay = useCallback(async () => {
-		if (!videoRef.current || playbackStartedRef.current) return;
-		if (applyInitialNativeAudioSelection('canplay')) return;
-
-		playbackStartedRef.current = true;
-
-		try {
-			await videoRef.current.play();
-			setLoading(false);
-			setPlaying(true);
-			if (pendingOverrideClearRef.current) {
-				playbackOverrideRef.current = null;
-				pendingOverrideClearRef.current = false;
-			}
-			clearStartWatch();
-			if (startupFallbackTimerRef.current) {
-				clearTimeout(startupFallbackTimerRef.current);
-				startupFallbackTimerRef.current = null;
-			}
-
-			const positionTicks = Math.floor(videoRef.current.currentTime * JELLYFIN_TICKS_PER_SECOND);
-			await jellyfinService.reportPlaybackStart(item.Id, positionTicks, getPlaybackSessionContext());
-			startProgressReporting();
-		} catch (playError) {
-			playbackStartedRef.current = false;
-			console.error('Auto-play failed:', playError);
-			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
-			setPlaying(false);
-
-			if (isFatalPlaybackError(playError)) {
-				const didFallback = await tryPlaybackFallbackOnCanPlayError(errorMessage);
-				if (didFallback) {
-					return;
-				}
-			}
-			if (isFatalPlaybackError(playError)) {
-				showPlaybackError(errorMessage);
-			} else {
-				setToastMessage('Playback failed to start. Press Play/Retry.');
-			}
-		}
+	const handleCanPlay = useCallback(() => {
+		if (!videoRef.current || playbackStartedRef.current || exitInProgressRef.current) return;
+		applyInitialNativeAudioSelection('canplay');
+		onVideoCanPlay?.();
 	}, [
-		clearStartWatch,
 		applyInitialNativeAudioSelection,
-		getPlaybackSessionContext,
-		item,
-		pendingOverrideClearRef,
+		exitInProgressRef,
+		onVideoCanPlay,
 		playbackStartedRef,
-		playbackOverrideRef,
-		setLoading,
-		setPlaying,
-		setToastMessage,
-		showPlaybackError,
-		startProgressReporting,
-		startupFallbackTimerRef,
-		tryPlaybackFallbackOnCanPlayError,
 		videoRef
 	]);
 
@@ -186,15 +156,17 @@ export const usePlayerMediaEventHandlers = ({
 	}, [checkSkipSegments, lastProgressRef, seekOffsetRef, setCurrentTime, videoRef]);
 
 	const handleVideoError = useCallback(async (event) => {
-		if (playbackFailureLockedRef.current) return;
+		if (playbackFailureLockedRef.current || exitInProgressRef.current) return;
 		const video = videoRef.current;
 		const mediaError = video?.error;
 
-		console.error('=== Video Error ===');
-		console.error('Event:', event);
-		console.error('Video src:', video?.src);
-		console.error('Network state:', video?.networkState);
-		console.error('Ready state:', video?.readyState);
+		console.error('[Player] Video playback error:', {
+			eventType: event?.type || 'error',
+			mediaErrorCode: Number(mediaError?.code) || null,
+			videoUrl: redactSensitiveUrl(video?.currentSrc || video?.src || '', {includeOrigin: false}),
+			networkState: Number(video?.networkState) || 0,
+			readyState: Number(video?.readyState) || 0
+		});
 
 		let errorMessage = 'Failed to play video';
 		if (mediaError) {
@@ -205,6 +177,12 @@ export const usePlayerMediaEventHandlers = ({
 				4: 'Format not supported'
 			};
 			errorMessage = errorMessages[mediaError.code] || `Error code: ${mediaError.code}`;
+			if (
+				mediaError.code === 4 &&
+				isImageSubtitleBurnInPlaybackPath({video, mediaSourceData, currentSubtitleTrack})
+			) {
+				errorMessage = 'Jellyfin failed to burn in image-based subtitles. Server hardware transcoding may not support PGS/PGSSUB burn-in; try Auto bitmap rendering or software transcoding.';
+			}
 			console.error('MediaError code:', mediaError.code, '-', errorMessage);
 		}
 		if (isSubtitleCompatibilityError(errorMessage) && playbackSettingsRef.current.strictTranscodingMode) {
@@ -233,9 +211,12 @@ export const usePlayerMediaEventHandlers = ({
 	}, [
 		attemptSubtitleCompatibilityFallback,
 		attemptTranscodeFallback,
+		currentSubtitleTrack,
+		exitInProgressRef,
 		handleStop,
 		isCurrentTranscoding,
 		isSubtitleCompatibilityError,
+		mediaSourceData,
 		playbackFailureLockedRef,
 		playbackSettingsRef,
 		showPlaybackError,

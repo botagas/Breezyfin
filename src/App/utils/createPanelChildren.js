@@ -7,10 +7,17 @@ import FavoritesPanel from '../../views/FavoritesPanel';
 import SettingsPanel from '../../views/SettingsPanel';
 import PlayerPanel from '../../views/PlayerPanel';
 import MediaDetailsPanel from '../../views/MediaDetailsPanel';
+import WatchlistPanel from '../../views/WatchlistPanel';
+import CalendarPanel from '../../views/CalendarPanel';
+import SyncPlayPanel from '../../views/SyncPlayPanel';
+import WatchPartyPanel from '../../views/WatchPartyPanel';
 
 export const createPanelChildren = ({
 	currentView,
+	sessionRestorePending = false,
 	inputMode,
+	screensaverActive = false,
+	diagnosticsEnabled = false,
 	selection,
 	notices,
 	cacheState,
@@ -36,6 +43,10 @@ export const createPanelChildren = ({
 		search: searchPanelState,
 		favorites: favoritesPanelState,
 		settings: settingsPanelState,
+		watchlist: watchlistPanelState,
+		calendar: calendarPanelState,
+		syncPlay: syncPlayPanelState,
+		watchParty: watchPartyPanelState,
 		detailsByItemId
 	} = cacheState;
 	const {
@@ -57,6 +68,10 @@ export const createPanelChildren = ({
 		search: handleSearchPanelStateChange,
 		favorites: handleFavoritesPanelStateChange,
 		settings: handleSettingsPanelStateChange,
+		watchlist: handleWatchlistPanelStateChange,
+		calendar: handleCalendarPanelStateChange,
+		syncPlay: handleSyncPlayPanelStateChange,
+		watchParty: handleWatchPartyPanelStateChange,
 		details: handleDetailsPanelStateChange
 	} = cacheActions;
 	const {
@@ -66,6 +81,10 @@ export const createPanelChildren = ({
 		search: registerSearchBackHandler,
 		favorites: registerFavoritesBackHandler,
 		settings: registerSettingsBackHandler,
+		watchlist: registerWatchlistBackHandler,
+		calendar: registerCalendarBackHandler,
+		syncPlay: registerSyncPlayBackHandler,
+		watchParty: registerWatchPartyBackHandler,
 		details: registerDetailsBackHandler,
 		player: registerPlayerBackHandler
 	} = backHandlers;
@@ -80,12 +99,14 @@ export const createPanelChildren = ({
 			onLogin={handleLogin}
 			onNavigate={handleNavigate}
 			isActive={currentView === 'login'}
+			deferBackdrops={sessionRestorePending}
 			sessionNotice={loginNotice}
 			sessionNoticeNonce={loginNoticeNonce}
 		/>,
 		<HomePanel
 			key="home"
 			isActive={currentView === 'home'}
+			screensaverActive={screensaverActive}
 			onItemSelect={handleItemSelect}
 			onNavigate={handleNavigate}
 			onSwitchUser={handleSwitchUser}
@@ -164,6 +185,57 @@ export const createPanelChildren = ({
 			onCacheState={handleSettingsPanelStateChange}
 			registerBackHandler={registerSettingsBackHandler}
 			noCloseButton
+		/>,
+		<WatchlistPanel
+			key="watchlist"
+			isActive={currentView === 'watchlist'}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={watchlistPanelState}
+			onCacheState={handleWatchlistPanelStateChange}
+			registerBackHandler={registerWatchlistBackHandler}
+			noCloseButton
+		/>,
+		<CalendarPanel
+			key="calendar"
+			isActive={currentView === 'calendar'}
+			onItemSelect={handleItemSelect}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={calendarPanelState}
+			onCacheState={handleCalendarPanelStateChange}
+			registerBackHandler={registerCalendarBackHandler}
+			noCloseButton
+		/>,
+		<SyncPlayPanel
+			key="syncPlay"
+			isActive={currentView === 'syncPlay'}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			cachedState={syncPlayPanelState}
+			onCacheState={handleSyncPlayPanelStateChange}
+			registerBackHandler={registerSyncPlayBackHandler}
+			noCloseButton
+		/>,
+		<WatchPartyPanel
+			key="watchParty"
+			isActive={currentView === 'watchParty'}
+			onNavigate={handleNavigate}
+			onSwitchUser={handleSwitchUser}
+			onLogout={handleLogout}
+			onExit={handleExit}
+			onPlay={handlePlay}
+			cachedState={watchPartyPanelState}
+			onCacheState={handleWatchPartyPanelStateChange}
+			registerBackHandler={registerWatchPartyBackHandler}
+			noCloseButton
 		/>
 	];
 
@@ -186,6 +258,7 @@ export const createPanelChildren = ({
 		<PlayerPanel
 			key="player"
 			isActive={currentView === 'player'}
+			diagnosticsEnabled={diagnosticsEnabled}
 			item={item}
 			playbackOptions={playbackOptions}
 			onBack={backToDetails}

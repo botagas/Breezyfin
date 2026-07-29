@@ -35,6 +35,7 @@ export const usePlayerLifecycleEffects = ({
 	skipOverlayVisible,
 	wasSkipOverlayVisibleRef,
 	focusSkipOverlayAction,
+	focusPlayerWakeAction,
 	playPauseButtonRef,
 	loadRequestIdRef,
 	playbackStartedRef
@@ -86,7 +87,7 @@ export const usePlayerLifecycleEffects = ({
 	}, [lastInteractionRef, playing, setShowControls, showAudioPopup, showControls, showSubtitlePopup]);
 
 	useEffect(() => {
-		if (!mediaSourceData || isCurrentTranscoding) return undefined;
+		if (!mediaSourceData || isCurrentTranscoding || !playing) return undefined;
 		const interval = setInterval(() => {
 			const now = Date.now();
 			const last = lastProgressRef.current;
@@ -117,12 +118,17 @@ export const usePlayerLifecycleEffects = ({
 	useEffect(() => {
 		let focusTimer = null;
 		const becameVisible = skipOverlayVisible && !wasSkipOverlayVisibleRef.current;
+		const becameHidden = !skipOverlayVisible && wasSkipOverlayVisibleRef.current;
 		wasSkipOverlayVisibleRef.current = skipOverlayVisible;
 
 		if (becameVisible) {
 			focusTimer = setTimeout(() => {
 				focusSkipOverlayAction();
 			}, 20);
+		} else if (becameHidden) {
+			lastInteractionRef.current = Date.now();
+			setShowControls(true);
+			focusPlayerWakeAction();
 		} else if (!playing && showControls && playPauseButtonRef.current) {
 			const target = playPauseButtonRef.current.nodeRef?.current || playPauseButtonRef.current;
 			if (target?.focus) {
@@ -135,5 +141,15 @@ export const usePlayerLifecycleEffects = ({
 				clearTimeout(focusTimer);
 			}
 		};
-	}, [focusSkipOverlayAction, playPauseButtonRef, playing, showControls, skipOverlayVisible, wasSkipOverlayVisibleRef]);
+	}, [
+		focusPlayerWakeAction,
+		focusSkipOverlayAction,
+		lastInteractionRef,
+		playPauseButtonRef,
+		playing,
+		setShowControls,
+		showControls,
+		skipOverlayVisible,
+		wasSkipOverlayVisibleRef
+	]);
 };

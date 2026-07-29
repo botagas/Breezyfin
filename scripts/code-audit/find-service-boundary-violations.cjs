@@ -3,8 +3,7 @@
 /*
  * Enforce the Jellyfin service boundary documented in DEVELOPING.md:
  * app code should import request/API behavior through the public
- * `jellyfinService` facade. A few pure playback helpers are intentionally
- * shared with PlayerPanel code until they can be moved to a neutral namespace.
+ * `jellyfinService` facade. Shared pure playback helpers live under `src/utils`.
  */
 
 const {
@@ -24,18 +23,12 @@ const ALLOWED_DIRECT_IMPORT_PATTERNS = [
 	/^src\/services\/__tests__\//,
 	/^src\/services\/testUtils\//
 ];
-const ALLOWED_APP_HELPER_IMPORTS = new Set([
-	'src/services/jellyfin/playbackSelection.js',
-	'src/services/jellyfin/playback-api/diagnostics.js'
-]);
-
 const isAllowedDirectImporter = (relativeFilePath) => (
 	ALLOWED_DIRECT_IMPORT_PATTERNS.some((pattern) => pattern.test(relativeFilePath))
 );
 
 const isForbiddenDirectImport = (resolvedImport) => (
-	resolvedImport.startsWith('src/services/jellyfin/') &&
-	!ALLOWED_APP_HELPER_IMPORTS.has(resolvedImport)
+	resolvedImport.startsWith('src/services/jellyfin/')
 );
 
 const resolveImportPath = (fromFilePath, importPath) => {

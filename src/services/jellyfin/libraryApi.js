@@ -6,7 +6,7 @@ export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 
 		const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items?includeItemTypes=${types}&limit=${limit}&startIndex=${safeStartIndex}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items?includeItemTypes=${types}&limit=${limit}&startIndex=${safeStartIndex}&sortBy=DateCreated&sortOrder=Descending&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
 			{},
 			'getLatestMedia'
 		);
@@ -20,7 +20,7 @@ export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0)
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items?limit=${limit}&startIndex=${safeStartIndex}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items?limit=${limit}&startIndex=${safeStartIndex}&sortBy=DateCreated&sortOrder=Descending&recursive=true&includeItemTypes=Movie,Series&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData,ChildCount&imageTypeLimit=1`,
 			{},
 			'getRecentlyAdded'
 		);
@@ -34,7 +34,7 @@ export const getNextUpItems = async (service, limit = 24, startIndex = 0) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Shows/NextUp?userId=${service.userId}&limit=${limit}&startIndex=${safeStartIndex}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData&imageTypeLimit=1&enableTotalRecordCount=false`,
+			`/Shows/NextUp?userId=${service.userId}&limit=${limit}&startIndex=${safeStartIndex}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData&imageTypeLimit=1&enableTotalRecordCount=false`,
 			{},
 			'getNextUp'
 		);
@@ -48,7 +48,7 @@ export const getResumeMediaItems = async (service, limit = 10, startIndex = 0) =
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items/Resume?limit=${limit}&startIndex=${safeStartIndex}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items/Resume?limit=${limit}&startIndex=${safeStartIndex}&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,ParentIndexNumber,IndexNumber,Tags,TagItems,UserData&imageTypeLimit=1`,
 			{},
 			'getResumeItems'
 		);
@@ -90,7 +90,7 @@ export const getLibraryChildItems = async (
 		params.set('recursive', 'true');
 		params.set('sortBy', 'SortName');
 		params.set('sortOrder', 'Ascending');
-		params.set('fields', 'Overview,PrimaryImageAspectRatio,BackdropImageTags,SeriesName,ParentIndexNumber,IndexNumber,UserData,ChildCount,Tags,TagItems');
+		params.set('fields', 'Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,ParentIndexNumber,IndexNumber,UserData,ChildCount,Tags,TagItems');
 
 		if (itemTypes) {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
@@ -100,6 +100,9 @@ export const getLibraryChildItems = async (
 		}
 		if (typeof options?.filters === 'string' && options.filters.trim()) {
 			params.set('filters', options.filters.trim());
+		}
+		if (typeof options?.searchTerm === 'string' && options.searchTerm.trim()) {
+			params.set('searchTerm', options.searchTerm.trim());
 		}
 		const url = `${service.serverUrl}/Users/${service.userId}/Items?${params.toString()}`;
 
@@ -150,6 +153,28 @@ export const getSeasonEpisodes = async (service, seriesId, seasonId) => {
 	}
 };
 
+export const getUnwatchedSeriesEpisodes = async (service, seriesId, limit = 30, startIndex = 0) => {
+	if (!seriesId) return {items: [], totalRecordCount: 0, nextStartIndex: 0, hasMore: false};
+	const safeLimit = Math.min(200, Math.max(1, Math.trunc(Number(limit) || 30)));
+	const safeStartIndex = Math.max(0, Math.trunc(Number(startIndex) || 0));
+	const params = new URLSearchParams({
+		userId: service.userId,
+		isPlayed: 'false',
+		enableImages: 'true',
+		enableTotalRecordCount: 'true',
+		fields: 'PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,UserData,Overview,PremiereDate',
+		limit: String(safeLimit),
+		startIndex: String(safeStartIndex)
+	});
+	const data = await service._request(`/Shows/${encodeURIComponent(seriesId)}/Episodes?${params.toString()}`, {
+		context: 'getUnwatchedSeriesEpisodes'
+	});
+	const items = Array.isArray(data?.Items) ? data.Items : [];
+	const totalRecordCount = Number.isInteger(data?.TotalRecordCount) ? data.TotalRecordCount : items.length;
+	const nextStartIndex = safeStartIndex + items.length;
+	return {items, totalRecordCount, nextStartIndex, hasMore: nextStartIndex < totalRecordCount};
+};
+
 export const getNextUpEpisodeForSeries = async (service, seriesId) => {
 	try {
 		const data = await service._request(
@@ -180,29 +205,66 @@ export const getNextUpEpisodeForSeries = async (service, seriesId) => {
 	}
 };
 
-export const searchLibraryItems = async (service, searchTerm, itemTypes = null, limit = 25, startIndex = 0) => {
+export const searchLibraryItemsPage = async (service, searchTerm, itemTypes = null, limit = 25, startIndex = 0) => {
 	try {
-		let url = `${service.serverUrl}/Users/${service.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&startIndex=${Math.max(0, Number(startIndex) || 0)}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=false`;
+		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
+		let url = `${service.serverUrl}/Users/${service.userId}/Items?searchTerm=${encodeURIComponent(searchTerm)}&limit=${limit}&startIndex=${safeStartIndex}&recursive=true&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,SeasonId,ParentId,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1&enableTotalRecordCount=true`;
 
 		if (itemTypes && itemTypes.length > 0) {
 			const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
 			url += `&includeItemTypes=${types}`;
 		}
 
-		return await service._fetchItems(url, {}, 'search');
+		const data = await service._request(url, {context: 'search'});
+		const items = Array.isArray(data?.Items) ? data.Items : [];
+		const totalRecordCount = Number(data?.TotalRecordCount);
+		return {
+			items,
+			startIndex: safeStartIndex,
+			totalRecordCount: Number.isFinite(totalRecordCount) ? totalRecordCount : null
+		};
 	} catch (error) {
 		console.error('search error:', error);
-		return [];
+		return {
+			items: [],
+			startIndex: Math.max(0, Number(startIndex) || 0),
+			totalRecordCount: null,
+			error
+		};
 	}
 };
 
-export const getFavoriteMediaItems = async (service, itemTypes = ['Movie', 'Series'], limit = 100, startIndex = 0) => {
+export const searchLibraryItems = async (service, searchTerm, itemTypes = null, limit = 25, startIndex = 0) => {
+	const page = await searchLibraryItemsPage(service, searchTerm, itemTypes, limit, startIndex);
+	return page.items;
+};
+
+export const getFavoriteMediaItems = async (
+	service,
+	itemTypes = ['Movie', 'Series'],
+	limit = 100,
+	startIndex = 0,
+	options = {}
+) => {
 	try {
 		const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.trunc(Number(limit))) : 100;
 		const safeStartIndex = Number.isFinite(Number(startIndex)) ? Math.max(0, Math.trunc(Number(startIndex))) : 0;
 		const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
+		const params = new URLSearchParams();
+		params.set('filters', 'IsFavorite');
+		params.set('includeItemTypes', types);
+		params.set('limit', String(safeLimit));
+		params.set('startIndex', String(safeStartIndex));
+		params.set('recursive', 'true');
+		params.set('sortBy', 'SortName');
+		params.set('sortOrder', 'Ascending');
+		params.set('fields', 'Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,SeriesId,ParentBackdropItemId,ParentBackdropImageTags,SeasonId,ParentId,ParentIndexNumber,IndexNumber,UserData');
+		params.set('imageTypeLimit', '1');
+		if (typeof options?.searchTerm === 'string' && options.searchTerm.trim()) {
+			params.set('searchTerm', options.searchTerm.trim());
+		}
 		return await service._fetchItems(
-			`/Users/${service.userId}/Items?filters=IsFavorite&includeItemTypes=${types}&limit=${safeLimit}&startIndex=${safeStartIndex}&recursive=true&sortBy=SortName&sortOrder=Ascending&fields=Overview,PrimaryImageAspectRatio,BackdropImageTags,ImageTags,PrimaryImageTag,SeriesPrimaryImageTag,SeriesName,ParentIndexNumber,IndexNumber,UserData&imageTypeLimit=1`,
+			`/Users/${service.userId}/Items?${params.toString()}`,
 			{},
 			'getFavorites'
 		);

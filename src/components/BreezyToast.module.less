@@ -33,3 +33,42 @@
 	opacity: 1;
 	transform: translate(-50%, 0);
 }
+
+.toastWarning {
+	background: var(--bf-theme-warning-bg);
+	border-color: var(--bf-theme-warning-border);
+	color: var(--bf-theme-warning-color);
+}
+
+.toastError {
+	background: var(--bf-theme-error-bg);
+	border-color: var(--bf-theme-error-border);
+	color: var(--bf-theme-error-color);
+}
+
+.toastStack {
+	position: fixed;
+	top: 1.25rem;
+	left: 50%;
+	width: calc(100vw - 2.5rem);
+	max-width: 52rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	transform: translateX(-50%);
+	pointer-events: none;
+	z-index: 180;
+}
+
+.toastStackItem {
+	position: relative;
+	top: auto;
+	left: auto;
+	width: 100%;
+	max-width: none;
+	transform: translateY(-0.65rem);
+}
+
+.toastStackItem.toastVisible {
+	transform: translateY(0);
+}

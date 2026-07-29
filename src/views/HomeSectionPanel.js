@@ -1,59 +1,39 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Panel, Header} from '../components/BreezyPanels';
-import Spinner from '@enact/sandstone/Spinner';
 import BodyText from '@enact/sandstone/BodyText';
 import Toolbar from '../components/Toolbar';
 import MediaFilterControls from '../components/MediaFilterControls';
-import PanelPosterMediaCard from '../components/PanelPosterMediaCard';
+import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
+import PanelLandscapeVirtualGrid from '../components/PanelLandscapeVirtualGrid';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
-import Spotlight from '@enact/spotlight';
+import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
+import ProviderItemPopup from '../components/ProviderItemPopup';
 import jellyfinService from '../services/jellyfinService';
 import {useMapById} from '../hooks/useMapById';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
-import {usePanelScrollState} from '../hooks/usePanelScrollState';
 import {useMediaFilterState} from '../hooks/useMediaFilterState';
-import {useLibraryScrollPersistence} from './library-panel/hooks/useLibraryScrollPersistence';
-import {HOME_SECTION_IDS, getHomeSectionDescriptor} from '../constants/homeSections';
+import {getHomeSectionDescriptor, isMyRequestsHomeSection} from '../constants/homeSections';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
-import {focusTargetFromRightMostGridItem, shouldLoadMoreFromGridFocus} from '../utils/gridFocus';
-import {getPanelPosterCardClassProps} from '../utils/posterCardClassProps';
 import {getJellyfinUsername} from '../utils/jellyfinUser';
 import {
 	MEDIA_FILTER_OPTIONS,
 	mediaItemMatchesFilters
 } from '../utils/mediaFilters';
-import {buildMediaListItemKey} from '../utils/reactKeys';
+import {buildGridQuerySignature} from '../utils/gridScrollRestore';
+import {focusSpotlightTarget} from '../utils/gridFocus';
+import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
+import {
+	collectFilteredHomeSectionPage,
+	normalizeHomeSectionPage
+} from './home-section-panel/utils/homeSectionPaging';
+import {fetchHomeSectionPage} from './home-section-panel/utils/homeSectionSource';
 
 import css from './LibraryPanel.module.less';
+import browseCss from '../components/MediaBrowseControls.module.less';
 
 const PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
-const FOCUS_PREFETCH_THRESHOLD = 12;
-const FILTERED_PAGE_SCAN_MULTIPLIER = 4;
 const FILTERED_PAGE_SCAN_LIMIT = 6;
-
-const fetchHomeSectionPage = async (sectionId, {
-	limit = PAGE_SIZE,
-	startIndex = 0
-} = {}) => {
-	switch (sectionId) {
-		case HOME_SECTION_IDS.RECENTLY_ADDED:
-			return jellyfinService.getRecentlyAdded(limit, startIndex);
-		case HOME_SECTION_IDS.CONTINUE_WATCHING:
-			return jellyfinService.getResumeItems(limit, startIndex);
-		case HOME_SECTION_IDS.NEXT_UP:
-			return jellyfinService.getNextUp(limit, startIndex);
-		case HOME_SECTION_IDS.LATEST_MOVIES:
-			return jellyfinService.getLatestMedia(['Movie'], limit, startIndex);
-		case HOME_SECTION_IDS.LATEST_SHOWS:
-			return jellyfinService.getLatestMedia(['Series'], limit, startIndex);
-		case HOME_SECTION_IDS.MY_REQUESTS: {
-			const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-			return jellyfinService.getMyRequests(null, ['Movie', 'Series'], limit, startIndex, userName);
-		}
-		default:
-			return [];
-	}
-};
+const HOME_SECTION_IMAGE_OPTIONS = Object.freeze({includeBackdrop: true, includeSeriesFallback: true});
 
 const HomeSectionPanel = ({
 	section,
@@ -69,27 +49,26 @@ const HomeSectionPanel = ({
 	inputMode = '5way',
 	...rest
 }) => {
-	const activeSection = getHomeSectionDescriptor(section?.id || section);
+	const activeSection = section?.source === 'plugin'
+		? section
+		: getHomeSectionDescriptor(section?.id || section);
 	const activeSectionId = activeSection?.id || null;
-	const isPointerInputMode = inputMode === 'pointer';
-	const scrollerRef = useRef(null);
-	const panelRootRef = useRef(null);
 	const requestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
-	const commitCurrentScrollNowRef = useRef(null);
-	const setScrollTopRef = useRef(null);
-	const [loading, setLoading] = useState(true);
-	const [loadingMore, setLoadingMore] = useState(false);
-	const [hasMore, setHasMore] = useState(false);
-	const [items, setItems] = useState([]);
-	const [error, setError] = useState('');
-	const nextStartIndexRef = useRef(0);
+	const focusResultsAfterFilterRef = useRef(false);
+	const lastFocusedCardIdRef = useRef(cachedState?.focusedItemId || null);
+	const nextStartIndexRef = useRef(
+		Number.isFinite(Number(cachedState?.nextStartIndex))
+			? Math.max(0, Math.trunc(Number(cachedState.nextStartIndex)))
+			: 0
+	);
 	const handleFilterApply = useCallback(() => {
-		commitCurrentScrollNowRef.current?.();
-		setScrollTopRef.current?.(0);
 		nextStartIndexRef.current = 0;
+		lastFocusedCardIdRef.current = null;
+		focusResultsAfterFilterRef.current = true;
 	}, []);
 	const {
+		activeFilterIds,
 		draftFilterIds,
 		filterPopupOpen,
 		filterPopupContentRef,
@@ -100,7 +79,8 @@ const HomeSectionPanel = ({
 		closeFilterPopup,
 		resetDraftFilters,
 		selectDraftFilter,
-		applyDraftFilters
+		applyDraftFilters,
+		handleFilterPopupHide
 	} = useMediaFilterState({
 		cachedState,
 		resetKey: activeSectionId,
@@ -108,16 +88,27 @@ const HomeSectionPanel = ({
 		triggerSpotlightId: 'home-section-filter-trigger',
 		onApplyFilters: handleFilterApply
 	});
+	const querySignature = buildGridQuerySignature(activeSectionId, activeFilterIds);
+	const cachedQueryMatches = cachedState?.querySignature === querySignature;
+	const cachedItems = cachedQueryMatches && Array.isArray(cachedState?.items) ? cachedState.items : [];
+	const skipInitialCachedLoadRef = useRef(cachedQueryMatches && cachedState?.loaded === true);
+	const [loading, setLoading] = useState(() => !skipInitialCachedLoadRef.current);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasMore, setHasMore] = useState(() => cachedQueryMatches && cachedState?.hasMore === true);
+	const [items, setItems] = useState(() => cachedItems);
+	const [error, setError] = useState('');
 	const {
-		scrollTop,
-		setScrollTop
-	} = usePanelScrollState({
-		cachedState,
-		isActive,
-		onCacheState: cacheStateWithFilters,
-		cacheKey: activeSectionId,
-		requireCacheKey: true
-	});
+		activateItem: activateDiscoveryItem,
+		externalItem,
+		externalItemOpen,
+		closeExternalItem,
+		clearExternalItem
+	} = usePluginMediaItemPopup({onItemSelect, isActive});
+	if (!cachedQueryMatches && skipInitialCachedLoadRef.current) {
+		skipInitialCachedLoadRef.current = false;
+		nextStartIndexRef.current = cachedItems.length;
+		lastFocusedCardIdRef.current = null;
+	}
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -126,12 +117,17 @@ const HomeSectionPanel = ({
 		registerBackHandler,
 		isActive,
 		onPanelBack: () => {
-			if (!filterPopupOpen) return false;
-			closeFilterPopup();
-			return true;
+			if (externalItemOpen) {
+				closeExternalItem();
+				return true;
+			}
+			if (filterPopupOpen) {
+				closeFilterPopup();
+				return true;
+			}
+			return false;
 		}
 	});
-	const panelCardClasses = getPanelPosterCardClassProps(css);
 	const itemsById = useMapById(items);
 	const hasActiveFilters = activeFilterCount > 0;
 
@@ -140,89 +136,38 @@ const HomeSectionPanel = ({
 		requestId,
 		currentFilterState
 	}) => {
-		if (activeSectionId === HOME_SECTION_IDS.MY_REQUESTS) {
-			const requestUserName = await getJellyfinUsername(jellyfinService);
-			let requestCursor = startIndex;
-			let requestCollected = [];
-			let requestScans = 0;
-			let requestSourceHasMore = true;
-			while (requestCollected.length < PAGE_SIZE && requestScans < FILTERED_PAGE_SCAN_LIMIT && requestSourceHasMore) {
-				const result = await jellyfinService.getMyRequests(
-					null,
-					['Movie', 'Series'],
-					PAGE_SIZE - requestCollected.length,
-					requestCursor,
-					requestUserName
-				);
-				if (requestId !== requestIdRef.current) {
-					return {items: [], nextStartIndex: requestCursor, hasMore: false};
-				}
-				const safeItems = Array.isArray(result?.items) ? result.items : [];
-				const nextStartIndex = Number(result?.nextStartIndex);
-				const resolvedNextStartIndex = Number.isFinite(nextStartIndex)
-					? Math.max(0, Math.trunc(nextStartIndex))
-					: requestCursor + safeItems.length;
-				if (resolvedNextStartIndex <= requestCursor && safeItems.length === 0) {
-					requestSourceHasMore = false;
-					break;
-				}
-				requestCollected = [
-					...requestCollected,
-					...safeItems.filter((item) => mediaItemMatchesFilters(item, {
-						...currentFilterState,
-						useMyRequestsSource: false,
-						username: requestUserName
-					}))
-				];
-				requestCursor = resolvedNextStartIndex;
-				requestSourceHasMore = result?.hasMore === true;
-				requestScans += 1;
-			}
-			return {
-				items: requestCollected.slice(0, PAGE_SIZE),
-				nextStartIndex: requestCursor,
-				hasMore: requestSourceHasMore
-			};
-		}
+		const requestMembershipSatisfied = isMyRequestsHomeSection(activeSection);
+		const requestUserName = requestMembershipSatisfied || currentFilterState.useMyRequestsSource
+			? await getJellyfinUsername(jellyfinService)
+			: '';
 
-		let cursor = startIndex;
-		let collected = [];
-		let scans = 0;
-		let sourceHasMore = true;
-		const rawLimit = PAGE_SIZE * FILTERED_PAGE_SCAN_MULTIPLIER;
-		const userName = currentFilterState.useMyRequestsSource ? await getJellyfinUsername(jellyfinService) : '';
-
-		while (collected.length < PAGE_SIZE && scans < FILTERED_PAGE_SCAN_LIMIT && sourceHasMore) {
-			const rawPage = await fetchHomeSectionPage(activeSectionId, {
-				limit: rawLimit,
-				startIndex: cursor
-			});
-			if (requestId !== requestIdRef.current) {
-				return {items: [], nextStartIndex: cursor, hasMore: false};
-			}
-			const safeItems = Array.isArray(rawPage) ? rawPage : [];
-			if (safeItems.length === 0) {
-				sourceHasMore = false;
-				break;
-			}
-			cursor += safeItems.length;
-			collected = [
-				...collected,
-				...safeItems.filter((item) => mediaItemMatchesFilters(item, {
-					...currentFilterState,
-					username: userName
-				}))
-			];
-			sourceHasMore = safeItems.length >= rawLimit;
-			scans += 1;
-		}
-
-		return {
-			items: collected.slice(0, PAGE_SIZE),
-			nextStartIndex: cursor,
-			hasMore: sourceHasMore
-		};
-	}, [activeSectionId]);
+		return collectFilteredHomeSectionPage({
+			startIndex,
+			pageSize: PAGE_SIZE,
+			scanLimit: FILTERED_PAGE_SCAN_LIMIT,
+			isStale: () => requestId !== requestIdRef.current,
+			fetchPage: ({startIndex: pageStartIndex, limit}) => (
+				requestMembershipSatisfied
+					? jellyfinService.getMyRequests(
+						null,
+						['Movie', 'Series'],
+						limit,
+						pageStartIndex,
+						requestUserName
+					)
+						: fetchHomeSectionPage(jellyfinService, activeSection, {
+						limit,
+						startIndex: pageStartIndex
+					})
+			),
+			matchesItem: (item) => mediaItemMatchesFilters(item, {
+				...currentFilterState,
+				username: requestUserName
+			}, {
+				requestMembershipSatisfied
+			})
+		});
+	}, [activeSection]);
 
 	const loadPage = useCallback(async ({
 		startIndex = 0,
@@ -244,21 +189,18 @@ const HomeSectionPanel = ({
 					requestId,
 					currentFilterState: filterState
 				})
-				: await fetchHomeSectionPage(activeSectionId, {
+				: await fetchHomeSectionPage(jellyfinService, activeSection, {
 					limit: PAGE_SIZE,
 					startIndex
 				});
 			if (requestId !== requestIdRef.current) return;
-			const safeItems = Array.isArray(pageResult)
-				? pageResult
-				: Array.isArray(pageResult?.items)
-					? pageResult.items
-					: [];
-			const nextStartIndex = Number(pageResult?.nextStartIndex);
-			nextStartIndexRef.current = Number.isFinite(nextStartIndex)
-				? Math.max(0, Math.trunc(nextStartIndex))
-				: startIndex + safeItems.length;
-			setHasMore(typeof pageResult?.hasMore === 'boolean' ? pageResult.hasMore : safeItems.length >= PAGE_SIZE);
+			const normalizedPage = normalizeHomeSectionPage(pageResult, {
+				startIndex,
+				requestedLimit: PAGE_SIZE
+			});
+			const safeItems = normalizedPage.items;
+			nextStartIndexRef.current = normalizedPage.nextStartIndex;
+			setHasMore(normalizedPage.hasMore);
 			setItems((previousItems) => {
 				if (!append) return safeItems;
 				const existingIds = new Set(previousItems.map((item) => String(item.Id)));
@@ -278,7 +220,7 @@ const HomeSectionPanel = ({
 				loadingMoreRef.current = false;
 			}
 		}
-	}, [activeSectionId, fetchFilteredHomeSectionPage, filterState, hasActiveFilters]);
+	}, [activeSection, activeSectionId, fetchFilteredHomeSectionPage, filterState, hasActiveFilters]);
 
 	const loadNextPage = useCallback(async () => {
 		if (!activeSectionId || loading || !hasMore || loadingMoreRef.current) return;
@@ -290,111 +232,80 @@ const HomeSectionPanel = ({
 		});
 	}, [activeSectionId, hasMore, loadPage, loading]);
 
-	const {handleScrollerScroll, commitCurrentScrollNow} = useLibraryScrollPersistence({
-		scrollerRef,
-		isActive,
-		activeLibraryId: activeSectionId,
-		loading,
-		hasMore,
-		loadNextPage,
-		scrollTop,
-		setScrollTop
-	});
-	commitCurrentScrollNowRef.current = commitCurrentScrollNow;
-	setScrollTopRef.current = setScrollTop;
+	const findingFilteredResults = (
+		isActive &&
+		hasActiveFilters &&
+		!loading &&
+		!error &&
+		items.length === 0 &&
+		hasMore
+	);
+	useEffect(() => {
+		if (!findingFilteredResults) return;
+		loadNextPage();
+	}, [findingFilteredResults, loadNextPage]);
 
 	useEffect(() => {
+		if (skipInitialCachedLoadRef.current) {
+			skipInitialCachedLoadRef.current = false;
+			return undefined;
+		}
 		loadPage({startIndex: 0, append: false});
 		return () => {
 			requestIdRef.current += 1;
 		};
-	}, [loadPage]);
+	}, [loadPage, querySignature]);
+
+	useEffect(() => {
+		if (!activeSectionId) return;
+		cacheStateWithFilters(activeSectionId, {
+			items,
+			hasMore,
+			nextStartIndex: nextStartIndexRef.current,
+			loaded: !loading,
+			querySignature,
+			focusedItemId: lastFocusedCardIdRef.current
+		});
+	}, [activeSectionId, cacheStateWithFilters, hasMore, items, loading, querySignature]);
 
 	const handleGridCardClick = useCallback((event) => {
-		commitCurrentScrollNow();
 		const itemId = event.currentTarget.dataset.itemId;
+		lastFocusedCardIdRef.current = itemId || null;
+		cacheStateWithFilters(activeSectionId, {focusedItemId: lastFocusedCardIdRef.current});
 		const selectedItem = itemsById.get(itemId);
 		if (!selectedItem) return;
-		onItemSelect(selectedItem);
-	}, [commitCurrentScrollNow, itemsById, onItemSelect]);
+		if (selectedItem.IsDiscoveryItem) activateDiscoveryItem(selectedItem);
+		else onItemSelect(selectedItem);
+	}, [activateDiscoveryItem, activeSectionId, cacheStateWithFilters, itemsById, onItemSelect]);
 
-	const handleGridCardFocus = useCallback((event) => {
-		if (shouldLoadMoreFromGridFocus({
-			event,
-			isPointerInputMode,
-			hasMore,
-			isLoadingMore: loadingMoreRef.current,
-			itemCount: items.length,
-			threshold: FOCUS_PREFETCH_THRESHOLD
-		})) {
-			loadNextPage();
-		}
-	}, [hasMore, isPointerInputMode, items.length, loadNextPage]);
-
-	const handleGridCardPointerDown = useCallback((event) => {
-		if (!isPointerInputMode) return;
-		event.stopPropagation();
-	}, [isPointerInputMode]);
-
-	const focusFilterTrigger = useCallback(() => {
-		Spotlight.focus('home-section-filter-trigger');
-	}, []);
-
-	const handlePanelKeyDownCapture = useCallback((event) => {
-		const code = event.keyCode || event.which;
-		const activeElement = document.activeElement;
-		const spotlightId = activeElement?.dataset?.spotlightId || '';
-		if (code === 40 && (spotlightId === 'toolbar-home' || spotlightId === 'toolbar-user')) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusFilterTrigger();
-		}
-	}, [focusFilterTrigger]);
-
-	const handleGridCardKeyDown = useCallback((event) => {
-		focusTargetFromRightMostGridItem({
-			event,
-			panelRoot: panelRootRef.current,
-			gridCardClassName: css.gridCard,
-			focusTarget: focusFilterTrigger
-		});
-	}, [focusFilterTrigger]);
+	const gridItemRendererProps = useMemo(() => ({
+		onItemClick: handleGridCardClick,
+		cardClassName: css.gridCard,
+		imageOptions: HOME_SECTION_IMAGE_OPTIONS
+	}), [handleGridCardClick]);
+	const handleToolbarNavigateDown = useCallback(() => focusSpotlightTarget('home-section-filter-trigger'), []);
 
 	const topToolbar = (
 		<Toolbar
 			activeSection="home"
 			isActive={isActive}
+			onNavigateDown={handleToolbarNavigateDown}
 			{...toolbarActions}
 		/>
 	);
 	const title = activeSection?.title || 'Home Section';
-	const showEmpty = !loading && !error && items.length === 0;
-
-	if (loading) {
-		return (
-			<Panel {...rest}>
-				<Header title={title} />
-				{topToolbar}
-				<div className={css.loading}>
-					<BreezyLoadingOverlay />
-				</div>
-			</Panel>
-		);
-	}
+	const showEmpty = !loading && !error && items.length === 0 && !hasMore;
 
 	return (
 		<Panel {...rest}>
 			<Header title={title} />
 			{topToolbar}
-			<div className={css.libraryContainer} ref={panelRootRef} onKeyDownCapture={handlePanelKeyDownCapture}>
-				<div
-					ref={scrollerRef}
-					className={`${css.nativeScroller} ${css.homeSectionScroller}`}
-					onScroll={handleScrollerScroll}
-				>
-					<div className={css.contentFrame}>
-						<div className={css.filterOverlay}>
-							<div className={css.filterOverlayControls}>
+			<div
+				className={`${css.libraryContainer} ${browseCss.panelLayout}`}
+				data-input-mode={inputMode}
+			>
+				<MediaPanelBackdrop item={items[0] || null} />
+				<MediaBrowseOverlay compact>
 								<MediaFilterControls
 									title={title}
 									triggerSpotlightId="home-section-filter-trigger"
@@ -405,12 +316,19 @@ const HomeSectionPanel = ({
 									filterOptions={MEDIA_FILTER_OPTIONS}
 									onTrigger={openFilterPopup}
 									onClose={closeFilterPopup}
+									onHide={handleFilterPopupHide}
 									onReset={resetDraftFilters}
 									onApply={applyDraftFilters}
 									onDraftSelect={selectDraftFilter}
 								/>
+				</MediaBrowseOverlay>
+				<div className={`${css.virtualGridViewport} ${browseCss.panelResultsOffset}`}>
+					{loading ? <div className={css.loading}><BreezyLoadingOverlay /></div> : null}
+						{findingFilteredResults ? (
+							<div className={css.loading}>
+								<BreezyLoadingOverlay label="Finding matching items..." />
 							</div>
-						</div>
+						) : null}
 						{error ? (
 							<div className={css.emptyState}>
 								<BodyText>{error}</BodyText>
@@ -421,31 +339,30 @@ const HomeSectionPanel = ({
 								<BodyText>No items found.</BodyText>
 							</div>
 						) : null}
-						<div className={css.gridContainer}>
-							{items.map((item, index) => (
-								<PanelPosterMediaCard
-									key={buildMediaListItemKey(`home-section-${activeSectionId || 'unknown'}`, item, index)}
-									item={item}
-									index={index}
-									classes={panelCardClasses}
-									imageOptions={{includeBackdrop: true, includeSeriesFallback: true}}
-									onClick={handleGridCardClick}
-									onPointerDown={handleGridCardPointerDown}
-									onMouseDown={handleGridCardPointerDown}
-									onFocus={handleGridCardFocus}
-									onKeyDown={handleGridCardKeyDown}
-									spotlightDisabled={inputMode === 'pointer'}
-								/>
-							))}
-							{loadingMore && (
-								<div className={css.loadingMore}>
-									<Spinner size="small" />
-								</div>
-							)}
-						</div>
-					</div>
+						<PanelLandscapeVirtualGrid
+							id="home-section-grid"
+							className={css.virtualGrid}
+							items={loading || error ? [] : items}
+							itemRendererProps={gridItemRendererProps}
+							isActive={isActive && !loading && !error}
+							queryKey={querySignature}
+							hasMore={!loading && !error && hasMore}
+							loadingMore={loadingMore}
+							onLoadMore={loadNextPage}
+							focusedItemIdRef={lastFocusedCardIdRef}
+							focusFirstItemRef={focusResultsAfterFilterRef}
+							data-spotlight-container-disabled={loading || Boolean(error) || items.length === 0}
+						/>
 				</div>
 			</div>
+			<ProviderItemPopup
+				open={externalItemOpen}
+				title={externalItem?.Name || 'Discovery'}
+				detail={externalItem?.Overview || 'No overview is available.'}
+				item={externalItem}
+				onClose={closeExternalItem}
+				onHide={clearExternalItem}
+			/>
 		</Panel>
 	);
 };

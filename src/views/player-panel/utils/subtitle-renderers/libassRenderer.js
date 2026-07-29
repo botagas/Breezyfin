@@ -11,6 +11,7 @@ import {
 	readVideoTime,
 	setManualSubtitleCanvasRect
 } from './manualCanvasLayout';
+import {attachSuspendableRendererInterval} from './rendererRuntimeSuspension';
 
 export const LIBASS_RENDERER_DEBUG = Object.freeze({
 	mode: 'video-attached',
@@ -63,10 +64,10 @@ const startManualCanvasSync = ({
 }) => {
 	if (!renderer || !videoElement || !canvas || !containerElement) return () => {};
 	let disposed = false;
-	let intervalId = null;
 	let lastSyncedTime = null;
+	let runtimeSuspended = false;
 	const syncTime = (force = false) => {
-		if (disposed) return;
+		if (disposed || runtimeSuspended) return;
 		const currentTime = readVideoTime(videoElement);
 		if (
 			!force &&
@@ -87,7 +88,7 @@ const startManualCanvasSync = ({
 		}
 	};
 	const syncPlaybackState = () => {
-		if (disposed || typeof renderer.setIsPaused !== 'function') return;
+		if (disposed || runtimeSuspended || typeof renderer.setIsPaused !== 'function') return;
 		try {
 			renderer.setIsPaused(videoElement.paused === true, readVideoTime(videoElement));
 		} catch (error) {
@@ -95,7 +96,7 @@ const startManualCanvasSync = ({
 		}
 	};
 	const syncRate = () => {
-		if (disposed || typeof renderer.setRate !== 'function') return;
+		if (disposed || runtimeSuspended || typeof renderer.setRate !== 'function') return;
 		try {
 			renderer.setRate(videoElement.playbackRate || 1);
 		} catch (error) {
@@ -140,23 +141,41 @@ const startManualCanvasSync = ({
 	syncRate();
 	syncPlaybackState();
 	syncTime(true);
-	intervalId = setInterval(syncTime, MANUAL_SYNC_INTERVAL_MS);
-	return () => cleanupManualSubtitleRenderer({
+	const detachRuntimeSuspension = attachSuspendableRendererInterval({
 		renderer,
-		videoElement,
-		eventHandlers,
-		intervalId,
-		markDisposed: () => {
-			disposed = true;
-		}
+		intervalMs: MANUAL_SYNC_INTERVAL_MS,
+		onInterval: syncTime,
+		onSuspensionChange: (suspended) => {
+			runtimeSuspended = suspended;
+		},
+		onResume: () => {
+			syncSize();
+			syncRate();
+			syncPlaybackState();
+			syncTime(true);
+		},
+		shouldRun: () => !disposed
 	});
+	return () => {
+		detachRuntimeSuspension();
+		cleanupManualSubtitleRenderer({
+			renderer,
+			videoElement,
+			eventHandlers,
+			intervalId: null,
+			markDisposed: () => {
+				disposed = true;
+			}
+		});
+	};
 };
 
 export const initLibassRenderer = async ({
 	videoElement,
 	containerElement,
 	subtitleContent,
-	onError
+	onError,
+	diagnosticsEnabled = false
 }) => {
 	const renderer = await initAssRenderer(videoElement, {content: subtitleContent}, onError);
 	const {
@@ -171,11 +190,11 @@ export const initLibassRenderer = async ({
 				canvasElement: canvas,
 				canvasMode: canvasMoved ? 'auto-moved' : 'auto-sibling'
 			}),
-			...collectExternalRendererDiagnostics({
+			...(diagnosticsEnabled ? collectExternalRendererDiagnostics({
 				containerElement,
 				videoElement,
 				renderer
-			}),
+			}) : {}),
 			libassStatus: renderer ? 'ready' : 'init-failed'
 		}
 	};
@@ -185,7 +204,8 @@ export const initLibassManualRenderer = async ({
 	videoElement,
 	containerElement,
 	subtitleContent,
-	onError
+	onError,
+	diagnosticsEnabled = false
 }) => {
 	if (!containerElement) {
 		return {
@@ -234,11 +254,11 @@ export const initLibassManualRenderer = async ({
 			}),
 			mode: 'manual-canvas',
 			manualSyncIntervalMs: MANUAL_SYNC_INTERVAL_MS,
-			...collectExternalRendererDiagnostics({
+			...(diagnosticsEnabled ? collectExternalRendererDiagnostics({
 				containerElement,
 				videoElement,
 				renderer
-			}),
+			}) : {}),
 			libassStatus: 'ready'
 		}
 	};

@@ -1,4 +1,4 @@
-import {getMediaSourceDynamicRangeInfo} from '../playbackSelection';
+import {getMediaSourceDynamicRangeInfo} from '../../../utils/playbackSelection';
 
 const normalizeContainerParts = (container) => (
 	String(container || '')
@@ -134,6 +134,8 @@ const AUDIO_ONLY_TRANSCODE_REASONS = new Set([
 	'UnknownAudioStreamInfo'
 ]);
 
+export const isAudioOnlyTranscodeReason = (reason) => AUDIO_ONLY_TRANSCODE_REASONS.has(reason);
+
 const parseTranscodingUrlSearchParams = (transcodingUrl) => {
 	if (!transcodingUrl) return null;
 	try {
@@ -158,7 +160,7 @@ export const isForceDolbyVisionAudioOnlyTranscode = (mediaSource) => {
 	if (!mediaSource?.TranscodingUrl) return false;
 	const reasons = parseTranscodeReasonsFromMediaSource(mediaSource);
 	if (reasons.length === 0) return false;
-	if (reasons.some((reason) => !AUDIO_ONLY_TRANSCODE_REASONS.has(reason))) {
+	if (reasons.some((reason) => !isAudioOnlyTranscodeReason(reason))) {
 		return false;
 	}
 	const searchParams = parseTranscodingUrlSearchParams(mediaSource.TranscodingUrl);

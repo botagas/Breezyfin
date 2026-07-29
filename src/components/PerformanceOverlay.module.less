@@ -8,12 +8,16 @@
 	);
 	display: inline-flex;
 	align-items: center;
+	flex-wrap: wrap;
+	max-width: calc(100vw - (2 * var(--bf-theme-debug-overlay-inset)));
 	gap: var(--bf-theme-debug-overlay-gap);
 	.debug-overlay-shell(
 		var(--bf-theme-debug-pill-radius);
 		var(--bf-theme-debug-compact-padding-block);
 		var(--bf-theme-debug-compact-padding-inline)
 	);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
 	pointer-events: none;
 }
 

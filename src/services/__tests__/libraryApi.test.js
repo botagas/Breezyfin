@@ -8,7 +8,8 @@ import {
 	getPublicSystemInfo,
 	getRecentlyAddedItems,
 	getResumeMediaItems,
-	searchLibraryItems
+	searchLibraryItems,
+	searchLibraryItemsPage
 } from '../jellyfin/libraryApi';
 
 const createService = () => ({
@@ -69,18 +70,50 @@ describe('libraryApi', () => {
 		});
 	});
 
-	it('normalizes search inputs for encoded term and non-negative start index', async () => {
+	it('keeps library search scoped to its parent and active server filters', async () => {
 		const service = createService();
 		service._fetchItems.mockResolvedValue([]);
+
+		await getLibraryChildItems(service, 'parent-1', ['Movie'], 30, 0, {
+			filters: 'IsUnplayed',
+			searchTerm: 'Blade Runner'
+		});
+
+		const requestedParams = new URL(service._fetchItems.mock.calls[0][0]).searchParams;
+		expect(requestedParams.get('parentId')).toBe('parent-1');
+		expect(requestedParams.get('filters')).toBe('IsUnplayed');
+		expect(requestedParams.get('searchTerm')).toBe('Blade Runner');
+	});
+
+	it('normalizes search inputs for encoded term and non-negative start index', async () => {
+		const service = createService();
+		service._request.mockResolvedValue({Items: [], TotalRecordCount: 0});
 
 		await expect(
 			searchLibraryItems(service, 'The Expanse', ['Series'], 25, -99)
 		).resolves.toEqual([]);
 
-		const requestedUrl = service._fetchItems.mock.calls[0][0];
+		const requestedUrl = service._request.mock.calls[0][0];
 		expect(requestedUrl).toContain('searchTerm=The%20Expanse');
 		expect(requestedUrl).toContain('startIndex=0');
 		expect(requestedUrl).toContain('includeItemTypes=Series');
+		expect(requestedUrl).toContain('enableTotalRecordCount=true');
+		expect(requestedUrl).toContain('SeriesId');
+		expect(requestedUrl).toContain('SeasonId');
+	});
+
+	it('returns exact search pagination metadata for sentinel termination', async () => {
+		const service = createService();
+		service._request.mockResolvedValue({
+			Items: [{Id: 'result-31'}],
+			TotalRecordCount: 31
+		});
+
+		await expect(searchLibraryItemsPage(service, 'Test', null, 30, 30)).resolves.toEqual({
+			items: [{Id: 'result-31'}],
+			startIndex: 30,
+			totalRecordCount: 31
+		});
 	});
 
 	it('builds favorites request with paging and type filters', async () => {
@@ -99,6 +132,20 @@ describe('libraryApi', () => {
 		expect(requestedParams.get('limit')).toBe('30');
 		expect(requestedParams.get('startIndex')).toBe('60');
 		expect(service._fetchItems).toHaveBeenCalledWith(requestedUrl, {}, 'getFavorites');
+	});
+
+	it('keeps favorites search scoped to favorite and type filters', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await getFavoriteMediaItems(service, ['Series'], 30, 0, {
+			searchTerm: 'The Expanse'
+		});
+
+		const requestedParams = new URL(service._fetchItems.mock.calls[0][0], service.serverUrl).searchParams;
+		expect(requestedParams.get('filters')).toBe('IsFavorite');
+		expect(requestedParams.get('includeItemTypes')).toBe('Series');
+		expect(requestedParams.get('searchTerm')).toBe('The Expanse');
 	});
 
 	it('builds paged Home section source requests with start indexes', async () => {

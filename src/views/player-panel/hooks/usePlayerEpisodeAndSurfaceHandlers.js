@@ -1,4 +1,6 @@
 import {useCallback} from 'react';
+import {useSyncPlay} from '../../../contexts/SyncPlayContext';
+import {runSyncPlayQueueAction} from '../utils/syncPlayQueueAction';
 
 export const usePlayerEpisodeAndSurfaceHandlers = ({
 	item,
@@ -25,14 +27,25 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 	setMuted,
 	setVolume,
 	setPlaying,
-	setError
+	setError,
+	setToastMessage
 }) => {
+	const syncPlay = useSyncPlay();
+	const syncPlayFollowing = Boolean(syncPlay.group && syncPlay.followMode === 'following');
+	const syncPlayNext = syncPlayFollowing ? syncPlay.next : null;
+	const syncPlayPrevious = syncPlayFollowing ? syncPlay.previous : null;
 	const handlePlayNextEpisode = useCallback(async () => {
+		if (await runSyncPlayQueueAction({
+			action: syncPlayNext,
+			logMessage: 'Failed to advance the SyncPlay queue:',
+			toastMessage: 'SyncPlay could not advance to the next item.',
+			setToastMessage
+		})) return;
 		if (!item || item.Type !== 'Episode' || !onPlay || !hasNextEpisode) return;
 		try {
 			const nextEpisode = nextEpisodeData || await getNextEpisode(item);
 			if (nextEpisode) {
-				const opts = buildPlaybackOptions();
+				const opts = buildPlaybackOptions({remapTrackIntents: true});
 				playbackOverrideRef.current = { ...opts, forceNewSession: true };
 				await handleStop();
 				onPlay(nextEpisode, opts);
@@ -48,15 +61,23 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 		item,
 		nextEpisodeData,
 		onPlay,
-		playbackOverrideRef
+		playbackOverrideRef,
+		setToastMessage,
+		syncPlayNext
 	]);
 
 	const handlePlayPreviousEpisode = useCallback(async () => {
+		if (await runSyncPlayQueueAction({
+			action: syncPlayPrevious,
+			logMessage: 'Failed to move back in the SyncPlay queue:',
+			toastMessage: 'SyncPlay could not return to the previous item.',
+			setToastMessage
+		})) return;
 		if (!item || item.Type !== 'Episode' || !onPlay || !hasPreviousEpisode) return;
 		try {
 			const previousEpisode = await getPreviousEpisode(item);
 			if (previousEpisode) {
-				const opts = buildPlaybackOptions();
+				const opts = buildPlaybackOptions({remapTrackIntents: true});
 				playbackOverrideRef.current = { ...opts, forceNewSession: true };
 				await handleStop();
 				onPlay(previousEpisode, opts);
@@ -71,7 +92,9 @@ export const usePlayerEpisodeAndSurfaceHandlers = ({
 		hasPreviousEpisode,
 		item,
 		onPlay,
-		playbackOverrideRef
+		playbackOverrideRef,
+		setToastMessage,
+		syncPlayPrevious
 	]);
 
 	const handleVideoSurfaceClick = useCallback(() => {

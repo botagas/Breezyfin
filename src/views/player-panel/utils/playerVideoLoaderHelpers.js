@@ -1,6 +1,8 @@
 import {normalizeDynamicRangeCap} from '../../../utils/playbackDynamicRange';
 import {toInteger} from '../../../utils/numberParsing';
 import {normalizeAssSubtitleRenderer} from '../../../utils/assSubtitleRenderers';
+import {normalizeBitmapSubtitleRenderer} from '../../../utils/bitmapSubtitleRenderers';
+import {resolveAudioTrackIndex, resolveSubtitleTrackIndex} from '../../../utils/trackMatching';
 
 const DEBUG_SOURCE_SUMMARY_LIMIT = 8;
 
@@ -31,20 +33,24 @@ export const buildMediaSourceDebugData = ({
 	dynamicRangeLabel,
 	requestedDynamicRangeCap,
 	playbackRequestDebug,
-	videoStream
+	videoStream,
+	diagnosticsEnabled = false
 } = {}) => ({
 	__selectedPlayMethod: resolvedPlayMethod,
 	__dynamicRangeInfo: dynamicRangeInfo,
 	__dynamicRangeLabel: dynamicRangeLabel,
 	__requestedDynamicRangeCap: playbackMeta.dynamicRangeCap || requestedDynamicRangeCap,
-	__debugVideoRangeType: videoStream?.VideoRangeType || '',
-	__debugVideoRange: videoStream?.VideoRange || '',
-	__debugVideoCodec: videoStream?.Codec || '',
-	__debugRequest: playbackRequestDebug,
-	__debugDecision: playbackMeta.decision || null,
+	__debugVideoRangeType: diagnosticsEnabled ? (videoStream?.VideoRangeType || '') : '',
+	__debugVideoRange: diagnosticsEnabled ? (videoStream?.VideoRange || '') : '',
+	__debugVideoCodec: diagnosticsEnabled ? (videoStream?.Codec || '') : '',
+	__debugRequest: diagnosticsEnabled ? playbackRequestDebug : null,
+	__debugDecision: diagnosticsEnabled ? (playbackMeta.decision || null) : null,
+	__safeSubtitleBurnInProfile: playbackMeta.safeSubtitleBurnInProfile === true,
+	__safeSdrFallbackProfile: playbackMeta.safeSdrFallbackProfile === true,
+	__requiredDecision: playbackMeta.requiredDecision || playbackMeta.subtitlePolicy?.requiredDecision || null,
 	__debugSubtitlePolicy: playbackMeta.subtitlePolicy || null,
-	__debugDiagnostics: Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
-	__debugAvailableSources: buildSourceDebugSummary(playbackInfo?.MediaSources),
+	__debugDiagnostics: diagnosticsEnabled && Array.isArray(playbackMeta.diagnostics) ? playbackMeta.diagnostics : [],
+	__debugAvailableSources: diagnosticsEnabled ? buildSourceDebugSummary(playbackInfo?.MediaSources) : [],
 	__debugSelectedSourceId: mediaSource?.Id || ''
 });
 
@@ -75,6 +81,7 @@ export const buildPlayerPlaybackSettingsSnapshot = ({
 		strictTranscodingMode: settings.forceTranscoding === true,
 		enableTranscoding: settings.enableTranscoding !== false,
 		maxBitrate: settings.maxBitrate,
+		enableDiagnostics: settings.enableDiagnostics === true,
 		autoPlayNext: settings.autoPlayNext !== false,
 		relaxedPlaybackProfile: settings.relaxedPlaybackProfile === true,
 		forceDolbyVision,
@@ -83,8 +90,11 @@ export const buildPlayerPlaybackSettingsSnapshot = ({
 		preferredAudioLanguage: String(settings.preferredAudioLanguage || '').trim().toLowerCase(),
 		smartSubtitleTranscoding: settings.smartSubtitleTranscoding !== false,
 		assSubtitleRenderer: normalizeAssSubtitleRenderer(settings.assSubtitleRenderer),
+		bitmapSubtitleRenderer: normalizeBitmapSubtitleRenderer(settings.bitmapSubtitleRenderer),
 		enableSubtitleBurnIn: settings.enableSubtitleBurnIn !== false,
-		forceSubtitleBurnInOnHdr: settings.forceTranscodingWithSubtitles === true,
+		forceSubtitleBurnInOnHdr:
+			settings.forceTranscodingWithSubtitles === true ||
+			playbackOverride?.forceSubtitleBurnInOnHdr === true,
 		forceSubtitleBurnIn: playbackOverride?.forceSubtitleBurnIn === true,
 		subtitleBurnInTextCodecs,
 		dynamicRangeCap: forceDolbyVision
@@ -110,11 +120,28 @@ export const resolveInitialTrackSelection = ({
 	const providedAudio = Number.isInteger(playbackOptions?.audioStreamIndex)
 		? playbackOptions.audioStreamIndex
 		: null;
+	const audioIntentMatch = resolveAudioTrackIndex({
+		audioStreams,
+		intent: playbackOptions?.audioTrackIntent,
+		fallbackIndex: providedAudio ?? defaultAudio?.Index ?? null
+	});
+	const effectiveProvidedAudio = audioIntentMatch.method !== 'no-intent'
+		? audioIntentMatch.index
+		: providedAudio;
 	const providedSubtitle = Number.isInteger(playbackOptions?.subtitleStreamIndex)
 		? playbackOptions.subtitleStreamIndex
 		: null;
-	const initialAudio = pickPreferredAudio(audioStreams, providedAudio, defaultAudio);
-	const initialSubtitle = pickPreferredSubtitle(subtitleStreams, providedSubtitle, defaultSubtitle);
+	const subtitleIntentMatch = resolveSubtitleTrackIndex({
+		subtitleStreams,
+		intent: playbackOptions?.subtitleTrackIntent,
+		fallbackIndex: providedSubtitle
+	});
+	const effectiveProvidedSubtitle =
+		subtitleIntentMatch.method !== 'no-intent'
+			? subtitleIntentMatch.index
+			: providedSubtitle;
+	const initialAudio = pickPreferredAudio(audioStreams, effectiveProvidedAudio, defaultAudio);
+	const initialSubtitle = pickPreferredSubtitle(subtitleStreams, effectiveProvidedSubtitle, defaultSubtitle);
 	const overrideAudio = Number.isInteger(playbackOverride?.audioStreamIndex)
 		? playbackOverride.audioStreamIndex
 		: null;
@@ -209,4 +236,14 @@ export const selectHlsEnginePreference = ({
 		return {engine: 'hls.js', allowNativeFallback: false, reason: 'hlsjs-available'};
 	}
 	return {engine: null, allowNativeFallback: false, reason: 'hls-unavailable'};
+};
+
+export const getPlaybackStartupFailureMessage = (dynamicRangeInfo = null) => {
+	const rangeId = String(dynamicRangeInfo?.id || '').toUpperCase();
+	if (['DV', 'HDR10', 'HDR10_PLUS', 'HLG'].includes(rangeId)) {
+		const label = dynamicRangeInfo?.label || (rangeId === 'DV' ? 'Dolby Vision' : 'HDR');
+		return `${label} playback did not become ready after rebuilding the session. ` +
+			'This runtime may not support the selected stream; try Force Transcoding or test on TV hardware.';
+	}
+	return 'Playback failed after session rebuild attempt. Please retry or go back.';
 };

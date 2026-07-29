@@ -1,12 +1,15 @@
 import {
 	isExternalAssRendererId,
+	isExternalBitmapRendererId,
 	SUBTITLE_RENDERER_IDS
 } from './rendererIds';
 import {
 	supportsAssJsRuntime,
 	supportsJassubManualRuntime,
 	supportsJassubRuntime,
-	supportsLibassRuntime
+	supportsLibassRuntime,
+	supportsLibbitsubRuntime,
+	supportsLibpgsRuntime
 } from './rendererSupport';
 
 const SUPPORT_CHECKS = {
@@ -14,7 +17,9 @@ const SUPPORT_CHECKS = {
 	[SUBTITLE_RENDERER_IDS.ASS_LIBASS_MANUAL]: supportsLibassRuntime,
 	[SUBTITLE_RENDERER_IDS.ASS_JASSUB]: supportsJassubRuntime,
 	[SUBTITLE_RENDERER_IDS.ASS_JASSUB_MANUAL]: supportsJassubManualRuntime,
-	[SUBTITLE_RENDERER_IDS.ASS_ASSJS]: supportsAssJsRuntime
+	[SUBTITLE_RENDERER_IDS.ASS_ASSJS]: supportsAssJsRuntime,
+	[SUBTITLE_RENDERER_IDS.BITMAP_LIBBITSUB]: supportsLibbitsubRuntime,
+	[SUBTITLE_RENDERER_IDS.BITMAP_LIBPGS]: supportsLibpgsRuntime
 };
 
 const loadLibassAdapter = () => new Promise((resolve) => {
@@ -47,6 +52,26 @@ const loadAssJsAdapter = () => new Promise((resolve) => {
 	}, 'ass-renderer-assjs');
 });
 
+const loadLibbitsubAdapter = () => new Promise((resolve) => {
+	if (typeof require.ensure !== 'function') {
+		resolve(require('./libbitsubRenderer'));
+		return;
+	}
+	require.ensure(['./libbitsubRenderer'], () => {
+		resolve(require('./libbitsubRenderer'));
+	}, 'subtitle-renderer-libbitsub');
+});
+
+const loadLibpgsAdapter = () => new Promise((resolve) => {
+	if (typeof require.ensure !== 'function') {
+		resolve(require('./libpgsRenderer'));
+		return;
+	}
+	require.ensure(['./libpgsRenderer'], () => {
+		resolve(require('./libpgsRenderer'));
+	}, 'subtitle-renderer-libpgs');
+});
+
 const loadRendererAdapter = async (rendererId) => {
 	switch (rendererId) {
 		case SUBTITLE_RENDERER_IDS.ASS_LIBASS:
@@ -57,6 +82,10 @@ const loadRendererAdapter = async (rendererId) => {
 			return loadJassubAdapter();
 		case SUBTITLE_RENDERER_IDS.ASS_ASSJS:
 			return loadAssJsAdapter();
+		case SUBTITLE_RENDERER_IDS.BITMAP_LIBBITSUB:
+			return loadLibbitsubAdapter();
+		case SUBTITLE_RENDERER_IDS.BITMAP_LIBPGS:
+			return loadLibpgsAdapter();
 		default:
 			return null;
 	}
@@ -94,6 +123,11 @@ export const supportsExternalAssRenderer = (rendererId) => {
 	return isExternalAssRendererId(rendererId) && typeof supports === 'function' && supports();
 };
 
+export const supportsExternalBitmapRenderer = (rendererId) => {
+	const supports = SUPPORT_CHECKS[rendererId];
+	return isExternalBitmapRendererId(rendererId) && typeof supports === 'function' && supports();
+};
+
 export const initExternalAssRenderer = async (rendererId, context) => {
 	const adapter = await loadRendererAdapter(rendererId);
 	if (!adapter) {
@@ -116,6 +150,37 @@ export const initExternalAssRenderer = async (rendererId, context) => {
 		initFunctionName = 'initJassubManualRenderer';
 	} else if (rendererId === SUBTITLE_RENDERER_IDS.ASS_ASSJS) {
 		initFunctionName = 'initAssJsRenderer';
+	}
+	const initRenderer = getAdapterFunction(adapter, initFunctionName);
+	if (initRenderer) {
+		return initRenderer(context);
+	}
+	return {
+		instance: null,
+		debug: {
+			engine: rendererId,
+			status: initFunctionName ? 'missing-adapter-function' : 'unknown-renderer',
+			adapterFunction: initFunctionName
+		}
+	};
+};
+
+export const initExternalBitmapRenderer = async (rendererId, context) => {
+	const adapter = await loadRendererAdapter(rendererId);
+	if (!adapter) {
+		return {
+			instance: null,
+			debug: {
+				engine: rendererId,
+				status: 'unknown-renderer'
+			}
+		};
+	}
+	let initFunctionName = '';
+	if (rendererId === SUBTITLE_RENDERER_IDS.BITMAP_LIBBITSUB) {
+		initFunctionName = 'initLibbitsubRenderer';
+	} else if (rendererId === SUBTITLE_RENDERER_IDS.BITMAP_LIBPGS) {
+		initFunctionName = 'initLibpgsRenderer';
 	}
 	const initRenderer = getAdapterFunction(adapter, initFunctionName);
 	if (initRenderer) {
@@ -164,4 +229,29 @@ export const disposeExternalAssRenderer = (rendererId, renderer, context = {}) =
 	}
 };
 
-export {isExternalAssRendererId, SUBTITLE_RENDERER_IDS};
+export const disposeExternalBitmapRenderer = (rendererId, renderer, context = {}) => {
+	if (!isExternalBitmapRendererId(rendererId) || !renderer) return;
+	try {
+		if (typeof renderer.__breezyfinCleanup === 'function') {
+			renderer.__breezyfinCleanup();
+			renderer.__breezyfinCleanup = null;
+		}
+		if (typeof renderer.dispose === 'function') {
+			renderer.dispose();
+		} else if (typeof renderer.destroy === 'function') {
+			renderer.destroy();
+		}
+	} catch (error) {
+		console.warn('[SubtitleRendererRegistry] Error disposing bitmap renderer:', error);
+	}
+	try {
+		if (renderer.__breezyfinCanvas && renderer.__breezyfinCanvas.parentNode) {
+			renderer.__breezyfinCanvas.parentNode.removeChild(renderer.__breezyfinCanvas);
+		}
+		clearContainer(context.containerElement);
+	} catch (error) {
+		console.warn('[SubtitleRendererRegistry] Error clearing bitmap renderer output:', error);
+	}
+};
+
+export {isExternalAssRendererId, isExternalBitmapRendererId, SUBTITLE_RENDERER_IDS};

@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 
 import {KeyCodes, isBackKey} from '../utils/keyCodes';
 
@@ -28,30 +28,33 @@ const isFiveWayKeyboardEvent = (event) => {
 
 export const useInputMode = (spotlightInstance) => {
 	const [inputMode, setInputMode] = useState(() => resolveInitialInputMode(spotlightInstance));
+	const inputModeRef = useRef(inputMode);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return undefined;
-		const applySpotlightPointerMode = (enabled) => {
-			if (!spotlightInstance?.setPointerMode || !spotlightInstance?.getPointerMode) return;
+		const applyMode = (nextMode) => {
+			if (inputModeRef.current === nextMode) return;
+			inputModeRef.current = nextMode;
+			const pointerModeEnabled = nextMode === 'pointer';
 			try {
-				if (spotlightInstance.getPointerMode() !== enabled) {
-					spotlightInstance.setPointerMode(enabled);
+				if (
+					spotlightInstance?.setPointerMode &&
+					spotlightInstance?.getPointerMode &&
+					spotlightInstance.getPointerMode() !== pointerModeEnabled
+				) {
+					spotlightInstance.setPointerMode(pointerModeEnabled);
 				}
 			} catch (_) {
 				// Ignore Spotlight mode sync failures and keep UI state updates flowing.
 			}
-		};
-		const setMode = (nextMode) => {
-			setInputMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
+			setInputMode(nextMode);
 		};
 		const handlePointerInput = () => {
-			applySpotlightPointerMode(true);
-			setMode('pointer');
+			applyMode('pointer');
 		};
 		const handleFiveWayInput = (event) => {
 			if (isFiveWayKeyboardEvent(event)) {
-				applySpotlightPointerMode(false);
-				setMode('5way');
+				applyMode('5way');
 			}
 		};
 

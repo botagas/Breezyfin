@@ -3,15 +3,41 @@
 const fs = require('fs');
 const path = require('path');
 const {
-	validateMinifiedJassubCanvas2dWorkerSource
+	validateJassubCanvas2dWorkerSource,
+	validateJassubStaticAssetEntrySource
 } = require('./subtitle-assets/jassubCanvas2dPatch.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
 const libassSourceDir = path.join(projectRoot, 'node_modules', 'libass-wasm', 'dist', 'js');
+const jassubSourceDir = path.join(projectRoot, 'node_modules', 'jassub', 'dist');
+const libbitsubWasmSource = path.join(projectRoot, 'node_modules', 'libbitsub', 'pkg', 'libbitsub_bg.wasm');
+const libpgsWorkerSource = path.join(projectRoot, 'node_modules', 'libpgs', 'dist', 'libpgs.worker.js');
 const sandstoneFontDir = path.join(projectRoot, 'node_modules', '@enact', 'sandstone', 'fonts', 'MuseoSans');
 const outputDir = path.join(projectRoot, 'dist');
 const jassubOutputDir = path.join(outputDir, 'node_modules', 'breezyfin-subtitle-assets');
+const subtitleAssetOutputDir = jassubOutputDir;
 const enactCliNodeModules = path.join(projectRoot, 'node_modules', '@enact', 'cli', 'node_modules');
+const packMode = process.env.BREEZYFIN_PACK_MODE === 'production' ? 'production' : 'development';
+const projectLicenseSource = path.join(projectRoot, 'LICENSE');
+const thirdPartyNoticesSource = path.join(projectRoot, 'THIRD_PARTY_NOTICES.txt');
+
+const validateRelativeWebosEntryAssets = () => {
+	const indexPath = path.join(outputDir, 'index.html');
+	if (!fs.existsSync(indexPath)) {
+		throw new Error(`Missing packaged webOS entry document: ${indexPath}`);
+	}
+	const indexSource = fs.readFileSync(indexPath, 'utf8');
+	const entryAssetPattern = /<(?:link|script)\b[^>]*\b(?:href|src)="([^"]+)"/giu;
+	const invalidAssets = [...indexSource.matchAll(entryAssetPattern)]
+		.map((match) => match[1])
+		.filter((assetPath) => /^(?:\/|https?:\/\/)/iu.test(assetPath));
+	if (invalidAssets.length > 0) {
+		throw new Error(
+			'Packaged webOS entry assets must be relative for file:// loading: ' +
+			invalidAssets.join(', ')
+		);
+	}
+};
 
 const LIBASS_ASSET_NAMES = [
 	'subtitles-octopus.js',
@@ -19,21 +45,6 @@ const LIBASS_ASSET_NAMES = [
 	'subtitles-octopus-worker-legacy.js',
 	'subtitles-octopus-worker.wasm'
 ];
-
-const removeFilesMatching = (patterns) => {
-	if (!fs.existsSync(outputDir)) return 0;
-	let removedCount = 0;
-	for (const fileName of fs.readdirSync(outputDir)) {
-		if (!patterns.some((pattern) => pattern.test(fileName))) continue;
-		fs.rmSync(path.join(outputDir, fileName), {force: true});
-		removedCount += 1;
-	}
-	return removedCount;
-};
-
-const removeGeneratedJassubPthreadChunks = () => removeFilesMatching([
-	/^chunk\.em-pthread\..*\.js(?:\.LICENSE\.txt)?$/
-]);
 
 const resolveEnactCliModule = (moduleName) => require.resolve(moduleName, {
 	paths: [enactCliNodeModules]
@@ -65,7 +76,7 @@ const getRendererChunkTranspiler = () => {
 
 const transpileExperimentalRendererChunks = () => {
 	if (!fs.existsSync(outputDir)) return 0;
-	const chunkPattern = /^chunk\.(?:ass-renderer-(?:assjs|jassub)|jassub-worker)\..*\.js$/;
+	const chunkPattern = /^chunk\.(?:ass-renderer-(?:assjs|jassub)|subtitle-renderer-(?:libbitsub|libpgs))\..*\.js$/;
 	const chunkNames = fs.readdirSync(outputDir).filter((fileName) => chunkPattern.test(fileName));
 	if (chunkNames.length === 0) return 0;
 	const transpileChunk = getRendererChunkTranspiler();
@@ -80,59 +91,102 @@ const transpileExperimentalRendererChunks = () => {
 	return chunkNames.length;
 };
 
-const patchJassubWorkerRuntimeUrl = () => {
-	const mainChunkNames = fs.readdirSync(outputDir).filter((fileName) => /^main\..*\.js$/u.test(fileName));
-	let patchedCount = 0;
-	for (const chunkName of mainChunkNames) {
-		const chunkPath = path.join(outputDir, chunkName);
-		const source = fs.readFileSync(chunkPath, 'utf8');
-		if (!source.includes('434:"jassub-worker"')) continue;
-		const patched = source.replace(
-			/(\.u=function\((\w+)\)\{return"chunk\."\+\(\{[^}]*434:"jassub-worker"[^}]*\}\[\2\]\|\|\2\)\+"\."\+\{[^}]*\}\[\2\])\+"\.js"(\})/u,
-			'$1+(434===$2?".worker":".js")$3'
-		);
-		if (patched === source) {
-			throw new Error(`Unable to patch JASSUB worker runtime URL in ${chunkPath}`);
+const stripSourceMapReference = (source) => source
+	.replace(/\n?\/\/[#@]\s*sourceMappingURL=.*$/gmu, '')
+	.replace(/\n?\/\*[#@]\s*sourceMappingURL=.*?\*\//gsu, '');
+
+const copyRuntimeFile = (sourcePath, targetPath) => {
+	const extension = path.extname(sourcePath).toLowerCase();
+	if (extension === '.ts' || sourcePath.endsWith('.d.ts')) return false;
+	if (packMode === 'production' && extension === '.map') return false;
+	if (packMode === 'production' && extension === '.js') {
+		fs.writeFileSync(targetPath, stripSourceMapReference(fs.readFileSync(sourcePath, 'utf8')));
+		return true;
+	}
+	fs.copyFileSync(sourcePath, targetPath);
+	return true;
+};
+
+const copyDirectoryRecursive = (sourceDir, targetDir) => {
+	if (!fs.existsSync(sourceDir)) {
+		throw new Error(`Missing source directory: ${sourceDir}`);
+	}
+	fs.mkdirSync(targetDir, {recursive: true});
+	for (const entry of fs.readdirSync(sourceDir, {withFileTypes: true})) {
+		const sourcePath = path.join(sourceDir, entry.name);
+		const targetPath = path.join(targetDir, entry.name);
+		if (entry.isDirectory()) {
+			copyDirectoryRecursive(sourcePath, targetPath);
+		} else if (entry.isFile()) {
+			copyRuntimeFile(sourcePath, targetPath);
 		}
-		fs.writeFileSync(chunkPath, patched);
-		patchedCount += 1;
 	}
-	return patchedCount;
 };
 
-const renameGeneratedJassubWorkerChunks = () => {
-	const workerChunkNames = fs.readdirSync(outputDir).filter((fileName) => (
-		/^chunk\.jassub-worker\..*\.js$/u.test(fileName)
-	));
-	let renamedCount = 0;
-	for (const chunkName of workerChunkNames) {
-		const sourcePath = path.join(outputDir, chunkName);
-		const outputPath = path.join(outputDir, chunkName.replace(/\.js$/u, '.worker'));
-		fs.renameSync(sourcePath, outputPath);
-		renamedCount += 1;
+const copyJassubStaticAssets = () => {
+	const workerSourceDir = path.join(jassubSourceDir, 'worker');
+	const wasmSourceDir = path.join(jassubSourceDir, 'wasm');
+	const fontSource = path.join(jassubSourceDir, 'default.woff2');
+	const entrySource = path.join(jassubSourceDir, 'jassub.js');
+	if (!fs.existsSync(fontSource)) {
+		throw new Error(`Missing JASSUB default font asset: ${fontSource}`);
 	}
-	return renamedCount;
-};
-
-const validateGeneratedJassubWorkerChunks = () => {
-	const workerChunkNames = fs.readdirSync(outputDir).filter((fileName) => (
-		/^chunk\.jassub-worker(?:\..*)?\.(?:js|worker)$/u.test(fileName)
-	));
-	if (workerChunkNames.length === 0) {
-		throw new Error('No generated JASSUB worker chunk found for Canvas2D validation.');
+	if (!fs.existsSync(entrySource)) {
+		throw new Error(`Missing JASSUB entry source: ${entrySource}`);
 	}
-	workerChunkNames.forEach((chunkName) => {
-		const chunkPath = path.join(outputDir, chunkName);
-		validateMinifiedJassubCanvas2dWorkerSource(fs.readFileSync(chunkPath, 'utf8'), {
-			fileName: chunkPath
-		});
+	if (fs.existsSync(jassubOutputDir)) {
+		fs.rmSync(jassubOutputDir, {recursive: true, force: true});
+	}
+	copyDirectoryRecursive(workerSourceDir, path.join(jassubOutputDir, 'worker'));
+	copyDirectoryRecursive(wasmSourceDir, path.join(jassubOutputDir, 'wasm'));
+	fs.copyFileSync(fontSource, path.join(jassubOutputDir, 'default.woff2'));
+	validateJassubStaticAssetEntrySource(fs.readFileSync(entrySource, 'utf8'), {
+		fileName: entrySource
 	});
-	return workerChunkNames.length;
+	validateJassubCanvas2dWorkerSource(fs.readFileSync(path.join(jassubOutputDir, 'worker', 'worker.js'), 'utf8'), {
+		fileName: path.join(jassubOutputDir, 'worker', 'worker.js')
+	});
+	return 3;
+};
+
+const assertNoGeneratedJassubRuntimeChunks = () => {
+	if (!fs.existsSync(outputDir)) return true;
+	const generatedJassubChunks = fs.readdirSync(outputDir).filter((fileName) => (
+		/^chunk\.(?:jassub-worker|em-pthread)\./u.test(fileName)
+	));
+	if (generatedJassubChunks.length > 0) {
+		throw new Error(
+			'Generated JASSUB worker/runtime chunks remain after pack: ' +
+			generatedJassubChunks.join(', ')
+		);
+	}
+	return true;
+};
+
+const copyBitmapSubtitleAssets = () => {
+	if (!fs.existsSync(libbitsubWasmSource)) {
+		throw new Error(`Missing libbitsub WASM asset: ${libbitsubWasmSource}`);
+	}
+	if (!fs.existsSync(libpgsWorkerSource)) {
+		throw new Error(`Missing libpgs worker asset: ${libpgsWorkerSource}`);
+	}
+	const libbitsubPublicDir = path.join(outputDir, 'libbitsub');
+	const libbitsubAssetDir = path.join(subtitleAssetOutputDir, 'libbitsub');
+	const libpgsAssetDir = path.join(subtitleAssetOutputDir, 'libpgs');
+	fs.mkdirSync(libbitsubPublicDir, {recursive: true});
+	fs.mkdirSync(libbitsubAssetDir, {recursive: true});
+	fs.mkdirSync(libpgsAssetDir, {recursive: true});
+	fs.copyFileSync(libbitsubWasmSource, path.join(libbitsubPublicDir, 'libbitsub_bg.wasm'));
+	fs.copyFileSync(libbitsubWasmSource, path.join(libbitsubAssetDir, 'libbitsub_bg.wasm'));
+	fs.copyFileSync(libpgsWorkerSource, path.join(libpgsAssetDir, 'libpgs.worker.js'));
+	return 3;
 };
 
 if (!fs.existsSync(outputDir)) {
 	fs.mkdirSync(outputDir, {recursive: true});
 }
+
+validateRelativeWebosEntryAssets();
 
 for (const assetName of LIBASS_ASSET_NAMES) {
 	const sourcePath = path.join(libassSourceDir, assetName);
@@ -143,26 +197,15 @@ for (const assetName of LIBASS_ASSET_NAMES) {
 	fs.copyFileSync(sourcePath, outputPath);
 }
 
-if (fs.existsSync(jassubOutputDir)) {
-	fs.rmSync(jassubOutputDir, {recursive: true, force: true});
-}
+const copiedJassubAssetGroups = copyJassubStaticAssets();
+const copiedBitmapSubtitleAssets = copyBitmapSubtitleAssets();
 const transpiledRendererChunks = transpileExperimentalRendererChunks();
 if (transpiledRendererChunks > 0) {
 	console.log(`Transpiled ${transpiledRendererChunks} experimental subtitle renderer chunks for webOS packaging`);
 }
-const renamedWorkerChunks = renameGeneratedJassubWorkerChunks();
-if (renamedWorkerChunks > 0) {
-	const patchedRuntimeChunks = patchJassubWorkerRuntimeUrl();
-	console.log(`Renamed ${renamedWorkerChunks} JASSUB worker chunk(s) and patched ${patchedRuntimeChunks} runtime chunk(s)`);
-}
-const validatedJassubWorkerChunks = validateGeneratedJassubWorkerChunks();
-if (validatedJassubWorkerChunks > 0) {
-	console.log(`Validated ${validatedJassubWorkerChunks} Canvas2D-patched JASSUB worker chunk(s)`);
-}
-const removedPthreadChunks = removeGeneratedJassubPthreadChunks();
-if (removedPthreadChunks > 0) {
-	console.log(`Removed ${removedPthreadChunks} JASSUB pthread chunk(s) for webOS packaging`);
-}
+assertNoGeneratedJassubRuntimeChunks();
+console.log(`Copied and validated ${copiedJassubAssetGroups} JASSUB static asset group(s) to ${jassubOutputDir}`);
+console.log(`Copied ${copiedBitmapSubtitleAssets} bitmap subtitle renderer asset(s)`);
 
 const fallbackFontSource = path.join(sandstoneFontDir, 'MuseoSans-Medium.ttf');
 const fallbackFontOutput = path.join(outputDir, 'breezyfin-subtitle-fallback.ttf');
@@ -171,8 +214,17 @@ if (!fs.existsSync(fallbackFontSource)) {
 }
 fs.copyFileSync(fallbackFontSource, fallbackFontOutput);
 
+for (const requiredNotice of [projectLicenseSource, thirdPartyNoticesSource]) {
+	if (!fs.existsSync(requiredNotice)) {
+		throw new Error(`Missing required release notice: ${requiredNotice}`);
+	}
+}
+fs.copyFileSync(projectLicenseSource, path.join(outputDir, 'LICENSE'));
+fs.copyFileSync(thirdPartyNoticesSource, path.join(outputDir, 'THIRD_PARTY_NOTICES.txt'));
+
 console.log(
 	`Copied ${LIBASS_ASSET_NAMES.length} libass-wasm assets, ` +
-	'bundled JASSUB assets, ' +
-	`and 1 fallback font to ${outputDir}`
+	'static JASSUB assets, ' +
+	'bitmap subtitle assets, ' +
+	`1 fallback font, and release notices to ${outputDir} (${packMode})`
 );

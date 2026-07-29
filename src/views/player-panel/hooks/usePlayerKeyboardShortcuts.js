@@ -4,7 +4,7 @@ import {KeyCodes} from '../../../utils/keyCodes';
 const BACK_KEYS = [KeyCodes.BACK, KeyCodes.BACK_SOFT, KeyCodes.EXIT, KeyCodes.BACKSPACE, KeyCodes.ESC];
 const SEEK_STEP_SECONDS = 15;
 const PLAY_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE, KeyCodes.MEDIA_PLAY_PAUSE];
-const PLAY_TOGGLE_POPUP_EXCLUDED_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE];
+const POPUP_ACTION_KEYS = [KeyCodes.ENTER, KeyCodes.OK, KeyCodes.SPACE];
 const PLAY_ONLY_KEYS = [KeyCodes.PLAY];
 const PAUSE_KEYS = [KeyCodes.PAUSE];
 const POPUP_FOCUS_SCOPE_SELECTOR = '[data-popup-focus-scope="true"]';
@@ -32,12 +32,16 @@ export const usePlayerKeyboardShortcuts = ({
 	controlsRef,
 	skipOverlayRef,
 	focusSkipOverlayAction,
-	isProgressSliderTarget
+	isProgressSliderTarget,
+	screensaverActive = false
 }) => {
 	useEffect(() => {
 		if (!isActive) return undefined;
 
 		const handleKeyDown = (event) => {
+			// The screensaver capture listener owns the wake input and decides whether ENTER resumes.
+			if (screensaverActive) return;
+
 			const consumeEvent = () => {
 				event.preventDefault?.();
 				event.stopPropagation?.();
@@ -49,6 +53,13 @@ export const usePlayerKeyboardShortcuts = ({
 
 			onUserInteraction();
 			const code = event.keyCode || event.which;
+			const popupOwnsActivation =
+				POPUP_ACTION_KEYS.includes(code) &&
+				(
+					isNodeInsidePopupFocusScope(event?.target) ||
+					isNodeInsidePopupFocusScope(document.activeElement)
+				);
+			if (popupOwnsActivation) return;
 
 			if (
 				showControls &&
@@ -102,18 +113,6 @@ export const usePlayerKeyboardShortcuts = ({
 			}
 
 			if (PLAY_KEYS.includes(code)) {
-				if ((showAudioPopup || showSubtitlePopup) && PLAY_TOGGLE_POPUP_EXCLUDED_KEYS.includes(code)) {
-					const eventTarget = event?.target;
-					const focusedElementInDocument = document.activeElement;
-					const popupScopeFocused =
-						isNodeInsidePopupFocusScope(eventTarget) ||
-						isNodeInsidePopupFocusScope(focusedElementInDocument);
-					// Keep ENTER/OK/SPACE bound to popup choices only while a popup is open.
-					if (!popupScopeFocused) {
-						consumeEvent();
-					}
-					return;
-				}
 				// Avoid double-trigger when an actual button is focused
 				const activeElement = document.activeElement;
 				const isControlFocused = controlsRef.current && activeElement && controlsRef.current.contains(activeElement);
@@ -156,6 +155,7 @@ export const usePlayerKeyboardShortcuts = ({
 		isSeekContext,
 		onUserInteraction,
 		playing,
+		screensaverActive,
 		isProgressSliderTarget,
 		seekBySeconds,
 		setShowControls,

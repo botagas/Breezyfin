@@ -27,9 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Enact CLI
-        run: npm install --global @enact/cli
-
       - name: Lint
         run: npm run lint
 
@@ -39,9 +36,12 @@ jobs:
       - name: Run code audits
         run: npm run audit
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Build production bundle
         env:
-          CI: "false"
+          REACT_APP_ENABLE_PERSISTENT_LOGS: "1"
           REACT_APP_RELEASE_CHANNEL: ${{ github.ref_name }}
         run: |
           npm run clean

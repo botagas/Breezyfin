@@ -23,8 +23,9 @@ Read these docs before substantial work (in this order):
 2. `DEVELOPING.md` (core architecture conventions)
 3. `HELPERS.md` (reuse map; shared hooks/helpers inventory)
 4. `THEMES.md` (theme/runtime-attribute/compat rules)
-5. `COMPONENTS.md` and `VIEWS.md` (shared vs panel-local boundaries)
-6. `CHECKS.md` and `TODOS.md` (verification + current priorities)
+5. `WORKAROUNDS.md` (active upstream/runtime constraints and removal conditions)
+6. `COMPONENTS.md` and `VIEWS.md` (shared vs panel-local boundaries)
+7. `CHECKS.md` and `TODOS.md` (verification + current priorities)
 
 ## 3) Repository operating model
 
@@ -146,6 +147,7 @@ When changes affect architecture or shared behavior, update docs in the same tas
 - Added/changed shared hook/helper/utility: update `HELPERS.md`
 - Changed architectural conventions: update `DEVELOPING.md`, `COMPONENTS.md`, or `VIEWS.md`
 - Changed theme/token/compat behavior: update `THEMES.md`
+- Added/changed/removed an intentional upstream or runtime workaround: update `WORKAROUNDS.md`
 - Completed planned work: update `TODOS.md`
 - Added recurring validation for completed work: update `CHECKS.md`
 

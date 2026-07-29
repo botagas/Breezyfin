@@ -10,7 +10,7 @@ import {
 	getTrackTitle,
 	normalizeTrackToken
 } from '../utils/trackMatching';
-import {isSupportedAudioCodec} from '../services/jellyfin/playbackSelection';
+import {isSupportedAudioCodec} from '../utils/playbackSelection';
 
 const isInteger = (value) => Number.isInteger(value);
 
@@ -88,7 +88,7 @@ const matchesSubtitleForcedState = (stream, preference) => {
 };
 
 const matchesSubtitleTitle = (stream, preference) => {
-	const preferredTitle = normalizeText(preference?.title);
+	const preferredTitle = normalizeText(preference?.displayTitle || preference?.title);
 	if (!preferredTitle) return true;
 	return getSubtitleTitle(stream) === preferredTitle;
 };
@@ -246,7 +246,7 @@ export const useTrackPreferences = () => {
 		const selectedStream = subtitleStreams.find((stream) => stream.Index === trackIndex);
 		return saveTrackPreferences({
 			...(preferencesRef.current || {}),
-			subtitle: createSubtitlePreference(trackIndex, selectedStream),
+			subtitle: createSubtitlePreference(trackIndex, selectedStream, subtitleStreams),
 			audio: preferencesRef.current?.audio
 		});
 	}, [saveTrackPreferences]);

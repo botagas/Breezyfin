@@ -2,6 +2,7 @@ import {
 	DEFAULT_SETTINGS_TAB_KEY,
 	SETTINGS_TABS,
 	getAssSubtitleRendererControlState,
+	getBitmapSubtitleRendererControlState,
 	getSettingsSectionKeys,
 	getSubtitleBurnInFormatsControlState,
 	getWipeCacheConfirmCopy,
@@ -11,8 +12,16 @@ import {
 	isSubtitleOptionSelected,
 	shouldRenderSettingsSection
 } from '../utils/settingsViewModel';
+import {BITRATE_OPTIONS, DEFAULT_SETTINGS} from '../constants';
 
 describe('settings view model', () => {
+	it('keeps diagnostics dormant by default', () => {
+		expect(DEFAULT_SETTINGS.enableDiagnostics).toBe(false);
+	});
+	it('defaults new installations to a 100 Mbps streaming limit', () => {
+		expect(DEFAULT_SETTINGS.maxBitrate).toBe('100');
+		expect(BITRATE_OPTIONS.find((option) => option.value === '100')?.label).toContain('Default');
+	});
 	it('defines stable Settings tab order and section visibility', () => {
 		expect(DEFAULT_SETTINGS_TAB_KEY).toBe('info');
 		expect(SETTINGS_TABS.map((tab) => tab.key)).toEqual([
@@ -52,6 +61,24 @@ describe('settings view model', () => {
 		expect(getAssSubtitleRendererControlState(
 			{smartSubtitleTranscoding: false},
 			'Auto (Breezyfin Lightweight)'
+		)).toEqual({
+			enabled: false,
+			label: 'Manual mode'
+		});
+	});
+
+	it('enables bitmap renderer selection only while Smart Subtitle Handling is active', () => {
+		expect(getBitmapSubtitleRendererControlState(
+			{smartSubtitleTranscoding: true},
+			'Auto (libbitsub first)'
+		)).toEqual({
+			enabled: true,
+			label: 'Auto (libbitsub first)'
+		});
+
+		expect(getBitmapSubtitleRendererControlState(
+			{smartSubtitleTranscoding: false},
+			'Auto (libbitsub first)'
 		)).toEqual({
 			enabled: false,
 			label: 'Manual mode'

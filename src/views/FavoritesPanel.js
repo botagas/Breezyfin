@@ -1,28 +1,35 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
-import Scroller from '../components/AppScroller';
 import BodyText from '@enact/sandstone/BodyText';
-import Spinner from '@enact/sandstone/Spinner';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
+import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
+import MediaFilterControls from '../components/MediaFilterControls';
 import PosterMediaCard from '../components/PosterMediaCard';
-import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
+import MediaVirtualGrid from '../components/MediaVirtualGrid';
+import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
-import {getPosterCardClassProps} from '../utils/posterCardClassProps';
-import {KeyCodes} from '../utils/keyCodes';
-import {buildMediaListItemKey} from '../utils/reactKeys';
-import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
+import {useDisclosureMap} from '../hooks/useDisclosureMap';
+import {usePopupInitialFocus} from '../hooks/usePopupInitialFocus';
+import {useCollapsibleBrowseSearch} from '../hooks/useCollapsibleBrowseSearch';
+import {getPosterCardImageUrls} from '../utils/mediaItemUtils';
+import {getMediaCardPresentation} from '../utils/mediaCardPresentation';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
+import {focusSpotlightTarget} from '../utils/gridFocus';
 
 import css from './FavoritesPanel.module.less';
+import browseCss from '../components/MediaBrowseControls.module.less';
 
 const FAVORITES_PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
-const FAVORITES_FOCUS_PREFETCH_THRESHOLD = 12;
+const FAVORITES_DISCLOSURE_KEYS = {
+	FILTER_POPUP: 'filterPopup'
+};
+const INITIAL_FAVORITES_DISCLOSURES = {
+	[FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP]: false
+};
 
 const FILTERS = [
 	{ id: 'all', label: 'All', types: ['Movie', 'Series', 'Episode'] },
@@ -60,46 +67,68 @@ const FavoritesPanel = ({
 	...rest
 }) => {
 	const cachedFavorites = normalizeCachedFavorites(cachedState);
+	const cachedSearchTerm = String(cachedState?.searchTerm || '');
 	const [favorites, setFavorites] = useState(() => cachedFavorites);
 	const [loading, setLoading] = useState(() => cachedState?.loaded !== true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(() => cachedState?.hasMore === true);
 	const [activeFilter, setActiveFilter] = useState(() => normalizeCachedFilterId(cachedState));
+	const [draftFilter, setDraftFilter] = useState(() => normalizeCachedFilterId(cachedState));
+	const {disclosures, openDisclosure, closeDisclosure} = useDisclosureMap(INITIAL_FAVORITES_DISCLOSURES);
+	const filterPopupOpen = disclosures[FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP] === true;
 	const loadRequestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
 	const lastCachedStateRef = useRef(cachedState);
 	const skipInitialCachedLoadRef = useRef(cachedState?.loaded === true);
 	const paginationRef = useRef({
 		nextStartIndex: normalizeCachedNextStartIndex(cachedState, cachedFavorites),
-		filterTypes: getFilterById(normalizeCachedFilterId(cachedState)).types
+		filterTypes: getFilterById(normalizeCachedFilterId(cachedState)).types,
+		searchTerm: cachedSearchTerm.trim()
 	});
-	const favoritesGridRef = useRef(null);
+	const lastFocusedCardIdRef = useRef(cachedState?.focusedItemId || null);
+	const filterPopupContentRef = useRef(null);
+	const pendingFilterRef = useRef(null);
+	usePopupInitialFocus(filterPopupOpen, filterPopupContentRef);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
 		onLogout,
 		onExit,
 		registerBackHandler,
-		isActive
+		isActive,
+		onPanelBack: () => {
+			if (!filterPopupOpen) return false;
+			pendingFilterRef.current = null;
+			closeDisclosure(FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP);
+			return true;
+		}
 	});
 	const favoritesById = useMapById(favorites);
+	const handleAppliedSearchChange = useCallback(() => {
+		lastFocusedCardIdRef.current = null;
+	}, []);
 	const {
-		scrollTop,
-		setScrollTop,
-		captureScrollTo: captureFavoritesScrollRestore,
-		handleScrollStop: handleFavoritesScrollMemoryStop
-	} = usePanelScrollState({
-		cachedState,
-		isActive
+		searchValue: searchTerm,
+		appliedSearchValue: appliedSearchTerm,
+		searchExpanded,
+		restoreSearchState,
+		handleSearchReveal,
+		handleSearchChange,
+		handleSearchBlur
+	} = useCollapsibleBrowseSearch({
+		initialValue: cachedSearchTerm,
+		spotlightId: 'favorites-search-input',
+		onApplySearch: handleAppliedSearchChange
 	});
 
-	const loadFavorites = useCallback(async (filterId = FILTERS[0].id) => {
+	const loadFavorites = useCallback(async (filterId = FILTERS[0].id, nextSearchTerm = '') => {
 		const requestId = loadRequestIdRef.current + 1;
 		loadRequestIdRef.current = requestId;
 		const filterTypes = getFilterById(filterId).types;
 		paginationRef.current = {
 			nextStartIndex: 0,
-			filterTypes
+			filterTypes,
+			searchTerm: nextSearchTerm
 		};
 		loadingMoreRef.current = false;
 		setLoading(true);
@@ -107,7 +136,9 @@ const FavoritesPanel = ({
 		setHasMore(false);
 		setFavorites([]);
 		try {
-			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, 0);
+			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, 0, {
+				searchTerm: nextSearchTerm
+			});
 			if (requestId !== loadRequestIdRef.current) return;
 			const safeItems = Array.isArray(items) ? items : [];
 			setFavorites(safeItems);
@@ -128,11 +159,13 @@ const FavoritesPanel = ({
 	const loadNextPage = useCallback(async () => {
 		if (loading || loadingMoreRef.current || !hasMore) return;
 		const requestId = loadRequestIdRef.current;
-		const {nextStartIndex, filterTypes} = paginationRef.current;
+		const {nextStartIndex, filterTypes, searchTerm: pagedSearchTerm} = paginationRef.current;
 		loadingMoreRef.current = true;
 		setLoadingMore(true);
 		try {
-			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, nextStartIndex);
+			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, nextStartIndex, {
+				searchTerm: pagedSearchTerm
+			});
 			if (requestId !== loadRequestIdRef.current) return;
 			const safeBatch = Array.isArray(items) ? items : [];
 			paginationRef.current.nextStartIndex = nextStartIndex + safeBatch.length;
@@ -161,11 +194,11 @@ const FavoritesPanel = ({
 			skipInitialCachedLoadRef.current = false;
 			return undefined;
 		}
-		loadFavorites(activeFilter);
+		loadFavorites(activeFilter, appliedSearchTerm);
 		return () => {
 			loadRequestIdRef.current += 1;
 		};
-	}, [activeFilter, loadFavorites]);
+	}, [activeFilter, appliedSearchTerm, loadFavorites]);
 
 	useEffect(() => {
 		const hadCachedState = lastCachedStateRef.current !== null;
@@ -175,18 +208,20 @@ const FavoritesPanel = ({
 		loadingMoreRef.current = false;
 		paginationRef.current = {
 			nextStartIndex: 0,
-			filterTypes: FILTERS[0].types
+			filterTypes: FILTERS[0].types,
+			searchTerm: ''
 		};
+		const hadActiveSearch = Boolean(appliedSearchTerm);
+		restoreSearchState('');
 		setFavorites([]);
 		setHasMore(false);
 		setLoadingMore(false);
-		setScrollTop(0);
 		if (activeFilter !== FILTERS[0].id) {
 			setActiveFilter(FILTERS[0].id);
 			return;
 		}
-		loadFavorites(FILTERS[0].id);
-	}, [activeFilter, cachedState, loadFavorites, setScrollTop]);
+		if (!hadActiveSearch) loadFavorites(FILTERS[0].id, '');
+	}, [activeFilter, appliedSearchTerm, cachedState, loadFavorites, restoreSearchState]);
 
 	useEffect(() => {
 		if (typeof onCacheState !== 'function') return;
@@ -195,10 +230,11 @@ const FavoritesPanel = ({
 			activeFilter,
 			hasMore,
 			nextStartIndex: paginationRef.current.nextStartIndex,
+			searchTerm: appliedSearchTerm,
 			loaded: !loading,
-			scrollTop
+			focusedItemId: lastFocusedCardIdRef.current
 		});
-	}, [activeFilter, favorites, hasMore, loading, onCacheState, scrollTop]);
+	}, [activeFilter, appliedSearchTerm, favorites, hasMore, loading, onCacheState]);
 
 	const handleRemoveFavorite = useCallback(async (event, item) => {
 		event.stopPropagation();
@@ -210,19 +246,56 @@ const FavoritesPanel = ({
 		}
 	}, []);
 
-	const handleFilterButtonClick = useCallback((event) => {
+	const handleOpenFilterPopup = useCallback(() => {
+		pendingFilterRef.current = null;
+		setDraftFilter(activeFilter);
+		openDisclosure(FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP);
+	}, [activeFilter, openDisclosure]);
+
+	const handleCloseFilterPopup = useCallback(() => {
+		pendingFilterRef.current = null;
+		closeDisclosure(FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP);
+	}, [closeDisclosure]);
+
+	const handleDraftFilterSelect = useCallback((event) => {
 		const filterId = event.currentTarget.dataset.filterId;
 		if (!filterId) return;
-		setActiveFilter(filterId);
-		setScrollTop(0);
-	}, [setScrollTop]);
+		setDraftFilter(getFilterById(filterId).id);
+	}, []);
+
+	const handleResetDraftFilter = useCallback(() => {
+		setDraftFilter(FILTERS[0].id);
+	}, []);
+
+	const handleApplyDraftFilter = useCallback(() => {
+		pendingFilterRef.current = draftFilter;
+		closeDisclosure(FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP);
+	}, [closeDisclosure, draftFilter]);
+
+	const handleFilterPopupHide = useCallback(() => {
+		const nextFilter = pendingFilterRef.current;
+		pendingFilterRef.current = null;
+		if (!nextFilter || nextFilter === activeFilter) return;
+		lastFocusedCardIdRef.current = null;
+		setActiveFilter(nextFilter);
+	}, [activeFilter]);
 
 	const handleFavoriteCardClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
+		lastFocusedCardIdRef.current = itemId || null;
+		onCacheState?.({
+			favorites,
+			activeFilter,
+			hasMore,
+			nextStartIndex: paginationRef.current.nextStartIndex,
+			searchTerm: appliedSearchTerm,
+			loaded: !loading,
+			focusedItemId: lastFocusedCardIdRef.current
+		});
 		const item = favoritesById.get(itemId);
 		if (!item) return;
 		onItemSelect(item);
-	}, [favoritesById, onItemSelect]);
+	}, [activeFilter, appliedSearchTerm, favorites, favoritesById, hasMore, loading, onCacheState, onItemSelect]);
 
 	const handleUnfavoriteClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
@@ -272,115 +345,63 @@ const FavoritesPanel = ({
 		}
 	}, [favoritesById]);
 
-	const handleFavoriteCardFocus = useCallback((event) => {
-		ensureFocusTargetVisibleWithTopChrome(event.currentTarget);
-		if (!hasMore || loadingMoreRef.current) return;
-		const itemIndex = Number(event.currentTarget.dataset.cardIndex);
-		if (!Number.isInteger(itemIndex)) return;
-		const remainingItems = favorites.length - itemIndex - 1;
-		if (remainingItems <= FAVORITES_FOCUS_PREFETCH_THRESHOLD) {
-			loadNextPage();
-		}
-	}, [favorites.length, hasMore, loadNextPage]);
+	const renderFavorite = useCallback(({index, items, onVirtualItemFocusEvent, ...itemProps}) => {
+		const item = items[index];
+		if (!item) return null;
+		const imageCandidates = getPosterCardImageUrls(item);
+		const presentation = getMediaCardPresentation(item);
+		return (
+			<PosterMediaCard
+				{...itemProps}
+				data-index={index}
+				itemId={item.Id}
+				className={css.favoriteCard}
+				imageCandidates={imageCandidates}
+				title={presentation.title}
+				subtitle={presentation.subtitle}
+				contextBadge={presentation.contextBadge}
+				contextBadgeExtras={(
+					<>
+						<span className={css.favoriteBadge}>{'\u2665'}</span>
+						{item.UserData?.Played === true ? <span className={css.watchedBadge}>{'\u2713'}</span> : null}
+					</>
+				)}
+				ariaLabel={presentation.ariaLabel}
+				placeholderText={item.Name?.charAt(0) || '?'}
+				progressPercent={item.UserData?.PlayedPercentage}
+				onClick={handleFavoriteCardClick}
+				onFocus={onVirtualItemFocusEvent}
+				overlayContent={(
+					<div className={css.favoriteOverlayFrame}>
+						<div className={css.favoriteActionColumn}>
+							<Button
+								className={css.unfavoriteButton}
+								icon="heart"
+								css={{icon: css.favoriteActionIcon}}
+								size="small"
+								data-item-id={item.Id}
+								onClick={handleUnfavoriteClick}
+								title="Remove from favorites"
+							/>
+							<Button
+								className={`${css.watchedToggleButton} ${item.UserData?.Played ? css.watchedToggleButtonActive : ''}`}
+								icon="check"
+								css={{icon: css.watchedActionIcon}}
+								size="small"
+								data-item-id={item.Id}
+								onClick={handleToggleWatchedClick}
+								title={item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'}
+							/>
+						</div>
+					</div>
+				)}
+			/>
+		);
+	}, [handleFavoriteCardClick, handleToggleWatchedClick, handleUnfavoriteClick]);
 
-	const handleFavoritesScrollerScrollStop = useCallback((event) => {
-		handleFavoritesScrollMemoryStop(event);
-		if (event?.reachedEdgeInfo?.bottom) {
-			loadNextPage();
-		}
-	}, [handleFavoritesScrollMemoryStop, loadNextPage]);
-
-	const getFavoriteCards = useCallback(() => {
-		return Array.from(favoritesGridRef.current?.querySelectorAll(`.${css.favoriteCard}`) || []);
-	}, []);
-
-	const focusFavoriteCardByIndex = useCallback((index) => {
-		const cards = getFavoriteCards();
-		if (index < 0 || index >= cards.length) return false;
-		const card = cards[index];
-		if (!card?.focus) return false;
-		card.focus();
-		return true;
-	}, [getFavoriteCards]);
-
-	const focusFavoriteActionButtonByIndex = useCallback((index, actionType = 'favorite') => {
-		const cards = getFavoriteCards();
-		if (index < 0 || index >= cards.length) return false;
-		const selector = actionType === 'watched' ? `.${css.watchedToggleButton}` : `.${css.unfavoriteButton}`;
-		const target = cards[index].querySelector(selector);
-		if (!target?.focus) return false;
-		target.focus();
-		return true;
-	}, [getFavoriteCards]);
-
-	const handleFavoriteCardKeyDown = useCallback((event) => {
-		const cardIndex = Number(event.currentTarget.dataset.cardIndex);
-		if (!Number.isInteger(cardIndex)) return;
-		const code = event.keyCode || event.which;
-		if (code === KeyCodes.LEFT) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusFavoriteCardByIndex(cardIndex - 1);
-		} else if (code === KeyCodes.RIGHT) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusFavoriteCardByIndex(cardIndex + 1);
-		} else if (code === KeyCodes.UP) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusFavoriteActionButtonByIndex(cardIndex, 'favorite');
-		}
-	}, [focusFavoriteActionButtonByIndex, focusFavoriteCardByIndex]);
-
-	const handleFavoriteActionKeyDown = useCallback((event) => {
-		const cardIndex = Number(event.currentTarget.dataset.cardIndex);
-		if (!Number.isInteger(cardIndex)) return;
-		const actionType = event.currentTarget.dataset.actionType || 'favorite';
-		const code = event.keyCode || event.which;
-		if (code === KeyCodes.ENTER || code === KeyCodes.OK || code === KeyCodes.SPACE) {
-			event.stopPropagation();
-			return;
-		}
-		if (code === KeyCodes.UP) {
-			event.stopPropagation();
-			return;
-		}
-		if (code === KeyCodes.DOWN) {
-			event.preventDefault();
-			event.stopPropagation();
-			focusFavoriteCardByIndex(cardIndex);
-			return;
-		}
-		if (code === KeyCodes.LEFT) {
-			event.preventDefault();
-			event.stopPropagation();
-			if (actionType === 'watched') {
-				focusFavoriteActionButtonByIndex(cardIndex, 'favorite');
-				return;
-			}
-			if (!focusFavoriteActionButtonByIndex(cardIndex - 1, 'favorite')) {
-				focusFavoriteCardByIndex(cardIndex - 1);
-			}
-			return;
-		}
-		if (code === KeyCodes.RIGHT) {
-			event.preventDefault();
-			event.stopPropagation();
-			if (actionType === 'favorite') {
-				if (!focusFavoriteActionButtonByIndex(cardIndex, 'watched')) {
-					if (!focusFavoriteActionButtonByIndex(cardIndex + 1, 'favorite')) {
-						focusFavoriteCardByIndex(cardIndex + 1);
-					}
-				}
-				return;
-			}
-			if (!focusFavoriteActionButtonByIndex(cardIndex + 1, 'watched')) {
-				focusFavoriteCardByIndex(cardIndex + 1);
-			}
-		}
-	}, [focusFavoriteActionButtonByIndex, focusFavoriteCardByIndex]);
-
-	const posterCardClassProps = getPosterCardClassProps(css);
+	const handleToolbarNavigateDown = useCallback(() => (
+		focusSpotlightTarget('favorites-filter-trigger')
+	), []);
 
 	return (
 		<Panel {...rest}>
@@ -388,30 +409,39 @@ const FavoritesPanel = ({
 				<Toolbar
 					activeSection="favorites"
 					isActive={isActive}
+					onNavigateDown={handleToolbarNavigateDown}
 					{...toolbarActions}
 				/>
-			<div className={css.favoritesContainer}>
-				<Scroller
-					className={css.favoritesScroller}
-					cbScrollTo={captureFavoritesScrollRestore}
-					onScrollStop={handleFavoritesScrollerScrollStop}
-				>
-					<div className={css.favoritesContent}>
-						<div className={css.filters}>
-							{FILTERS.map(filter => (
-								<Button
-									key={filter.id}
-									data-filter-id={filter.id}
-									className={css.filterButton}
-									selected={activeFilter === filter.id}
-									onClick={handleFilterButtonClick}
-									size="small"
-								>
-									{filter.label}
-								</Button>
-							))}
-						</div>
-
+			<div
+				className={`${css.favoritesContainer} ${browseCss.panelLayout}`}
+			>
+				<MediaPanelBackdrop item={favorites[0] || null} />
+				<MediaBrowseOverlay compact expanded={searchExpanded} actionCount={2}>
+					<MediaFilterControls
+						title="Favorites"
+						triggerSpotlightId="favorites-filter-trigger"
+						activeFilterCount={activeFilter === FILTERS[0].id ? 0 : 1}
+						filterPopupOpen={filterPopupOpen}
+						filterPopupContentRef={filterPopupContentRef}
+						draftFilterIds={[draftFilter]}
+						filterOptions={FILTERS}
+						searchVisible
+						searchExpanded={searchExpanded}
+						searchValue={searchTerm}
+						searchPlaceholder="Search favorites..."
+						searchSpotlightId="favorites-search-input"
+						onSearchReveal={handleSearchReveal}
+						onSearchChange={handleSearchChange}
+						onSearchBlur={handleSearchBlur}
+						onTrigger={handleOpenFilterPopup}
+						onClose={handleCloseFilterPopup}
+						onHide={handleFilterPopupHide}
+						onReset={handleResetDraftFilter}
+						onApply={handleApplyDraftFilter}
+						onDraftSelect={handleDraftFilterSelect}
+					/>
+				</MediaBrowseOverlay>
+				<div className={`${css.favoritesContent} ${browseCss.panelResultsOffset}`}>
 						<div className={css.favoritesBody}>
 							{loading ? (
 								<div className={css.loadingState}>
@@ -419,84 +449,33 @@ const FavoritesPanel = ({
 								</div>
 							) : favorites.length === 0 ? (
 								<div className={css.emptyState}>
-									<BodyText className={css.emptyTitle}>No favorites yet</BodyText>
-									<BodyText className={css.emptyMessage}>
-										Mark items as favorites from the detail view to see them here
+								<BodyText className={css.emptyTitle}>
+									{appliedSearchTerm ? 'No matching favorites' : 'No favorites yet'}
+								</BodyText>
+								<BodyText className={css.emptyMessage}>
+									{appliedSearchTerm
+										? `No favorites match “${appliedSearchTerm}” with the current filter`
+										: 'Mark items as favorites from the detail view to see them here'}
 									</BodyText>
 								</div>
-							) : (
-								<div className={css.favoritesGrid} ref={favoritesGridRef}>
-									{favorites.map((item, index) => {
-										const imageUrl = getPosterCardImageUrl(item);
-										return (
-											<PosterMediaCard
-												key={buildMediaListItemKey(`favorites-${activeFilter}`, item, index)}
-												itemId={item.Id}
-												data-card-index={index}
-												className={css.favoriteCard}
-												{...posterCardClassProps}
-												imageUrl={imageUrl}
-												title={item.Name}
-												subtitle={getMediaItemSubtitle(item)}
-												placeholderText={item.Name?.charAt(0) || '?'}
-												onClick={handleFavoriteCardClick}
-												onKeyDown={handleFavoriteCardKeyDown}
-												onFocus={handleFavoriteCardFocus}
-												overlayContent={(
-													<MediaCardStatusOverlay
-														progressPercent={item.UserData?.PlayedPercentage}
-														progressBarClassName={css.progressBar}
-														progressClassName={css.progress}
-													>
-														<div className={css.favoriteOverlayFrame}>
-															<div className={css.favoriteBadgeColumn}>
-																<div className={css.favoriteBadge}>{'\u2665'}</div>
-																{item.UserData?.Played === true ? (
-																	<div className={css.watchedBadge}>{'\u2713'}</div>
-																) : null}
-															</div>
-															<div className={css.favoriteActionColumn}>
-																<Button
-																	className={css.unfavoriteButton}
-																	icon="heart"
-																	css={{icon: css.favoriteActionIcon}}
-																	size="small"
-																	data-item-id={item.Id}
-																	data-card-index={index}
-																	data-action-type="favorite"
-																	onClick={handleUnfavoriteClick}
-																	onKeyDown={handleFavoriteActionKeyDown}
-																	title="Remove from favorites"
-																/>
-																<Button
-																	className={`${css.watchedToggleButton} ${item.UserData?.Played ? css.watchedToggleButtonActive : ''}`}
-																	icon="check"
-																	css={{icon: css.watchedActionIcon}}
-																	size="small"
-																	data-item-id={item.Id}
-																	data-card-index={index}
-																	data-action-type="watched"
-																	onClick={handleToggleWatchedClick}
-																	onKeyDown={handleFavoriteActionKeyDown}
-																	title={item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'}
-																/>
-															</div>
-														</div>
-													</MediaCardStatusOverlay>
-												)}
-											/>
-										);
-									})}
-									{loadingMore && (
-										<div className={css.loadingMore}>
-											<Spinner size="small" />
-										</div>
-									)}
-								</div>
-							)}
+							) : null}
+							<MediaVirtualGrid
+								id="favorites-grid"
+								spotlightId="favorites-grid"
+								className={css.favoritesGrid}
+								items={loading ? [] : favorites}
+								itemRenderer={renderFavorite}
+								isActive={isActive && !loading}
+								queryKey={`${activeFilter}:${appliedSearchTerm}`}
+								restoreItemId={lastFocusedCardIdRef.current}
+								hasMore={!loading && hasMore}
+								loadingMore={loadingMore}
+								onLoadMore={loadNextPage}
+								focusedItemIdRef={lastFocusedCardIdRef}
+								data-spotlight-container-disabled={loading || favorites.length === 0}
+							/>
 						</div>
 					</div>
-				</Scroller>
 			</div>
 		</Panel>
 	);

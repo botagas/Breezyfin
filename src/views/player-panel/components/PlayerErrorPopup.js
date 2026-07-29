@@ -1,6 +1,8 @@
+import {useRef} from 'react';
 import Popup from '@enact/sandstone/Popup';
 import BodyText from '@enact/sandstone/BodyText';
 import Button from '../../../components/BreezyButton';
+import {usePopupInitialFocus} from '../../../hooks/usePopupInitialFocus';
 import css from '../../PlayerPanel.module.less';
 import popupStyles from '../../../styles/popupStyles.module.less';
 
@@ -11,6 +13,9 @@ const PlayerErrorPopup = ({
 	onRetry,
 	onBack
 }) => {
+	const contentRef = useRef(null);
+	usePopupInitialFocus(open, contentRef);
+
 	return (
 		<Popup
 			open={open}
@@ -18,11 +23,15 @@ const PlayerErrorPopup = ({
 			noAutoDismiss
 			css={{popup: popupStyles.popupShell, body: css.errorPopupBody}}
 		>
-			<div className={`${popupStyles.popupSurface} ${css.errorPopupContent} bf-error-surface`}>
+			<div
+				ref={contentRef}
+				data-popup-focus-scope="true"
+				className={`${popupStyles.popupSurface} ${css.errorPopupContent} bf-error-surface`}
+			>
 				<BodyText className={`${css.popupTitle} bf-error-title`}>Playback Error</BodyText>
 				<BodyText className={`${css.errorMessage} bf-error-message`}>{error}</BodyText>
 				<div className={`${css.errorActions} bf-error-actions`}>
-					<Button onClick={onRetry} autoFocus className={`${css.errorActionButton} bf-error-action-button`}>
+					<Button onClick={onRetry} className={`${css.errorActionButton} bf-error-action-button`}>
 						Retry
 					</Button>
 					<Button onClick={onBack} className={`${css.errorActionButton} bf-error-action-button`}>

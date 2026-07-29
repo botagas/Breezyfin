@@ -54,16 +54,27 @@ export const getSkipSegmentLabel = (segmentType, hasNextEpisode = false) => {
 	}
 };
 
-export const getPlayerErrorBackdropUrl = (item, imageApi) => {
-	if (!item || !imageApi) return '';
-	if (Array.isArray(item?.BackdropImageTags) && item.BackdropImageTags.length > 0) {
-		return imageApi.getBackdropUrl(item.Id, 0, 1920);
+export const getPlayerBackdropCandidates = (item, imageApi) => {
+	if (!item || !imageApi) return [];
+	const candidates = [];
+	const addCandidate = (url) => {
+		if (url && !candidates.includes(url)) candidates.push(url);
+	};
+	if (item.Type === 'Episode' && item.SeriesId) {
+		addCandidate(imageApi.getBackdropUrl(item.SeriesId, 0, 1920));
+		addCandidate(imageApi.getBackdropUrl(item.Id, 0, 1920));
+		addCandidate(imageApi.getImageUrl(item.SeriesId, 'Primary', 1920));
+		addCandidate(imageApi.getImageUrl(item.Id, 'Primary', 1920));
+		return candidates;
 	}
-	if (item?.SeriesId) {
-		return imageApi.getBackdropUrl(item.SeriesId, 0, 1920);
+	if (Array.isArray(item.BackdropImageTags) && item.BackdropImageTags.length > 0) {
+		addCandidate(imageApi.getBackdropUrl(item.Id, 0, 1920));
 	}
-	if (item?.ImageTags?.Primary) {
-		return imageApi.getImageUrl(item.Id, 'Primary', 1920);
-	}
-	return '';
+	if (item.SeriesId) addCandidate(imageApi.getBackdropUrl(item.SeriesId, 0, 1920));
+	addCandidate(imageApi.getImageUrl(item.Id, 'Primary', 1920));
+	return candidates;
 };
+
+export const getPlayerBackdropUrl = (item, imageApi) => getPlayerBackdropCandidates(item, imageApi)[0] || '';
+
+export const getPlayerErrorBackdropUrl = getPlayerBackdropUrl;

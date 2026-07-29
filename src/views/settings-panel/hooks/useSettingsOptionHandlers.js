@@ -3,6 +3,8 @@ import {useCallback, useMemo} from 'react';
 import {writeBreezyfinSettings} from '../../../utils/settingsStorage';
 import {
 	ASS_SUBTITLE_RENDERER_OPTIONS,
+	BITMAP_SUBTITLE_RENDERER_OPTIONS,
+	SCREENSAVER_TIMEOUT_OPTIONS,
 	SETTINGS_DISCLOSURE_KEYS,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
@@ -34,6 +36,7 @@ export const useSettingsOptionHandlers = ({
 	closeAudioLangPopup,
 	closeSubtitleLangPopup,
 	closeAssSubtitleRendererPopup,
+	closeBitmapSubtitleRendererPopup,
 	closeSubtitleOverlayPositionPopup,
 	closeSubtitleOverlayBackgroundPopup,
 	closeSubtitleOverlayWeightPopup,
@@ -44,13 +47,15 @@ export const useSettingsOptionHandlers = ({
 	closeSubtitleOverlayShadowDistancePopup,
 	closeSubtitleOverlayShadowAnglePopup,
 	closeNavbarThemePopup,
+	closeScreensaverTimeoutPopup,
 	closePlayNextPromptModePopup,
 	normalizeCapabilityProbeRefreshDaysSetting,
 	setRuntimeCapabilityProbeRefreshDays,
 	setToastMessage,
 	bumpCapabilitySnapshotVersion,
 	getCapabilityProbeRefreshLabel,
-	assSubtitleRendererOptions = ASS_SUBTITLE_RENDERER_OPTIONS
+	assSubtitleRendererOptions = ASS_SUBTITLE_RENDERER_OPTIONS,
+	bitmapSubtitleRendererOptions = BITMAP_SUBTITLE_RENDERER_OPTIONS
 }) => {
 	const openPlayNextPromptModePopup = useCallback(() => {
 		if (settings.showPlayNextPrompt !== false) {
@@ -64,6 +69,13 @@ export const useSettingsOptionHandlers = ({
 		handleSettingChange('navbarTheme', themeValue);
 		closeNavbarThemePopup();
 	}, [closeNavbarThemePopup, handleSettingChange]);
+
+	const handleScreensaverTimeoutSelect = useCallback((event) => {
+		const value = event.currentTarget.dataset.value;
+		if (!SCREENSAVER_TIMEOUT_OPTIONS.some((option) => option.value === value)) return;
+		handleSettingChange('screensaverTimeoutMinutes', value);
+		closeScreensaverTimeoutPopup();
+	}, [closeScreensaverTimeoutPopup, handleSettingChange]);
 
 	const handleBitrateSelect = useCallback((event) => {
 		const bitrate = event.currentTarget.dataset.bitrate;
@@ -110,6 +122,19 @@ export const useSettingsOptionHandlers = ({
 		handleSettingChange('assSubtitleRenderer', value);
 		closeAssSubtitleRendererPopup();
 	}, [assSubtitleRendererOptions, closeAssSubtitleRendererPopup, handleSettingChange, settings.smartSubtitleTranscoding]);
+
+	const handleBitmapSubtitleRendererSelect = useCallback((event) => {
+		if (settings.smartSubtitleTranscoding === false) return;
+		const value = event.currentTarget.dataset.value;
+		if (!bitmapSubtitleRendererOptions.some((option) => option.value === value)) return;
+		handleSettingChange('bitmapSubtitleRenderer', value);
+		closeBitmapSubtitleRendererPopup();
+	}, [
+		bitmapSubtitleRendererOptions,
+		closeBitmapSubtitleRendererPopup,
+		handleSettingChange,
+		settings.smartSubtitleTranscoding
+	]);
 
 	const handleSubtitleBurnInTextCodecToggle = useCallback((event) => {
 		if (settings.smartSubtitleTranscoding !== false) return;
@@ -275,6 +300,10 @@ export const useSettingsOptionHandlers = ({
 		() => getOptionLabel(assSubtitleRendererOptions, settings.assSubtitleRenderer, 'Auto'),
 		[assSubtitleRendererOptions, settings.assSubtitleRenderer]
 	);
+	const bitmapSubtitleRendererLabel = useMemo(
+		() => getOptionLabel(bitmapSubtitleRendererOptions, settings.bitmapSubtitleRenderer, 'Auto'),
+		[bitmapSubtitleRendererOptions, settings.bitmapSubtitleRenderer]
+	);
 	const subtitleOverlayFontSizeLabel = useMemo(
 		() => getNumericSettingLabel(settings.subtitleOverlayFontSizePx, SUBTITLE_OVERLAY_FONT_SIZE_RANGE),
 		[settings.subtitleOverlayFontSizePx]
@@ -319,15 +348,25 @@ export const useSettingsOptionHandlers = ({
 		() => getOptionLabel(SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS, settings.subtitleOverlayShadowAngle, 'Down'),
 		[settings.subtitleOverlayShadowAngle]
 	);
+	const screensaverTimeoutLabel = useMemo(
+		() => getOptionLabel(
+			SCREENSAVER_TIMEOUT_OPTIONS,
+			settings.screensaverTimeoutMinutes,
+			'1 minute'
+		),
+		[settings.screensaverTimeoutMinutes]
+	);
 
 	return {
 		openPlayNextPromptModePopup,
 		handleNavbarThemeSelect,
+		handleScreensaverTimeoutSelect,
 		handleBitrateSelect,
 		handleCapabilityProbeRefreshSelect,
 		handleAudioLanguageSelect,
 		handleSubtitleLanguageSelect,
 		handleAssSubtitleRendererSelect,
+		handleBitmapSubtitleRendererSelect,
 		handleSubtitleBurnInTextCodecToggle,
 		handleSubtitleOverlayFontSizeDecrease,
 		handleSubtitleOverlayFontSizeIncrease,
@@ -348,6 +387,7 @@ export const useSettingsOptionHandlers = ({
 		setSegmentsOrLast60PromptMode,
 		subtitleBurnInTextCodecsLabel,
 		assSubtitleRendererLabel,
+		bitmapSubtitleRendererLabel,
 		subtitleOverlayFontSizeLabel,
 		subtitleOverlayPositionLabel,
 		subtitleOverlayBackgroundLabel,
@@ -358,6 +398,7 @@ export const useSettingsOptionHandlers = ({
 		subtitleOverlayBorderStrengthLabel,
 		subtitleOverlayOutlineSizeLabel,
 		subtitleOverlayShadowDistanceLabel,
-		subtitleOverlayShadowAngleLabel
+		subtitleOverlayShadowAngleLabel,
+		screensaverTimeoutLabel
 	};
 };

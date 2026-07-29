@@ -10,10 +10,16 @@ const BreezyLoadingOverlay = ({
 	if (!visible) return null;
 
 	return (
-		<div className={joinClasses(css.loading, className)}>
-			<div className={css.loadingSpinner} aria-hidden="true">
-				<div className={css.loadingSpinnerRing} />
-				<div className={css.loadingSpinnerCore} />
+		<div
+			className={joinClasses(css.loading, className)}
+			role="status"
+			aria-live="polite"
+			aria-atomic="true"
+		>
+			<div className={css.loadingGust} aria-hidden="true">
+				<span className={css.loadingStroke} />
+				<span className={css.loadingStroke} />
+				<span className={css.loadingStroke} />
 			</div>
 			<div className={css.loadingText}>{label}</div>
 		</div>

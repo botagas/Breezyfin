@@ -9,3 +9,41 @@
 :global([data-bf-input-mode='5way']) .skipButton:hover :global(.bg) {
 	background: var(--bf-theme-player-skip-button-bg) !important;
 }
+
+.subtitleBurnInPrompt {
+	width: min(52rem, 92vw);
+	padding: 1.55rem;
+	border-color: var(--bf-theme-warning-border) !important;
+}
+
+.subtitleBurnInPromptTitle {
+	margin: 0 0 0.6rem;
+	color: var(--bf-theme-warning-color);
+	font-size: 1.32rem;
+	font-weight: 800;
+}
+
+.subtitleBurnInPromptMessage,
+.subtitleBurnInPromptReason {
+	margin: 0.5rem 0 0;
+	color: var(--bf-theme-message-color);
+	line-height: 1.35;
+}
+
+.subtitleBurnInPromptReason {
+	color: var(--bf-theme-warning-color);
+	font-size: 0.92rem;
+	opacity: 0.88;
+}
+
+.subtitleBurnInPromptActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.7rem;
+	justify-content: flex-end;
+	margin-top: 1.1rem;
+}
+
+.subtitleBurnInPromptButton {
+	--bf-button-fg: var(--bf-theme-warning-color);
+}

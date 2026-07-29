@@ -1,15 +1,23 @@
 import {useCallback} from 'react';
 import jellyfinService from '../../../services/jellyfinService';
+import {
+	updateItemsPlayedState,
+	withItemPlayedState
+} from '../utils/mediaDetailsHelpers';
 
 export const useMediaDetailsItemActions = ({
 	item,
 	isFavorite,
 	isWatched,
+	isWatchlisted,
 	selectedSeason,
 	selectedEpisode,
 	setIsFavorite,
 	setIsWatched,
+	setIsWatchlisted,
+	setSeasons,
 	setEpisodes,
+	setSelectedSeason,
 	setSelectedEpisode,
 	setToastMessage
 }) => {
@@ -72,13 +80,23 @@ export const useMediaDetailsItemActions = ({
 
 		if (!targetId) return;
 		try {
-			await jellyfinService.toggleWatched(targetId, targetWatchedState);
+			const nextWatchedState = await jellyfinService.toggleWatched(targetId, targetWatchedState);
 
 			if (!itemId || itemId === item?.Id) {
-				setIsWatched(!targetWatchedState);
+				setIsWatched(nextWatchedState);
 			}
 
 			if (itemId && item?.Type === 'Series' && selectedSeason?.Id) {
+				setSeasons((currentSeasons) => updateItemsPlayedState(
+					currentSeasons,
+					targetId,
+					nextWatchedState
+				));
+				setSelectedSeason((currentSeason) => withItemPlayedState(
+					currentSeason,
+					targetId,
+					nextWatchedState
+				));
 				await refreshSeriesEpisodes();
 			} else {
 				const refreshed = await jellyfinService.getItem(targetId);
@@ -86,7 +104,7 @@ export const useMediaDetailsItemActions = ({
 					setIsWatched(refreshed.UserData.Played || false);
 				}
 			}
-			setToastMessage(!targetWatchedState ? 'Marked as watched' : 'Marked as unwatched');
+			setToastMessage(nextWatchedState ? 'Marked as watched' : 'Marked as unwatched');
 		} catch (error) {
 			console.error('Error toggling watched status:', error);
 			setToastMessage('Failed to update watched status');
@@ -97,12 +115,33 @@ export const useMediaDetailsItemActions = ({
 		refreshSeriesEpisodes,
 		selectedSeason?.Id,
 		setIsWatched,
+		setSeasons,
+		setSelectedSeason,
 		setToastMessage
 	]);
+
+	const handleToggleWatchlist = useCallback(async () => {
+		if (!item?.Id || !['Movie', 'Series'].includes(item.Type)) return;
+		try {
+			if (isWatchlisted) {
+				await jellyfinService.removeFromLikesWatchlist(item.Id);
+				setIsWatchlisted(false);
+				setToastMessage('Removed from watchlist');
+			} else {
+				await jellyfinService.addToLikesWatchlist(item.Id);
+				setIsWatchlisted(true);
+				setToastMessage('Added to watchlist');
+			}
+		} catch (error) {
+			console.error('Failed to update watchlist:', error);
+			setToastMessage('Failed to update watchlist');
+		}
+	}, [isWatchlisted, item, setIsWatchlisted, setToastMessage]);
 
 	return {
 		handleToggleFavorite,
 		handleToggleFavoriteById,
-		handleToggleWatched
+		handleToggleWatched,
+		handleToggleWatchlist
 	};
 };

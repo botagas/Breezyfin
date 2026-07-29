@@ -1,31 +1,30 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Panel, Header } from '../components/BreezyPanels';
-import Input from '@enact/sandstone/Input';
 import Button from '../components/BreezyButton';
-import Scroller from '../components/AppScroller';
-import Spinner from '@enact/sandstone/Spinner';
+import MediaBrowseControls from '../components/MediaBrowseControls';
+import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
 import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import Toolbar from '../components/Toolbar';
 import PosterMediaCard from '../components/PosterMediaCard';
-import MediaCardStatusOverlay from '../components/MediaCardStatusOverlay';
+import MediaVirtualGrid from '../components/MediaVirtualGrid';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
-import {KeyCodes} from '../utils/keyCodes';
-import {getMediaItemSubtitle, getPosterCardImageUrl} from '../utils/mediaItemUtils';
-import {getPosterCardClassProps} from '../utils/posterCardClassProps';
-import {ensureFocusTargetVisibleWithTopChrome} from '../utils/verticalFocusScroll';
+import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
+import {getPosterCardImageUrls} from '../utils/mediaItemUtils';
+import {getMediaCardPresentation} from '../utils/mediaCardPresentation';
 import { useDisclosureMap } from '../hooks/useDisclosureMap';
 import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
 import { useMapById } from '../hooks/useMapById';
 import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
 import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
-import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
-import {buildMediaListItemKey} from '../utils/reactKeys';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
+import {
+	resolveSearchPageProgress
+} from '../utils/searchPagination';
 
 import css from './SearchPanel.module.less';
+import browseCss from '../components/MediaBrowseControls.module.less';
 import popupStyles from '../styles/popupStyles.module.less';
 import {popupShellCss} from '../styles/popupStyles';
 
@@ -47,7 +46,7 @@ const INITIAL_SEARCH_DISCLOSURES = {
 const ALL_FILTER_IDS = FILTER_OPTIONS.map((filter) => filter.id);
 const SEARCH_PAGE_SIZE = MEDIA_GRID_PAGE_SIZE;
 const SEARCH_FOCUS_PREFETCH_THRESHOLD = 12;
-const SearchResultsSpotlightContainer = createLastFocusedSpotlightContainer();
+const SEARCH_GRID_ID = 'search-results-grid';
 const sanitizeSelectedFilterIds = (candidateIds) => {
 	if (!Array.isArray(candidateIds) || candidateIds.length === 0) return ALL_FILTER_IDS;
 	const allowed = new Set(ALL_FILTER_IDS);
@@ -99,6 +98,10 @@ const SearchPanel = ({
 	const searchDebounceRef = useRef(null);
 	const activeSearchRequestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const lastPaginationCursorRef = useRef(null);
+	const resultsRef = useRef(results);
+	const gridScrollToRef = useRef(null);
+	const lastFocusedItemIdRef = useRef(cachedState?.focusedItemId || null);
 	const filterPopupContentRef = useRef(null);
 	const lastCachedStateRef = useRef(cachedState);
 	const paginationRef = useRef({
@@ -109,18 +112,18 @@ const SearchPanel = ({
 		filterTypes: null
 	});
 	const filtersById = useMapById(FILTER_OPTIONS, 'id');
-	const resultsById = useMapById(results);
-	const {
-		scrollTop,
-		setScrollTop,
-		captureScrollTo: captureSearchScrollRestore,
-		handleScrollStop: handleSearchScrollMemoryStop
-	} = usePanelScrollState({cachedState, isActive});
 	const appliedFilterCount = useMemo(
 		() => (selectedFilterIds.length < FILTER_OPTIONS.length ? selectedFilterIds.length : 0),
 		[selectedFilterIds]
 	);
+	resultsRef.current = results;
 	usePopupInitialFocus(filterPopupOpen, filterPopupContentRef);
+	const captureGridScrollTo = useCallback((scrollTo) => {
+		gridScrollToRef.current = scrollTo;
+	}, []);
+	const resetGridScroll = useCallback(() => {
+		gridScrollToRef.current?.({align: 'top', animate: false});
+	}, []);
 
 	useEffect(() => {
 		const hadCachedState = lastCachedStateRef.current !== null;
@@ -132,6 +135,7 @@ const SearchPanel = ({
 		}
 		activeSearchRequestIdRef.current += 1;
 		loadingMoreRef.current = false;
+		lastPaginationCursorRef.current = null;
 		closeDisclosure(SEARCH_DISCLOSURE_KEYS.FILTER_POPUP);
 		paginationRef.current = {
 			nextStartIndex: 0,
@@ -139,18 +143,19 @@ const SearchPanel = ({
 			filterTypes: null
 		};
 		setSearchTerm('');
+		lastFocusedItemIdRef.current = null;
 		setResults([]);
+		resultsRef.current = [];
 		setLoading(false);
 		setLoadingMore(false);
 		setHasSearched(false);
 		setSelectedFilterIds(ALL_FILTER_IDS);
 		setHasMore(false);
-		setScrollTop(0);
-	}, [cachedState, closeDisclosure, setScrollTop]);
+		resetGridScroll();
+	}, [cachedState, closeDisclosure, resetGridScroll]);
 
 	const buildFilterTypes = useCallback((filterIds) => {
 		if (!Array.isArray(filterIds) || filterIds.length === 0) return null;
-		if (filterIds.length >= FILTER_OPTIONS.length) return null;
 		const selectedTypeSet = new Set();
 		filterIds.forEach((id) => {
 			const option = filtersById.get(id);
@@ -165,11 +170,12 @@ const SearchPanel = ({
 		if (normalizedTerm.length < 2) {
 			if (requestId !== activeSearchRequestIdRef.current) return;
 			setResults([]);
+			resultsRef.current = [];
 			setHasSearched(false);
 			setLoading(false);
 			setLoadingMore(false);
 			setHasMore(false);
-			setScrollTop(0);
+			resetGridScroll();
 			loadingMoreRef.current = false;
 			paginationRef.current = {
 				nextStartIndex: 0,
@@ -184,22 +190,26 @@ const SearchPanel = ({
 		setLoadingMore(false);
 		setHasSearched(true);
 		setHasMore(false);
-		setScrollTop(0);
+		resetGridScroll();
 		loadingMoreRef.current = false;
+		lastPaginationCursorRef.current = null;
 		try {
-			const items = await jellyfinService.search(normalizedTerm, filterTypes, SEARCH_PAGE_SIZE, 0);
+			const page = await jellyfinService.searchPage(normalizedTerm, filterTypes, SEARCH_PAGE_SIZE, 0);
 			if (requestId !== activeSearchRequestIdRef.current) return;
-			const safeItems = Array.isArray(items) ? items : [];
+			const progress = resolveSearchPageProgress({page, pageSize: SEARCH_PAGE_SIZE});
+			const safeItems = progress.uniqueItems;
+			resultsRef.current = safeItems;
 			setResults(safeItems);
-			setHasMore(safeItems.length === SEARCH_PAGE_SIZE);
+			setHasMore(progress.hasMore);
 			paginationRef.current = {
-				nextStartIndex: safeItems.length,
+				nextStartIndex: progress.nextStartIndex,
 				term: normalizedTerm,
 				filterTypes
 			};
 		} catch (error) {
 			if (requestId !== activeSearchRequestIdRef.current) return;
 			console.error('Search failed:', error);
+			resultsRef.current = [];
 			setResults([]);
 			setHasMore(false);
 			paginationRef.current = {
@@ -212,43 +222,45 @@ const SearchPanel = ({
 				setLoading(false);
 			}
 		}
-	}, [setScrollTop]);
+	}, [resetGridScroll]);
 
 	const loadNextPage = useCallback(async () => {
 		if (loading || loadingMoreRef.current || !hasSearched || !hasMore) return;
 		const {nextStartIndex, term, filterTypes} = paginationRef.current;
 		if (!term || term.length < 2) return;
+		if (lastPaginationCursorRef.current === nextStartIndex) return;
 
 		const requestId = activeSearchRequestIdRef.current;
+		lastPaginationCursorRef.current = nextStartIndex;
 		loadingMoreRef.current = true;
 		setLoadingMore(true);
 		try {
-			const nextBatch = await jellyfinService.search(term, filterTypes, SEARCH_PAGE_SIZE, nextStartIndex);
+			const page = await jellyfinService.searchPage(term, filterTypes, SEARCH_PAGE_SIZE, nextStartIndex);
 			if (requestId !== activeSearchRequestIdRef.current) return;
-
-			const safeBatch = Array.isArray(nextBatch) ? nextBatch : [];
-			if (safeBatch.length === 0) {
+			const progress = resolveSearchPageProgress({
+				page,
+				existingItems: resultsRef.current,
+				pageSize: SEARCH_PAGE_SIZE,
+				fallbackStartIndex: nextStartIndex
+			});
+			if (!progress.madeProgress) {
 				setHasMore(false);
 				return;
 			}
-
-			paginationRef.current.nextStartIndex = nextStartIndex + safeBatch.length;
-			setResults((prevResults) => {
-				const existingIds = new Set(prevResults.map((item) => String(item.Id)));
-				const dedupedBatch = safeBatch.filter((item) => !existingIds.has(String(item.Id)));
-				return dedupedBatch.length ? [...prevResults, ...dedupedBatch] : prevResults;
-			});
-			if (safeBatch.length < SEARCH_PAGE_SIZE) {
+			paginationRef.current.nextStartIndex = progress.nextStartIndex;
+			resultsRef.current = [...resultsRef.current, ...progress.uniqueItems];
+				setResults(resultsRef.current);
+				setHasMore(progress.hasMore);
+			} catch (error) {
+				if (requestId !== activeSearchRequestIdRef.current) return;
+				console.error('Failed to load additional search results:', error);
 				setHasMore(false);
+			} finally {
+				if (requestId === activeSearchRequestIdRef.current) {
+					setLoadingMore(false);
+					loadingMoreRef.current = false;
+				}
 			}
-		} catch (error) {
-			console.error('Failed to load additional search results:', error);
-		} finally {
-			if (requestId === activeSearchRequestIdRef.current) {
-				setLoadingMore(false);
-			}
-			loadingMoreRef.current = false;
-		}
 	}, [hasMore, hasSearched, loading]);
 
 	const scheduleSearch = useCallback((term, filterTypes) => {
@@ -256,14 +268,16 @@ const SearchPanel = ({
 			clearTimeout(searchDebounceRef.current);
 		}
 		activeSearchRequestIdRef.current += 1;
+		lastPaginationCursorRef.current = null;
 		const requestId = activeSearchRequestIdRef.current;
 		if (!term || term.trim().length < 2) {
 			setResults([]);
+			resultsRef.current = [];
 			setHasSearched(false);
 			setLoading(false);
 			setLoadingMore(false);
 			setHasMore(false);
-			setScrollTop(0);
+			resetGridScroll();
 			loadingMoreRef.current = false;
 			paginationRef.current = {
 				nextStartIndex: 0,
@@ -275,7 +289,7 @@ const SearchPanel = ({
 		searchDebounceRef.current = setTimeout(() => {
 			performSearch(term, filterTypes, requestId);
 		}, 500);
-	}, [performSearch, setScrollTop]);
+	}, [performSearch, resetGridScroll]);
 
 	useEffect(() => () => {
 		if (searchDebounceRef.current) {
@@ -305,26 +319,42 @@ const SearchPanel = ({
 			selectedFilterIds,
 			hasMore,
 			nextStartIndex: paginationRef.current.nextStartIndex,
-			scrollTop
+			focusedItemId: lastFocusedItemIdRef.current
 		});
-	}, [hasMore, hasSearched, onCacheState, results, scrollTop, searchTerm, selectedFilterIds]);
+	}, [hasMore, hasSearched, onCacheState, results, searchTerm, selectedFilterIds]);
 
 	const handleSearchChange = useCallback((e) => {
 		const value = e.value;
+		lastFocusedItemIdRef.current = null;
 		setSearchTerm(value);
 		const filterTypes = buildFilterTypes(selectedFilterIds);
 		scheduleSearch(value, filterTypes);
 	}, [buildFilterTypes, scheduleSearch, selectedFilterIds]);
 
 	const handleFilterSelection = useCallback((nextSelectedFilterIds) => {
+		lastFocusedItemIdRef.current = null;
 		setSelectedFilterIds(nextSelectedFilterIds);
 		if (searchTerm.trim().length >= 2) {
 			scheduleSearch(searchTerm, buildFilterTypes(nextSelectedFilterIds));
 		}
 	}, [buildFilterTypes, scheduleSearch, searchTerm]);
 
-	const handleItemClick = useCallback((item) => {
+	const handleItemClick = useCallback(async (item) => {
 		if (item.Type === 'Person') {
+			return;
+		}
+		if (item.Type === 'Season') {
+			if (!item.SeriesId) {
+				console.warn('[Search] Cannot open season without its parent series id.');
+				return;
+			}
+			try {
+				const series = await jellyfinService.getItem(item.SeriesId);
+				if (!series) return;
+				onItemSelect({...series, __initialSeasonId: item.Id});
+			} catch (error) {
+				console.error('Failed to open season search result:', error);
+			}
 			return;
 		}
 		onItemSelect(item);
@@ -369,178 +399,127 @@ const SearchPanel = ({
 	}, [handleFilterSelection]);
 
 	const handleResultCardClick = useCallback((event) => {
-		const itemId = event.currentTarget.dataset.itemId;
-		const selectedItem = resultsById.get(itemId);
+		const itemIndex = Number(event.currentTarget.dataset.index);
+		const selectedItem = Number.isInteger(itemIndex) ? resultsRef.current[itemIndex] : null;
 		if (!selectedItem) return;
+		lastFocusedItemIdRef.current = selectedItem.Id || null;
+		onCacheState?.({
+			searchTerm,
+			results: resultsRef.current,
+			hasSearched,
+			selectedFilterIds,
+			hasMore,
+			nextStartIndex: paginationRef.current.nextStartIndex,
+			focusedItemId: lastFocusedItemIdRef.current
+		});
 		handleItemClick(selectedItem);
-	}, [handleItemClick, resultsById]);
-	const posterCardClassProps = getPosterCardClassProps(css);
+	}, [handleItemClick, hasMore, hasSearched, onCacheState, searchTerm, selectedFilterIds]);
 
-	const handleResultCardKeyDown = useCallback((e) => {
-		const code = e.keyCode || e.which;
-		const card = e.currentTarget;
-		const cards = Array.from(card.parentElement.querySelectorAll(`.${css.resultCard}`));
-		const idx = cards.indexOf(card);
-		const columns = Math.floor(card.parentElement.clientWidth / card.clientWidth) || 1;
-		const consumeDirectionalEvent = () => {
-			e.preventDefault?.();
-			if (typeof e.stopPropagation === 'function') {
-				e.stopPropagation();
-			}
-			if (typeof e.stopImmediatePropagation === 'function') {
-				e.stopImmediatePropagation();
-			}
-		};
-		if (code === KeyCodes.LEFT && idx > 0) {
-			consumeDirectionalEvent();
-			cards[idx - 1].focus();
-		} else if (code === KeyCodes.RIGHT && idx < cards.length - 1) {
-			consumeDirectionalEvent();
-			cards[idx + 1].focus();
-		} else if (code === KeyCodes.UP && idx - columns >= 0) {
-			consumeDirectionalEvent();
-			cards[idx - columns].focus();
-		} else if (code === KeyCodes.DOWN && idx + columns < cards.length) {
-			consumeDirectionalEvent();
-			cards[idx + columns].focus();
-		}
-	}, []);
-
-	const handleResultCardFocus = useCallback((event) => {
-		ensureFocusTargetVisibleWithTopChrome(event.currentTarget);
-		if (!hasMore || loadingMoreRef.current) return;
-		const itemIndex = Number(event.currentTarget.dataset.itemIndex);
-		if (!Number.isInteger(itemIndex)) return;
-		const remainingItems = results.length - itemIndex - 1;
-		if (remainingItems <= SEARCH_FOCUS_PREFETCH_THRESHOLD) {
-			loadNextPage();
-		}
-	}, [hasMore, loadNextPage, results.length]);
-
-	const handleScrollerScrollStop = useCallback((event) => {
-		handleSearchScrollMemoryStop(event);
-		if (event?.reachedEdgeInfo?.bottom) {
-			loadNextPage();
-		}
-	}, [handleSearchScrollMemoryStop, loadNextPage]);
+	const renderSearchResult = useCallback(({index, items, ...itemProps}) => {
+		const item = items[index];
+		if (!item) return null;
+		const {onVirtualItemFocusEvent, ...cardProps} = itemProps;
+		const presentation = getMediaCardPresentation(item, {includePersonRole: true});
+		const imageCandidates = getPosterCardImageUrls(item, {
+			maxWidth: 400,
+			personMaxWidth: 200,
+			includeBackdrop: true,
+			includeSeriesFallback: true
+		});
+		return (
+			<PosterMediaCard
+				{...cardProps}
+				data-index={index}
+				itemId={item.Id}
+				className={css.resultCard}
+				imageCandidates={imageCandidates}
+				title={presentation.title}
+				subtitle={presentation.subtitle}
+				contextBadge={presentation.contextBadge}
+				ariaLabel={presentation.ariaLabel}
+				placeholderText={item.Name?.charAt(0) || '?'}
+				showWatched={item.UserData?.Played === true}
+				progressPercent={item.UserData?.PlayedPercentage}
+				onClick={handleResultCardClick}
+				onFocus={onVirtualItemFocusEvent}
+			/>
+		);
+	}, [handleResultCardClick]);
 
 	return (
 		<Panel {...rest}>
 			<Header title="Search" />
-				<Toolbar
-					activeSection="search"
-					isActive={isActive}
-					{...toolbarActions}
-				/>
-			<div className={css.searchContainer}>
-				<div className={css.searchBox}>
-					<div className={css.searchControls}>
-						<div className={css.searchFieldShell}>
-							<Input
-								className={`bf-input-trigger ${css.searchInput}`}
-								placeholder="Search movies, shows, people..."
-								value={searchTerm}
-								onChange={handleSearchChange}
-								dismissOnEnter
-								size="small"
-							/>
+			<Toolbar
+				activeSection="search"
+				isActive={isActive}
+				{...toolbarActions}
+			/>
+			<div className={`${css.searchContainer} ${browseCss.panelLayout}`}>
+				<MediaPanelBackdrop item={results[0] || null} />
+				<MediaBrowseOverlay>
+					<MediaBrowseControls
+						searchVisible
+						searchExpanded
+						searchValue={searchTerm}
+						searchPlaceholder="Search movies, shows, people..."
+						searchSpotlightId="search-input"
+						filterSpotlightId="search-filter-trigger"
+						onSearchChange={handleSearchChange}
+						activeFilterCount={appliedFilterCount}
+						onFilterClick={openFilterPopup}
+						filterLabel="Search filters"
+					/>
+				</MediaBrowseOverlay>
+				<div className={css.resultsViewport}>
+					<MediaVirtualGrid
+						id={SEARCH_GRID_ID}
+						spotlightId={SEARCH_GRID_ID}
+						className={css.resultsVirtualGrid}
+						items={loading ? [] : results}
+						itemRenderer={renderSearchResult}
+						cbScrollTo={captureGridScrollTo}
+						isActive={isActive}
+						queryKey={`${searchTerm}:${selectedFilterIds.join(',')}`}
+						restoreItemId={lastFocusedItemIdRef.current}
+						hasMore={hasMore}
+						loadingMore={loadingMore}
+						loadMoreThreshold={SEARCH_FOCUS_PREFETCH_THRESHOLD}
+						onLoadMore={loadNextPage}
+						focusedItemIdRef={lastFocusedItemIdRef}
+						data-spotlight-container-disabled={loading || results.length === 0}
+						verticalScrollbar="auto"
+					/>
+					{loading ? (
+						<div className={css.resultsStateOverlay}>
+							<BreezyLoadingOverlay />
 						</div>
-						<Button
-							className={css.filterTriggerButton}
-							onClick={openFilterPopup}
-							size="small"
-							icon="edit"
-							aria-label={`Filters${appliedFilterCount ? `, ${appliedFilterCount} applied` : ''}`}
-						>
-							{appliedFilterCount > 0 && (
-								<span className={css.filterAppliedBadge}>{appliedFilterCount}</span>
-							)}
-						</Button>
-					</div>
+					) : hasSearched && results.length === 0 ? (
+						<div className={css.resultsStateOverlay}>
+							<BodyText>No results found for {searchTerm}</BodyText>
+						</div>
+					) : !hasSearched ? (
+						<div className={css.resultsStateOverlay}>
+							<BodyText>Enter a search term to find movies, shows, and more</BodyText>
+						</div>
+					) : null}
 				</div>
-				<Scroller
-					className={css.resultsScroller}
-					cbScrollTo={captureSearchScrollRestore}
-					onScrollStop={handleScrollerScrollStop}
-				>
-					<div className={css.resultsContent}>
-						<div className={css.resultsBody}>
-							{loading ? (
-								<div className={css.loadingState}>
-									<BreezyLoadingOverlay />
-								</div>
-							) : hasSearched && results.length === 0 ? (
-								<div className={css.emptyState}>
-									<BodyText>No results found for {searchTerm}</BodyText>
-								</div>
-							) : !hasSearched ? (
-								<div className={css.emptyState}>
-									<BodyText>Enter a search term to find movies, shows, and more</BodyText>
-								</div>
-							) : (
-								<>
-									<SearchResultsSpotlightContainer className={css.resultsGrid} spotlightId="search-results-grid">
-										{results.map((item, index) => {
-											const imageUrl = getPosterCardImageUrl(item, {
-												maxWidth: 400,
-												personMaxWidth: 200,
-												includeBackdrop: true,
-												includeSeriesFallback: true
-											});
-											return (
-												<PosterMediaCard
-													key={buildMediaListItemKey('search-results', item, index)}
-													itemId={item.Id}
-													data-item-index={index}
-													className={css.resultCard}
-													{...posterCardClassProps}
-													imageUrl={imageUrl}
-													title={item.Name}
-													subtitle={getMediaItemSubtitle(item, {includePersonRole: true})}
-													placeholderText={item.Name?.charAt(0) || '?'}
-													onClick={handleResultCardClick}
-													onKeyDown={handleResultCardKeyDown}
-													onFocus={handleResultCardFocus}
-													overlayContent={(
-														<MediaCardStatusOverlay
-															showWatched={item.UserData?.Played === true}
-															watchedClassName={css.watchedBadge}
-															progressPercent={item.UserData?.PlayedPercentage}
-															progressBarClassName={css.progressBar}
-															progressClassName={css.progress}
-														/>
-													)}
-												/>
-											);
-										})}
-									</SearchResultsSpotlightContainer>
-									{loadingMore && (
-										<div className={css.loadingMore}>
-											<Spinner size="small" />
-										</div>
-									)}
-								</>
-							)}
-							</div>
-					</div>
-				</Scroller>
 
 				<Popup open={filterPopupOpen} onClose={closeFilterPopup} css={popupShellCss}>
 					<div
 						ref={filterPopupContentRef}
-						className={`${popupStyles.popupSurface} ${css.filterPopupContent}`}
+						className={`${popupStyles.popupSurface} ${browseCss.filterPopupContent}`}
 						data-popup-focus-scope="true"
 					>
-						<BodyText className={css.filterPopupTitle}>Search Filters</BodyText>
-						<div className={css.filterPopupActions}>
-							<Button size="small" onClick={handleSelectAllFilters} className={css.filterPopupActionButton}>
+						<BodyText className={browseCss.filterPopupTitle}>Search Filters</BodyText>
+						<div className={browseCss.filterPopupActions}>
+							<Button size="small" onClick={handleSelectAllFilters} className={browseCss.filterPopupActionButton}>
 								Select All
 							</Button>
-							<Button size="small" onClick={closeFilterPopup} className={css.filterPopupActionButton}>
+							<Button size="small" onClick={closeFilterPopup} className={browseCss.filterPopupActionButton}>
 								Done
 							</Button>
 						</div>
-						<div className={css.filterPopupOptions}>
+						<div className={browseCss.filterPopupOptions}>
 							{FILTER_OPTIONS.map((filter) => (
 								<Button
 									key={filter.id}
@@ -548,7 +527,7 @@ const SearchPanel = ({
 									selected={selectedFilterIds.includes(filter.id)}
 									onClick={handleFilterToggleClick}
 									size="small"
-									className={`${css.filterPopupOptionButton} ${selectedFilterIds.includes(filter.id) ? css.filterPopupOptionButtonSelected : ''}`}
+									className={`${browseCss.filterPopupOptionButton} ${selectedFilterIds.includes(filter.id) ? browseCss.filterPopupOptionButtonSelected : ''}`}
 								>
 									{filter.label}
 								</Button>

@@ -33,6 +33,8 @@ import { useMediaDetailsOverviewState } from './media-details-panel/hooks/useMed
 import { useMediaDetailsPanelSync } from './media-details-panel/hooks/useMediaDetailsPanelSync';
 import { useMediaDetailsItemBootstrap } from './media-details-panel/hooks/useMediaDetailsItemBootstrap';
 import { useMediaDetailsStagedReveal } from './media-details-panel/hooks/useMediaDetailsStagedReveal';
+import {readIntegrationPreferences} from '../utils/integrationPreferences';
+import jellyfinService from '../services/jellyfinService';
 import MediaDetailsToast from './media-details-panel/components/MediaDetailsToast';
 import MediaTrackPickerPopup from './media-details-panel/components/MediaTrackPickerPopup';
 import MediaEpisodePickerPopup from './media-details-panel/components/MediaEpisodePickerPopup';
@@ -41,6 +43,7 @@ import MediaSeasonsSection from './media-details-panel/components/MediaSeasonsSe
 import MediaSeriesStickyControls from './media-details-panel/components/MediaSeriesStickyControls';
 import MediaEpisodesSection from './media-details-panel/components/MediaEpisodesSection';
 import MediaDetailsIntroSection from './media-details-panel/components/MediaDetailsIntroSection';
+import {isPlayableMediaItem} from '../utils/mediaItemUtils';
 
 import css from './MediaDetailsPanel.module.less';
 import imageLoadCss from '../components/ImageLoadReveal.module.less';
@@ -78,6 +81,7 @@ const MediaDetailsPanel = ({
 	const [episodeNavList, setEpisodeNavList] = useState([]);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [isWatched, setIsWatched] = useState(false);
+	const [isWatchlisted, setIsWatchlisted] = useState(false);
 	const [navbarTheme, setNavbarTheme] = useState('elegant');
 	const [showSeasonImages, setShowSeasonImages] = useState(false);
 	const [useSidewaysEpisodeList, setUseSidewaysEpisodeList] = useState(true);
@@ -245,22 +249,28 @@ const MediaDetailsPanel = ({
 		setSelectedSeason,
 		setSelectedEpisode,
 		setIsFavorite,
-		setIsWatched
+		setIsWatched,
+		setIsWatchlisted
 	});
 
 	const {
 		handleToggleFavorite,
 		handleToggleFavoriteById,
-		handleToggleWatched
+		handleToggleWatched,
+		handleToggleWatchlist
 	} = useMediaDetailsItemActions({
 		item,
 		isFavorite,
 		isWatched,
+		isWatchlisted,
 		selectedSeason,
 		selectedEpisode,
 		setIsFavorite,
 		setIsWatched,
+		setIsWatchlisted,
+		setSeasons,
 		setEpisodes,
+		setSelectedSeason,
 		setSelectedEpisode,
 		setToastMessage
 	});
@@ -574,6 +584,9 @@ const MediaDetailsPanel = ({
 	const isSeriesMode = item.Type === 'Series';
 	const showEpisodeInfoButton = typeof onItemSelect === 'function';
 	const popupEpisodes = isSeriesMode ? episodes : episodeNavList;
+	const showPlaybackControls = isSeriesMode ? Boolean(selectedEpisode) : isPlayableMediaItem(item);
+	const showWatchlistAction = ['Movie', 'Series'].includes(item.Type) &&
+		readIntegrationPreferences(jellyfinService).watchlistEnabled;
 	const introDetails = {
 		item,
 		pageTitle,
@@ -587,10 +600,13 @@ const MediaDetailsPanel = ({
 		writerNames,
 		isFavorite,
 		isWatched,
+		isWatchlisted,
+		showWatchlistAction,
 		hasOverviewText,
 		overviewExpanded,
 		hasOverviewOverflow,
-		overviewPlayLabel
+		overviewPlayLabel,
+		showPlaybackControls
 	};
 	const introMedia = {
 		audioTracks,
@@ -606,6 +622,7 @@ const MediaDetailsPanel = ({
 		onHeaderLogoLoad: handleHeaderLogoLoad,
 		renderCreditNames,
 		onToggleFavorite: handleToggleFavorite,
+		onToggleWatchlist: handleToggleWatchlist,
 		onToggleWatchedMain: handleToggleWatchedMain,
 		onOverviewActivate: handleOverviewActivate,
 		onOpenAudioPicker: openAudioPicker,

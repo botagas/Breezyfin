@@ -1,0 +1,154 @@
+.toolbarCompactPill {
+	--bf-compact-tab-group-radius: 1.15rem;
+	--bf-compact-tab-radius: 0.9rem;
+	--bf-compact-action-size: 2.65rem;
+	--bf-elegant-tab-bg: transparent;
+	--bf-elegant-tab-active-bg: var(--bf-theme-tab-hover-bg);
+	min-height: var(--bf-toolbar-height);
+	padding: 0.55rem clamp(1.5rem, 4vw, 4rem) !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+
+	.glassNav {
+		width: 100%;
+		max-width: none;
+		height: calc(var(--bf-toolbar-height) - 1.1rem);
+		border: 0 !important;
+		border-radius: 0;
+		background: transparent !important;
+		box-shadow: none !important;
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+	}
+
+	.glassFilter,
+	.glassOverlay,
+	.glassSpecular {
+		display: none !important;
+	}
+
+	.glassContent {
+		position: relative;
+	}
+
+	.elegantContainer {
+		grid-template-columns: minmax(3rem, 1fr) auto minmax(15rem, 1fr);
+		gap: 0.65rem;
+		padding: 0;
+	}
+
+	.elegantLeftSpacer {
+		width: 2.65rem;
+		height: 2.65rem;
+	}
+
+	.elegantTabs {
+		position: relative;
+		isolation: isolate;
+		min-width: auto;
+		gap: 0.08rem;
+		padding: 0.24rem 0.1rem;
+		border: 1px solid var(--bf-theme-surface-border);
+		border-radius: var(--bf-compact-tab-group-radius);
+		background: transparent;
+		box-shadow: var(--bf-theme-card-shadow-rest);
+		overflow: hidden;
+
+		&::before,
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			border-radius: inherit;
+			pointer-events: none;
+		}
+
+		&::before {
+			z-index: 0;
+			background: transparent;
+			backdrop-filter: blur(0.7rem);
+			-webkit-backdrop-filter: blur(0.7rem);
+			filter: var(--bf-glass-distortion-filter) saturate(1.14) brightness(1.04);
+		}
+
+		&::after {
+			z-index: 1;
+			background: var(--bf-theme-glass-specular-bg);
+			box-shadow: var(--bf-theme-glass-specular-shadow);
+		}
+	}
+
+	.tabButton {
+		position: relative;
+		z-index: 2;
+		height: 2.45rem !important;
+		min-height: 2.45rem !important;
+		padding: 0 1.25rem !important;
+		border-radius: var(--bf-compact-tab-radius) !important;
+
+		:global(.bf-button-bg) {
+			border: 0 !important;
+			border-radius: var(--bf-compact-tab-radius) !important;
+			background: transparent !important;
+		}
+
+		&:hover :global(.bf-button-bg),
+		&:focus :global(.bf-button-bg),
+		&:global(.spottable):focus :global(.bf-button-bg) {
+			background: var(--bf-elegant-tab-active-bg) !important;
+		}
+	}
+
+	.tabSelected :global(.bf-button-bg) {
+		background: var(--bf-elegant-tab-active-bg) !important;
+	}
+
+	.elegantActions {
+		gap: 0.16rem;
+	}
+
+	&.toolbarElegant .iconButton {
+		min-width: var(--bf-compact-action-size);
+		width: var(--bf-compact-action-size);
+		min-height: var(--bf-compact-action-size);
+		height: var(--bf-compact-action-size);
+		padding: 0.45rem;
+		border-radius: 50%;
+		background: transparent !important;
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+		transition: background-color 120ms ease, color 120ms ease;
+	}
+
+	&.toolbarElegant .iconButton.selected,
+	&.toolbarElegant .iconButton:focus,
+	&.toolbarElegant .iconButton:hover {
+		background: var(--bf-theme-overlay-ultra-soft-bg) !important;
+		backdrop-filter: blur(0.4rem);
+		-webkit-backdrop-filter: blur(0.4rem);
+	}
+
+	.userAvatar {
+		width: 1.8rem;
+		height: 1.8rem;
+	}
+}
+
+:global([data-bf-all-animations='off']) .toolbarCompactPill.toolbarElegant .iconButton,
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill.toolbarElegant .iconButton {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+:global([data-bf-animations='off']) .toolbarCompactPill .elegantTabs::before {
+	filter: none !important;
+}
+
+:global([data-bf-all-animations='off']) .toolbarCompactPill .elegantTabs::before,
+:global([data-bf-webos-v6-compat='on']) .toolbarCompactPill .elegantTabs::before {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	filter: none !important;
+}

@@ -1,0 +1,58 @@
+@import (reference) '../styles/panelLayoutMixins.less';
+
+.scroller {
+	--bf-integration-overlap-lift: calc(var(--bf-top-chrome-height) - var(--bf-panel-scroller-offset-nudge));
+	position: relative;
+	z-index: 1;
+	height: calc(100vh + var(--bf-integration-overlap-lift));
+	min-height: 0;
+	margin-top: calc(-1 * var(--bf-integration-overlap-lift));
+	background: transparent;
+	overscroll-behavior: contain;
+}
+
+.content {
+	position: relative;
+	z-index: 1;
+	box-sizing: border-box;
+	min-height: 100vh;
+	padding: calc(var(--bf-top-chrome-height) + 1.5rem) 4rem var(--bf-panel-content-bottom-padding);
+}
+
+.staticViewport {
+	overflow: hidden;
+}
+
+.staticContent {
+	display: flex;
+	height: 100%;
+	min-height: 0;
+	flex-direction: column;
+}
+
+.loading {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+}
+
+.stateSurface {
+	display: flex;
+	min-height: 16rem;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	gap: 1rem;
+	text-align: center;
+	color: var(--bf-theme-muted-text);
+}
+
+.stateSurface :global(.BodyText) {
+	max-width: 64rem;
+	margin: 0;
+	text-align: center;
+}

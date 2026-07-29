@@ -3,6 +3,11 @@ import {
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE
 } from '../../../utils/subtitleAppearance';
+import {
+	getAssCoordinatePlane,
+	getAssStageLengthPx,
+	getAssStagePercent
+} from './subtitleRendererAssStage';
 
 const SUBTITLE_SIZE_VALUES = new Set(['small', 'medium', 'large']);
 const SUBTITLE_POSITION_VALUES = new Set(['low', 'standard', 'raised']);
@@ -18,6 +23,14 @@ const SUBTITLE_SHADOW_ANGLE_VALUES = new Set(['down', 'downRight', 'downLeft', '
 
 export const SUBTITLE_REGION_KEYS = ['top', 'middle', 'bottom'];
 export const SUBTITLE_ALIGN_KEYS = ['left', 'center', 'right'];
+const ASS_VIEWPORT_LENGTH_PATTERN = /^(-?\d+(?:\.\d+)?)vh$/i;
+const ASS_BORDER_LENGTH_STYLE_KEYS = new Set([
+	'--bf-player-subtitle-current-outline-size',
+	'--bf-player-subtitle-current-shadow-distance',
+	'--bf-player-subtitle-current-shadow-x',
+	'--bf-player-subtitle-current-shadow-y',
+	'--bf-player-subtitle-current-shadow-blur'
+]);
 
 const normalizeSubtitleSetting = (value, allowedValues, fallback) => {
 	return allowedValues.has(value) ? value : fallback;
@@ -60,16 +73,16 @@ export const getSubtitleTextStyle = (settings = {}) => ({
 	)}px`
 });
 
-const getCueSourceFontSize = (cue = {}) => {
+const getCueSourceFontSize = (cue = {}, stageGeometry = {}) => {
 	const sourceFontSize = cue.sourceFontSize || {};
+	const sourceSize = Number(sourceFontSize.size);
+	const stageSize = getAssStageLengthPx(sourceSize, 'y', cue, stageGeometry);
+	if (Number.isFinite(stageSize) && stageSize > 0) return `${stageSize.toFixed(3)}px`;
 	const fontSizeVh = Number(sourceFontSize.fontSizeVh);
-	return Number.isFinite(fontSizeVh) && fontSizeVh > 0 ? `${fontSizeVh.toFixed(3)}vh` : '';
-};
-
-const getCueSourceFontSizeVh = (cue = {}) => {
-	const sourceFontSize = cue.sourceFontSize || {};
-	const fontSizeVh = Number(sourceFontSize.fontSizeVh);
-	return Number.isFinite(fontSizeVh) && fontSizeVh > 0 ? fontSizeVh : null;
+	const stageHeight = Number(stageGeometry.height);
+	return Number.isFinite(fontSizeVh) && fontSizeVh > 0 && Number.isFinite(stageHeight)
+		? `${((fontSizeVh / 100) * stageHeight).toFixed(3)}px`
+		: '';
 };
 
 const getCueLineCount = (cue = {}) => (Array.isArray(cue.lines) ? cue.lines.length : 0);
@@ -83,46 +96,53 @@ export const isLargeSubtitleCue = (cue = {}) => (
 	getCueTextLength(cue) >= 220
 );
 
-const getLargeCueFontSize = (cue = {}) => {
-	if (!isLargeSubtitleCue(cue)) return '';
-	const lineCount = Math.max(1, getCueLineCount(cue));
-	const sourceFontSizeVh = getCueSourceFontSizeVh(cue);
-	const maxFitVh = Math.max(1.25, Math.min(2.8, 78 / (lineCount * 1.12)));
-	const fallbackVh = 2.2;
-	const resolvedVh = sourceFontSizeVh
-		? Math.min(sourceFontSizeVh, maxFitVh)
-		: Math.min(fallbackVh, maxFitVh);
-	return `${resolvedVh.toFixed(3)}vh`;
-};
-
-const toPercent = (value) => {
-	const numberValue = Number(value);
-	return Number.isFinite(numberValue) && numberValue > 0 ? `${numberValue.toFixed(3)}%` : '';
-};
-
-const toVh = (value) => {
-	const numberValue = Number(value);
-	return Number.isFinite(numberValue) && numberValue > 0 ? `${numberValue.toFixed(3)}vh` : '';
-};
-
 const clampPercent = (value) => {
 	const numberValue = Number(value);
 	if (!Number.isFinite(numberValue)) return null;
 	return Math.min(100, Math.max(0, numberValue));
 };
 
-const getCueMarginStyle = (cue = {}) => {
+export const getSubtitleAbsolutePositionStyle = (cue = {}, stageGeometry = {}) => {
+	const authoredX = getAssStagePercent(cue.absolutePosition?.x, 'x', cue, stageGeometry) ?? cue.absolutePosition?.xPercent;
+	const authoredY = getAssStagePercent(cue.absolutePosition?.y, 'y', cue, stageGeometry) ?? cue.absolutePosition?.yPercent;
+	const xPercent = Number(authoredX);
+	const yPercent = Number(authoredY);
+	if (!Number.isFinite(xPercent) || !Number.isFinite(yPercent)) return {};
+	return {
+		'--bf-player-subtitle-absolute-x': `${xPercent.toFixed(3)}%`,
+		'--bf-player-subtitle-absolute-y': `${yPercent.toFixed(3)}%`,
+		'--bf-player-subtitle-absolute-max-width': 'none',
+		'--bf-player-subtitle-absolute-max-height': 'none'
+	};
+};
+
+const getCueMarginStyle = (cue = {}, stageGeometry = {}) => {
+	if (cue.absolutePosition || cue.move) return {};
 	const sourceMargins = cue.sourceMargins || {};
-	const left = toPercent(sourceMargins.leftPercent);
-	const right = toPercent(sourceMargins.rightPercent);
-	const vertical = toVh(sourceMargins.verticalPercent);
+	const leftPx = getAssStageLengthPx(sourceMargins.left, 'x', cue, stageGeometry);
+	const rightPx = getAssStageLengthPx(sourceMargins.right, 'x', cue, stageGeometry);
+	const leftPercent = Number(sourceMargins.leftPercent);
+	const rightPercent = Number(sourceMargins.rightPercent);
+	const left = Number.isFinite(leftPx) && leftPx > 0
+		? `${leftPx.toFixed(3)}px`
+		: (Number.isFinite(leftPercent) && leftPercent > 0 ? `${leftPercent.toFixed(3)}%` : '');
+	const right = Number.isFinite(rightPx) && rightPx > 0
+		? `${rightPx.toFixed(3)}px`
+		: (Number.isFinite(rightPercent) && rightPercent > 0 ? `${rightPercent.toFixed(3)}%` : '');
+	const verticalPx = getAssStageLengthPx(sourceMargins.vertical, 'y', cue, stageGeometry);
+	const fallbackVerticalPercent = Number(sourceMargins.verticalPercent);
+	const fallbackStageHeight = Number(stageGeometry.height) || 1080;
+	const resolvedVerticalPx = Number.isFinite(verticalPx)
+		? verticalPx
+		: ((Number.isFinite(fallbackVerticalPercent) ? fallbackVerticalPercent : 0) / 100) * fallbackStageHeight;
+	const vertical = resolvedVerticalPx > 0 ? `${resolvedVerticalPx.toFixed(3)}px` : '';
 	const style = {};
 	if (left) style.marginLeft = left;
 	if (right) style.marginRight = right;
 	if (left || right) {
-		const leftPercent = Number(sourceMargins.leftPercent) || 0;
-		const rightPercent = Number(sourceMargins.rightPercent) || 0;
-		style.maxWidth = `calc(100% - ${(leftPercent + rightPercent).toFixed(3)}%)`;
+		style.maxWidth = Number.isFinite(leftPx) || Number.isFinite(rightPx)
+			? `calc(100% - ${((leftPx || 0) + (rightPx || 0)).toFixed(3)}px)`
+			: `calc(100% - ${((leftPercent || 0) + (rightPercent || 0)).toFixed(3)}%)`;
 	}
 	if (vertical && cue.placement === 'top') {
 		style.marginTop = vertical;
@@ -158,6 +178,25 @@ const getCueSourceStyle = (cue = {}) => ({
 	...(cue.activeSourceStyle || {})
 });
 
+const convertStageRelativeStyle = (style = {}, stageGeometry = {}, cue = {}) => {
+	const stageHeight = Number(stageGeometry.height) || 1080;
+	const plane = getAssCoordinatePlane(cue, stageGeometry);
+	return Object.entries(style).reduce((nextStyle, [key, value]) => {
+		const match = typeof value === 'string' ? value.trim().match(ASS_VIEWPORT_LENGTH_PATTERN) : null;
+		if (!match) {
+			nextStyle[key] = value;
+			return nextStyle;
+		}
+		const authoredVh = Number(match[1]);
+		const useUnscaledBorder = cue.scriptGeometry?.scaledBorderAndShadow === false && ASS_BORDER_LENGTH_STYLE_KEYS.has(key);
+		const playResY = Number(cue.scriptGeometry?.playResY) || Number(cue.sourceFontSize?.playResY) || 288;
+		nextStyle[key] = useUnscaledBorder
+			? `${(((authoredVh / 100) * playResY) * plane.layoutScaleY).toFixed(3)}px`
+			: `${((authoredVh / 100) * stageHeight).toFixed(3)}px`;
+		return nextStyle;
+	}, {});
+};
+
 const hasOriginTransformLayer = (cue = {}) => (
 	Number.isFinite(cue?.origin?.xPercent) &&
 	Number.isFinite(cue?.origin?.yPercent) &&
@@ -174,22 +213,23 @@ const stripCueTransformLayerStyle = (style = {}) => {
 	return textStyle;
 };
 
-export const getSubtitleCueTransformLayerStyle = (cue = {}) => {
+export const getSubtitleCueTransformLayerStyle = (cue = {}, stageGeometry = {}) => {
 	if (!hasOriginTransformLayer(cue)) return {};
 	const sourceStyle = getCueSourceStyle(cue);
+	const originX = getAssStagePercent(cue.origin?.x, 'x', cue, stageGeometry) ?? cue.origin.xPercent;
+	const originY = getAssStagePercent(cue.origin?.y, 'y', cue, stageGeometry) ?? cue.origin.yPercent;
 	return {
 		transform: sourceStyle.transform,
-		transformOrigin: `${cue.origin.xPercent.toFixed(3)}% ${cue.origin.yPercent.toFixed(3)}%`
+		transformOrigin: `${originX.toFixed(3)}% ${originY.toFixed(3)}%`
 	};
 };
 
-export const getSubtitleCueTextStyle = (baseTextStyle = {}, cue = {}) => {
-	const sourceFontSize = getCueSourceFontSize(cue);
+export const getSubtitleCueTextStyle = (baseTextStyle = {}, cue = {}, stageGeometry = {}) => {
+	const sourceFontSize = getCueSourceFontSize(cue, stageGeometry);
 	const largeCue = isLargeSubtitleCue(cue);
-	const largeCueFontSize = getLargeCueFontSize(cue);
 	const sourceStyle = hasOriginTransformLayer(cue)
-		? stripCueTransformLayerStyle(getCueSourceStyle(cue))
-		: getCueSourceStyle(cue);
+		? stripCueTransformLayerStyle(convertStageRelativeStyle(getCueSourceStyle(cue), stageGeometry, cue))
+		: convertStageRelativeStyle(getCueSourceStyle(cue), stageGeometry, cue);
 	return {
 		...baseTextStyle,
 		...(cue.runLines || cue.drawing ? {
@@ -200,20 +240,50 @@ export const getSubtitleCueTextStyle = (baseTextStyle = {}, cue = {}) => {
 		...sourceStyle,
 		...(largeCue ? {
 			lineHeight: 1.12,
-			maxHeight: '86vh',
 			maxWidth: '100%',
-			overflow: 'hidden',
 			padding: '0.08em 0.28em'
 		} : {}),
-		...getCueMarginStyle(cue),
+		...getCueMarginStyle(cue, stageGeometry),
 		...getCueWrapStyle(cue),
 		...(sourceFontSize ? {fontSize: sourceFontSize} : {}),
-		...(largeCueFontSize ? {fontSize: largeCueFontSize} : {}),
 		...(Number.isFinite(cue.opacity) ? {opacity: cue.opacity} : {})
 	};
 };
 
-export const getSubtitleCueRunStyle = (run = {}) => (run?.style ? {...run.style} : {});
+export const getSubtitleCueRunStyle = (run = {}, stageGeometry = {}, cue = {}) => {
+	if (!run?.style) return {};
+	return convertStageRelativeStyle(run.style, stageGeometry, cue);
+};
+
+const hasPositiveRunLength = (style = {}, property) => {
+	const value = Number.parseFloat(style[property]);
+	return Number.isFinite(value) && Math.abs(value) > 0.0001;
+};
+
+export const getSubtitleCueRunEffects = (run = {}) => {
+	const style = run?.style || {};
+	const borderStyle = Number(style['--bf-player-subtitle-source-border-style']);
+	const usesOutlineBorder = !Number.isFinite(borderStyle) || borderStyle === 1;
+	const authored = [
+		'--bf-player-subtitle-source-border-style',
+		'--bf-player-subtitle-current-outline-size',
+		'--bf-player-subtitle-current-shadow-distance',
+		'--bf-player-subtitle-current-shadow-x',
+		'--bf-player-subtitle-current-shadow-y'
+	].some((property) => Object.prototype.hasOwnProperty.call(style, property));
+	return {
+		authored,
+		outline: usesOutlineBorder && hasPositiveRunLength(
+			style,
+			'--bf-player-subtitle-current-outline-size'
+		),
+		shadow: usesOutlineBorder && [
+			'--bf-player-subtitle-current-shadow-distance',
+			'--bf-player-subtitle-current-shadow-x',
+			'--bf-player-subtitle-current-shadow-y'
+		].some((property) => hasPositiveRunLength(style, property))
+	};
+};
 
 export const isDrawingSubtitleCue = (cue) => (
 	Array.isArray(cue?.drawing?.paths) &&
@@ -221,59 +291,18 @@ export const isDrawingSubtitleCue = (cue) => (
 	typeof cue.drawing.viewBox?.value === 'string'
 );
 
-export const isDrawingVectorClippedSubtitleCue = (cue) => (
-	isDrawingSubtitleCue(cue) &&
-	cue?.clip?.type === 'drawing' &&
-	typeof cue.clip.pathData === 'string' &&
-	cue.clip.pathData.trim().length > 0
-);
-
-export const getSubtitleDrawingSvgStyle = (cue = {}) => {
+export const getSubtitleDrawingSvgStyle = (cue = {}, stageGeometry = {}) => {
 	if (!isDrawingSubtitleCue(cue)) return {};
 	const width = Number(cue.drawing.viewBox.width);
 	const height = Number(cue.drawing.viewBox.height);
-	const playResX = Number(cue.drawing.playResX);
-	const playResY = Number(cue.drawing.playResY);
+	const plane = getAssCoordinatePlane(cue, stageGeometry);
 	return {
-		...(Number.isFinite(width) && Number.isFinite(playResX) && playResX > 0 ? {
-			width: `${Math.max(1, Math.min(100, (width / playResX) * 100)).toFixed(3)}vw`
+		...(Number.isFinite(width) && plane.scaleX > 0 ? {
+			width: `${Math.max(1, width * plane.scaleX).toFixed(3)}px`
 		} : {}),
-		...(Number.isFinite(height) && Number.isFinite(playResY) && playResY > 0 ? {
-			height: `${Math.max(1, Math.min(100, (height / playResY) * 100)).toFixed(3)}vh`
+		...(Number.isFinite(height) && plane.scaleY > 0 ? {
+			height: `${Math.max(1, height * plane.scaleY).toFixed(3)}px`
 		} : {})
-	};
-};
-
-export const getSubtitleDrawingClipPath = (cue = {}) => {
-	if (!isDrawingVectorClippedSubtitleCue(cue)) return null;
-	const viewBox = cue.drawing.viewBox || {};
-	if (cue.clip.inverted !== true) {
-		return {
-			d: cue.clip.pathData,
-			inverted: false
-		};
-	}
-	const x = Number(viewBox.x);
-	const y = Number(viewBox.y);
-	const width = Number(viewBox.width);
-	const height = Number(viewBox.height);
-	if (![x, y, width, height].every(Number.isFinite)) {
-		return {
-			d: cue.clip.pathData,
-			inverted: true
-		};
-	}
-	const right = x + width;
-	const bottom = y + height;
-	return {
-		d: [
-			`M ${x.toFixed(3)} ${y.toFixed(3)}`,
-			`H ${right.toFixed(3)}`,
-			`V ${bottom.toFixed(3)}`,
-			`H ${x.toFixed(3)} Z`,
-			cue.clip.pathData
-		].join(' '),
-		inverted: true
 	};
 };
 
@@ -283,28 +312,65 @@ export const isAbsoluteSubtitleCue = (cue) => (
 );
 
 export const isClippedSubtitleCue = (cue) => (
-	Boolean(cue?.clip) &&
-	Number.isFinite(cue.clip.leftPercent) &&
-	Number.isFinite(cue.clip.topPercent) &&
-	Number.isFinite(cue.clip.rightPercent) &&
-	Number.isFinite(cue.clip.bottomPercent)
+	Boolean(cue?.clip) && (
+		(
+			Number.isFinite(cue.clip.leftPercent) &&
+			Number.isFinite(cue.clip.topPercent) &&
+			Number.isFinite(cue.clip.rightPercent) &&
+			Number.isFinite(cue.clip.bottomPercent)
+		) || (
+			cue.clip.type === 'drawing' &&
+			typeof cue.clip.pathData === 'string' &&
+			cue.clip.pathData.trim().length > 0
+		)
+	)
 );
 
-export const getSubtitleClipLayerStyle = (cue = {}) => {
+export const scaleAssClipPathData = (pathData, scaleX, scaleY, offsetX = 0, offsetY = 0) => {
+	let coordinateIndex = 0;
+	return String(pathData || '').replace(/-?\d+(?:\.\d+)?/g, (value) => {
+		const numericValue = Number(value);
+		const horizontal = coordinateIndex % 2 === 0;
+		const scale = horizontal ? scaleX : scaleY;
+		const offset = horizontal ? offsetX : offsetY;
+		coordinateIndex += 1;
+		return Number.isFinite(numericValue) && Number.isFinite(scale)
+			? ((numericValue * scale) + (Number(offset) || 0)).toFixed(3)
+			: value;
+	});
+};
+
+export const getSubtitleClipLayerStyle = (cue = {}, stageGeometry = {}) => {
 	if (!isClippedSubtitleCue(cue)) return {};
-	const left = clampPercent(cue.clip.leftPercent);
-	const top = clampPercent(cue.clip.topPercent);
-	const right = clampPercent(cue.clip.rightPercent);
-	const bottom = clampPercent(cue.clip.bottomPercent);
+	if (cue.clip.type === 'drawing') {
+		const plane = getAssCoordinatePlane(cue, stageGeometry);
+		const pathData = scaleAssClipPathData(
+			cue.clip.pathData,
+			plane.scaleX,
+			plane.scaleY,
+			plane.offsetX,
+			plane.offsetY
+		);
+		const stageWidth = Number(stageGeometry.width) || plane.width * plane.scaleX;
+		const stageHeight = Number(stageGeometry.height) || plane.height * plane.scaleY;
+		const path = cue.clip.inverted === true
+			? `path(evenodd, "M0 0 H${stageWidth.toFixed(3)} V${stageHeight.toFixed(3)} H0 Z ${pathData}")`
+			: `path(evenodd, "${pathData}")`;
+		return {
+			clipPath: path,
+			WebkitClipPath: path
+		};
+	}
+	const left = clampPercent(getAssStagePercent(cue.clip.x1, 'x', cue, stageGeometry) ?? cue.clip.leftPercent);
+	const top = clampPercent(getAssStagePercent(cue.clip.y1, 'y', cue, stageGeometry) ?? cue.clip.topPercent);
+	const right = clampPercent(getAssStagePercent(cue.clip.x2, 'x', cue, stageGeometry) ?? cue.clip.rightPercent);
+	const bottom = clampPercent(getAssStagePercent(cue.clip.y2, 'y', cue, stageGeometry) ?? cue.clip.bottomPercent);
 	if ([left, top, right, bottom].some((value) => value === null)) return {};
 	if (cue.clip.inverted === true) {
-		const path = [
-			'path(evenodd, "M0 0 H100 V100 H0 Z',
-			`M${left.toFixed(3)} ${top.toFixed(3)}`,
-			`H${right.toFixed(3)}`,
-			`V${bottom.toFixed(3)}`,
-			`H${left.toFixed(3)} Z")`
-		].join(' ');
+		const path = `polygon(evenodd, ${left.toFixed(3)}% ${top.toFixed(3)}%, ` +
+			`${left.toFixed(3)}% ${bottom.toFixed(3)}%, ${right.toFixed(3)}% ${bottom.toFixed(3)}%, ` +
+			`${right.toFixed(3)}% ${top.toFixed(3)}%, ${left.toFixed(3)}% ${top.toFixed(3)}%, ` +
+			'0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%)';
 		return {
 			clipPath: path,
 			WebkitClipPath: path
@@ -330,3 +396,16 @@ export const groupSubtitleCuesByPlacement = (cues = []) => cues.reduce((groups, 
 		[align]: []
 	}), {})
 }), {}));
+
+export const groupSubtitleCuesByLayer = (cues = []) => {
+	const layers = new Map();
+	for (const cue of cues) {
+		const numericLayer = Number(cue?.layer);
+		const layer = Number.isFinite(numericLayer) ? numericLayer : 0;
+		if (!layers.has(layer)) layers.set(layer, []);
+		layers.get(layer).push(cue);
+	}
+	return Array.from(layers.entries())
+		.sort(([leftLayer], [rightLayer]) => leftLayer - rightLayer)
+		.map(([layer, layerCues]) => ({layer, cues: layerCues}));
+};

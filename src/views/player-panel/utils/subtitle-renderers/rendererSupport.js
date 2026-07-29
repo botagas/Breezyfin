@@ -63,3 +63,20 @@ export const supportsAssJsRuntime = () => (
 	typeof window !== 'undefined' &&
 	typeof Promise === 'function'
 );
+
+export const supportsLibbitsubRuntime = () => (
+	typeof document !== 'undefined' &&
+	typeof window !== 'undefined' &&
+	typeof WebAssembly === 'object' &&
+	typeof Promise === 'function' &&
+	typeof fetch === 'function' &&
+	typeof ArrayBuffer === 'function'
+);
+
+export const supportsLibpgsRuntime = () => (
+	typeof document !== 'undefined' &&
+	typeof window !== 'undefined' &&
+	typeof Promise === 'function' &&
+	typeof fetch === 'function' &&
+	typeof ArrayBuffer === 'function'
+);

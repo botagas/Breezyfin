@@ -1,19 +1,21 @@
-import {isPersistentAppLoggingEnabled} from './featureFlags';
+import {isPersistentAppLoggingAvailable} from './featureFlags';
+import {
+	redactSensitiveText,
+	sanitizeConsoleArgs,
+	sanitizeSensitiveValue
+} from './sensitiveData';
 
 const LOG_STORAGE_KEY = 'breezyfinAppLogs';
 const VERBOSE_LOG_STORAGE_KEY = 'breezyfinVerboseLogs';
 const MAX_LOG_ENTRIES = 400;
+const LOG_FLUSH_DELAY_MS = 500;
 let loggerInitialized = false;
-let logListenersInitialized = false;
 let patchedConsole = false;
+let diagnosticsEnabled = false;
+let flushTimer = null;
+let pendingEntries = [];
 const nativeConsole = {};
-const PERSISTENT_LOGGING_ENABLED = isPersistentAppLoggingEnabled();
-const REDACTION_RULES = [
-	{pattern: /([?&](?:api_key|access_token|token)=)([^&#\s]+)/gi, replacement: '$1[REDACTED]'},
-	{pattern: /("?(?:api_key|access_token|accesstoken|x-emby-token|authorization|token)"?\s*:\s*")([^"]+)(")/gi, replacement: '$1[REDACTED]$3'},
-	{pattern: /(Authorization\s*[:=]\s*Bearer\s+)([^\s,]+)/gi, replacement: '$1[REDACTED]'},
-	{pattern: /(X-Emby-Token\s*[:=]\s*)([^\s,]+)/gi, replacement: '$1[REDACTED]'}
-];
+const PERSISTENT_LOGGING_AVAILABLE = isPersistentAppLoggingAvailable();
 
 const safeReadLogs = () => {
 	try {
@@ -35,27 +37,26 @@ const safeWriteLogs = (logs) => {
 };
 
 const stringifyArg = (value) => {
-	if (typeof value === 'string') return value;
-	if (value instanceof Error) {
-		return `${value.name}: ${value.message}${value.stack ? ` | ${value.stack}` : ''}`;
-	}
+	const sanitized = sanitizeSensitiveValue(value);
+	if (typeof sanitized === 'string') return sanitized;
 	try {
-		return JSON.stringify(value);
+		return JSON.stringify(sanitized);
 	} catch (_) {
-		return String(value);
+		return redactSensitiveText(String(sanitized));
 	}
 };
 
-const sanitizeMessage = (message) => REDACTION_RULES.reduce(
-	(current, rule) => current.replace(rule.pattern, rule.replacement),
-	String(message || '')
-);
-
 const trimMessage = (message) => {
-	const normalized = sanitizeMessage(message).replace(/\s+/g, ' ').trim();
+	const normalized = redactSensitiveText(message).replace(/\s+/g, ' ').trim();
 	if (normalized.length <= 1200) return normalized;
 	return `${normalized.slice(0, 1197)}...`;
 };
+
+const createLogEntry = (level, args) => ({
+	ts: new Date().toISOString(),
+	level: String(level || 'info').toLowerCase(),
+	message: trimMessage(args.map(stringifyArg).join(' '))
+});
 
 export const isVerboseLoggingEnabled = () => {
 	try {
@@ -78,29 +79,108 @@ export const setVerboseLoggingEnabled = (enabled) => {
 };
 
 const shouldCaptureLevel = (level) => {
-	if (!PERSISTENT_LOGGING_ENABLED) return false;
+	if (!PERSISTENT_LOGGING_AVAILABLE || !diagnosticsEnabled) return false;
 	if (level === 'warn' || level === 'error') return true;
 	return isVerboseLoggingEnabled();
 };
 
-export const appendAppLog = (level, ...args) => {
-	if (!PERSISTENT_LOGGING_ENABLED) return;
-	const message = trimMessage(args.map(stringifyArg).join(' '));
+export const flushAppLogs = () => {
+	if (flushTimer !== null) {
+		clearTimeout(flushTimer);
+		flushTimer = null;
+	}
+	if (!PERSISTENT_LOGGING_AVAILABLE || pendingEntries.length === 0) return;
+	const entries = pendingEntries;
+	pendingEntries = [];
 	const logs = safeReadLogs();
-	logs.push({
-		ts: new Date().toISOString(),
-		level: String(level || 'info').toLowerCase(),
-		message
-	});
+	logs.push(...entries);
 	if (logs.length > MAX_LOG_ENTRIES) {
 		logs.splice(0, logs.length - MAX_LOG_ENTRIES);
 	}
 	safeWriteLogs(logs);
 };
 
-export const getAppLogs = () => safeReadLogs();
+const scheduleLogFlush = () => {
+	if (flushTimer !== null) return;
+	flushTimer = setTimeout(flushAppLogs, LOG_FLUSH_DELAY_MS);
+};
+
+const appendBufferedEntry = (level, args) => {
+	pendingEntries.push(createLogEntry(level, args));
+	if (pendingEntries.length >= 20) {
+		flushAppLogs();
+		return;
+	}
+	scheduleLogFlush();
+};
+
+export const appendAppLog = (level, ...args) => {
+	if (!shouldCaptureLevel(level)) return;
+	appendBufferedEntry(level, args);
+};
+
+export const appendCriticalAppLog = (level, ...args) => {
+	if (!PERSISTENT_LOGGING_AVAILABLE) return;
+	pendingEntries.push(createLogEntry(level || 'error', args));
+	flushAppLogs();
+};
+
+const patchConsole = () => {
+	if (patchedConsole || typeof console === 'undefined') return;
+	['log', 'info', 'warn', 'error'].forEach((level) => {
+		nativeConsole[level] = typeof console[level] === 'function' ? console[level] : () => {};
+		console[level] = (...args) => {
+			const sanitizedArgs = sanitizeConsoleArgs(args);
+			nativeConsole[level].apply(console, sanitizedArgs);
+			appendAppLog(level, ...sanitizedArgs);
+		};
+	});
+	patchedConsole = true;
+};
+
+const restoreConsole = () => {
+	if (!patchedConsole || typeof console === 'undefined') return;
+	Object.entries(nativeConsole).forEach(([level, method]) => {
+		console[level] = method;
+	});
+	patchedConsole = false;
+};
+
+export const configureAppDiagnostics = ({enabled = false, verbose = false} = {}) => {
+	diagnosticsEnabled = PERSISTENT_LOGGING_AVAILABLE && enabled === true;
+	setVerboseLoggingEnabled(verbose === true);
+	if (diagnosticsEnabled) {
+		patchConsole();
+		return;
+	}
+	flushAppLogs();
+	restoreConsole();
+};
+
+export const isAppDiagnosticsLoggingEnabled = () => diagnosticsEnabled;
+
+export const logCriticalAppError = (...args) => {
+	const sanitizedArgs = sanitizeConsoleArgs(args);
+	const errorConsole = patchedConsole
+		? nativeConsole.error
+		: (typeof console !== 'undefined' ? console.error : null);
+	if (typeof errorConsole === 'function') {
+		errorConsole.apply(console, sanitizedArgs);
+	}
+	appendCriticalAppLog('error', ...sanitizedArgs);
+};
+
+export const getAppLogs = () => {
+	flushAppLogs();
+	return safeReadLogs();
+};
 
 export const clearAppLogs = () => {
+	pendingEntries = [];
+	if (flushTimer !== null) {
+		clearTimeout(flushTimer);
+		flushTimer = null;
+	}
 	try {
 		localStorage.removeItem(LOG_STORAGE_KEY);
 	} catch (_) {
@@ -111,28 +191,6 @@ export const clearAppLogs = () => {
 export const initAppLogger = () => {
 	if (loggerInitialized || typeof window === 'undefined') return;
 	loggerInitialized = true;
-	if (!PERSISTENT_LOGGING_ENABLED) return;
-
-	if (!patchedConsole && typeof console !== 'undefined') {
-		['log', 'info', 'warn', 'error'].forEach((level) => {
-			nativeConsole[level] = console[level] ? console[level].bind(console) : () => {};
-			console[level] = (...args) => {
-				nativeConsole[level](...args);
-				if (shouldCaptureLevel(level)) {
-					appendAppLog(level, ...args);
-				}
-			};
-		});
-		patchedConsole = true;
-	}
-
-	if (!logListenersInitialized) {
-		window.addEventListener('error', (event) => {
-			appendAppLog('error', '[window.error]', event?.message || 'Unhandled error', event?.error || '');
-		});
-		window.addEventListener('unhandledrejection', (event) => {
-			appendAppLog('error', '[unhandledrejection]', event?.reason || 'Unhandled promise rejection');
-		});
-		logListenersInitialized = true;
-	}
+	if (!PERSISTENT_LOGGING_AVAILABLE) return;
+	window.addEventListener('pagehide', flushAppLogs);
 };

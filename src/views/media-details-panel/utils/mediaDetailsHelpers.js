@@ -125,3 +125,21 @@ export const isEpisodePlayed = (episode) => {
 	if (episode.UserData.Played === true) return true;
 	return (episode.UserData.PlayedPercentage || 0) >= 100;
 };
+
+export const withItemPlayedState = (item, itemId, played) => {
+	if (!item || String(item.Id) !== String(itemId)) return item;
+	return {
+		...item,
+		UserData: {
+			...(item.UserData || {}),
+			Played: played === true,
+			PlayedPercentage: played === true ? 100 : 0
+		}
+	};
+};
+
+export const updateItemsPlayedState = (items, itemId, played) => (
+	Array.isArray(items)
+		? items.map((entry) => withItemPlayedState(entry, itemId, played))
+		: []
+);

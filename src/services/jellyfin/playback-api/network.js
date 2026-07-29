@@ -24,6 +24,7 @@ export const buildPlaystatePayload = (basePayload, session = {}) => {
 	};
 	if (session.playSessionId) payload.PlaySessionId = session.playSessionId;
 	if (session.mediaSourceId) payload.MediaSourceId = session.mediaSourceId;
+	if (session.playlistItemId) payload.PlaylistItemId = session.playlistItemId;
 	if (Number.isInteger(session.audioStreamIndex)) payload.AudioStreamIndex = session.audioStreamIndex;
 	if (session.subtitleStreamIndex === -1 || Number.isInteger(session.subtitleStreamIndex)) {
 		payload.SubtitleStreamIndex = session.subtitleStreamIndex;

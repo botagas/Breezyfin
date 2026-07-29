@@ -14,6 +14,7 @@ build
 dist
 release
 *.ipk
+*.ipk.sha256
 
 # OS files
 .DS_Store

@@ -1,7 +1,7 @@
 :global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton {
-	--bf-button-fg: var(--bf-theme-text-primary);
-	--bf-button-fg-hover: var(--bf-theme-accent);
-	--bf-button-fg-active: var(--bf-theme-accent);
+	--bf-button-fg: var(--bf-theme-button-fg);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
 	border-radius: 0.72rem !important;
 	border: 1px solid rgba(255, 255, 255, 0.16) !important;
 	background: transparent !important;
@@ -51,8 +51,8 @@
 
 :global([data-bf-nav-theme='classic']) .libraryNativeContent:not(.libraryNativeContentGlass) .libraryNativeButton:global(.selected) {
 	--bf-button-fg: var(--bf-theme-accent);
-	--bf-button-fg-hover: var(--bf-theme-accent);
-	--bf-button-fg-active: var(--bf-theme-accent);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
 	border-color: rgba(var(--bf-theme-accent-rgb), 0.55) !important;
 	background: rgba(var(--bf-theme-accent-rgb), 0.14) !important;
 }

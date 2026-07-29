@@ -1,5 +1,6 @@
 import {HOME_ROW_ORDER} from '../../constants/homeRows';
 import {ASS_SUBTITLE_RENDERERS} from '../../utils/assSubtitleRenderers';
+import {BITMAP_SUBTITLE_RENDERERS} from '../../utils/bitmapSubtitleRenderers';
 
 export {
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
@@ -9,13 +10,14 @@ export {
 } from '../../utils/subtitleAppearance';
 
 export const DEFAULT_SETTINGS = {
-	maxBitrate: '40',
+	maxBitrate: '100',
 	enableTranscoding: true,
 	forceTranscoding: false,
 	smartSubtitleTranscoding: true,
 	enableSubtitleBurnIn: true,
 	forceTranscodingWithSubtitles: false,
 	assSubtitleRenderer: 'auto',
+	bitmapSubtitleRenderer: 'auto',
 	subtitleBurnInTextCodecs: ['ass', 'ssa'],
 	subtitleOverlaySize: 'medium',
 	subtitleOverlayFontSizePx: '36',
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS = {
 	preferredSubtitleLanguage: 'eng',
 	disableAnimations: true,
 	disableAllAnimations: false,
+	screensaverTimeoutMinutes: '1',
 	showMediaBar: true,
 	navbarTheme: 'elegant',
 	autoPlayNext: true,
@@ -49,6 +52,7 @@ export const DEFAULT_SETTINGS = {
 	showExtendedPlayerDebugOverlay: false,
 	showFocusDebugOverlay: false,
 	showDebugErrorMenu: false,
+	enableDiagnostics: false,
 	verboseAppLogs: false,
 	forceDolbyVision: false,
 	enableFmp4HlsContainerPreference: false,
@@ -67,10 +71,10 @@ export const DEFAULT_SETTINGS = {
 export const BITRATE_OPTIONS = [
 	{value: '10', label: '10 Mbps'},
 	{value: '20', label: '20 Mbps'},
-	{value: '40', label: '40 Mbps (Default)'},
+	{value: '40', label: '40 Mbps'},
 	{value: '60', label: '60 Mbps'},
 	{value: '80', label: '80 Mbps'},
-	{value: '100', label: '100 Mbps'},
+	{value: '100', label: '100 Mbps (Default)'},
 	{value: '120', label: '120 Mbps'}
 ];
 
@@ -90,6 +94,15 @@ export const LANGUAGE_OPTIONS = [
 export const NAVBAR_THEME_OPTIONS = [
 	{value: 'classic', label: 'Classic'},
 	{value: 'elegant', label: 'Elegant'}
+];
+
+export const SCREENSAVER_TIMEOUT_OPTIONS = [
+	{value: 'off', label: 'Off'},
+	{value: '1', label: '1 minute (Default)'},
+	{value: '3', label: '3 minutes'},
+	{value: '5', label: '5 minutes'},
+	{value: '10', label: '10 minutes'},
+	{value: '15', label: '15 minutes'}
 ];
 
 export const CAPABILITY_PROBE_REFRESH_OPTIONS = [
@@ -123,6 +136,13 @@ export const ASS_SUBTITLE_RENDERER_STABLE_OPTIONS = [
 export const ASS_SUBTITLE_RENDERER_OPTIONS = ASS_SUBTITLE_RENDERER_STABLE_OPTIONS;
 
 export const getAssSubtitleRendererOptions = () => ASS_SUBTITLE_RENDERER_OPTIONS;
+
+export const BITMAP_SUBTITLE_RENDERER_OPTIONS = [
+	{value: BITMAP_SUBTITLE_RENDERERS.AUTO, label: 'Auto (libbitsub first)'},
+	{value: BITMAP_SUBTITLE_RENDERERS.LIBBITSUB, label: 'libbitsub (Experimental)'},
+	{value: BITMAP_SUBTITLE_RENDERERS.LIBPGS, label: 'libpgs (Experimental)'},
+	{value: BITMAP_SUBTITLE_RENDERERS.BURN_IN, label: 'Burn-in'}
+];
 
 export const SUBTITLE_OVERLAY_SIZE_OPTIONS = [
 	{value: 'small', label: 'Small'},
@@ -204,6 +224,7 @@ export const SETTINGS_DISCLOSURE_KEYS = {
 	AUDIO_LANGUAGE: 'audioLanguagePopup',
 	SUBTITLE_LANGUAGE: 'subtitleLanguagePopup',
 	ASS_SUBTITLE_RENDERER: 'assSubtitleRendererPopup',
+	BITMAP_SUBTITLE_RENDERER: 'bitmapSubtitleRendererPopup',
 	SUBTITLE_BURN_IN_TEXT_CODECS: 'subtitleBurnInTextCodecsPopup',
 	SUBTITLE_OVERLAY_SIZE: 'subtitleOverlaySizePopup',
 	SUBTITLE_OVERLAY_POSITION: 'subtitleOverlayPositionPopup',
@@ -217,6 +238,7 @@ export const SETTINGS_DISCLOSURE_KEYS = {
 	SUBTITLE_OVERLAY_SHADOW_DISTANCE: 'subtitleOverlayShadowDistancePopup',
 	SUBTITLE_OVERLAY_SHADOW_ANGLE: 'subtitleOverlayShadowAnglePopup',
 	NAVBAR_THEME: 'navbarThemePopup',
+	SCREENSAVER_TIMEOUT: 'screensaverTimeoutPopup',
 	PLAY_NEXT_PROMPT_MODE: 'playNextPromptModePopup',
 	LOGOUT_CONFIRM: 'logoutConfirmPopup',
 	LOGS: 'logsPopup',
@@ -229,6 +251,7 @@ export const SETTINGS_DISCLOSURE_KEY_LIST = [
 	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.ASS_SUBTITLE_RENDERER,
+	SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION,
@@ -242,6 +265,7 @@ export const SETTINGS_DISCLOSURE_KEY_LIST = [
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SHADOW_DISTANCE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SHADOW_ANGLE,
 	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
+	SETTINGS_DISCLOSURE_KEYS.SCREENSAVER_TIMEOUT,
 	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
 	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
 	SETTINGS_DISCLOSURE_KEYS.LOGS,
@@ -254,6 +278,7 @@ export const INITIAL_SETTINGS_DISCLOSURES = {
 	[SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.ASS_SUBTITLE_RENDERER]: false,
+	[SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION]: false,
@@ -267,6 +292,7 @@ export const INITIAL_SETTINGS_DISCLOSURES = {
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SHADOW_DISTANCE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SHADOW_ANGLE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SCREENSAVER_TIMEOUT]: false,
 	[SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE]: false,
 	[SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM]: false,
 	[SETTINGS_DISCLOSURE_KEYS.LOGS]: false,
@@ -279,6 +305,7 @@ export const DISCLOSURE_BACK_PRIORITY = [
 	SETTINGS_DISCLOSURE_KEYS.LOGOUT_CONFIRM,
 	SETTINGS_DISCLOSURE_KEYS.PLAY_NEXT_PROMPT_MODE,
 	SETTINGS_DISCLOSURE_KEYS.NAVBAR_THEME,
+	SETTINGS_DISCLOSURE_KEYS.SCREENSAVER_TIMEOUT,
 	SETTINGS_DISCLOSURE_KEYS.CAPABILITY_PROBE_REFRESH,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SHADOW_ANGLE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SHADOW_DISTANCE,
@@ -292,6 +319,7 @@ export const DISCLOSURE_BACK_PRIORITY = [
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
+	SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER,
 	SETTINGS_DISCLOSURE_KEYS.ASS_SUBTITLE_RENDERER,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_LANGUAGE,
 	SETTINGS_DISCLOSURE_KEYS.AUDIO_LANGUAGE,
@@ -304,5 +332,6 @@ export const HOME_ROW_LABELS = {
 	nextUp: 'Next Up',
 	latestMovies: 'Latest Movies',
 	latestShows: 'Latest TV Shows',
-	myRequests: 'My Requests'
+	myRequests: 'My Requests',
+	watchlist: 'Watchlist'
 };

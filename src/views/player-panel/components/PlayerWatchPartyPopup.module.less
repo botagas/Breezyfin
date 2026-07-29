@@ -1,0 +1,36 @@
+.content {
+	box-sizing: border-box;
+	width: min(42rem, 92vw);
+}
+
+.title {
+	margin: 0 0 0.65rem;
+	color: var(--bf-theme-text-primary);
+	font-weight: 700;
+}
+
+.body {
+	display: flex;
+	max-height: 58vh;
+	flex-direction: column;
+	gap: 0.55rem;
+	overflow-x: hidden;
+	overflow-y: auto;
+	overflow-wrap: anywhere;
+}
+
+.chat {
+	max-height: 18vh;
+	padding: 0.35rem 0.55rem;
+	overflow-y: auto;
+	border: 0.06rem solid var(--bf-theme-surface-border);
+	border-radius: var(--bf-theme-popup-radius);
+	background: var(--bf-theme-card-filter-chip-bg);
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.65rem;
+	margin-top: 0.8rem;
+}

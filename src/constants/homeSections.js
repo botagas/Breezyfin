@@ -4,7 +4,8 @@ export const HOME_SECTION_IDS = {
 	NEXT_UP: 'nextUp',
 	LATEST_MOVIES: 'latestMovies',
 	LATEST_SHOWS: 'latestShows',
-	MY_REQUESTS: 'myRequests'
+	MY_REQUESTS: 'myRequests',
+	WATCHLIST: 'watchlist'
 };
 
 export const HOME_SECTION_DESCRIPTORS = {
@@ -31,9 +32,19 @@ export const HOME_SECTION_DESCRIPTORS = {
 	[HOME_SECTION_IDS.MY_REQUESTS]: {
 		id: HOME_SECTION_IDS.MY_REQUESTS,
 		title: 'My Requests'
+	},
+	[HOME_SECTION_IDS.WATCHLIST]: {
+		id: HOME_SECTION_IDS.WATCHLIST,
+		title: 'Watchlist'
 	}
 };
 
 export const getHomeSectionDescriptor = (sectionId) => (
 	HOME_SECTION_DESCRIPTORS[sectionId] || null
+);
+
+export const isMyRequestsHomeSection = (section) => (
+	section === HOME_SECTION_IDS.MY_REQUESTS ||
+	section?.id === HOME_SECTION_IDS.MY_REQUESTS ||
+	section?.kind === 'MyRequests'
 );

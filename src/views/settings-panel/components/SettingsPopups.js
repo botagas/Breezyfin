@@ -38,6 +38,10 @@ const SettingsPopups = ({
 	closeAssSubtitleRendererPopup,
 	assSubtitleRendererOptions,
 	handleAssSubtitleRendererSelect,
+	bitmapSubtitleRendererPopupOpen,
+	closeBitmapSubtitleRendererPopup,
+	bitmapSubtitleRendererOptions,
+	handleBitmapSubtitleRendererSelect,
 	subtitleOverlaySizePopupOpen,
 	closeSubtitleOverlaySizePopup,
 	subtitleOverlayFontSizeLabel,
@@ -90,6 +94,10 @@ const SettingsPopups = ({
 	closeNavbarThemePopup,
 	navbarThemeOptions,
 	handleNavbarThemeSelect,
+	screensaverTimeoutPopupOpen,
+	closeScreensaverTimeoutPopup,
+	screensaverTimeoutOptions,
+	handleScreensaverTimeoutSelect,
 	playNextPromptModePopupOpen,
 	closePlayNextPromptModePopup,
 	setSegmentsOnlyPromptMode,
@@ -120,6 +128,7 @@ const SettingsPopups = ({
 	const subtitleLangPopupContentRef = useRef(null);
 	const subtitleBurnInTextCodecsPopupContentRef = useRef(null);
 	const assSubtitleRendererPopupContentRef = useRef(null);
+	const bitmapSubtitleRendererPopupContentRef = useRef(null);
 	const subtitleOverlaySizePopupContentRef = useRef(null);
 	const subtitleOverlayPositionPopupContentRef = useRef(null);
 	const subtitleOverlayBackgroundPopupContentRef = useRef(null);
@@ -132,6 +141,7 @@ const SettingsPopups = ({
 	const subtitleOverlayShadowDistancePopupContentRef = useRef(null);
 	const subtitleOverlayShadowAnglePopupContentRef = useRef(null);
 	const navbarThemePopupContentRef = useRef(null);
+	const screensaverTimeoutPopupContentRef = useRef(null);
 	const playNextPromptModePopupContentRef = useRef(null);
 	const logoutConfirmPopupContentRef = useRef(null);
 	const logsPopupContentRef = useRef(null);
@@ -143,6 +153,7 @@ const SettingsPopups = ({
 	usePopupInitialFocus(subtitleLangPopupOpen, subtitleLangPopupContentRef);
 	usePopupInitialFocus(subtitleBurnInTextCodecsPopupOpen, subtitleBurnInTextCodecsPopupContentRef);
 	usePopupInitialFocus(assSubtitleRendererPopupOpen, assSubtitleRendererPopupContentRef);
+	usePopupInitialFocus(bitmapSubtitleRendererPopupOpen, bitmapSubtitleRendererPopupContentRef);
 	usePopupInitialFocus(subtitleOverlaySizePopupOpen, subtitleOverlaySizePopupContentRef);
 	usePopupInitialFocus(subtitleOverlayPositionPopupOpen, subtitleOverlayPositionPopupContentRef);
 	usePopupInitialFocus(subtitleOverlayBackgroundPopupOpen, subtitleOverlayBackgroundPopupContentRef);
@@ -155,6 +166,7 @@ const SettingsPopups = ({
 	usePopupInitialFocus(subtitleOverlayShadowDistancePopupOpen, subtitleOverlayShadowDistancePopupContentRef);
 	usePopupInitialFocus(subtitleOverlayShadowAnglePopupOpen, subtitleOverlayShadowAnglePopupContentRef);
 	usePopupInitialFocus(navbarThemePopupOpen, navbarThemePopupContentRef);
+	usePopupInitialFocus(screensaverTimeoutPopupOpen, screensaverTimeoutPopupContentRef);
 	usePopupInitialFocus(playNextPromptModePopupOpen, playNextPromptModePopupContentRef);
 	usePopupInitialFocus(logoutConfirmOpen, logoutConfirmPopupContentRef);
 	usePopupInitialFocus(logsPopupOpen, logsPopupContentRef);
@@ -248,6 +260,17 @@ const SettingsPopups = ({
 					))}
 				</div>
 			</Popup>
+
+			{renderSubtitleOptionPopup({
+				open: screensaverTimeoutPopupOpen,
+				onClose: closeScreensaverTimeoutPopup,
+				contentRef: screensaverTimeoutPopupContentRef,
+				title: 'Screensaver Timeout',
+				options: screensaverTimeoutOptions,
+				settingKey: 'screensaverTimeoutMinutes',
+				onSelect: handleScreensaverTimeoutSelect,
+				fallback: '1'
+			})}
 
 			{renderSubtitleOptionPopup({
 				open: subtitleOverlayWeightPopupOpen,
@@ -442,6 +465,17 @@ const SettingsPopups = ({
 				options: assSubtitleRendererOptions,
 				settingKey: 'assSubtitleRenderer',
 				onSelect: handleAssSubtitleRendererSelect,
+				fallback: 'auto'
+			})}
+
+			{renderSubtitleOptionPopup({
+				open: bitmapSubtitleRendererPopupOpen,
+				onClose: closeBitmapSubtitleRendererPopup,
+				contentRef: bitmapSubtitleRendererPopupContentRef,
+				title: 'Bitmap Subtitle Renderer',
+				options: bitmapSubtitleRendererOptions,
+				settingKey: 'bitmapSubtitleRenderer',
+				onSelect: handleBitmapSubtitleRendererSelect,
 				fallback: 'auto'
 			})}
 

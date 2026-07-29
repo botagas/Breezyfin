@@ -210,6 +210,24 @@ export const isExternalRendererEmptyOutputFailure = (diagnostics) => (
 	Number(diagnostics?.jassubActiveEventsAssMs || 0) > 0
 );
 
+export const probeExternalRendererOutput = ({renderer = null, videoElement = null} = {}) => {
+	try {
+		if (typeof renderer?.__breezyfinRefreshJassubSourceDiagnostics === 'function') {
+			renderer.__breezyfinRefreshJassubSourceDiagnostics(videoElement);
+		}
+	} catch (error) {
+		// The bounded correctness probe must not destabilize playback.
+	}
+	const canvas = renderer?.__breezyfinCanvas || findLibassCanvas(videoElement);
+	const trackDiagnostics = renderer?.__breezyfinJassubTrackDiagnostics || {};
+	return {
+		jassubActiveEventsAssMs: Number.isFinite(trackDiagnostics.activeEventsAssMs)
+			? trackDiagnostics.activeEventsAssMs
+			: null,
+		...getCanvasPixelDiagnostics(canvas)
+	};
+};
+
 export const collectExternalRendererDiagnostics = ({
 	containerElement,
 	renderer = null,
@@ -227,6 +245,16 @@ export const collectExternalRendererDiagnostics = ({
 	const assBox = findAssJsBox(containerElement);
 	const pixelDiagnostics = getCanvasPixelDiagnostics(canvas);
 	const jassubTrackDiagnostics = renderer?.__breezyfinJassubTrackDiagnostics || {};
+	let bitmapDiagnostics = {};
+	try {
+		bitmapDiagnostics = typeof renderer?.__breezyfinGetDiagnostics === 'function'
+			? renderer.__breezyfinGetDiagnostics()
+			: (renderer?.__breezyfinBitmapDiagnostics || {});
+	} catch (error) {
+		bitmapDiagnostics = {
+			bitmapDiagnosticError: 'diagnostic-error'
+		};
+	}
 	return {
 		layerChildren: containerElement?.childNodes?.length ?? 0,
 		layerBox: describeElement(containerElement),
@@ -268,6 +296,7 @@ export const collectExternalRendererDiagnostics = ({
 		jassubTrackDiagnosticAgeMs: getJassubTrackDiagnosticAgeMs(renderer),
 		jassubTrackError: jassubTrackDiagnostics.error || '',
 		jassubOptions: getJassubOptionLabel(renderer),
+		...bitmapDiagnostics,
 		...pixelDiagnostics,
 		diagnosticAtMs: Date.now()
 	};

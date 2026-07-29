@@ -1,6 +1,7 @@
 import {useCallback} from 'react';
 
 import {KeyCodes} from '../../../utils/keyCodes';
+import {isPlayableMediaItem} from '../../../utils/mediaItemUtils';
 
 export const useMediaDetailsPrimaryActions = ({
 	item,
@@ -39,7 +40,7 @@ export const useMediaDetailsPrimaryActions = ({
 			} else {
 				console.error('No episode selected');
 			}
-		} else {
+		} else if (isPlayableMediaItem(item)) {
 			onPlay(item, options);
 		}
 	}, [item, onPlay, playbackInfo, selectedAudioTrack, selectedEpisode, selectedSubtitleTrack]);
@@ -106,4 +107,3 @@ export const useMediaDetailsPrimaryActions = ({
 		handleOverviewActivate
 	};
 };
-

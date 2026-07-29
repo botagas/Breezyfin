@@ -1,0 +1,49 @@
+@import (reference) '../styles/surfaceMixins.less';
+
+.actionButton {
+	--bf-button-fg: var(--bf-theme-button-fg);
+	--bf-button-fg-hover: var(--bf-theme-button-fg-hover);
+	--bf-button-fg-active: var(--bf-theme-button-fg-active);
+	border: none !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	box-shadow: none !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		border: 0.08rem solid var(--bf-theme-input-surface-border) !important;
+		border-radius: 999px !important;
+		background: var(--bf-theme-input-surface-bg) !important;
+		box-shadow: none !important;
+		transition: background 0.14s ease, border-color 0.14s ease !important;
+	}
+
+	.buttonInteractiveSurface(
+		var(--bf-theme-input-hover-bg);
+		0.08rem solid var(--bf-theme-input-hover-border)
+	);
+
+	&:active :global(.bf-button-bg),
+	&:active :global(.bg) {
+		border-color: var(--bf-theme-settings-focus-border) !important;
+		background: var(--bf-theme-settings-focus) !important;
+	}
+
+	&:global(.focusExpand) {
+		margin: 0 !important;
+		transform: none !important;
+	}
+
+	&:disabled,
+	&:global(.disabled) {
+		opacity: 0.48;
+	}
+}
+
+:global([data-bf-input-mode='5way']) .actionButton:hover:not(:focus) {
+	:global(.bf-button-bg),
+	:global(.bg) {
+		border-color: var(--bf-theme-input-surface-border) !important;
+		background: var(--bf-theme-input-surface-bg) !important;
+	}
+}

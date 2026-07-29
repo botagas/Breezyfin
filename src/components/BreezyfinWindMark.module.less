@@ -1,0 +1,34 @@
+.mark,
+.image {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.mark {
+	transform-origin: center;
+}
+
+.image {
+	object-fit: contain;
+}
+
+.animated {
+	animation: breezy-wind-mark-breathe 900ms ease-in-out infinite alternate;
+}
+
+@keyframes breezy-wind-mark-breathe {
+	from {
+		transform: scale(0.9);
+		opacity: 0.72;
+	}
+
+	to {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+:global([data-bf-all-animations='off']) .animated {
+	animation: none !important;
+}

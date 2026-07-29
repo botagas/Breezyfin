@@ -17,6 +17,7 @@ export const usePlayerCoreControls = ({
 	skipFocusRetryTimerRef,
 	skipButtonRef,
 	skipOverlayRef,
+	playPauseButtonRef,
 	getPlaybackSessionContext
 }) => {
 	const clearStartWatch = useCallback(() => {
@@ -56,7 +57,41 @@ export const usePlayerCoreControls = ({
 		tryFocus();
 	}, [skipButtonRef, skipFocusRetryTimerRef, skipOverlayRef]);
 
+	const focusPlayerWakeAction = useCallback(({preferSkip = false} = {}) => {
+		if (preferSkip) {
+			focusSkipOverlayAction();
+			return;
+		}
+		if (skipFocusRetryTimerRef.current) {
+			clearTimeout(skipFocusRetryTimerRef.current);
+			skipFocusRetryTimerRef.current = null;
+		}
+
+		let attempts = 0;
+		const maxAttempts = 10;
+		const tryFocus = () => {
+			Spotlight.focus('player-primary-playback-action');
+			const target = playPauseButtonRef.current?.nodeRef?.current || playPauseButtonRef.current;
+			target?.focus?.({preventScroll: true});
+			const focused = target && (
+				document.activeElement === target || target.contains?.(document.activeElement)
+			);
+			if (!focused && attempts < maxAttempts) {
+				attempts += 1;
+				skipFocusRetryTimerRef.current = setTimeout(tryFocus, 40);
+			} else {
+				skipFocusRetryTimerRef.current = null;
+			}
+		};
+		tryFocus();
+	}, [focusSkipOverlayAction, playPauseButtonRef, skipFocusRetryTimerRef]);
+
 	const handleStop = useCallback(async () => {
+		const video = videoRef.current;
+		const positionTicks = video && item
+			? Math.floor(video.currentTime * JELLYFIN_TICKS_PER_SECOND)
+			: 0;
+		const sessionContext = getPlaybackSessionContext();
 		if (progressIntervalRef.current) {
 			clearInterval(progressIntervalRef.current);
 			progressIntervalRef.current = null;
@@ -79,24 +114,23 @@ export const usePlayerCoreControls = ({
 			hlsRef.current = null;
 		}
 
-		if (videoRef.current && item) {
-			const positionTicks = Math.floor(videoRef.current.currentTime * JELLYFIN_TICKS_PER_SECOND);
-			try {
-				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks, getPlaybackSessionContext());
-			} catch (error) {
-				console.warn('Failed to report playback stopped:', error);
-			}
-		}
-
-		if (videoRef.current) {
-			videoRef.current.removeAttribute('src');
-			videoRef.current.load();
+		if (video) {
+			video.removeAttribute('src');
+			video.load();
 		}
 		playbackSessionRef.current = {
 			playSessionId: null,
 			mediaSourceId: null,
 			playMethod: 'DirectStream'
 		};
+
+		if (item) {
+			try {
+				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks, sessionContext);
+			} catch (error) {
+				console.warn('Failed to report playback stopped:', error);
+			}
+		}
 	}, [
 		clearStartWatch,
 		getPlaybackSessionContext,
@@ -111,6 +145,7 @@ export const usePlayerCoreControls = ({
 
 	return {
 		clearStartWatch,
+		focusPlayerWakeAction,
 		focusSkipOverlayAction,
 		handleStop
 	};
