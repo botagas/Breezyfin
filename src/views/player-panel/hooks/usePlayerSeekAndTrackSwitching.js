@@ -10,7 +10,7 @@ import {
 } from '../../../utils/trackMatching';
 import {buildPlaybackOverride} from '../utils/playbackOverride';
 
-const NATIVE_AUDIO_SWITCH_SETTLE_MS = 1000;
+const NATIVE_AUDIO_SWITCH_SETTLE_MS = 1; 
 
 export const waitForNativeAudioTrackReadiness = (
 	video,
