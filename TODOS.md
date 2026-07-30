@@ -23,7 +23,7 @@ Expected scope: minimal corrective improvements, UI/UX changes, etc.
 - Remove native audio track switch timeout until a proper 
   identification method is found.
 - Fix Media Details audio/subtitle track selection not 
-  persisting to player. 
+  persisting to player. Seems to be related to native playback, as transcoded streams seem to work properly. For native playback, player audio selector will incorrectly show the desired language as the one that is selected, but the other one will be played instead, until it is re-applied in-player by the selector.
   May be caused by `useMediaDetailsDataLoader.js` overwriting user-picked audio track, or due to audio intent not being passed, so that the audio track could be identified not just by the raw index, but by using `playerVideoLoaderHelpers.js` and `playbackApi.js` if needed.
 
 ## Medium changes / issues
