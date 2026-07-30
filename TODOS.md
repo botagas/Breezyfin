@@ -20,6 +20,8 @@ Expected scope: minimal corrective improvements, UI/UX changes, etc.
   multi-server restoration remain correct.
 - Align Player Panel Subtitle/Audio Pop-up Selected styling with Media Details and Filter pop-ups, 
   which retain selected state and styling for the active track/selection.
+- Remove native audio track switch timeout until a proper 
+  identification method is found.
 
 ## Medium changes / issues
 
