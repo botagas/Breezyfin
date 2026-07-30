@@ -34,7 +34,10 @@ describe('MediaTrackPickerPopup', () => {
 		);
 
 		expect(screen.getByText('Selected')).toBeTruthy();
-		expect(screen.getByText('English ASS').closest('button')?.getAttribute('aria-current')).toBe('true');
+		const selectedButton = screen.getByText('English ASS').closest('button');
+		expect(selectedButton?.getAttribute('aria-current')).toBe('true');
+		expect(selectedButton?.getAttribute('data-selected')).toBe('true');
+		expect(selectedButton?.className).toContain('selectedControl');
 		expect(screen.queryByText('Off')?.closest('button')?.getAttribute('aria-current')).toBeNull();
 	});
 });

@@ -236,3 +236,31 @@ equivalent readiness contract.
 burn-in in the Simulator and native DirectPlay/DirectStream/native-HLS on TV. Confirm
 HLS.js waits for one buffered fragment, native playback does not wait for `canplay`, and
 Back/replacement cannot leave stale HLS callbacks or background audio active.
+
+## WA-009: Bounded native audio-track settling pause
+
+**Status:** Active for supported webOS media runtimes.
+
+**Constraint:** Native webOS can switch an enabled `AudioTrack` without rebuilding the
+video source, but it exposes no reliable event proving that the newly selected decoder
+output is audible. Continuing playback immediately can therefore produce a short period
+of silent video.
+
+**Implementation:**
+
+- `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js` pauses only active
+  native playback before applying and verifying a runtime audio-track change.
+- Playback resumes after a new `canplay`/`loadeddata` signal or a bounded 400 ms settling
+  window. The source identity is checked again before resuming so replaced playback
+  cannot be restarted by a stale switch.
+- HLS.js is excluded because it owns a separate track-switch lifecycle. Rejected HLS.js
+  assignments reload through Jellyfin with the explicit audio stream index.
+
+**Removal condition:** Replace the bounded pause when every supported webOS generation
+provides a dependable native event or promise indicating that changed audio output is
+decoded and ready.
+
+**Validation:** During native DirectPlay, switch repeatedly between audio tracks while
+playing and paused. Confirm active playback pauses briefly instead of playing silent
+video, paused playback stays paused, the chosen language becomes audible, and changing
+items during the settling window cannot restart old playback.

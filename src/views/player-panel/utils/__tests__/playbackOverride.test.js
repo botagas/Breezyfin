@@ -46,6 +46,21 @@ describe('playbackOverride', () => {
 		});
 	});
 
+	it('drops stale semantic intents when explicit track indices are supplied', () => {
+		expect(buildPlaybackOverride({
+			baseOptions: {
+				audioTrackIntent: {language: 'eng', codec: 'ac3'},
+				subtitleTrackIntent: {language: 'eng', codec: 'ass'}
+			},
+			audioStreamIndex: 4,
+			subtitleStreamIndex: 7
+		})).toEqual({
+			audioStreamIndex: 4,
+			subtitleStreamIndex: 7,
+			forceNewSession: true
+		});
+	});
+
 	it('normalizes negative seek positions to zero', () => {
 		expect(buildPlaybackOverride({seekSeconds: -12})).toEqual({
 			seekSeconds: 0,

@@ -327,6 +327,9 @@ Jellyfin service paths:
 - `src/services/jellyfin/libraryApi.js` (library, item, search, favorites, system info, segments)
 - `src/services/jellyfin/itemStateApi.js` (favorite/watched mutation operations)
 - `src/services/jellyfin/playbackApi.js` (playback info, playback URLs, playback progress reporting)
+  - explicit same-item `audioStreamIndex` selections are authoritative; semantic
+    `audioTrackIntent` remapping is reserved for cross-item transitions where callers
+    intentionally omit the previous item's raw stream index
 - `src/utils/playbackSelection.js` (pure media-source/audio selection and compatibility logic)
 - `src/utils/playbackDiagnostics.js` (generic playback diagnostic construction/appending)
 - `src/services/jellyfin/playbackProfileBuilder.js` (playback profile request context)

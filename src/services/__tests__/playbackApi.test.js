@@ -1038,6 +1038,47 @@ describe('playbackApi', () => {
 		}));
 	});
 
+	it('keeps an explicit audio index authoritative over stale cross-item intent', async () => {
+		const service = createService();
+		const source = createMediaSource('SDR', {
+			defaultAudioStreamIndex: 0,
+			audioStreams: [
+				{Codec: 'aac', Index: 0, IsDefault: true},
+				{Codec: 'aac', Index: 1}
+			]
+		});
+		Object.assign(source.MediaStreams.find((stream) => stream.Index === 0), {
+			Language: 'eng',
+			DisplayTitle: 'English'
+		});
+		Object.assign(source.MediaStreams.find((stream) => stream.Index === 1), {
+			Language: 'jpn',
+			DisplayTitle: 'Japanese'
+		});
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			audioStreamIndex: 1,
+			audioTrackIntent: {
+				index: 0,
+				language: 'eng',
+				displayTitle: 'English',
+				codec: 'aac'
+			}
+		});
+		const requestPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
+
+		expect(global.fetch).toHaveBeenCalledTimes(1);
+		expect(requestPayload.AudioStreamIndex).toBe(1);
+		expect(playbackInfo?.__breezyfin?.selectedAudioStreamIndex).toBe(1);
+	});
+
 	it('probes compatible audio tracks to keep Force DV on a direct playback path', async () => {
 		const service = createService();
 		global.fetch

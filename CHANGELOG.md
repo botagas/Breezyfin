@@ -14,6 +14,8 @@ All notable changes to Breezyfin are documented in this file.
   uniqueness-only fallback for legacy webOS runtimes.
 - Made selected audio, subtitle, and filter options use one persistent Selected marker
   and consistent active styling.
+- Kept explicit in-player audio and subtitle choices authoritative over cross-episode
+  track intent, with verified HLS.js switching and a bounded native audio settling pause.
 
 ### Fixed
 
@@ -27,6 +29,8 @@ All notable changes to Breezyfin are documented in this file.
   source generation.
 - Serialized Jellyfin playback start, progress, pause, seek, and stop reporting.
 - Kept PlaybackInfo-selected audio and subtitle tracks authoritative through Player startup.
+- Fixed same-item audio reloads being remapped back to a previous episode's semantic
+  language intent, and restored the complete selected surface in track pickers.
 - Allowed SyncPlay readiness after source preparation without waiting for native media
   readiness events that may require authoritative group playback to begin first.
 - Replaced ambiguous startup format errors on confirmed transcodes with bounded

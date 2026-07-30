@@ -522,7 +522,12 @@ usePlayerInteractionReveal({
 
 ### `usePlayerSeekAndTrackSwitching`
 - File: `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
-- Purpose: centralize seek behavior and track switching reload/session-override behavior for HLS/direct/transcode flows.
+- Purpose: centralize seek behavior and track switching reload/session-override behavior for HLS/direct/transcode flows:
+  - explicit same-item stream indexes replace stale cross-item semantic intents;
+  - HLS.js assignments are verified before the selection is committed and otherwise
+    reload with the explicit Jellyfin stream index;
+  - active native playback pauses through a bounded audio-decoder settling window before
+    resuming, because supported webOS runtimes expose no reliable audible-track-ready event.
 - Returns:
   - `isSeekContext(target)`
   - `isProgressSliderTarget(target)`

@@ -18,6 +18,8 @@ Expected scope: minimal corrective improvements, UI/UX changes, etc.
   cycles. Before removal, document that users upgrading directly from older releases
   may need to sign in again and verify logout, switch-user, cache clearing, and
   multi-server restoration remain correct.
+- Align Player Panel Subtitle/Audio Pop-up Selected styling with Media Details and Filter pop-ups, 
+  which retain selected state and styling for the active track/selection.
 
 ## Medium changes / issues
 

@@ -39,7 +39,10 @@ describe('PlayerTrackPopup', () => {
 		);
 
 		expect(screen.getByText('Selected')).toBeTruthy();
-		expect(screen.getByText('Japanese').closest('button')?.getAttribute('aria-current')).toBe('true');
+		const selectedButton = screen.getByText('Japanese').closest('button');
+		expect(selectedButton?.getAttribute('aria-current')).toBe('true');
+		expect(selectedButton?.getAttribute('data-selected')).toBe('true');
+		expect(selectedButton?.className).toContain('selectedControl');
 		expect(screen.queryByText('English')?.closest('button')?.getAttribute('aria-current')).toBeNull();
 	});
 });

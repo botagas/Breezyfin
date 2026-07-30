@@ -658,6 +658,7 @@ const PlayerPanel = ({
 	} = usePlayerSeekAndTrackSwitching({
 		videoRef,
 		hlsRef,
+		nativeSourceTokenRef,
 		duration,
 		isCurrentTranscoding,
 		mediaSourceData,

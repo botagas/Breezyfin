@@ -349,15 +349,17 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			});
 		}
 
-		const audioIntentResult = await attemptAudioTrackIntentRemap({
-			service,
-			itemId,
-			activePayload,
-			selectedSource,
-			audioTrackIntent: options.audioTrackIntent,
-			createSourceSelectionOptions,
-			diagnostics: collectDiagnostics ? diagnostics : null
-		});
+		const audioIntentResult = Number.isInteger(options.audioStreamIndex)
+			? null
+			: await attemptAudioTrackIntentRemap({
+				service,
+				itemId,
+				activePayload,
+				selectedSource,
+				audioTrackIntent: options.audioTrackIntent,
+				createSourceSelectionOptions,
+				diagnostics: collectDiagnostics ? diagnostics : null
+			});
 		if (audioIntentResult) {
 			data = audioIntentResult.data || data;
 			selectedSource = audioIntentResult.selectedSource || selectedSource;
