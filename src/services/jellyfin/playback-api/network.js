@@ -1,9 +1,11 @@
+import {buildTokenAuthHeaders} from '../../../utils/auth';
+
 export const fetchPlaybackInfo = async (service, itemId, payload) => {
 	const response = await fetch(`${service.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${service.userId}`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			'X-Emby-Token': service.accessToken
+			...buildTokenAuthHeaders(service.accessToken)
 		},
 		body: JSON.stringify(payload)
 	});

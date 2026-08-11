@@ -1,3 +1,4 @@
+import {AUTH_QUERY_PARAM} from '../../utils/auth';
 import { getPlaystateApi } from '@jellyfin/sdk/lib/utils/api/playstate-api';
 import {
 	determinePlayMethod,
@@ -1147,7 +1148,7 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 export const getPlaybackStreamUrl = (service, itemId, mediaSourceId, playSessionId, tag, container, liveStreamId) => {
 	const params = new URLSearchParams({
 		static: 'true',
-		api_key: service.accessToken
+		[AUTH_QUERY_PARAM]: service.accessToken
 	});
 	if (container) {
 		params.set('container', container);

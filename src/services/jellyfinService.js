@@ -50,6 +50,7 @@ import {
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
+import {AUTH_QUERY_PARAM, buildTokenAuthHeaders} from '../utils/auth';
 import {getBreezyfinCapabilities, getMyRequestItems} from './jellyfin/requestsApi';
 import {getHomeSectionDescriptors, getHomeSectionItems} from './jellyfin/homeSectionsApi';
 import {getDiscoveryDetails, getDiscoveryFeed} from './jellyfin/discoveryApi';
@@ -170,7 +171,7 @@ class JellyfinService {
 
 	_getAuthHeaders(extraHeaders = {}) {
 		return {
-			'X-Emby-Token': this.accessToken,
+			...buildTokenAuthHeaders(this.accessToken),
 			...extraHeaders
 		};
 	}
@@ -182,7 +183,7 @@ class JellyfinService {
 			if (value === undefined || value === null || value === '') return;
 			search.set(key, String(value));
 		});
-		search.set('api_key', this.accessToken);
+		search.set(AUTH_QUERY_PARAM, this.accessToken);
 		applyPreferredImageFormatToParams(search, options);
 		return `${this.serverUrl}${path}?${search.toString()}`;
 	}

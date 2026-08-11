@@ -130,7 +130,7 @@ describe('sessionApi', () => {
 			PrimaryImageTag: 'avatar-1'
 		});
 
-		const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.['X-Emby-Authorization'] || '';
+		const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.Authorization || '';
 		expect(authHeader).toContain('Version="3.4.5"');
 		expect(authHeader).toContain('DeviceId="service-device-id"');
 		expect(service.resolveClientVersion).toHaveBeenCalledTimes(1);

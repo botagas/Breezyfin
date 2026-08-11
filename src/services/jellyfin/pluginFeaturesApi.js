@@ -1,3 +1,4 @@
+import {AUTH_QUERY_PARAM} from '../../utils/auth';
 import {
 	getBreezyfinCapabilities,
 	getUnavailablePluginResult,
@@ -63,7 +64,7 @@ export const buildAuthenticatedPluginImageUrl = (service, relativePath, width = 
 		return null;
 	}
 	url.searchParams.set('width', String(safeWidth));
-	url.searchParams.set('api_key', service.accessToken);
+	url.searchParams.set(AUTH_QUERY_PARAM, service.accessToken);
 	return url.toString();
 };
 

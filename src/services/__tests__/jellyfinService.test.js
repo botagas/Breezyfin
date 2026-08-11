@@ -99,7 +99,7 @@ describe('jellyfinService', () => {
 		const parsedImageUrl = new URL(imageUrl);
 		expect(parsedImageUrl.origin).toBe('http://media.local');
 		expect(parsedImageUrl.pathname).toBe('/Items/item-1/Images/Primary');
-		expect(parsedImageUrl.searchParams.get('api_key')).toBe('token-123');
+		expect(parsedImageUrl.searchParams.get('ApiKey')).toBe('token-123');
 		expect(parsedImageUrl.searchParams.get('width')).toBe('320');
 		expect(parsedImageUrl.searchParams.get('tag')).toBe('tag-1');
 		expect(parsedImageUrl.searchParams.get('format')).toBe('Jpg');
@@ -129,7 +129,7 @@ describe('jellyfinService', () => {
 
 		expect(parsedImageUrl.origin).toBe('http://media.local');
 		expect(parsedImageUrl.pathname).toBe('/Users/user-1/Images/Primary');
-		expect(parsedImageUrl.searchParams.get('api_key')).toBe('token-123');
+		expect(parsedImageUrl.searchParams.get('ApiKey')).toBe('token-123');
 		expect(parsedImageUrl.searchParams.get('width')).toBe('96');
 		expect(parsedImageUrl.searchParams.has('tag')).toBe(false);
 	});
@@ -173,12 +173,12 @@ describe('jellyfinService', () => {
 				expect.objectContaining({
 					method: 'POST',
 					headers: expect.objectContaining({
-						'X-Emby-Authorization': expect.stringContaining(`DeviceId="${jellyfinService.getDeviceId()}"`)
+						'Authorization': expect.stringContaining(`DeviceId="${jellyfinService.getDeviceId()}"`)
 					}),
 					body: JSON.stringify({Username: 'Alice', Pw: 'secret'})
 				})
 			);
-			const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.['X-Emby-Authorization'] || '';
+			const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.Authorization || '';
 			expect(authHeader).toContain('Version="9.9.9"');
 			expect(resolveClientVersionSpy).toHaveBeenCalledTimes(1);
 			expect(getClientVersionSpy).toHaveBeenCalled();

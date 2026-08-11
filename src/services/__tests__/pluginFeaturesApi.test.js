@@ -208,7 +208,7 @@ describe('plugin feature APIs', () => {
 		expect(imageUrl.origin).toBe(service.serverUrl);
 		expect(imageUrl.pathname).toBe('/Breezyfin/ExternalImages/signed');
 		expect(imageUrl.searchParams.get('width')).toBe('500');
-		expect(imageUrl.searchParams.get('api_key')).toBe(service.accessToken);
+		expect(imageUrl.searchParams.get('ApiKey')).toBe(service.accessToken);
 	});
 
 	it.each([
@@ -224,7 +224,7 @@ describe('plugin feature APIs', () => {
 
 		expect(imageUrl.pathname).toBe(expectedPath);
 		expect(imageUrl.searchParams.get('width')).toBe('640');
-		expect(imageUrl.searchParams.get('api_key')).toBe('secret');
+		expect(imageUrl.searchParams.get('ApiKey')).toBe('secret');
 	});
 
 	it('rejects malformed plugin image context', () => {

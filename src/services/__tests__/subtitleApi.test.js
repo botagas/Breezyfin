@@ -27,7 +27,7 @@ describe('subtitleApi', () => {
 			serverUrl: 'https://jellyfin.example',
 			accessToken: 'token'
 		}, 'item-1', 'source-1', 3, 'ass')).toBe(
-			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/Stream.ass?api_key=token'
+			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/Stream.ass?ApiKey=token'
 		);
 	});
 
@@ -39,7 +39,7 @@ describe('subtitleApi', () => {
 			serverUrl: 'https://jellyfin.example',
 			accessToken: 'token'
 		}, 'item-1', 'source-1', 3, 'pgs')).toBe(
-			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.pgs?api_key=token'
+			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.pgs?ApiKey=token'
 		);
 	});
 
@@ -96,7 +96,7 @@ describe('subtitleApi', () => {
 			'/Videos/item-1/source-1/Subtitles/4/0/Stream.pgssub'
 		]);
 		expect(result.candidates[0].url).toBe(
-			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/4/0/Stream.sup?api_key=token'
+			'https://jellyfin.example/Videos/item-1/source-1/Subtitles/4/0/Stream.sup?ApiKey=token'
 		);
 	});
 
@@ -208,7 +208,7 @@ describe('subtitleApi', () => {
 			text: 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello',
 			format: 'vtt',
 			path: '/Videos/item-1/source-1/Subtitles/3/Stream.vtt',
-			url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/Stream.vtt?api_key=token',
+			url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/Stream.vtt?ApiKey=token',
 			contentType: 'text/vtt'
 		}));
 	});
@@ -237,8 +237,8 @@ describe('subtitleApi', () => {
 			data: buffer,
 			format: 'sup',
 			path: '/Videos/item-1/source-1/Subtitles/3/0/Stream.sup',
-			url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?api_key=token',
-			debugUrl: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?api_key=[REDACTED]',
+			url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?ApiKey=token',
+			debugUrl: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?ApiKey=[REDACTED]',
 			contentType: 'application/octet-stream',
 			status: 200,
 			failureStage: '',
@@ -328,8 +328,8 @@ describe('subtitleApi', () => {
 				status: 400,
 				failureStage: 'request',
 				path: '/Videos/item-1/source-1/Subtitles/3/0/Stream.sup',
-				url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?api_key=token',
-				debugUrl: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?api_key=[REDACTED]'
+				url: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?ApiKey=token',
+				debugUrl: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?ApiKey=[REDACTED]'
 			})
 		);
 	});
@@ -351,7 +351,7 @@ describe('subtitleApi', () => {
 				error: 'body read failed',
 				status: 200,
 				failureStage: 'body-read',
-				debugUrl: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?api_key=[REDACTED]'
+				debugUrl: 'https://jellyfin.example/Videos/item-1/source-1/Subtitles/3/0/Stream.sup?ApiKey=[REDACTED]'
 			})
 		);
 	});

@@ -344,6 +344,10 @@ Jellyfin service paths:
   normalized server base so reverse-proxy prefixes such as `/jellyfin` survive)
 - `src/services/jellyfin/requestErrors.js` (bounded Problem Details parsing and safe
   Jellyfin request errors; raw provider bodies must not be embedded in errors/logs)
+- `src/utils/auth.js` (single source for outbound auth headers, shared by services
+  and login-panel utils; every authenticated request must go through it. Do not reintroduce
+  the legacy `X-Emby-Authorization`/`X-Emby-Token` spellings: 10.x already falls back to
+  the standard `Authorization` header and 12 rejects the old ones)
 - `src/services/jellyfin/homeSectionsApi.js` (opaque Home descriptors/items)
 - `src/services/jellyfin/discoveryApi.js` and `calendarApi.js` (read-only provider data;
   Discovery is surfaced through enabled HSS Home descriptors rather than a standalone tab)
