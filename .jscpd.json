@@ -1,6 +1,9 @@
 {
 	"minTokens": 80,
 	"minLines": 12,
+	"ignore": [
+		"**/__tests__/**"
+	],
 	"reporters": [
 		"console",
 		"threshold"

@@ -10,14 +10,37 @@ export const normalizeToastInput = (input) => {
 	if (typeof input === 'string') {
 		return {
 			message: input.trim(),
-			severity: TOAST_SEVERITIES.INFO
+			severity: TOAST_SEVERITIES.INFO,
+			key: '',
+			persistent: false
 		};
 	}
 	const message = typeof input?.message === 'string' ? input.message.trim() : '';
 	const severity = Object.values(TOAST_SEVERITIES).includes(input?.severity)
 		? input.severity
 		: TOAST_SEVERITIES.INFO;
-	return {message, severity};
+	return {
+		message,
+		severity,
+		key: String(input?.key || '').trim(),
+		persistent: input?.persistent === true
+	};
+};
+
+export const appendProtectedStackedToast = (current = [], entry, maxVisible = 1) => {
+	const limit = Math.max(1, Number(maxVisible) || 1);
+	const next = [...current, entry];
+	const removed = [];
+	while (next.length > limit) {
+		const transientIndex = next.findIndex((item) => item?.persistent !== true);
+		if (transientIndex < 0) break;
+		removed.push(next.splice(transientIndex, 1)[0]);
+	}
+	return {
+		items: next,
+		removed,
+		accepted: next.some((item) => item?.id === entry?.id)
+	};
 };
 
 export const useToastMessage = (options = {}) => {
@@ -31,11 +54,22 @@ export const useToastMessage = (options = {}) => {
 	const [toastSeverity, setToastSeverity] = useState(TOAST_SEVERITIES.INFO);
 	const [toastVisible, setToastVisible] = useState(false);
 	const [toastMessages, setToastMessages] = useState([]);
+	const [toastRevision, setToastRevision] = useState(0);
 	const frameRef = useRef(null);
 	const hideTimerRef = useRef(null);
 	const clearTimerRef = useRef(null);
 	const stackTimersRef = useRef(new Map());
 	const nextToastIdRef = useRef(1);
+	const activeToastRef = useRef({key: '', persistent: false});
+	const toastMessagesRef = useRef([]);
+
+	const updateToastMessages = useCallback((updater) => {
+		const current = toastMessagesRef.current;
+		const next = typeof updater === 'function' ? updater(current) : updater;
+		toastMessagesRef.current = next;
+		setToastMessages(next);
+		return next;
+	}, []);
 
 	const clearToastTimers = useCallback(() => {
 		if (frameRef.current !== null) {
@@ -76,8 +110,9 @@ export const useToastMessage = (options = {}) => {
 		setToastVisible(false);
 		setToastMessage('');
 		setToastSeverity(TOAST_SEVERITIES.INFO);
-		setToastMessages([]);
-	}, [clearStackTimers, clearToastTimers]);
+		updateToastMessages([]);
+		activeToastRef.current = {key: '', persistent: false};
+	}, [clearStackTimers, clearToastTimers, updateToastMessages]);
 
 	const addStackedToast = useCallback((toastInput) => {
 		const normalized = normalizeToastInput(toastInput);
@@ -85,26 +120,36 @@ export const useToastMessage = (options = {}) => {
 			clearToast();
 			return;
 		}
+		if (normalized.key) {
+			updateToastMessages((current) => current.filter((item) => {
+				if (item.key !== normalized.key) return true;
+				clearStackTimers(item.id);
+				return false;
+			}));
+		}
 
 		const id = nextToastIdRef.current;
 		nextToastIdRef.current += 1;
 		const entry = {
 			id,
+			key: normalized.key,
 			message: normalized.message,
 			severity: normalized.severity,
-			visible: fadeOutMs <= 0
+			visible: normalized.persistent || fadeOutMs <= 0,
+			persistent: normalized.persistent
 		};
 
+		const stackResult = appendProtectedStackedToast(
+			toastMessagesRef.current,
+			entry,
+			maxVisible
+		);
+		stackResult.removed.forEach((removedEntry) => clearStackTimers(removedEntry.id));
+		updateToastMessages(stackResult.items);
+		if (!stackResult.accepted) return;
 		setToastMessage(normalized.message);
 		setToastSeverity(normalized.severity);
 		setToastVisible(true);
-		setToastMessages((current) => {
-			const limit = Math.max(1, Number(maxVisible) || 1);
-			const next = [...current, entry];
-			const removed = next.length > limit ? next.slice(0, next.length - limit) : [];
-			removed.forEach((removedEntry) => clearStackTimers(removedEntry.id));
-			return next.slice(-limit);
-		});
 
 		const timers = {
 			frame: null,
@@ -112,27 +157,42 @@ export const useToastMessage = (options = {}) => {
 			clear: null
 		};
 		stackTimersRef.current.set(id, timers);
+		if (normalized.persistent) return;
 
 		if (fadeOutMs > 0) {
 			timers.frame = window.requestAnimationFrame(() => {
-				setToastMessages((current) => current.map((item) => (
+				updateToastMessages((current) => current.map((item) => (
 					item.id === id ? {...item, visible: true} : item
 				)));
 				timers.frame = null;
 			});
 			const hideDelay = Math.max(0, durationMs - fadeOutMs);
 			timers.hide = setTimeout(() => {
-				setToastMessages((current) => current.map((item) => (
+				updateToastMessages((current) => current.map((item) => (
 					item.id === id ? {...item, visible: false} : item
 				)));
 				timers.hide = null;
 			}, hideDelay);
 		}
 		timers.clear = setTimeout(() => {
-			setToastMessages((current) => current.filter((item) => item.id !== id));
+			updateToastMessages((current) => current.filter((item) => item.id !== id));
 			clearStackTimers(id);
 		}, durationMs);
-	}, [clearStackTimers, clearToast, durationMs, fadeOutMs, maxVisible]);
+	}, [clearStackTimers, clearToast, durationMs, fadeOutMs, maxVisible, updateToastMessages]);
+
+	const dismissToast = useCallback((key) => {
+		const normalizedKey = String(key || '').trim();
+		if (!normalizedKey) return;
+		if (!stack && activeToastRef.current.key === normalizedKey) {
+			clearToast();
+			return;
+		}
+		updateToastMessages((current) => current.filter((item) => {
+			if (item.key !== normalizedKey) return true;
+			clearStackTimers(item.id);
+			return false;
+		}));
+	}, [clearStackTimers, clearToast, stack, updateToastMessages]);
 
 	const setToast = useCallback((toastInput) => {
 		if (stack) {
@@ -146,6 +206,11 @@ export const useToastMessage = (options = {}) => {
 		}
 		setToastMessage(normalized.message);
 		setToastSeverity(normalized.severity);
+		activeToastRef.current = {
+			key: normalized.key,
+			persistent: normalized.persistent
+		};
+		setToastRevision((current) => current + 1);
 	}, [addStackedToast, clearToast, stack]);
 
 	useEffect(() => {
@@ -158,6 +223,10 @@ export const useToastMessage = (options = {}) => {
 		}
 
 		clearToastTimers();
+		if (activeToastRef.current.persistent) {
+			setToastVisible(true);
+			return clearToastTimers;
+		}
 		if (fadeOutMs > 0) {
 			setToastVisible(false);
 			frameRef.current = window.requestAnimationFrame(() => {
@@ -185,7 +254,7 @@ export const useToastMessage = (options = {}) => {
 		}
 
 		return clearToastTimers;
-	}, [clearToastTimers, durationMs, fadeOutMs, stack, toastMessage]);
+	}, [clearToastTimers, durationMs, fadeOutMs, stack, toastMessage, toastRevision]);
 
 	useEffect(() => () => {
 		clearToastTimers();
@@ -198,6 +267,7 @@ export const useToastMessage = (options = {}) => {
 		toastVisible,
 		toastMessages,
 		setToastMessage: setToast,
-		clearToast
+		clearToast,
+		dismissToast
 	};
 };

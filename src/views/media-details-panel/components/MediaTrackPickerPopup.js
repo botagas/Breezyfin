@@ -1,5 +1,4 @@
-import Button from '../../../components/BreezyButton';
-import SelectionOptionContent, {selectionOptionSelectedClass} from '../../../components/SelectionOptionContent';
+import SelectionOptionButton from '../../../components/SelectionOptionButton';
 import css from '../../MediaDetailsPanel.module.less';
 import MediaOptionPickerPopup from './MediaOptionPickerPopup';
 
@@ -15,20 +14,17 @@ const MediaTrackPickerPopup = ({
 	const trackOptions = tracks.map((track) => {
 		const selected = track.key === selectedKey;
 		return (
-			<Button
+			<SelectionOptionButton
 				key={track.key}
 				data-track-key={track.key}
 				data-track-type={type}
 				size="large"
 				selected={selected}
-				aria-current={selected ? 'true' : undefined}
 				onClick={onTrackSelect}
-				className={`${css.popupButton} ${selected ? selectionOptionSelectedClass : ''}`}
+				className={css.popupButton}
 			>
-				<SelectionOptionContent selected={selected}>
-					{track.children}
-				</SelectionOptionContent>
-			</Button>
+				{track.children}
+			</SelectionOptionButton>
 		);
 	});
 

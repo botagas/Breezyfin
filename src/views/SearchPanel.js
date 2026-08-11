@@ -3,7 +3,7 @@ import { Panel, Header } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import MediaBrowseControls from '../components/MediaBrowseControls';
 import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
-import SelectionOptionContent, {selectionOptionSelectedClass} from '../components/SelectionOptionContent';
+import SelectionOptionButton from '../components/SelectionOptionButton';
 import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
@@ -524,19 +524,17 @@ const SearchPanel = ({
 							{FILTER_OPTIONS.map((filter) => {
 								const selected = selectedFilterIds.includes(filter.id);
 								return (
-									<Button
+									<SelectionOptionButton
 										key={filter.id}
 										data-filter-id={filter.id}
 										selected={selected}
-										aria-pressed={selected}
+										selectionMode="multiple"
 										onClick={handleFilterToggleClick}
 										size="small"
-										className={`${browseCss.filterPopupOptionButton} ${selected ? selectionOptionSelectedClass : ''}`}
+										className={browseCss.filterPopupOptionButton}
 									>
-										<SelectionOptionContent selected={selected}>
-											{filter.label}
-										</SelectionOptionContent>
-									</Button>
+										{filter.label}
+									</SelectionOptionButton>
 								);
 							})}
 						</div>

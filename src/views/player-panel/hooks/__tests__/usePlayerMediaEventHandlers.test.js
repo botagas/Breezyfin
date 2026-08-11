@@ -56,7 +56,8 @@ const createProps = () => {
 			exitInProgressRef: {current: false},
 			nativeSourceTokenRef: {current: sourceToken},
 			playbackRuntimeContextRef: {current: runtimeContext},
-			playbackGenerationRef: {current: 4}
+			playbackGenerationRef: {current: 4},
+			onAudioTransitionFailed: jest.fn().mockResolvedValue(false)
 		}
 	};
 };
@@ -143,5 +144,42 @@ describe('usePlayerMediaEventHandlers', () => {
 		expect(view.props.attemptSubtitleCompatibilityFallback).not.toHaveBeenCalled();
 		expect(view.props.attemptTranscodeFallback).not.toHaveBeenCalled();
 		expect(view.props.showPlaybackError).not.toHaveBeenCalled();
+	});
+
+	it('routes replacement-source errors to the audio transition before generic recovery', async () => {
+		const view = createProps();
+		view.sourceToken = Object.freeze({
+			...view.sourceToken,
+			runtimeContext: Object.freeze({
+				...view.sourceToken.runtimeContext,
+				audioTransition: Object.freeze({id: 'audio-1'})
+			})
+		});
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		view.props.playbackRuntimeContextRef.current = view.sourceToken.runtimeContext;
+		view.props.onAudioTransitionFailed.mockResolvedValue(true);
+		Object.defineProperty(view.video, 'error', {
+			configurable: true,
+			value: {code: 4}
+		});
+		const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+		const {result} = renderHook(() => usePlayerMediaEventHandlers(view.props));
+
+		await act(async () => {
+			await result.current.handleVideoError({
+				type: 'error',
+				currentTarget: view.video,
+				timeStamp: 201
+			});
+		});
+
+		expect(view.props.onAudioTransitionFailed).toHaveBeenCalledWith(
+			view.sourceToken,
+			'Format not supported'
+		);
+		expect(view.props.attemptSubtitleCompatibilityFallback).not.toHaveBeenCalled();
+		expect(view.props.attemptTranscodeFallback).not.toHaveBeenCalled();
+		expect(view.props.handleStop).not.toHaveBeenCalled();
+		consoleError.mockRestore();
 	});
 });

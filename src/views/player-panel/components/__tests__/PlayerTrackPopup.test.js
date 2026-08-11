@@ -8,7 +8,7 @@ jest.mock('@enact/sandstone/Popup', () => ({children, open}) => (
 jest.mock('@enact/sandstone/BodyText', () => ({children, ...props}) => (
 	<div {...props}>{children}</div>
 ));
-jest.mock('@enact/sandstone/Item', () => (
+jest.mock('../../../../components/BreezyButton', () => (
 	require('../../../../testUtils/mocks/SelectedControl').default
 ));
 jest.mock('@enact/sandstone/Icon', () => ({children, ...props}) => (

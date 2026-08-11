@@ -26,6 +26,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Centralize PlayerPanel playback negotiation and resolved-source descriptor creation | `usePlayerVideoLoader` |
 | Own native/native-HLS/HLS.js source attachment, engine readiness, and teardown | `usePlayerSourcePipeline` |
 | Gate Player startup until the source engine, selected client subtitles, and SyncPlay authority are ready | `usePlayerStartupCoordinator` |
+| Prepare, commit, restore, and roll back native runtime audio-track replacements | `usePlayerAudioTransition` |
 | Reject pre-attachment media events and keep HLS.js errors on its generation-bound callback path | `isPlaybackSourceMediaEventCurrent` |
 | Centralize PlayerPanel playback option/session-context builders | `usePlayerPlaybackContext` |
 | Centralize PlayerPanel skip overlay + next-episode prompt state machine | `usePlayerSkipOverlayState` |
@@ -61,6 +62,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Fast lookup of items by id/key | `useMapById` |
 | Fetch item metadata with cancel-safe effect | `useItemMetadata` |
 | Reusable toast lifecycle | `useToastMessage` |
+| Render a shared Sandstone-selected option with the persistent Selected marker | `SelectionOptionButton` |
 | Reusable image fallback behavior, including ordered URL candidates | `useImageErrorFallback` |
 | Manage App-level panel history snapshots | `usePanelHistory` |
 | Register and run App-level panel back handlers | `usePanelBackHandlerRegistry` |
@@ -103,10 +105,11 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Normalize PlayerPanel subtitle renderer failure and fallback status names, and route renderer failures into burn-in/no-subtitle consent decisions | `normalizeSubtitleRendererFailureReason` / `getSubtitleBurnInFallbackStatus` / `runSubtitleBurnInFallbackDecision` |
 | Resolve raw subtitle fetch format priority from Jellyfin subtitle codecs | `getRawSubtitleFormats` |
 | Fetch subtitle event/raw text/binary payloads and resolve bitmap delivery candidates for client-side rendering | `getSubtitleTrackEvents` / `getSubtitleTrackText` / `getSubtitleTrackBinary` / `getBitmapSubtitleDeliveryCandidates` / `buildSubtitleStreamUrl` |
-| Fetch, normalize, place, cache, and render PlayerPanel subtitle cues, including safe SRT/VTT inline formatting, escaped safe subtitle tags, long-running overlapping cue lookup, ASS layer/source render ordering, lightweight ASS/SSA alignment including legacy `\a` codes, margins, wrap style, `\pos(x,y)` / `\move(...)` placement, `\org(x,y)` transform origins for absolute transformed cues, bounded rectangular `\clip(x1,y1,x2,y2)` / `\iclip(x1,y1,x2,y2)`, common vector `\clip(...)` / `\iclip(...)` masks for SVG drawing cues, source-authored absolute/relative font size, colors, fonts, borders, shadows, blur, simple/complex fades, basic karaoke timing/color states, active `\K`/`\kf` sweep approximation, common `\p` vector drawing paths including B-spline `s`/`p` conversion and `\pbo` baseline offsets, style reset, scale, spacing, rotation/skew, and interpolated numeric/color `\t(...)` transforms | `normalizeSubtitleEvents` / `normalizeSubtitleText` / `findActiveSubtitleCues` / `subtitleRendererAss` / `subtitleRendererAssAlignment` / `subtitleRendererAssClip` / `subtitleRendererAssDimensions` / `subtitleRendererAssDrawing` / `subtitleRendererAssFontSize` / `subtitleRendererAssOrigin` / `subtitleRendererAssPosition` / `subtitleRendererAssTransform` / `usePlayerSubtitleRenderer` |
+| Normalize, place, and render text subtitle cues | `normalizeSubtitleEvents` / `normalizeSubtitleText` / `findActiveSubtitleCues` / `subtitleRendererAss*` / `usePlayerSubtitleRenderer` |
 | Normalize numeric Breezyfin subtitle appearance settings shared by Settings and Player overlay | `normalizeNumericSetting` / `adjustNumericSetting` / `SUBTITLE_OVERLAY_FONT_SIZE_RANGE` / `SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE` |
-| Render ASS/SSA through stable-visible experimental external renderers using app-fetched subtitle content when Smart Subtitle Handling selects them; Auto still resolves to Breezyfin lightweight rendering, while explicit libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in options remain selectable in every release channel; packaging prepares JASSUB static assets, applies version-guarded webOS patches that force Canvas2D and require explicit worker/WASM/font URLs, preserves external-renderer chunks/assets in stable and develop builds, transpiles ASS.js/JASSUB renderer chunks for webOS packaging, validates copied JASSUB static assets, and fails if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` chunks reappear; external renderer init waits for an attached video source, libass and JASSUB can also run in manual caller-owned canvas diagnostic modes, their intervals share `rendererRuntimeSuspension`, and renderer-layer diagnostics report playback phase, video state, external layer/canvas/ASS.js box visibility, hit-test target, dimensions, JASSUB backend, active DOM node counts, canvas pixel probe state, manual sync counters, and renderer update counters for real-TV debugging | `subtitle-renderers/subtitleRendererRegistry.js` plus `libassRenderer`, `jassubRenderer`, `assJsRenderer`, `manualCanvasLayout`, `rendererRuntimeSuspension`, `videoSourceReady`, and `rendererDiagnostics`; `scripts/prepare-subtitle-package-assets.cjs`; `scripts/copy-subtitle-assets.cjs`; `scripts/subtitle-assets/jassubCanvas2dPatch.cjs` |
-| Render PGS/PGSSUB bitmap subtitles through Smart Subtitle Handling before burn-in fallback; image subtitles are detached from Jellyfin playback requests, the selected subtitle index is preserved for client rendering, Auto tries libbitsub first and then libpgs using DeliveryUrl/raw URL candidates before optional binary preflight, and renderer disposal, bitmap diagnostics, warning-gated image subtitle burn-in, and no-subtitle fallback consent stay explicit | `src/utils/bitmapSubtitleRenderers.js`; `subtitle-renderers/libbitsubRenderer.js`; `subtitle-renderers/libpgsRenderer.js`; `getSubtitleTranscodePolicy`; `getBitmapSubtitleDeliveryCandidates`; `getSubtitleTrackBinary`; `PlayerPlaybackDecisionPrompt` |
+| Render ASS/SSA with an explicit external renderer | `subtitleRendererRegistry` / `libassRenderer` / `jassubRenderer` / `assJsRenderer` / `manualCanvasLayout` |
+| Package and validate external subtitle-renderer assets | `prepare-subtitle-package-assets.cjs` / `copy-subtitle-assets.cjs` / `jassubCanvas2dPatch.cjs` |
+| Render PGS/PGSSUB before consent-gated burn-in fallback | `bitmapSubtitleRenderers` / `libbitsubRenderer` / `libpgsRenderer` / `PlayerPlaybackDecisionPrompt` |
 | Normalize PlayerPanel subtitle overlay appearance, map ASS coordinates onto the visible video stage, preserve authored placement, contain only managed multiline text boxes, group region cues by ASS layer, and apply full-stage rectangular/inverse/vector clips | `getSubtitleOverlayAttributes` / `getSubtitleVideoStageGeometry` / `getAssCoordinatePlane` / `getAssCueContainmentPolicy` / `getAssCueContainment` / `groupSubtitleCuesByPlacement` / `groupSubtitleCuesByLayer` / `getSubtitleAbsolutePositionStyle` / `getSubtitleClipLayerStyle` |
 
 ---
@@ -453,7 +456,8 @@ usePlayerInteractionReveal({
   - audio/subtitle initialization
   - stream URL construction (direct/hls/transcode)
   - immutable playback runtime context and resolved source descriptor creation
-  - bounded video-element mount retry
+  - awaitable, cancellable video-element mount admission that preserves the original
+    prepared-plan transaction and allocates no playback generation before the surface exists
 
   Loader code must not assign `video.src`, attach HLS.js, call `video.load()`, or own
   startup watchdogs. It hands the resolved descriptor to `usePlayerSourcePipeline`.
@@ -492,12 +496,32 @@ usePlayerInteractionReveal({
   subtitle gate, the 15-second deadline remains fixed across readiness rerenders, and a
   previous source's renderer-ready state cannot satisfy a replacement source.
 
+### `usePlayerAudioTransition`
+- File: `src/views/player-panel/hooks/usePlayerAudioTransition.js`
+- Purpose:
+  - pause native playback while preserving the attached frame during PlaybackInfo preparation
+  - serialize one runtime audio transition and lock Player actions other than Back
+  - commit one replacement source only after negotiation succeeds
+  - restore metadata position before releasing startup and preserve the prior play state
+  - save the selected preference only after the replacement becomes ready
+  - restore the previous source in a fresh paused generation after post-swap failure
+  - close the superseded Jellyfin session after successful readiness, and close an unused
+    or failed replacement session before decision handoff, cancellation, or rollback
+  - use the SyncPlay bridge's server-clock position and wait for Ready/Unpause authority
+
+  Native runtime changes must use this hook rather than enabling `AudioTrackList` and
+  waiting an arbitrary delay. HLS.js remains in `usePlayerSeekAndTrackSwitching` because
+  it exposes an explicit generation-bound `AUDIO_TRACK_SWITCHED` event.
+
 ### `usePlayerPlaybackReporter`
 - File: `src/views/player-panel/hooks/usePlayerPlaybackReporter.js`
 - Purpose:
   - report `PlaybackStart` once per item/session/generation
   - serialize progress, pause, seek, and stop reporting
-  - coalesce timer ticks while preserving the latest forced state
+  - coalesce timer ticks while preserving the latest forced state; forced callers await
+    their queued report attempt rather than the request that happened to be active
+  - stop captured superseded sessions through immutable session metadata without stopping
+    reporting for the active replacement, with bounded item/session deduplication
   - keep reporting failures best-effort and isolated from Player controls
 
 ### `usePlayerPlaybackContext`
@@ -524,10 +548,10 @@ usePlayerInteractionReveal({
 - File: `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
 - Purpose: centralize seek behavior and track switching reload/session-override behavior for HLS/direct/transcode flows:
   - explicit same-item stream indexes replace stale cross-item semantic intents;
-  - HLS.js assignments are verified before the selection is committed and otherwise
-    reload with the explicit Jellyfin stream index;
-  - active native playback pauses through a bounded audio-decoder settling window before
-    resuming, because supported webOS runtimes expose no reliable audible-track-ready event.
+  - HLS.js audio/subtitle assignments are registered before mutation and committed only
+    after the matching current-generation switch event;
+  - failed/timed-out HLS audio changes enter `usePlayerAudioTransition`;
+  - native runtime audio changes always enter the controlled prepare/swap flow.
 - Returns:
   - `isSeekContext(target)`
   - `isProgressSliderTarget(target)`
@@ -737,7 +761,10 @@ useImageErrorFallback(placeholderClassName, {
 
 ### `useToastMessage`
 - File: `src/hooks/useToastMessage.js`
-- Purpose: standard toast lifecycle with optional fade-out staging and opt-in stacking for player diagnostics.
+- Purpose: standard toast lifecycle with optional fade-out staging, opt-in stacking,
+  keyed persistent messages, and targeted dismissal. In stacked mode, persistent entries
+  reserve their slots: transient entries evict older transient entries first and are
+  suppressed when every configured slot is persistent.
 - Signature:
 ```js
 useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 1 })
@@ -748,6 +775,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - `toastMessages`
   - `setToastMessage`
   - `clearToast`
+  - `dismissToast(key)`
 
 ### `usePluginMediaItemActivation`
 
@@ -913,17 +941,35 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - `normalizeSubtitleEvents(events)` and `normalizeSubtitleText(text, options)` normalize event/raw subtitle payloads into cue objects for the Player overlay. Keep SRT/VTT sanitization and public subtitle APIs here.
   - `findActiveSubtitleCues(events, currentTimeSeconds)` returns normalized active cues for overlay rendering, preserving long-running overlapping cues and sorting active output by ASS layer/source order so higher layers render above lower layers.
 - `src/views/player-panel/utils/subtitleRendererAss.js`
-  - Lightweight ASS/SSA parsing and active-cue decoration, including placement, alignment, margins, wrapping, `\pos(x,y)`, `\move(...)`, `\org(x,y)` transform origins for absolute transformed cues, `@font` vertical-writing intent, source-authored absolute/relative font size, source colors/fonts/borders/shadows/blur, simple and complex fades, active `\K`/`\kf` sweep approximation, common vector drawing paths, drawing-cue vector clip masks, `\pbo` drawing baseline offsets, style reset, scale, spacing, rotation/skew, and interpolated numeric/color `\t(...)` transforms. It is still an approximation layer, not full ASS parity for advanced vector drawing edge cases, advanced karaoke collision/outline behavior, arbitrary text vector masks, mixed inline `\org` transform-origin cases, collision resolution, or advanced vertical layout/collision behavior.
+  - Parses ASS/SSA and decorates active cues. Supported features include placement,
+    alignment, margins, wrapping, `\pos(x,y)`, `\move(...)`, and `\org(x,y)`.
+  - Supports `@font` vertical-writing intent, source-authored font sizes, source colors,
+    fonts, borders, shadows, blur, fades, common vector paths, drawing clip masks, `\pbo`,
+    style reset, scale, spacing, rotation, skew, and interpolated `\t(...)` transforms.
+  - Approximates active `\K` and `\kf` sweeps. It does not provide full ASS parity for
+    advanced vector edge cases, karaoke collision and outline behavior, arbitrary text
+    vector masks, mixed inline `\org` cases, collision resolution, or advanced vertical
+    layout and collision behavior.
 - `src/views/player-panel/utils/subtitleRendererAssAlignment.js`
   - ASS/SSA alignment normalization helpers, including ASS numpad `\an1`-`\an9` alignment and legacy SSA `\a` alignment mapping.
 - `src/views/player-panel/utils/subtitleRendererAssColors.js`
   - ASS/SSA `&HAABBGGRR` color conversion and alpha application helpers shared by lightweight ASS style parsing.
 - `src/views/player-panel/utils/subtitleRendererAssClip.js`
-  - Parses bounded rectangular ASS `\clip(x1,y1,x2,y2)` / `\iclip(x1,y1,x2,y2)` and common vector `\clip(...)` / `\iclip(...)` paths. Direct and inverse rectangular clips render through the subtitle overlay clip layer; vector clips render for SVG drawing cues. Arbitrary text vector masks remain explicit future scope because CSS clipping cannot represent them accurately without mask composition.
+  - Parses bounded rectangular ASS `\clip(x1,y1,x2,y2)` and
+    `\iclip(x1,y1,x2,y2)` values. It also parses common vector `\clip(...)` and
+    `\iclip(...)` paths.
+  - The overlay clip layer renders direct and inverse rectangular clips. The SVG drawing
+    layer renders vector clips for drawing cues.
+  - Arbitrary text vector masks remain future work because CSS clipping cannot represent
+    them accurately without mask composition.
 - `src/views/player-panel/utils/subtitleRendererAssDimensions.js`
   - Shared ASS script-resolution defaults and scaled-value conversion helpers used by baseline ASS parsing and active `\t(...)` transform interpolation.
 - `src/views/player-panel/utils/subtitleRendererAssDrawing.js`
-  - Parses common ASS `\p` vector drawing payloads into safe SVG path metadata for the Player subtitle overlay. Supports move, line, cubic Bezier, close-path, B-spline `s`/`p` commands by converting splines into SVG cubic segments, and `\pbo` drawing baseline offsets so drawing payload text never leaks into subtitle text. Vector `\clip` / `\iclip` masks are applied inside the SVG drawing layer; full libass-equivalent drawing edge-case behavior remains explicit future scope.
+  - Converts common ASS `\p` vector drawing payloads into safe SVG path metadata.
+  - Supports move, line, cubic Bezier, close-path, and B-spline `s` and `p` commands. It
+    converts splines into SVG cubic segments.
+  - Applies `\pbo` baseline offsets and vector `\clip` or `\iclip` masks in the SVG drawing
+    layer. Full libass-equivalent edge-case behavior remains future work.
 - `src/views/player-panel/utils/subtitleRendererAssFontSize.js`
   - Resolves ASS absolute `\fsN` and relative `\fs+N` / `\fs-N` font-size overrides against the active source style size.
 - `src/views/player-panel/utils/subtitleRendererAssOrigin.js`
@@ -931,7 +977,11 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/utils/subtitleRendererAssPosition.js`
   - Normalizes ASS source-frame coordinates into script-resolution metadata and viewport percentages for `\pos(...)`, `\move(...)`, and `\org(...)`.
 - `src/views/player-panel/utils/subtitleRendererAssKaraoke.js`
-  - Basic lightweight ASS karaoke support for `\k`, `\K`, `\kf`, and `\ko`: tracks syllable timing, source primary/secondary colors, active progress for currently displayed cues, and a CSS text-gradient sweep approximation for active `\K`/`\kf` syllables. Keep advanced collision/outline behavior out of this helper until it can be rendered accurately and cheaply on TV.
+  - Provides basic ASS karaoke support for `\k`, `\K`, `\kf`, and `\ko`.
+  - Tracks syllable timing, source primary and secondary colors, and progress for active
+    cues. It approximates active `\K` and `\kf` sweeps with a CSS text gradient.
+  - Do not add advanced collision or outline behavior until the TV renderer can produce it
+    accurately at an acceptable cost.
 - `src/views/player-panel/utils/subtitleRendererAssTransform.js`
   - Parses ASS `\t(...)` timing/acceleration payloads, strips transform target tags from baseline inline styling, and interpolates active numeric/color transform state for scale, rotation, skew, border, shadow, blur, spacing, and font size.
 - `src/views/player-panel/utils/subtitleOverlaySettings.js`
@@ -939,7 +989,12 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - `groupSubtitleCuesByPlacement(cues)` groups active cues into top/middle/bottom and left/center/right render buckets.
   - `getSubtitleAbsolutePositionStyle(cue)` preserves source-authored ASS anchors, including intentional off-screen placement, while the subtitle stage clips output to the visible video surface.
 - `src/views/player-panel/utils/subtitleRendererAssStage.js`
-  - Maps `PlayResX/Y` coordinates independently across the contained video stage, uses valid `LayoutResX/Y` only for source-layout and pixel-aspect metadata, and classifies cue geometry before bounded containment. Explicit positions, clips, drawings, motion, transform origins, transforms, and intentionally off-screen positions preserve authored behavior; only ordinary unpositioned text boxes receive the bounded initial/font-ready fit.
+  - Maps `PlayResX/Y` coordinates across the contained video stage.
+  - Uses valid `LayoutResX/Y` only for source-layout and pixel-aspect metadata.
+  - Classifies cue geometry before bounded containment. Explicit positions, clips,
+    drawings, motion, transform origins, transforms, and intentional off-screen positions
+    preserve authored behavior.
+  - Applies the bounded initial and font-ready fit only to ordinary unpositioned text boxes.
   - `subtitleTextLoader.js` prefers raw ASS/SSA documents for Breezyfin Lightweight so PlayRes, style tables, and inline geometry survive delivery. It retains event-first loading for SRT/VTT and falls back to Jellyfin `Stream.js` only when raw ASS/SSA delivery is unavailable.
 - `src/views/media-details-panel/utils/mediaDetailsHelpers.js`
   - language display mapping, track summary labels
@@ -989,19 +1044,28 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/hooks/usePlayerInteractionReveal.js`
   - centralizes wheel and pointer-edge PlayerPanel controls reveal behavior without focus/playback side effects.
 - `src/views/player-panel/hooks/usePlayerVideoLoader.js`
-  - centralizes playback source/session negotiation and emits a resolved source descriptor.
+  - admits load transactions, prepares immutable PlaybackPlans, validates item/request/
+    override identity, and delegates the admitted transaction to the commit boundary.
+- `src/views/player-panel/hooks/playerPlaybackPlanCommit.js`
+  - publishes negotiated session/track/debug state, handles required decisions before
+    attachment, creates the immutable runtime context, and commits exactly one resolved
+    source descriptor after rechecking transaction identity.
 - `src/views/player-panel/hooks/usePlayerSourcePipeline.js`
   - exclusively owns native/native-HLS/HLS.js attachment, source tokens, engine bootstrap,
     native-HLS fallback, and teardown.
 - `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
   - gates startup on engine/client-subtitle/SyncPlay readiness and owns the independent
-    subtitle and post-play deadlines.
+    subtitle and post-play deadlines, initial native-track discovery, and replacement
+    metadata/position restoration.
+- `src/views/player-panel/hooks/usePlayerAudioTransition.js`
+  - owns serialized native runtime audio prepare/swap/rollback behavior.
 - `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
   - centralizes playback option/session-context derivation and selected-track ref synchronization.
 - `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
   - centralizes skip-intro/next-episode prompt transitions and skip/dismiss handlers.
 - `src/views/player-panel/hooks/usePlayerSeekAndTrackSwitching.js`
-  - centralizes seek logic and audio/subtitle switching behavior across HLS/direct/transcode paths.
+  - centralizes seek logic, event-confirmed HLS track changes, subtitle reload isolation,
+    and delegation of native audio changes to the transition coordinator.
 - `src/views/player-panel/hooks/usePlayerTrackPopupHandlers.js`
   - centralizes Player track-popup click handlers that parse `data-track-index`.
 - `src/views/player-panel/hooks/usePlayerPlaybackCommands.js`
@@ -1027,8 +1091,11 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/hooks/usePlayerRecoveryHandlers.js`
   - centralizes playback recovery/session rebuild + fallback/transcode/HLS fatal recovery logic.
   - receives an immutable `playbackRuntimeContext` captured before source attachment.
-    HLS callbacks and asynchronous fallback continuations must verify both their bound
-    HLS instance and playback generation before changing playback.
+    HLS callbacks verify their bound source/runtime identity before teardown. Recovery
+    continuations use a separate item/generation/load-request transaction after intentional
+    teardown because the old source token has correctly been invalidated.
+  - executes pure actions from `buildPlayerRecoveryAction`; current transactions claim the
+    generation-aware recovery ledger before publishing a replacement override or load.
 - `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
   - centralizes player lifecycle effects (item bootstrap, control hide timers, stall watchdog, focus/cleanup timers).
 - `src/views/player-panel/hooks/useNativeSyncPlay.js`
@@ -1044,6 +1111,29 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - applies at most one hard seek for each authoritative SyncPlay command; later drift
     for that command converges through bounded playback-rate correction so buffering
     cannot create a repeated seek loop.
+
+### Player playback utilities
+
+- `src/views/player-panel/utils/playbackGeneration.js`
+  - creates the sole playback-generation writer with `current`, `isCurrent`,
+    unpublished `invalidate`, and published `allocate` operations.
+- `src/views/player-panel/utils/playbackRecoveryLedger.js`
+  - owns bounded, atomic recovery claims and their generation/item carry scopes.
+- `src/views/player-panel/utils/playbackRecoveryTransaction.js`
+  - owns one recovery operation across intentional source teardown and rejects it after
+    item, playback-generation, load-request, exit, supersession, or unmount changes.
+- `src/views/player-panel/utils/playbackPlan.js`
+  - converts decorated PlaybackInfo plus player inputs into a callback-free, deeply
+    immutable plan containing source, track, decision, range, runtime, and diagnostics
+    inputs. It never owns DOM, HLS.js, React setters, or source tokens.
+- `src/views/player-panel/utils/playbackLifecycleReducer.js`
+  - rejects stale generation/source events and derives the visible startup/recovery phase;
+    refs remain authoritative for mutable media and final event validation.
+- `src/views/player-panel/utils/hlsStartupMeasurements.js`
+  - records bounded current-source HLS startup timing only while Diagnostics is enabled.
+- `src/views/player-panel/utils/playerRecoveryPolicy.js`
+  - classifies recovery context into pure actions. Hooks remain responsible for ledger
+    claims, user decisions, asynchronous execution, and post-await transaction checks.
 - `src/views/player-panel/hooks/useJellyWatchParty.js`
   - maps isolated room events to host/guest player control, readiness, reconnect,
     clock-offset, drift-correction, and chat behavior.

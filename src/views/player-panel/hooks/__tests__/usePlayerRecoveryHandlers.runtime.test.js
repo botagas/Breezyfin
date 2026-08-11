@@ -6,6 +6,14 @@ import {
 	SERVER_TRANSCODING_FAILURE_MESSAGE
 } from '../../utils/playerRecoveryPolicy';
 
+const createDeferred = () => {
+	let resolve;
+	const promise = new Promise((next) => {
+		resolve = next;
+	});
+	return {promise, resolve};
+};
+
 const createProps = () => {
 	const runtimeContext = createPlaybackRuntimeContext({
 		generation: 3,
@@ -15,6 +23,7 @@ const createProps = () => {
 	return {
 		runtimeContext,
 		props: {
+			itemId: 'item-1',
 			maxHlsNetworkRecoveryAttempts: 1,
 			maxHlsMediaRecoveryAttempts: 1,
 			maxPlaySessionRebuildAttempts: 1,
@@ -48,7 +57,8 @@ const createProps = () => {
 			seekOffsetRef: {current: 0},
 			playbackOverrideRef: {current: null},
 			loadVideoRef: {current: jest.fn()},
-			mediaSourceData: {Id: 'source-1'},
+			loadRequestIdRef: {current: 1},
+			mediaSourceData: {Id: 'source-1', SupportsTranscoding: true},
 			appendPlaybackDiagnostic: jest.fn(),
 			playbackSettingsRef: {current: {}},
 			transcodeFallbackAttemptedRef: {current: false},
@@ -102,6 +112,321 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 			jest.runOnlyPendingTimers();
 		});
 
+		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+	});
+
+	it('consumes a stale transcode continuation without publishing or loading it', async () => {
+		const {props} = createProps();
+		const stopped = createDeferred();
+		props.handleStop.mockReturnValue(stopped.promise);
+		props.playbackRecoveryLedger = {
+			get: jest.fn(() => null),
+			claim: jest.fn(() => ({accepted: true}))
+		};
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		let fallbackPromise;
+		act(() => {
+			fallbackPromise = result.current.attemptTranscodeFallback('Playback stalled');
+		});
+		expect(props.playbackOverrideRef.current).toBeNull();
+
+		props.exitInProgressRef.current = true;
+		props.loadRequestIdRef.current += 1;
+		stopped.resolve();
+		await act(async () => {
+			expect(await fallbackPromise).toBe(true);
+		});
+
+		expect(props.playbackRecoveryLedger.claim).not.toHaveBeenCalled();
+		expect(props.playbackOverrideRef.current).toBeNull();
+		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+		expect(props.setLoading).not.toHaveBeenCalledWith(true);
+	});
+
+	it('does not continue a transcode recovery after unmount', async () => {
+		const {props} = createProps();
+		const stopped = createDeferred();
+		props.handleStop.mockReturnValue(stopped.promise);
+		props.playbackRecoveryLedger = {
+			get: jest.fn(() => null),
+			claim: jest.fn(() => ({accepted: true}))
+		};
+		const {result, unmount} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		let fallbackPromise;
+		act(() => {
+			fallbackPromise = result.current.attemptTranscodeFallback('Playback stalled');
+		});
+		unmount();
+		stopped.resolve();
+		await act(async () => {
+			expect(await fallbackPromise).toBe(true);
+		});
+
+		expect(props.playbackRecoveryLedger.claim).not.toHaveBeenCalled();
+		expect(props.playbackOverrideRef.current).toBeNull();
+		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+	});
+
+	it('does not continue a transcode recovery for a replacement item', async () => {
+		const {props} = createProps();
+		const stopped = createDeferred();
+		props.handleStop.mockReturnValue(stopped.promise);
+		props.playbackRecoveryLedger = {
+			get: jest.fn(() => null),
+			claim: jest.fn(() => ({accepted: true}))
+		};
+		const {result, rerender} = renderHook(
+			({hookProps}) => usePlayerRecoveryHandlers(hookProps),
+			{initialProps: {hookProps: props}}
+		);
+
+		let fallbackPromise;
+		act(() => {
+			fallbackPromise = result.current.attemptTranscodeFallback('Playback stalled');
+		});
+		props.itemId = 'item-2';
+		rerender({hookProps: props});
+		stopped.resolve();
+		await act(async () => {
+			expect(await fallbackPromise).toBe(true);
+		});
+
+		expect(props.playbackRecoveryLedger.claim).not.toHaveBeenCalled();
+		expect(props.playbackOverrideRef.current).toBeNull();
+		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+	});
+
+	it('awaits and commits one current transcode recovery', async () => {
+		const {props} = createProps();
+		const stopped = createDeferred();
+		const loaded = createDeferred();
+		props.handleStop.mockReturnValue(stopped.promise);
+		props.loadVideoRef.current.mockReturnValue(loaded.promise);
+		props.playbackRecoveryLedger = {
+			get: jest.fn(() => null),
+			claim: jest.fn(() => ({accepted: true}))
+		};
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		let fallbackPromise;
+		act(() => {
+			fallbackPromise = result.current.attemptTranscodeFallback('Playback stalled');
+		});
+		stopped.resolve();
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(props.playbackOverrideRef.current).toEqual(expect.objectContaining({
+			forceNewSession: true,
+			mediaSourceId: 'source-1'
+		}));
+		expect(props.loadVideoRef.current).toHaveBeenCalledWith(true);
+		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+		let settled = false;
+		fallbackPromise.then(() => {
+			settled = true;
+		});
+		await Promise.resolve();
+		expect(settled).toBe(false);
+
+		loaded.resolve({status: 'attached'});
+		await act(async () => {
+			expect(await fallbackPromise).toBe(true);
+		});
+	});
+
+	it('allows only the newest overlapping recovery to publish an override', async () => {
+		const {props} = createProps();
+		const firstStop = createDeferred();
+		const secondStop = createDeferred();
+		props.handleStop
+			.mockReturnValueOnce(firstStop.promise)
+			.mockReturnValueOnce(secondStop.promise);
+		props.loadVideoRef.current.mockResolvedValue({status: 'attached'});
+		props.playbackRecoveryLedger = {
+			get: jest.fn(() => null),
+			claim: jest.fn(() => ({accepted: true}))
+		};
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		let firstPromise;
+		let secondPromise;
+		act(() => {
+			firstPromise = result.current.attemptTranscodeFallback('first failure');
+			secondPromise = result.current.attemptTranscodeFallback('second failure');
+		});
+		firstStop.resolve();
+		await act(async () => {
+			expect(await firstPromise).toBe(true);
+		});
+		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+
+		secondStop.resolve();
+		await act(async () => {
+			expect(await secondPromise).toBe(true);
+		});
+		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+		expect(props.playbackRecoveryLedger.claim).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not publish a stale safe subtitle burn-in retry', async () => {
+		const {props} = createProps();
+		const stopped = createDeferred();
+		props.handleStop.mockReturnValue(stopped.promise);
+		props.currentSubtitleTrackRef.current = 3;
+		props.mediaSourceData = {
+			Id: 'source-1',
+			SupportsTranscoding: true,
+			__debugSubtitlePolicy: {forceBurnIn: true, codec: 'ass'},
+			MediaStreams: [{Type: 'Subtitle', Index: 3, Codec: 'ass'}]
+		};
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 3,
+			itemId: 'item-1',
+			mediaSourceData: props.mediaSourceData
+		});
+		props.playbackRuntimeContextRef.current = runtimeContext;
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		let fallbackPromise;
+		act(() => {
+			fallbackPromise = result.current.attemptSubtitleCompatibilityFallback({
+				details: 'fragLoadError',
+				fatal: true,
+				response: {code: 500},
+				frag: {url: '/Videos/item/master.m3u8?SubtitleMethod=Encode&SubtitleStreamIndex=3'}
+			}, runtimeContext);
+		});
+		props.loadRequestIdRef.current += 1;
+		stopped.resolve();
+		await act(async () => {
+			expect(await fallbackPromise).toBe(true);
+		});
+
+		expect(props.playbackOverrideRef.current).toBeNull();
+		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+		expect(props.setToastMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+			message: expect.stringContaining('safer transcode profile')
+		}));
+	});
+
+	it('commits one current safe subtitle burn-in retry', async () => {
+		const {props} = createProps();
+		props.handleStop.mockResolvedValue(undefined);
+		props.loadVideoRef.current.mockResolvedValue({status: 'attached'});
+		props.currentSubtitleTrackRef.current = 3;
+		props.mediaSourceData = {
+			Id: 'source-1',
+			SupportsTranscoding: true,
+			__debugSubtitlePolicy: {forceBurnIn: true, codec: 'ass'},
+			MediaStreams: [{Type: 'Subtitle', Index: 3, Codec: 'ass'}]
+		};
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 3,
+			itemId: 'item-1',
+			mediaSourceData: props.mediaSourceData
+		});
+		props.playbackRuntimeContextRef.current = runtimeContext;
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		await act(async () => {
+			expect(await result.current.attemptSubtitleCompatibilityFallback({
+				details: 'fragLoadError',
+				fatal: true,
+				response: {code: 500},
+				frag: {url: '/Videos/item/master.m3u8?SubtitleMethod=Encode&SubtitleStreamIndex=3'}
+			}, runtimeContext)).toBe(true);
+		});
+
+		expect(props.playbackOverrideRef.current).toEqual(expect.objectContaining({
+			forceSubtitleBurnIn: true,
+			safeSubtitleBurnInProfile: true,
+			subtitleStreamIndex: 3
+		}));
+		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not publish a stale no-subtitle restart', async () => {
+		const {props} = createProps();
+		const stopped = createDeferred();
+		props.handleStop.mockReturnValue(stopped.promise);
+		props.currentSubtitleTrackRef.current = 4;
+		props.mediaSourceData = {
+			Id: 'source-1',
+			SupportsTranscoding: true,
+			__safeSubtitleBurnInProfile: true,
+			__debugSubtitlePolicy: {forceBurnIn: true, codec: 'pgssub'},
+			MediaStreams: [{Type: 'Subtitle', Index: 4, Codec: 'pgssub'}]
+		};
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 3,
+			itemId: 'item-1',
+			mediaSourceData: props.mediaSourceData
+		});
+		props.playbackRuntimeContextRef.current = runtimeContext;
+		props.requestSubtitleBurnInFallback = null;
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		let fallbackPromise;
+		act(() => {
+			fallbackPromise = result.current.attemptSubtitleCompatibilityFallback({
+				details: 'fragLoadError',
+				fatal: true,
+				response: {code: 500},
+				frag: {url: '/Videos/item/master.m3u8?SubtitleMethod=Encode&SubtitleStreamIndex=4'}
+			}, runtimeContext);
+		});
+		props.loadRequestIdRef.current += 1;
+		stopped.resolve();
+		await act(async () => {
+			expect(await fallbackPromise).toBe(true);
+		});
+
+		expect(props.currentSubtitleTrackRef.current).toBe(4);
+		expect(props.setCurrentSubtitleTrack).not.toHaveBeenCalled();
+		expect(props.playbackOverrideRef.current).toBeNull();
+		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+	});
+
+	it('commits one current no-subtitle restart', async () => {
+		const {props} = createProps();
+		props.handleStop.mockResolvedValue(undefined);
+		props.loadVideoRef.current.mockResolvedValue({status: 'attached'});
+		props.currentSubtitleTrackRef.current = 4;
+		props.mediaSourceData = {
+			Id: 'source-1',
+			SupportsTranscoding: true,
+			__safeSubtitleBurnInProfile: true,
+			__debugSubtitlePolicy: {forceBurnIn: true, codec: 'pgssub'},
+			MediaStreams: [{Type: 'Subtitle', Index: 4, Codec: 'pgssub'}]
+		};
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 3,
+			itemId: 'item-1',
+			mediaSourceData: props.mediaSourceData
+		});
+		props.playbackRuntimeContextRef.current = runtimeContext;
+		props.requestSubtitleBurnInFallback = null;
+		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+
+		await act(async () => {
+			expect(await result.current.attemptSubtitleCompatibilityFallback({
+				details: 'fragLoadError',
+				fatal: true,
+				response: {code: 500},
+				frag: {url: '/Videos/item/master.m3u8?SubtitleMethod=Encode&SubtitleStreamIndex=4'}
+			}, runtimeContext)).toBe(true);
+		});
+
+		expect(props.currentSubtitleTrackRef.current).toBe(-1);
+		expect(props.setCurrentSubtitleTrack).toHaveBeenCalledWith(-1);
+		expect(props.playbackOverrideRef.current).toEqual(expect.objectContaining({
+			subtitleFallbackConsent: 'no-subtitles',
+			subtitleStreamIndex: -1
+		}));
 		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
 	});
 

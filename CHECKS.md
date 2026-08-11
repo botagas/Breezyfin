@@ -40,12 +40,16 @@ Run these before packaging a release candidate:
 
 ### Plugin and realtime integration validation
 
-- Verify JellyWatchParty is hidden for `404`, malformed, disabled, or
-   `auth_enabled=false` token responses. Test room create/password join/leave,
-   reconnect, host transfer, ready/buffering, play/pause/seek, 500-character input,
-   50-message history, and `hide_native_sync_button` without persisting JWTs,
-   passwords, or chat. Verify token-refresh failure returns to an unavailable Retry state,
-   and Back during a pending room-item lookup cannot navigate into Player afterward.
+- Return a `404`, malformed, disabled, or `auth_enabled=false` token response. Verify
+  JellyWatchParty remains hidden.
+- Test room creation, password-protected join, leave, reconnect, and host transfer.
+- Test ready, buffering, Play, Pause, and Seek synchronization.
+- Verify the room accepts 500-character input and retains at most 50 messages.
+- Enable `hide_native_sync_button`. Verify Breezyfin hides the native SyncPlay action.
+- Verify Breezyfin does not persist JWTs, passwords, or chat messages.
+- Cause token refresh to fail. Verify the panel shows an unavailable state with Retry.
+- Press Back during a pending room-item lookup. Verify the completed lookup cannot open
+  Player.
 - Open the SyncPlay queue-replacement decision and WatchParty popup with 5-way input.
     Verify the decision and WatchParty surfaces focus their first actions, pending actions
     cannot be submitted twice, failures remain visible, and the suspended-playback
@@ -59,6 +63,32 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
+- With Diagnostics disabled, start HLS.js playback. Verify Breezyfin creates no HLS
+  startup measurement trail or timer.
+- With Diagnostics enabled, start HLS.js playback. Verify one bounded current-source trail
+  records the first fragment type, buffered seconds, engine-ready-to-`playing` latency,
+  engine-ready-to-first-timeline-progress latency, and early recovery.
+- Replace the source. Verify the previous HLS measurement trail does not remain active.
+- Open each required subtitle, audio, and dynamic-range decision. Verify a prepared plan
+  attaches no source before consent.
+- Exercise Retry, next episode, Back, and native audio replacement. Verify each committed
+  plan attaches exactly one source.
+- Verify stale plans cannot commit and old source events cannot update current playback.
+- Verify playback generations advance only through the allocator's invalidate and allocate
+  operations.
+- Force repeated HLS network and media errors, session rebuild, Direct Play Transcode
+  fallback, subtitle fallback, and dynamic-range fallback.
+- Verify generation-scoped attempts reset when the source is replaced.
+- Verify item-scoped attempts remain for replacement generations of the same item.
+- Select Retry. Verify Retry resets the ledger.
+- Verify no recovery exceeds its configured budget.
+- Delay recovery teardown. During the delay, separately trigger Back, item replacement,
+  episode replacement, a newer load, and a newer recovery.
+- Verify each stale Transcode, safe-burn-in, or no-subtitle continuation publishes no
+  override, loading state, terminal error, or delayed attachment.
+- Verify the current recovery remains valid after its intentional source-token
+  invalidation and loads exactly once.
+
 - Force a server-side transcode startup failure and verify the Player reports
   `Server transcoding failed` rather than generic format support. With Diagnostics
   enabled, verify the runtime trail includes the exit-code 159/systemd syscall-policy
@@ -70,6 +100,29 @@ Run these before packaging a release candidate:
 - Force a genuine native DirectPlay startup failure. Verify Breezyfin shows
   `Direct playback did not start. Retrying with server transcoding.`, retries once, and
   preserves the existing HDR/DV and subtitle consent prompts where applicable.
+- Start native playback from Media Details with an explicit non-default audio track.
+  Verify the requested language is audible before playback starts; if webOS does not
+  expose it, verify Breezyfin communicates the server remux/transcode replacement.
+- During native DirectPlay, DirectStream, and native HLS, change audio while playing and
+  paused. Verify `Switching audio...` remains visible, only Back is actionable, the old
+  frame remains during preparation, position and prior play state are restored, and a
+  failed replacement restores the previous track paused without background audio.
+- Delay the Player video surface during an audio replacement. Verify the original
+  transition waits, retains its prepared plan/options, commits once after mount, and Back
+  or unmount settles the wait without a delayed attachment or generation allocation.
+- While an audio replacement is preparing, emit compatibility and recovery toasts. Verify
+  the persistent `Switching audio...` status remains visible and independently dismisses
+  only after success, rollback, or cancellation.
+- Inspect Jellyfin sessions during successful replacement, rollback, and Back after swap.
+  Verify the paused progress barrier is attempted before negotiation, the superseded or
+  failed session is stopped exactly once, and the active replacement remains reportable.
+- In HLS.js, verify audio selection commits only after `AUDIO_TRACK_SWITCHED`, stale
+  events cannot update the UI, and timeout falls back to controlled source replacement.
+  Repeat during SyncPlay and confirm the server-clock position and authoritative Unpause
+  remain in control.
+- Open Filter, Media Details track, and Player track popups. Verify each active option
+  has the same complete rounded selected surface, Sandstone selected state, Selected
+  marker, and correct `aria-pressed`/`aria-current` semantics in pointer and 5-way modes.
 
 ### Navigation/focus validation
 

@@ -2,6 +2,7 @@ import {useCallback} from 'react';
 import Spotlight from '@enact/spotlight';
 
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
+import {cancelVideoMountAdmission} from '../utils/playerVideoLoaderHelpers';
 
 export const usePlayerCoreControls = ({
 	item,
@@ -84,10 +85,7 @@ export const usePlayerCoreControls = ({
 		const positionTicks = video && item
 			? Math.floor(video.currentTime * JELLYFIN_TICKS_PER_SECOND)
 			: 0;
-		if (videoMountRetryTimerRef.current) {
-			clearTimeout(videoMountRetryTimerRef.current);
-			videoMountRetryTimerRef.current = null;
-		}
+		cancelVideoMountAdmission(videoMountRetryTimerRef);
 		stopProgressReporting();
 		clearStartupDeadline();
 		detachPlaybackSource?.({

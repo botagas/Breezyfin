@@ -1,9 +1,11 @@
 import {
 	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
+	cancelVideoMountAdmission,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
-	selectHlsEnginePreference
+	selectHlsEnginePreference,
+	waitForVideoMount
 } from '../playerVideoLoaderHelpers';
 
 describe('playerVideoLoaderHelpers', () => {
@@ -302,6 +304,79 @@ describe('playerVideoLoaderHelpers', () => {
 			allowNativeFallback: false,
 			reason: 'hlsjs-available'
 		});
+	});
+
+	it('waits for the video surface and resolves the original admission promise', async () => {
+		jest.useFakeTimers();
+		const video = {};
+		const videoRef = {current: null};
+		const pendingRef = {current: null};
+		const admission = waitForVideoMount({
+			videoRef,
+			pendingRef,
+			isStale: () => false,
+			maxAttempts: 2,
+			intervalMs: 10
+		});
+		videoRef.current = video;
+		jest.advanceTimersByTime(10);
+
+		await expect(admission).resolves.toEqual({status: 'ready', video});
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
+	});
+
+	it('settles a cancelled mount admission as stale without delayed retries', async () => {
+		jest.useFakeTimers();
+		const pendingRef = {current: null};
+		const admission = waitForVideoMount({
+			videoRef: {current: null},
+			pendingRef,
+			isStale: () => false,
+			maxAttempts: 2,
+			intervalMs: 10
+		});
+
+		expect(cancelVideoMountAdmission(pendingRef)).toBe(true);
+		jest.advanceTimersByTime(100);
+		await expect(admission).resolves.toEqual({
+			status: 'stale',
+			reason: 'video-surface-wait-cancelled'
+		});
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
+	});
+
+	it('clears a legacy timer-only mount retry during teardown', () => {
+		jest.useFakeTimers();
+		const callback = jest.fn();
+		const pendingRef = {current: setTimeout(callback, 10)};
+
+		expect(cancelVideoMountAdmission(pendingRef)).toBe(true);
+		jest.advanceTimersByTime(20);
+		expect(callback).not.toHaveBeenCalled();
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
+	});
+
+	it('returns a bounded mount failure without leaving a pending timer', async () => {
+		jest.useFakeTimers();
+		const pendingRef = {current: null};
+		const admission = waitForVideoMount({
+			videoRef: {current: null},
+			pendingRef,
+			isStale: () => false,
+			maxAttempts: 2,
+			intervalMs: 10
+		});
+		jest.advanceTimersByTime(20);
+
+		await expect(admission).resolves.toEqual({
+			status: 'failed',
+			reason: 'video-surface-unavailable'
+		});
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
 	});
 
 });

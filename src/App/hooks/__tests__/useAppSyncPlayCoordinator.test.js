@@ -93,6 +93,33 @@ describe('useAppSyncPlayCoordinator', () => {
 		expect(jellyfinService.syncPlayPlay).not.toHaveBeenCalled();
 	});
 
+	it('carries initiating-client track choices into authoritative Player navigation', async () => {
+		const onOpenRemoteItem = jest.fn();
+		const item = {Id: 'item-2', Type: 'Movie'};
+		const playbackOptions = {audioStreamIndex: 2, subtitleStreamIndex: 4};
+		jellyfinService.getItem.mockResolvedValue(item);
+		jellyfinService.syncPlaySetQueue.mockImplementation(async () => {
+			currentGroup = buildGroup('item-2');
+			stateListener(currentGroup);
+		});
+		const {result} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'home',
+			selectedItemId: null,
+			onOpenRemoteItem
+		}));
+
+		await act(async () => {
+			await result.current.requestPlay(item, playbackOptions);
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(onOpenRemoteItem).toHaveBeenCalledWith(item, expect.objectContaining({
+			localPlaybackOptions: playbackOptions
+		}));
+	});
+
 	it('forces a waiting group to start only through the explicit override', async () => {
 		currentGroup = {
 			...buildGroup('item-1'),

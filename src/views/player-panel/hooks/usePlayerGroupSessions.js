@@ -13,7 +13,8 @@ export const usePlayerGroupSessions = ({
 	handleLocalSeek,
 	handleLocalSurfaceClick,
 	syncPlayStartupBridge,
-	setToastMessage
+	setToastMessage,
+	blocked = false
 }) => {
 	const syncPlay = useNativeSyncPlay({
 		isActive,
@@ -24,7 +25,8 @@ export const usePlayerGroupSessions = ({
 		handleLocalPlay,
 		handleLocalSeek,
 		syncPlayStartupBridge,
-		setToastMessage
+		setToastMessage,
+		blocked
 	});
 	const watchParty = useJellyWatchParty({
 		isActive,
@@ -36,23 +38,34 @@ export const usePlayerGroupSessions = ({
 		setToastMessage
 	});
 	const handleSyncPlaySurfaceClick = useCallback(() => {
+		if (blocked) return;
 		if (!syncPlay.group) return handleLocalSurfaceClick();
 		return playing ? syncPlay.handlePause() : syncPlay.handlePlay();
-	}, [handleLocalSurfaceClick, playing, syncPlay]);
+	}, [blocked, handleLocalSurfaceClick, playing, syncPlay]);
 	const handleSurfaceClick = useCallback(() => {
+		if (blocked) return;
 		if (!watchParty.state.room) return handleSyncPlaySurfaceClick();
 		return playing ? watchParty.handlePause() : watchParty.handlePlay();
-	}, [handleSyncPlaySurfaceClick, playing, watchParty]);
+	}, [blocked, handleSyncPlaySurfaceClick, playing, watchParty]);
 	const handleBack = useCallback(() => (
 		watchParty.handleBack() || syncPlay.handleBack()
 	), [syncPlay, watchParty]);
+	const handlePause = useCallback((...args) => (
+		blocked ? undefined : watchParty.handlePause(...args)
+	), [blocked, watchParty]);
+	const handlePlay = useCallback((...args) => (
+		blocked ? undefined : watchParty.handlePlay(...args)
+	), [blocked, watchParty]);
+	const handleSeek = useCallback((...args) => (
+		blocked ? undefined : watchParty.handleSeek(...args)
+	), [blocked, watchParty]);
 
 	return {
 		popupOpen: syncPlay.popupOpen || watchParty.popupOpen,
 		handleBack,
-		handlePause: watchParty.handlePause,
-		handlePlay: watchParty.handlePlay,
-		handleSeek: watchParty.handleSeek,
+		handlePause,
+		handlePlay,
+		handleSeek,
 		handleNext: syncPlay.group && syncPlay.followMode === 'following' ? syncPlay.next : null,
 		handlePrevious: syncPlay.group && syncPlay.followMode === 'following' ? syncPlay.previous : null,
 		handleSurfaceClick,

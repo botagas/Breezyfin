@@ -2,7 +2,10 @@
 
 Last reviewed: 2026-07-30.
 
-This document records the current lint/test/audit posture and the evidence-backed adoption path for external quality tools. It is intentionally practical: only add a tool when it covers a real gap without fighting Enact, React, webOS packaging, or the existing custom audits.
+This document records the current lint, test, and audit coverage. It also defines how to
+evaluate external quality tools. Add a tool only when measured evidence shows that it
+covers a real gap without conflicting with Enact, React, webOS packaging, or repository
+audits.
 
 ## Current Source Surface
 
@@ -13,7 +16,10 @@ This document records the current lint/test/audit posture and the evidence-backe
 - Current app-owned style surface is large: `src/` contains 217 CSS/LESS files.
 - Current app-owned JavaScript surface contains 341 production modules plus 118
   test/test-support modules.
-- Rendered integration tests use Testing Library through `src/testUtils/renderWithBreezyfin.js`, which installs the Breezyfin Sandstone theme and Spotlight root. Prefer pure view-model/helper seams for isolated policy coverage, then use rendered tests for Popup lifecycle, Spotlight focus, and virtual-grid contracts.
+- Rendered integration tests use Testing Library through
+  `src/testUtils/renderWithBreezyfin.js`. The helper installs the Breezyfin Sandstone theme
+  and Spotlight root. Prefer pure view-model or helper seams for isolated policy coverage.
+  Use rendered tests for Popup lifecycle, Spotlight focus, and virtual-grid contracts.
 
 ## Current Custom Audit Coverage
 
@@ -43,7 +49,9 @@ The custom audit suite covers repo-specific invariants that generic tools do not
 - raw JS color literals
 - cross-file duplicate snippets
 
-Keep these checks even if external tools are added. External tools should supplement these repo-specific tests, not replace them without a measured comparison.
+Keep these checks when adding an external tool. An external tool may replace a
+repository-specific check only after a measured comparison shows equivalent or better
+coverage.
 
 `npm run audit:hotspots` parses application source with the explicitly pinned
 `@babel/parser` dependency and reports file growth plus function length, complexity,
@@ -71,9 +79,17 @@ Evidence:
 
 - JSCPD describes itself as a copy/paste detector and advertises broad multi-format support plus CLI/reporting modes: https://github.com/kucherenko/jscpd
 - Breezyfin already has a blocking custom duplicate audit that is tuned to this codebase and currently passes. Keep it because it reports repo-specific snippet locations and normalizes source differently from JSCPD.
+- The custom audit treats repeated immutable object-spread test-fixture construction as
+  low-signal scaffolding. Duplicated executable control flow remains blocking; do not
+  extract product abstractions solely to disguise incidental fixture setup.
 - Most initial findings were audit-script scaffolding that `audit:duplicates` intentionally does not scan. Common path, file-walk, comment-stripping, location, and import-reference helpers now live in `scripts/audit-utils/files.cjs`.
-- `npm run audit:jscpd` now runs the checked-in `.jscpd.json` config against `src` and `scripts` with a zero-duplicate threshold. It is also part of `npm run audit`.
-- A zero-clone gate is useful evidence, but it should not justify awkward rewrites if a future finding is intentional or better handled by a higher-level API change.
+- `npm run audit:jscpd` uses the checked-in `.jscpd.json` configuration. It scans production
+  code in `src` and `scripts` with a zero-duplicate threshold.
+- The generic token-clone gate excludes test directories. `audit:duplicates` applies
+  Breezyfin's low-signal handling to test fixtures and still blocks duplicated executable
+  behavior. Both checks remain part of `npm run audit`.
+- A zero-clone result is evidence, not a design target. If a finding is intentional or a
+  shared API is the correct fix, do not distort product code to preserve that result.
 
 Maintenance path:
 
@@ -125,7 +141,11 @@ Recommended adoption path:
 
 ## Release Supply-Chain Checks
 
-- `npm run audit:runtime-deps` validates the production closure remains on Enact 4, Sandstone 2, and React 18 without mixed runtime generations. It also verifies that Enact CLI resolves its build-time `react-is` alias to Breezyfin's pinned React 18-compatible root package instead of leaking the CLI's React 19 element checks into development bundles.
+- `npm run audit:runtime-deps` verifies that the production closure remains on Enact 4,
+  Sandstone 2, and React 18 without mixed runtime generations.
+- The same audit verifies that Enact CLI resolves its build-time `react-is` alias to
+  Breezyfin's pinned React 18-compatible root package. This prevents the CLI's React 19
+  element checks from entering development bundles.
 - `npm run audit:licenses` validates the generated `THIRD_PARTY_NOTICES.txt`, including copied subtitle-engine and Museo font licenses.
 - `npm run audit:repository-hygiene` rejects backup and temporary artifacts. Contributors may add an ignored
   `.breezyfin-hygiene.local.json` file, or set `BREEZYFIN_HYGIENE_PATTERNS_FILE`, to apply private literal

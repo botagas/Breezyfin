@@ -17,6 +17,7 @@ import {
 	getItemPlaybackInfo,
 	getPlaybackStreamUrl,
 	getTranscodePlaybackUrl,
+	preparePlaybackNegotiation,
 	reportPlaybackProgressState,
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
@@ -257,6 +258,27 @@ describe('playbackApi', () => {
 		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual([]);
 		expect(playbackInfo?.__breezyfin?.decision).toBeNull();
 		expect(playbackInfo?.__breezyfin?.requestDebug).toBeNull();
+	});
+
+	it('keeps getItemPlaybackInfo compatible with the prepared negotiation response', async () => {
+		const service = createService();
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [createMediaSource('SDR')]
+			})
+		});
+
+		const negotiation = await preparePlaybackNegotiation(service, 'item-1');
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1');
+
+		expect(negotiation).toEqual(expect.objectContaining({
+			playbackInfo: negotiation.playbackInfo,
+			selectedSource: negotiation.playbackInfo.MediaSources[0],
+			playbackMetadata: negotiation.playbackInfo.__breezyfin
+		}));
+		expect(playbackInfo).toEqual(negotiation.playbackInfo);
 	});
 
 	it('reports playback start/progress/stop with merged session metadata', async () => {

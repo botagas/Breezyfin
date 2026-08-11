@@ -2,7 +2,7 @@ import BodyText from '@enact/sandstone/BodyText';
 import Popup from '@enact/sandstone/Popup';
 import Button from './BreezyButton';
 import MediaBrowseControls from './MediaBrowseControls';
-import SelectionOptionContent, {selectionOptionSelectedClass} from './SelectionOptionContent';
+import SelectionOptionButton from './SelectionOptionButton';
 import {MEDIA_FILTER_OPTIONS} from '../utils/mediaFilters';
 import {popupShellCss} from '../styles/popupStyles';
 
@@ -78,19 +78,17 @@ const MediaFilterControls = ({
 						{filterOptions.map((option) => {
 							const selected = draftFilterIds.includes(option.id);
 							return (
-								<Button
+								<SelectionOptionButton
 									key={option.id}
 									spotlightId={`${triggerSpotlightId}-option-${option.id}`}
 									data-filter-id={option.id}
 									selected={selected}
-									aria-pressed={selected}
+									selectionMode="multiple"
 									onClick={onDraftSelect}
-									className={`${browseCss.filterPopupOptionButton} ${selected ? selectionOptionSelectedClass : ''}`}
+									className={browseCss.filterPopupOptionButton}
 								>
-									<SelectionOptionContent selected={selected}>
-										{option.label}
-									</SelectionOptionContent>
-								</Button>
+									{option.label}
+								</SelectionOptionButton>
 							);
 						})}
 					</div>

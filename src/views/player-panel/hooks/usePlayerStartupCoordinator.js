@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useReducer, useRef, useState} from 'react';
 
 import {getPlaybackErrorMessage, isFatalPlaybackError} from '../../../utils/errorMessages';
 import {
@@ -8,6 +8,14 @@ import {
 	isInterruptedPlaybackStartError
 } from '../utils/playerStartupState';
 import {isNativePlaybackSourceTokenCurrent} from '../utils/playbackRuntimeContext';
+import {applyNativeAudioTrackSelection} from '../../../utils/trackMatching';
+import {
+	createInitialPlayerLifecycleState,
+	playerLifecycleReducer
+} from '../utils/playbackLifecycleReducer';
+
+const INITIAL_NATIVE_AUDIO_DISCOVERY_TIMEOUT_MS = 1800;
+const AUDIO_TRANSITION_RESTORE_TIMEOUT_MS = 5000;
 
 export const usePlayerStartupCoordinator = ({
 	videoRef,
@@ -33,12 +41,21 @@ export const usePlayerStartupCoordinator = ({
 	showPlaybackError,
 	attemptTranscodeFallback,
 	isCurrentTranscoding,
-	onSubtitleTimeout
+	onSubtitleTimeout,
+	onInitialAudioSelectionFallback,
+	onAudioTransitionReady,
+	onAudioTransitionFailed
 }) => {
 	const [sourceVersion, setSourceVersion] = useState(0);
-	const [status, setStatus] = useState('waiting-source');
+	const [lifecycle, dispatchLifecycle] = useReducer(
+		playerLifecycleReducer,
+		{generation: playbackGenerationRef.current},
+		createInitialPlayerLifecycleState
+	);
 	const sourceTokenRef = useRef(null);
 	const engineReadyRef = useRef(false);
+	const audioSelectionReadyRef = useRef(true);
+	const audioSelectionCleanupRef = useRef(null);
 	const startupGatesReadyRef = useRef(false);
 	const startInFlightRef = useRef(false);
 	const startAttemptRef = useRef(0);
@@ -47,6 +64,14 @@ export const usePlayerStartupCoordinator = ({
 	const subtitleDeadlineRef = useRef({key: '', timer: null});
 	const subtitleTimeoutCallbackRef = useRef(onSubtitleTimeout);
 	subtitleTimeoutCallbackRef.current = onSubtitleTimeout;
+	const setStatus = useCallback((phase, sourceToken = sourceTokenRef.current) => {
+		dispatchLifecycle({
+			type: 'PHASE_UPDATED',
+			generation: sourceToken?.generation ?? playbackGenerationRef.current,
+			sourceGeneration: sourceToken?.sourceGeneration ?? null,
+			phase
+		});
+	}, [playbackGenerationRef]);
 
 	const clearStartupDeadline = useCallback(() => {
 		if (startupDeadlineTimerRef.current) {
@@ -60,6 +85,11 @@ export const usePlayerStartupCoordinator = ({
 			clearTimeout(subtitleDeadlineRef.current.timer);
 		}
 		subtitleDeadlineRef.current = {key: '', timer: null};
+	}, []);
+
+	const clearAudioSelectionGate = useCallback(() => {
+		audioSelectionCleanupRef.current?.();
+		audioSelectionCleanupRef.current = null;
 	}, []);
 
 	const isTokenCurrent = useCallback((sourceToken = sourceTokenRef.current) => (
@@ -78,21 +108,46 @@ export const usePlayerStartupCoordinator = ({
 	]);
 
 	const invalidatePlaybackSource = useCallback(() => {
+		const invalidatedToken = sourceTokenRef.current;
+		if (invalidatedToken) {
+			dispatchLifecycle({
+				type: 'SOURCE_INVALIDATED',
+				generation: invalidatedToken.generation,
+				sourceGeneration: invalidatedToken.sourceGeneration
+			});
+		}
 		startAttemptRef.current += 1;
 		startInFlightRef.current = false;
 		sourceTokenRef.current = null;
 		engineReadyRef.current = false;
+		audioSelectionReadyRef.current = true;
 		startupGatesReadyRef.current = false;
 		clearStartupDeadline();
 		clearSubtitleDeadline();
-		setStatus('waiting-source');
+		clearAudioSelectionGate();
 		setSourceVersion((current) => current + 1);
-	}, [clearStartupDeadline, clearSubtitleDeadline]);
+	}, [clearAudioSelectionGate, clearStartupDeadline, clearSubtitleDeadline]);
 
 	const registerPlaybackSource = useCallback((sourceToken, {engineReady = true} = {}) => {
 		if (!sourceToken || exitInProgressRef.current) return false;
+		dispatchLifecycle({type: 'GENERATION_ALLOCATED', generation: sourceToken.generation});
 		sourceTokenRef.current = sourceToken;
 		engineReadyRef.current = engineReady === true;
+		clearAudioSelectionGate();
+		const requiresAudioSelection = sourceToken.runtimeContext?.requiresInitialNativeAudioSelection === true &&
+			sourceToken.engine !== 'hls.js';
+		const audioTransition = sourceToken.runtimeContext?.audioTransition || null;
+		const requiresTransitionRestore = Boolean(audioTransition?.id) &&
+			Number.isFinite(Number(audioTransition?.seekSeconds));
+		audioSelectionReadyRef.current = !(requiresAudioSelection || requiresTransitionRestore);
+		dispatchLifecycle({
+			type: 'SOURCE_ATTACHED',
+			generation: sourceToken.generation,
+			sourceGeneration: sourceToken.sourceGeneration,
+			engineReady,
+			audioSelectionReady: audioSelectionReadyRef.current,
+			subtitleReady: false
+		});
 		startupGatesReadyRef.current = false;
 		startAttemptRef.current += 1;
 		startInFlightRef.current = false;
@@ -101,6 +156,173 @@ export const usePlayerStartupCoordinator = ({
 		playbackStartedRef.current = false;
 		clearStartupDeadline();
 		clearSubtitleDeadline();
+		if (requiresTransitionRestore) {
+			const video = sourceToken.video;
+			const targetSeconds = Math.max(0, Number(audioTransition.seekSeconds));
+			const mediaTracks = sourceToken.runtimeContext?.mediaSourceData?.MediaStreams?.filter(
+				(stream) => stream?.Type === 'Audio'
+			) || [];
+			const selectedTrackIndex = sourceToken.runtimeContext?.selectedAudioTrack;
+			let timer = null;
+			let finished = false;
+			let seekRequested = false;
+			let positionRestored = false;
+			let audioApplied = !requiresAudioSelection;
+			let audioSelectionMethod = requiresAudioSelection ? 'pending' : 'not-required';
+			const cleanup = () => {
+				if (timer) clearTimeout(timer);
+				video?.removeEventListener?.('loadedmetadata', restorePosition);
+				video?.removeEventListener?.('seeked', confirmPosition);
+				video?.audioTracks?.removeEventListener?.('addtrack', tryAudioSelection);
+				video?.audioTracks?.removeEventListener?.('change', tryAudioSelection);
+			};
+			const finish = (restored, reason) => {
+				if (finished) return;
+				finished = true;
+				cleanup();
+				audioSelectionCleanupRef.current = null;
+				if (!isTokenCurrent(sourceToken)) return;
+				appendPlaybackDiagnostic?.({
+					scope: 'audio-track',
+					stage: 'transition-source-restore',
+					status: restored ? 'ready' : 'failed',
+					reason,
+					message: restored
+						? `Restored the source to ${targetSeconds.toFixed(3)} seconds with audio selection ${audioSelectionMethod}.`
+						: 'The source did not restore its playback position and selected audio track.'
+				});
+				if (restored) {
+					audioSelectionReadyRef.current = true;
+					dispatchLifecycle({
+						type: 'AUDIO_GATE_READY',
+						generation: sourceToken.generation,
+						sourceGeneration: sourceToken.sourceGeneration
+					});
+					setSourceVersion((current) => current + 1);
+					return;
+				}
+				Promise.resolve(onAudioTransitionFailed?.(sourceToken, reason)).catch(() => undefined);
+			};
+			function confirmRestoreReady (reason) {
+				if (positionRestored && audioApplied) finish(true, reason);
+			}
+			function confirmPosition () {
+				if (!isTokenCurrent(sourceToken)) return finish(false, 'source-replaced');
+				if (Math.abs((Number(video?.currentTime) || 0) - targetSeconds) <= 0.35) {
+					positionRestored = true;
+					confirmRestoreReady(seekRequested ? 'seeked' : 'already-positioned');
+				}
+			}
+			function tryAudioSelection () {
+				if (!requiresAudioSelection || audioApplied) return;
+				if (!isTokenCurrent(sourceToken)) return finish(false, 'source-replaced');
+				const result = applyNativeAudioTrackSelection({
+					video,
+					mediaTracks,
+					selectedTrackIndex
+				});
+				if (!result.applied) return;
+				audioApplied = true;
+				audioSelectionMethod = result.method;
+				confirmRestoreReady(result.method);
+			}
+			function restorePosition () {
+				if (!isTokenCurrent(sourceToken)) return finish(false, 'source-replaced');
+				if (!video || video.readyState < 1) return;
+				tryAudioSelection();
+				confirmPosition();
+				if (finished) return;
+				seekRequested = true;
+				try {
+					video.currentTime = targetSeconds;
+				} catch (_) {
+					return;
+				}
+				confirmPosition();
+			}
+			video?.addEventListener?.('loadedmetadata', restorePosition);
+			video?.addEventListener?.('seeked', confirmPosition);
+			if (requiresAudioSelection) {
+				video?.audioTracks?.addEventListener?.('addtrack', tryAudioSelection);
+				video?.audioTracks?.addEventListener?.('change', tryAudioSelection);
+			}
+			timer = setTimeout(
+				() => finish(false, audioApplied ? 'position-restore-timeout' : 'native-track-discovery-timeout'),
+				AUDIO_TRANSITION_RESTORE_TIMEOUT_MS
+			);
+			audioSelectionCleanupRef.current = () => {
+				finished = true;
+				cleanup();
+			};
+			restorePosition();
+		} else if (requiresAudioSelection) {
+			const video = sourceToken.video;
+			const mediaTracks = sourceToken.runtimeContext?.mediaSourceData?.MediaStreams?.filter(
+				(stream) => stream?.Type === 'Audio'
+			) || [];
+			const selectedTrackIndex = sourceToken.runtimeContext?.selectedAudioTrack;
+			let timer = null;
+			let finished = false;
+			const cleanup = () => {
+				if (timer) clearTimeout(timer);
+				video?.removeEventListener?.('loadedmetadata', trySelection);
+				video?.audioTracks?.removeEventListener?.('addtrack', trySelection);
+				video?.audioTracks?.removeEventListener?.('change', trySelection);
+			};
+			const finish = (applied, reason) => {
+				if (finished) return;
+				finished = true;
+				cleanup();
+				audioSelectionCleanupRef.current = null;
+				if (!isTokenCurrent(sourceToken)) return;
+				appendPlaybackDiagnostic?.({
+					scope: 'audio-track',
+					stage: 'initial-native-selection',
+					status: applied ? 'applied' : 'failed',
+					reason,
+					message: applied
+						? `Selected native audio track ${selectedTrackIndex} before playback startup.`
+						: 'The selected native audio track was not exposed before startup.'
+				});
+				if (applied) {
+					audioSelectionReadyRef.current = true;
+					dispatchLifecycle({
+						type: 'AUDIO_GATE_READY',
+						generation: sourceToken.generation,
+						sourceGeneration: sourceToken.sourceGeneration
+					});
+					setSourceVersion((current) => current + 1);
+					return;
+				}
+				Promise.resolve(onInitialAudioSelectionFallback?.({
+					sourceToken,
+					reason,
+					audioStreamIndex: selectedTrackIndex,
+					subtitleStreamIndex: sourceToken.runtimeContext?.selectedSubtitleTrack
+				})).catch(() => undefined);
+			};
+			function trySelection () {
+				if (!isTokenCurrent(sourceToken)) return finish(false, 'source-replaced');
+				const result = applyNativeAudioTrackSelection({
+					video,
+					mediaTracks,
+					selectedTrackIndex
+				});
+				if (result.applied) finish(true, result.method);
+			}
+			video?.addEventListener?.('loadedmetadata', trySelection);
+			video?.audioTracks?.addEventListener?.('addtrack', trySelection);
+			video?.audioTracks?.addEventListener?.('change', trySelection);
+			timer = setTimeout(
+				() => finish(false, 'native-track-discovery-timeout'),
+				INITIAL_NATIVE_AUDIO_DISCOVERY_TIMEOUT_MS
+			);
+			audioSelectionCleanupRef.current = () => {
+				finished = true;
+				cleanup();
+			};
+			trySelection();
+		}
 		setStatus(engineReady ? 'waiting-subtitles' : 'waiting-engine');
 		setSourceVersion((current) => current + 1);
 		appendPlaybackDiagnostic?.({
@@ -113,10 +335,15 @@ export const usePlayerStartupCoordinator = ({
 		return true;
 	}, [
 		appendPlaybackDiagnostic,
+		clearAudioSelectionGate,
 		clearStartupDeadline,
 		clearSubtitleDeadline,
 		exitInProgressRef,
-		playbackStartedRef
+		isTokenCurrent,
+		onAudioTransitionFailed,
+		onInitialAudioSelectionFallback,
+		playbackStartedRef,
+		setStatus
 	]);
 
 	const reportPlaybackEngineReady = useCallback((
@@ -125,6 +352,11 @@ export const usePlayerStartupCoordinator = ({
 	) => {
 		if (!isTokenCurrent(sourceToken) || engineReadyRef.current) return false;
 		engineReadyRef.current = true;
+		dispatchLifecycle({
+			type: 'ENGINE_READY',
+			generation: sourceToken.generation,
+			sourceGeneration: sourceToken.sourceGeneration
+		});
 		appendPlaybackDiagnostic?.({
 			scope: 'startup',
 			stage: 'engine-ready',
@@ -147,7 +379,11 @@ export const usePlayerStartupCoordinator = ({
 		startInFlightRef.current = false;
 		clearStartupDeadline();
 		clearSubtitleDeadline();
-		setStatus('started');
+		dispatchLifecycle({
+			type: 'PLAY_CONFIRMED',
+			generation: sourceToken.generation,
+			sourceGeneration: sourceToken.sourceGeneration
+		});
 		setLoading(false);
 		setPlaying(true);
 		if (pendingOverrideClearRef.current) {
@@ -163,6 +399,7 @@ export const usePlayerStartupCoordinator = ({
 		});
 		reportPlaybackStartedOnce();
 		startProgressReporting();
+		onAudioTransitionReady?.(sourceToken, {started: true});
 		return true;
 	}, [
 		appendPlaybackDiagnostic,
@@ -175,7 +412,8 @@ export const usePlayerStartupCoordinator = ({
 		reportPlaybackStartedOnce,
 		setLoading,
 		setPlaying,
-		startProgressReporting
+		startProgressReporting,
+		onAudioTransitionReady
 	]);
 
 	const attemptSafeTranscodeFallback = useCallback(async (reason) => {
@@ -207,6 +445,7 @@ export const usePlayerStartupCoordinator = ({
 			reason: 'startup-no-progress',
 			message: 'Playback made no progress after the play request.'
 		});
+		if (await onAudioTransitionFailed?.(sourceToken, 'startup-no-progress')) return true;
 		if (!isCurrentTranscoding) {
 			const didFallback = await attemptSafeTranscodeFallback('startup-no-progress');
 			if (didFallback || !isTokenCurrent(sourceToken)) return didFallback;
@@ -222,7 +461,9 @@ export const usePlayerStartupCoordinator = ({
 		isCurrentTranscoding,
 		isTokenCurrent,
 		playbackStartedRef,
-		showPlaybackError
+		showPlaybackError,
+		onAudioTransitionFailed,
+		setStatus
 	]);
 
 	const requestPlaybackStart = useCallback(async () => {
@@ -238,7 +479,11 @@ export const usePlayerStartupCoordinator = ({
 		if (!video) return false;
 		startInFlightRef.current = true;
 		const startAttempt = ++startAttemptRef.current;
-		setStatus('starting');
+		dispatchLifecycle({
+			type: 'PLAY_REQUESTED',
+			generation: sourceToken.generation,
+			sourceGeneration: sourceToken.sourceGeneration
+		});
 		setLoading(true);
 		setLoadingStatusMessage('Starting playback...');
 		appendPlaybackDiagnostic?.({
@@ -275,6 +520,7 @@ export const usePlayerStartupCoordinator = ({
 			clearStartupDeadline();
 			startInFlightRef.current = false;
 			const errorMessage = getPlaybackErrorMessage(playError, 'Playback failed to start');
+			if (await onAudioTransitionFailed?.(sourceToken, errorMessage)) return false;
 			if (isFatalPlaybackError(playError) && !isCurrentTranscoding) {
 				const didFallback = await attemptSafeTranscodeFallback(errorMessage);
 				if (didFallback || !isTokenCurrent(sourceToken)) return false;
@@ -299,9 +545,11 @@ export const usePlayerStartupCoordinator = ({
 		setLoading,
 		setLoadingStatusMessage,
 		setToastMessage,
+		setStatus,
 		showPlaybackError,
 		startupDeadlineTimerRef,
-		videoRef
+		videoRef,
+		onAudioTransitionFailed
 	]);
 
 	const reportPlaybackEvidence = useCallback((signal, sourceToken = sourceTokenRef.current) => (
@@ -356,9 +604,17 @@ export const usePlayerStartupCoordinator = ({
 			return undefined;
 		}
 		const subtitleStartup = getSubtitleStartupContext(sourceToken);
+		dispatchLifecycle({
+			type: 'SUBTITLE_GATE_UPDATED',
+			generation: sourceToken.generation,
+			sourceGeneration: sourceToken.sourceGeneration,
+			status: subtitleRendererState?.status || 'ready',
+			readyForSource: subtitleStartup.readyForSource
+		});
 		const nextStatus = getPlayerStartupState({
 			sourceAttached: true,
 			engineReady: engineReadyRef.current,
+			audioSelectionReady: audioSelectionReadyRef.current,
 			currentSubtitleTrack: subtitleStartup.selectedTrack,
 			subtitleRendererPolicy: subtitleStartup.policy,
 			subtitleRendererStatus: subtitleRendererState?.status,
@@ -383,19 +639,62 @@ export const usePlayerStartupCoordinator = ({
 			return undefined;
 		}
 
+		if (nextStatus === 'waiting-audio') {
+			setLoading(true);
+			setLoadingStatusMessage('Preparing selected audio...');
+			return undefined;
+		}
+
 		if (nextStatus !== 'starting') return undefined;
 		if (syncPlayStartupBridge?.shouldBlockAutomaticStart()) {
+			dispatchLifecycle({
+				type: 'SYNCPLAY_WAITING',
+				generation: sourceToken.generation,
+				sourceGeneration: sourceToken.sourceGeneration
+			});
 			setStatus('waiting-syncplay');
 			setLoading(true);
 			setLoadingStatusMessage('Waiting for SyncPlay...');
 			if (!syncPlayReadyRequestedRef.current) {
 				syncPlayReadyRequestedRef.current = true;
 				Promise.resolve(syncPlayStartupBridge.reportVideoReady()).then((ready) => {
-					if (!ready) syncPlayReadyRequestedRef.current = false;
+					if (!isTokenCurrent(sourceToken)) return;
+					if (!ready) {
+						syncPlayReadyRequestedRef.current = false;
+						return;
+					}
+					if (
+						sourceToken.runtimeContext?.audioTransition?.id &&
+						pendingOverrideClearRef.current
+					) {
+						playbackOverrideRef.current = null;
+						pendingOverrideClearRef.current = false;
+					}
+					onAudioTransitionReady?.(sourceToken, {
+						started: false,
+						syncPlayReady: true
+					});
 				}).catch(() => {
 					syncPlayReadyRequestedRef.current = false;
 				});
 			}
+			return undefined;
+		}
+		if (sourceToken.runtimeContext?.audioTransition?.startPaused === true) {
+			dispatchLifecycle({
+				type: 'AUDIO_TRANSITION_READY',
+				generation: sourceToken.generation,
+				sourceGeneration: sourceToken.sourceGeneration,
+				started: false
+			});
+			setStatus('started');
+			setLoading(false);
+			setPlaying(false);
+			if (pendingOverrideClearRef.current) {
+				playbackOverrideRef.current = null;
+				pendingOverrideClearRef.current = false;
+			}
+			onAudioTransitionReady?.(sourceToken, {started: false});
 			return undefined;
 		}
 		requestPlaybackStart();
@@ -405,12 +704,17 @@ export const usePlayerStartupCoordinator = ({
 		isTokenCurrent,
 		onSubtitleTimeout,
 		playbackStartedRef,
+		playbackOverrideRef,
+		pendingOverrideClearRef,
 		requestPlaybackStart,
 		setLoading,
 		setLoadingStatusMessage,
+		setPlaying,
 		sourceVersion,
 		subtitleRendererState?.status,
-		syncPlayStartupBridge
+		syncPlayStartupBridge,
+		onAudioTransitionReady,
+		setStatus
 	]);
 
 	useEffect(() => {
@@ -464,17 +768,19 @@ export const usePlayerStartupCoordinator = ({
 		isTokenCurrent,
 		playbackStartedRef,
 		sourceVersion,
-		subtitleRendererState?.status
+		subtitleRendererState?.status,
+		setStatus
 	]);
 
 	useEffect(() => () => {
 		startAttemptRef.current += 1;
 		clearStartupDeadline();
 		clearSubtitleDeadline();
-	}, [clearStartupDeadline, clearSubtitleDeadline]);
+		clearAudioSelectionGate();
+	}, [clearAudioSelectionGate, clearStartupDeadline, clearSubtitleDeadline]);
 
 	return {
-		status,
+		status: lifecycle.phase,
 		registerPlaybackSource,
 		invalidatePlaybackSource,
 		reportPlaybackEngineReady,

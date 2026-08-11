@@ -27,7 +27,8 @@ const PlayerControlsOverlay = ({
 		debugOverlayVisible,
 		syncPlayGroup,
 		watchPartyAvailable,
-		watchPartyRoom
+		watchPartyRoom,
+		actionsLocked = false
 	} = state;
 	const {
 		handleBackButton,
@@ -46,7 +47,7 @@ const PlayerControlsOverlay = ({
 	} = actions;
 	const {controlsRef, playPauseButtonRef} = refs;
 
-	if (!show || loading || error) return null;
+	if (!show || (loading && !actionsLocked) || error) return null;
 
 	return (
 		<div className={css.controls} ref={controlsRef}>
@@ -62,6 +63,7 @@ const PlayerControlsOverlay = ({
 						onClick={handleToggleDebugOverlay}
 						size="small"
 						className={css.playerDebugToggleButton}
+						disabled={actionsLocked}
 					>
 						{debugOverlayVisible ? 'Hide Debug' : 'Show Debug'}
 					</Button>
@@ -69,7 +71,7 @@ const PlayerControlsOverlay = ({
 				<BodyText className={css.title}>{getPlayerHeaderTitle(item)}</BodyText>
 			</div>
 
-			<div className={css.bottomBar}>
+			<div className={css.bottomBar} data-player-actions-locked={actionsLocked ? 'true' : undefined}>
 				<div className={css.progressContainer} data-seekable="true">
 					<BodyText className={css.time}>
 						{formatPlaybackTime(currentTime)}
@@ -81,6 +83,7 @@ const PlayerControlsOverlay = ({
 						step={1}
 						value={Math.floor(currentTime)}
 						onChange={handleSeek}
+						disabled={actionsLocked}
 						data-seekable="true"
 						data-player-progress-slider="true"
 					/>
@@ -95,7 +98,7 @@ const PlayerControlsOverlay = ({
 							onClick={handlePlayPreviousEpisode}
 							size="large"
 							icon="jumpbackward"
-							disabled={!hasPreviousEpisode}
+							disabled={actionsLocked || !hasPreviousEpisode}
 							className={css.playerControlButton}
 						/>
 					)}
@@ -104,6 +107,7 @@ const PlayerControlsOverlay = ({
 						<Button
 							spotlightId="player-primary-playback-action"
 							onClick={handlePause}
+							disabled={actionsLocked}
 							size="large"
 							icon="pause"
 							componentRef={playPauseButtonRef}
@@ -113,6 +117,7 @@ const PlayerControlsOverlay = ({
 						<Button
 							spotlightId="player-primary-playback-action"
 							onClick={handlePlay}
+							disabled={actionsLocked}
 							size="large"
 							icon="play"
 							componentRef={playPauseButtonRef}
@@ -125,7 +130,7 @@ const PlayerControlsOverlay = ({
 							onClick={handlePlayNextEpisode}
 							size="large"
 							icon="jumpforward"
-							disabled={!hasNextEpisode}
+							disabled={actionsLocked || !hasNextEpisode}
 							className={css.playerControlButton}
 						/>
 					)}
@@ -135,6 +140,7 @@ const PlayerControlsOverlay = ({
 							<Button
 								size="small"
 								onClick={openWatchPartyPopup}
+								disabled={actionsLocked}
 								className={css.playerControlButton}
 							>
 								{watchPartyRoom ? 'Watch Party' : 'Parties'}
@@ -146,6 +152,7 @@ const PlayerControlsOverlay = ({
 								icon="dlna"
 								aria-label="SyncPlay"
 								onClick={openSyncPlayPopup}
+								disabled={actionsLocked}
 								className={css.playerControlButton}
 							/>
 						) : null}
@@ -154,6 +161,7 @@ const PlayerControlsOverlay = ({
 								size="small"
 								icon="speaker"
 								onClick={openAudioPopup}
+								disabled={actionsLocked}
 								className={css.playerControlButton}
 							/>
 						)}
@@ -162,6 +170,7 @@ const PlayerControlsOverlay = ({
 								size="small"
 								icon="subtitle"
 								onClick={openSubtitlePopup}
+								disabled={actionsLocked}
 								className={css.playerControlButton}
 							/>
 						)}
@@ -172,6 +181,7 @@ const PlayerControlsOverlay = ({
 							size="small"
 							icon={muted || volume === 0 ? 'soundmute' : 'sound'}
 							onClick={toggleMute}
+							disabled={actionsLocked}
 							className={css.playerControlButton}
 						/>
 						<Slider
@@ -180,6 +190,7 @@ const PlayerControlsOverlay = ({
 							max={100}
 							value={muted ? 0 : volume}
 							onChange={handleVolumeChange}
+							disabled={actionsLocked}
 						/>
 					</div>
 				</div>

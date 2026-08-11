@@ -7,6 +7,83 @@ import {
 
 const HDR_DYNAMIC_RANGE_IDS = new Set(['DV', 'HDR10', 'HDR10_PLUS', 'HLG']);
 
+export const PLAYER_RECOVERY_ACTIONS = Object.freeze({
+	IGNORE: 'ignore',
+	RECOVER_HLS_NETWORK: 'recover-hls-network',
+	RECOVER_HLS_MEDIA: 'recover-hls-media',
+	REBUILD_SESSION: 'rebuild-session',
+	RETRY_TRANSCODE: 'retry-transcode',
+	REQUEST_DECISION: 'request-decision',
+	TERMINAL: 'terminal'
+});
+
+export const buildPlayerRecoveryAction = (context = {}, error = {}, ledgerSnapshot = null) => {
+	if (context.kind === 'transcode-fallback') {
+		if (context.exitInProgress === true || context.failureLocked === true) {
+			return {type: PLAYER_RECOVERY_ACTIONS.IGNORE, reason: 'playback-failure-locked'};
+		}
+		if (context.forceDolbyVision === true) {
+			return {type: PLAYER_RECOVERY_ACTIONS.TERMINAL, reason: 'force-dolby-vision'};
+		}
+		if (context.requiresDynamicRangeDecision === true) {
+			return {
+				type: PLAYER_RECOVERY_ACTIONS.REQUEST_DECISION,
+				claim: 'dynamicRangeFallback',
+				decision: context.decision || null,
+				reason: context.reason || 'dolby-vision-playback-failed'
+			};
+		}
+		if (context.strictTranscodingMode === true) {
+			return {type: PLAYER_RECOVERY_ACTIONS.IGNORE, reason: 'strict-transcoding-mode'};
+		}
+		if (context.transcodeFallbackAttempted === true || ledgerSnapshot?.claims?.transcodeFallback === true) {
+			return {type: PLAYER_RECOVERY_ACTIONS.IGNORE, reason: 'already-attempted'};
+		}
+		if (context.supportsTranscoding !== true) {
+			return {type: PLAYER_RECOVERY_ACTIONS.IGNORE, reason: 'server-transcoding-unsupported'};
+		}
+		return {
+			type: PLAYER_RECOVERY_ACTIONS.RETRY_TRANSCODE,
+			claim: 'transcodeFallback',
+			override: context.override || null,
+			toast: context.toast || null,
+			reason: context.reason || 'playback-failure'
+		};
+	}
+
+	if (error?.fatal !== true || context.exitInProgress === true || context.sourceCurrent === false) {
+		return {type: PLAYER_RECOVERY_ACTIONS.IGNORE, reason: 'not-actionable'};
+	}
+	if (ledgerSnapshot?.failureLocked === true) {
+		return {type: PLAYER_RECOVERY_ACTIONS.IGNORE, reason: 'terminal-locked'};
+	}
+
+	const statusCode = Number(error?.response?.code ?? error?.response?.status);
+	if (error.type === context.networkErrorType) {
+		if (error.details === 'fragLoadError' && Number.isFinite(statusCode) && statusCode >= 500) {
+			return {
+				type: PLAYER_RECOVERY_ACTIONS.REBUILD_SESSION,
+				claim: 'playSessionRebuild',
+				reason: `fragment-http-${statusCode}`,
+				statusCode
+			};
+		}
+		const attempts = Number(ledgerSnapshot?.attempts?.hlsNetwork) || 0;
+		return attempts < Math.max(0, Number(context.maxHlsNetworkRecoveryAttempts) || 0)
+			? {type: PLAYER_RECOVERY_ACTIONS.RECOVER_HLS_NETWORK, claim: 'hlsNetwork', reason: error.details || 'network-error'}
+			: {type: PLAYER_RECOVERY_ACTIONS.TERMINAL, reason: 'hls-network-budget-exhausted'};
+	}
+
+	if (error.type === context.mediaErrorType) {
+		const attempts = Number(ledgerSnapshot?.attempts?.hlsMedia) || 0;
+		return attempts < Math.max(0, Number(context.maxHlsMediaRecoveryAttempts) || 0)
+			? {type: PLAYER_RECOVERY_ACTIONS.RECOVER_HLS_MEDIA, claim: 'hlsMedia', reason: error.details || 'media-error'}
+			: {type: PLAYER_RECOVERY_ACTIONS.TERMINAL, reason: 'hls-media-budget-exhausted'};
+	}
+
+	return {type: PLAYER_RECOVERY_ACTIONS.TERMINAL, reason: error.details || 'unknown-hls-error'};
+};
+
 export const SERVER_TRANSCODING_FAILURE_TITLE = 'Server transcoding failed';
 export const SERVER_TRANSCODING_FAILURE_MESSAGE =
 	'Jellyfin could not start the requested video transcode. This could be an issue with FFmpeg, hardware-acceleration, permissions, service-sandbox configuration, or else. Check the latest Jellyfin FFmpeg log.';

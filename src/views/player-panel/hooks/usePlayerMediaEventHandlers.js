@@ -2,7 +2,6 @@ import {useCallback} from 'react';
 import {redactSensitiveUrl} from '../../../utils/sensitiveData';
 
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
-import {applyNativeAudioTrackSelection} from '../../../utils/trackMatching';
 import {
 	getSubtitleStreamByIndex,
 	isBitmapSubtitleCodec,
@@ -54,17 +53,15 @@ export const usePlayerMediaEventHandlers = ({
 	attemptTranscodeFallback,
 	handleStop,
 	mediaSourceData,
-	audioTracks,
-	currentAudioTrack,
 	currentSubtitleTrack,
 	appendPlaybackDiagnostic,
-	onNativeAudioSwitchFallback,
 	onPlaybackEvidence,
 	setPlaying,
 	exitInProgressRef,
 	nativeSourceTokenRef,
 	playbackRuntimeContextRef,
-	playbackGenerationRef
+	playbackGenerationRef,
+	onAudioTransitionFailed
 }) => {
 	const isCurrentNativeEvent = useCallback((event, sourceToken = nativeSourceTokenRef.current) => (
 		isPlaybackSourceMediaEventCurrent({
@@ -80,60 +77,6 @@ export const usePlayerMediaEventHandlers = ({
 		nativeSourceTokenRef,
 		playbackGenerationRef,
 		playbackRuntimeContextRef
-	]);
-
-	const applyInitialNativeAudioSelection = useCallback((phase) => {
-		const defaultAudioTrack = Number.isInteger(mediaSourceData?.DefaultAudioStreamIndex)
-			? mediaSourceData.DefaultAudioStreamIndex
-			: audioTracks.find((track) => track?.IsDefault === true)?.Index;
-		if (
-			mediaSourceData?.__selectedPlayMethod !== 'DirectPlay' ||
-			!Number.isInteger(currentAudioTrack) ||
-			currentAudioTrack < 0 ||
-			currentAudioTrack === defaultAudioTrack ||
-			!Array.isArray(audioTracks) ||
-			audioTracks.length <= 1
-		) {
-			return false;
-		}
-		const nativeResult = applyNativeAudioTrackSelection({
-			video: videoRef.current,
-			mediaTracks: audioTracks,
-			selectedTrackIndex: currentAudioTrack
-		});
-		if (typeof appendPlaybackDiagnostic === 'function') {
-			appendPlaybackDiagnostic({
-				scope: 'audio-track',
-				stage: `initial-native-switch-${phase}`,
-				status: nativeResult.status,
-				reason: nativeResult.method,
-				message: nativeResult.applied
-					? `Selected native audio track ${nativeResult.index} from ${nativeResult.tracks.length} tracks.`
-					: `Native initial audio selection failed with ${nativeResult.tracks.length} tracks.`
-			});
-		}
-		if (nativeResult.applied) return false;
-		if (nativeResult.status === 'native-unavailable' && phase === 'metadata') {
-			return false;
-		}
-		if (typeof onNativeAudioSwitchFallback !== 'function') return false;
-		Promise.resolve(onNativeAudioSwitchFallback({
-			reason: nativeResult.status || 'native-initial-audio-switch-failed',
-			audioStreamIndex: currentAudioTrack,
-			subtitleStreamIndex: currentSubtitleTrack
-		})).catch((error) => {
-			console.warn('Failed to run native audio fallback:', error);
-		});
-		return true;
-	}, [
-		appendPlaybackDiagnostic,
-		audioTracks,
-		currentAudioTrack,
-		currentSubtitleTrack,
-		mediaSourceData?.DefaultAudioStreamIndex,
-		mediaSourceData?.__selectedPlayMethod,
-		onNativeAudioSwitchFallback,
-		videoRef
 	]);
 
 	const handleLoadedMetadata = useCallback((event) => {
@@ -156,8 +99,7 @@ export const usePlayerMediaEventHandlers = ({
 			reason: nativeSourceTokenRef.current?.engine || 'native',
 			message: 'Current playback source emitted loadedmetadata.'
 		});
-		applyInitialNativeAudioSelection('metadata');
-	}, [appendPlaybackDiagnostic, applyInitialNativeAudioSelection, isCurrentNativeEvent, item, nativeSourceTokenRef, playbackOverrideRef, setCurrentTime, videoRef]);
+	}, [appendPlaybackDiagnostic, isCurrentNativeEvent, item, nativeSourceTokenRef, playbackOverrideRef, setCurrentTime, videoRef]);
 
 	const handleLoadedData = useCallback((event) => {
 		if (!isCurrentNativeEvent(event)) return;
@@ -177,7 +119,6 @@ export const usePlayerMediaEventHandlers = ({
 
 	const handleCanPlay = useCallback((event) => {
 		if (!isCurrentNativeEvent(event) || !videoRef.current || exitInProgressRef.current) return;
-		applyInitialNativeAudioSelection('canplay');
 		appendPlaybackDiagnostic?.({
 			scope: 'startup',
 			stage: 'canplay',
@@ -187,7 +128,6 @@ export const usePlayerMediaEventHandlers = ({
 		});
 	}, [
 		appendPlaybackDiagnostic,
-		applyInitialNativeAudioSelection,
 		exitInProgressRef,
 		isCurrentNativeEvent,
 		nativeSourceTokenRef,
@@ -251,6 +191,7 @@ export const usePlayerMediaEventHandlers = ({
 			}
 			console.error('MediaError code:', mediaError.code, '-', errorMessage);
 		}
+		if (await onAudioTransitionFailed?.(sourceToken, errorMessage)) return;
 		if (isSubtitleCompatibilityError(errorMessage) && playbackSettingsRef.current.strictTranscodingMode) {
 			showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
 			return;
@@ -307,6 +248,7 @@ export const usePlayerMediaEventHandlers = ({
 		playbackFailureLockedRef,
 		playbackStartedRef,
 		playbackSettingsRef,
+		onAudioTransitionFailed,
 		showPlaybackError,
 		videoRef
 	]);

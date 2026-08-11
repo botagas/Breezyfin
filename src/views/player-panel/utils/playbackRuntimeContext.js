@@ -7,7 +7,9 @@ export const createPlaybackRuntimeContext = ({
 	subtitlePolicy,
 	selectedAudioTrack,
 	selectedSubtitleTrack,
-	playbackOptions
+	playbackOptions,
+	audioTransition = null,
+	requiresInitialNativeAudioSelection = false
 }) => Object.freeze({
 	generation,
 	itemId: String(itemId || ''),
@@ -18,7 +20,9 @@ export const createPlaybackRuntimeContext = ({
 	subtitlePolicy: subtitlePolicy || null,
 	selectedAudioTrack,
 	selectedSubtitleTrack,
-	playbackOptions: Object.freeze({...playbackOptions})
+	playbackOptions: Object.freeze({...playbackOptions}),
+	audioTransition: audioTransition ? Object.freeze({...audioTransition}) : null,
+	requiresInitialNativeAudioSelection: requiresInitialNativeAudioSelection === true
 });
 
 export const isPlaybackRuntimeContextCurrent = ({

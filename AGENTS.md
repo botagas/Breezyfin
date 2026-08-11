@@ -75,7 +75,8 @@ Do not add duplicate hooks/helpers for behavior already covered by shared module
 
 - All focusable interactions must behave in both `5way` and `pointer` modes.
 - Do not rely on hover-only affordances for critical actions.
-- Popups should autofocus first actionable item on open via `usePopupInitialFocus`.
+- Popups should focus the first actionable item when they open. Use
+  `usePopupInitialFocus`.
 - In Media Details, keep initial/forced first-section focus playback-first (`Audio -> Subtitle -> Play`) and avoid automatic Favorite/Watched fallback. Directional LEFT/RIGHT navigation may continue through Favorite/Watched after Play when those actions are available.
 - Preserve layered back behavior:
   1. close local disclosure(s)
@@ -108,7 +109,11 @@ For non-trivial work:
 
 Avoid broad refactors unless explicitly requested.
 
-Audit findings should improve the codebase, not distort it. Do not add temporary workarounds only to satisfy an audit, such as reshaping equivalent helper calls, adding explicit CSS references solely for dead-class detection, or duplicating intent under different syntax. If an audit reports a false positive or encourages worse code, prefer one of these outcomes:
+Audit findings should improve the codebase, not distort it. Do not add temporary
+workarounds only to satisfy an audit. Prohibited examples include reshaping equivalent
+helper calls, adding CSS references only for dead-class detection, and duplicating intent
+under different syntax. If an audit reports a false positive or encourages worse code,
+prefer one of these outcomes:
 
 1. improve the shared helper/component API so usage is explicit and reusable
 2. improve the audit rule so it understands the intended pattern
@@ -155,6 +160,21 @@ Rule from repo docs:
 
 - `TODOS.md` = unfinished/planned work only.
 - `CHECKS.md` = recurring validation/test runbooks (added after related TODO completion).
+
+### Documentation language
+
+Use controlled technical English adapted from ASD-STE100 principles. Do not describe
+the repository documentation as certified ASD-STE100 content.
+
+- Use `must` for mandatory requirements.
+- Use `should` for recommendations that permit an exception.
+- Use `may` for permission or a possible outcome.
+- Use `can` for capability.
+- Name the actor and keep one primary requirement in each sentence.
+- Avoid vague terms such as `simply`, `just`, and `etc.`. Avoid unclear uses of `this`
+  and `it`.
+- Preserve literal commands, paths, identifiers, API fields, status values, numbers,
+  and user-facing labels.
 
 ## 9) Areas requiring extra caution
 

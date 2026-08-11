@@ -137,6 +137,11 @@ describe('usePlayerStartupCoordinator state', () => {
 	it('waits for a selected client renderer but starts native and subtitle-off paths', () => {
 		expect(getPlayerStartupState({
 			sourceAttached: true,
+			audioSelectionReady: false,
+			currentSubtitleTrack: -1
+		})).toBe('waiting-audio');
+		expect(getPlayerStartupState({
+			sourceAttached: true,
 			currentSubtitleTrack: 2,
 			subtitleRendererPolicy: {clientRender: true},
 			subtitleRendererStatus: 'loading'
@@ -186,6 +191,175 @@ describe('usePlayerStartupCoordinator state', () => {
 			);
 		});
 		await waitFor(() => expect(view.video.play).toHaveBeenCalledTimes(1));
+	});
+
+	it('applies an explicit native audio selection before initial playback', async () => {
+		const view = createCoordinatorProps();
+		const nativeTracks = [
+			{language: 'en', label: 'English', enabled: true},
+			{language: 'ja', label: 'Japanese', enabled: false}
+		];
+		nativeTracks.addEventListener = jest.fn();
+		nativeTracks.removeEventListener = jest.fn();
+		Object.defineProperty(view.video, 'audioTracks', {
+			configurable: true,
+			value: nativeTracks
+		});
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 1,
+			itemId: 'item-1',
+			mediaSourceData: {
+				Id: 'source-1',
+				MediaStreams: [
+					{Type: 'Audio', Index: 1, Language: 'eng'},
+					{Type: 'Audio', Index: 2, Language: 'jpn'}
+				]
+			},
+			playMethod: 'DirectPlay',
+			selectedAudioTrack: 2,
+			requiresInitialNativeAudioSelection: true
+		});
+		view.sourceToken = createNativePlaybackSourceToken({
+			runtimeContext,
+			video: view.video,
+			sourceUrl: 'video.mkv'
+		});
+		view.props.playbackRuntimeContextRef.current = runtimeContext;
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken);
+		});
+
+		await waitFor(() => expect(view.video.play).toHaveBeenCalledTimes(1));
+		expect(nativeTracks[0].enabled).toBe(false);
+		expect(nativeTracks[1].enabled).toBe(true);
+		expect(view.props.onInitialAudioSelectionFallback).toBeUndefined();
+	});
+
+	it('restores the audio replacement position before releasing a paused transition', async () => {
+		const view = createCoordinatorProps();
+		let readyState = 0;
+		Object.defineProperty(view.video, 'readyState', {
+			configurable: true,
+			get: () => readyState
+		});
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 1,
+			itemId: 'item-1',
+			mediaSourceData: {Id: 'source-1'},
+			playMethod: 'DirectStream',
+			audioTransition: {id: 'audio-1', startPaused: true, seekSeconds: 42}
+		});
+		view.sourceToken = createNativePlaybackSourceToken({
+			runtimeContext,
+			video: view.video,
+			sourceUrl: 'video.mkv'
+		});
+		view.props.playbackRuntimeContextRef.current = runtimeContext;
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		view.props.onAudioTransitionReady = jest.fn();
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => {
+			result.current.registerPlaybackSource(view.sourceToken);
+		});
+		await waitFor(() => expect(result.current.status).toBe('waiting-audio'));
+		expect(view.props.onAudioTransitionReady).not.toHaveBeenCalled();
+
+		act(() => {
+			readyState = 1;
+			view.video.dispatchEvent(new Event('loadedmetadata'));
+		});
+
+		await waitFor(() => expect(view.props.onAudioTransitionReady).toHaveBeenCalledWith(
+			view.sourceToken,
+			{started: false}
+		));
+		expect(view.video.currentTime).toBe(42);
+		expect(view.video.play).not.toHaveBeenCalled();
+	});
+
+	it('restores a non-default native audio track and position before completing rollback', async () => {
+		const view = createCoordinatorProps();
+		let readyState = 0;
+		Object.defineProperty(view.video, 'readyState', {
+			configurable: true,
+			get: () => readyState
+		});
+		const nativeTracks = [
+			{language: 'en', label: 'English', enabled: true},
+			{language: 'ja', label: 'Japanese', enabled: false}
+		];
+		nativeTracks.addEventListener = jest.fn();
+		nativeTracks.removeEventListener = jest.fn();
+		Object.defineProperty(view.video, 'audioTracks', {
+			configurable: true,
+			value: nativeTracks
+		});
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 1,
+			itemId: 'item-1',
+			mediaSourceData: {
+				Id: 'source-1',
+				MediaStreams: [
+					{Type: 'Audio', Index: 1, Language: 'eng'},
+					{Type: 'Audio', Index: 2, Language: 'jpn'}
+				]
+			},
+			playMethod: 'DirectPlay',
+			selectedAudioTrack: 2,
+			requiresInitialNativeAudioSelection: true,
+			audioTransition: {id: 'audio-1', startPaused: true, rollback: true, seekSeconds: 42}
+		});
+		view.sourceToken = createNativePlaybackSourceToken({
+			runtimeContext,
+			video: view.video,
+			sourceUrl: 'video.mkv'
+		});
+		view.props.playbackRuntimeContextRef.current = runtimeContext;
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		view.props.onAudioTransitionReady = jest.fn();
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => result.current.registerPlaybackSource(view.sourceToken));
+		await waitFor(() => expect(result.current.status).toBe('waiting-audio'));
+		act(() => {
+			readyState = 1;
+			view.video.dispatchEvent(new Event('loadedmetadata'));
+		});
+
+		await waitFor(() => expect(view.props.onAudioTransitionReady).toHaveBeenCalled());
+		expect(view.video.currentTime).toBe(42);
+		expect(nativeTracks[0].enabled).toBe(false);
+		expect(nativeTracks[1].enabled).toBe(true);
+		expect(view.video.play).not.toHaveBeenCalled();
+	});
+
+	it('fails an active audio transition before attempting generic startup recovery', async () => {
+		const view = createCoordinatorProps();
+		const error = new Error('codec not supported');
+		error.name = 'NotSupportedError';
+		view.video.play.mockRejectedValue(error);
+		view.props.onAudioTransitionFailed = jest.fn().mockResolvedValue(true);
+		view.sourceToken = Object.freeze({
+			...view.sourceToken,
+			runtimeContext: Object.freeze({
+				...view.sourceToken.runtimeContext,
+				audioTransition: Object.freeze({id: 'audio-1'})
+			})
+		});
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		view.props.playbackRuntimeContextRef.current = view.sourceToken.runtimeContext;
+		const {result} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => result.current.registerPlaybackSource(view.sourceToken));
+		await waitFor(() => expect(view.props.onAudioTransitionFailed).toHaveBeenCalledWith(
+			view.sourceToken,
+			'Format not supported'
+		));
+		expect(view.props.attemptTranscodeFallback).not.toHaveBeenCalled();
 	});
 
 	it('rejects playback evidence and direct start requests before engine readiness', async () => {

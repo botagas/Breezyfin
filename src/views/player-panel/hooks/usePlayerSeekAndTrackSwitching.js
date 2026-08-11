@@ -1,34 +1,13 @@
-import {useCallback} from 'react';
+import {useCallback, useRef} from 'react';
+import Hls from 'hls.js';
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import {
 	getSubtitleTranscodePolicy,
 	shouldTranscodeForSubtitleSelection
 } from '../../../utils/playbackSelection';
-import {
-	applyNativeAudioTrackSelection,
-	resolveRuntimeTrackIndex
-} from '../../../utils/trackMatching';
+import {resolveRuntimeTrackIndex} from '../../../utils/trackMatching';
 import {buildPlaybackOverride} from '../utils/playbackOverride';
-
-const NATIVE_AUDIO_SWITCH_SETTLE_MS = 1000; 
-
-export const waitForNativeAudioTrackReadiness = (
-	video,
-	timeoutMs = NATIVE_AUDIO_SWITCH_SETTLE_MS
-) => new Promise((resolve) => {
-	let timer = null;
-	let onReady = null;
-	const readinessEvents = ['canplay', 'loadeddata'];
-	const finish = (signal) => {
-		if (timer !== null) clearTimeout(timer);
-		readinessEvents.forEach((eventName) => video?.removeEventListener?.(eventName, onReady));
-		resolve(signal);
-	};
-	onReady = (event) => finish(event?.type || 'media-ready');
-
-	readinessEvents.forEach((eventName) => video?.addEventListener?.(eventName, onReady, {once: true}));
-	timer = setTimeout(() => finish('settle-timeout'), timeoutMs);
-});
+import {waitForHlsTrackSwitch} from '../utils/hlsTrackSwitch';
 
 export const usePlayerSeekAndTrackSwitching = ({
 	videoRef,
@@ -61,8 +40,13 @@ export const usePlayerSeekAndTrackSwitching = ({
 	setCurrentAudioTrack,
 	setCurrentSubtitleTrack,
 	setToastMessage,
+	dismissToast,
+	requestAudioTransition,
+	isTrackTransitionActive,
+	setInlineAudioSwitchActive,
 	appendPlaybackDiagnostic
 }) => {
+	const trackOperationIdRef = useRef(0);
 	const isSeekContext = useCallback((target) => {
 		if (!target) return true;
 		if (target === videoRef.current || target === document.body || target === document.documentElement) return true;
@@ -76,6 +60,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 	}, []);
 
 	const seekBySeconds = useCallback((deltaSeconds) => {
+		if (isTrackTransitionActive?.()) return;
 		const video = videoRef.current;
 		if (!video || !Number.isFinite(deltaSeconds)) return;
 		const nextTime = Math.min(Math.max(0, video.currentTime + deltaSeconds), duration || video.duration || 0);
@@ -91,9 +76,10 @@ export const usePlayerSeekAndTrackSwitching = ({
 			setSeekFeedback('');
 			seekFeedbackTimerRef.current = null;
 		}, 900);
-	}, [checkSkipSegments, duration, seekFeedbackTimerRef, seekOffsetRef, setCurrentTime, setSeekFeedback, videoRef]);
+	}, [checkSkipSegments, duration, isTrackTransitionActive, seekFeedbackTimerRef, seekOffsetRef, setCurrentTime, setSeekFeedback, videoRef]);
 
 	const handleSeek = useCallback(async (e) => {
+		if (isTrackTransitionActive?.()) return;
 		const seekTime = e.value;
 		setCurrentTime(seekTime);
 		checkSkipSegments(seekTime);
@@ -140,6 +126,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		currentSubtitleTrack,
 		handleStop,
 		isCurrentTranscoding,
+		isTrackTransitionActive,
 		lastInteractionRef,
 		loadVideo,
 		mediaSourceData,
@@ -177,7 +164,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 		}
 		setLoading(true);
 		await handleStop();
-		loadVideo();
+		return loadVideo();
 	}, [
 		appendPlaybackDiagnostic,
 		handleStop,
@@ -217,145 +204,143 @@ export const usePlayerSeekAndTrackSwitching = ({
 	}, [mediaSourceData, playbackSettingsRef]);
 
 	const handleAudioTrackChange = useCallback(async (trackIndex) => {
+		if (isTrackTransitionActive?.() || trackIndex === currentAudioTrack) return;
+		const operationId = ++trackOperationIdRef.current;
 		closeAudioPopup();
 
 		if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
 			const hls = hlsRef.current;
+			const sourceToken = nativeSourceTokenRef?.current || null;
 			const hlsTrack = resolveRuntimeTrackIndex({
 				runtimeTracks: hls.audioTracks,
 				mediaTracks: audioTracks,
 				selectedTrackIndex: trackIndex
 			});
 			if (hlsTrack.index >= 0) {
-				hls.audioTrack = hlsTrack.index;
-				const applied = hls.audioTrack === hlsTrack.index;
+				setInlineAudioSwitchActive?.(true);
+				setToastMessage({
+					key: 'audio-track-switch',
+					message: 'Switching audio...',
+					severity: 'warning',
+					persistent: true
+				});
+				let switchResult;
+				try {
+					switchResult = await waitForHlsTrackSwitch({
+						hls,
+						eventName: Hls.Events.AUDIO_TRACK_SWITCHED,
+						expectedTrackId: hlsTrack.index,
+						apply: () => {
+							hls.audioTrack = hlsTrack.index;
+						},
+						isCurrent: () => (
+							trackOperationIdRef.current === operationId &&
+							hlsRef.current === hls &&
+							nativeSourceTokenRef?.current === sourceToken
+						)
+					});
+				} finally {
+					setInlineAudioSwitchActive?.(false);
+				}
+				if (
+					switchResult.reason === 'stale-source' ||
+					trackOperationIdRef.current !== operationId
+				) return;
+				const applied = switchResult.confirmed;
 				if (typeof appendPlaybackDiagnostic === 'function') {
 					appendPlaybackDiagnostic({
 						scope: 'audio-track',
 						stage: 'hls-switch',
 						status: applied ? 'applied' : 'failed',
-						reason: hlsTrack.method,
+						reason: applied ? hlsTrack.method : switchResult.reason,
 						message: applied
 							? `Selected HLS audio track ${hlsTrack.index}.`
 							: `HLS.js rejected audio track ${hlsTrack.index}; reloading the stream.`
 					});
 				}
-				if (applied) {
+				if (applied && trackOperationIdRef.current === operationId) {
+					dismissToast?.('audio-track-switch');
 					setCurrentAudioTrack(trackIndex);
 					saveAudioSelection(trackIndex, audioTracks);
 					return;
 				}
 			}
 		}
-
-		const video = videoRef.current;
-		const sourceToken = nativeSourceTokenRef?.current || null;
-		const sourceIdentity = video?.currentSrc || video?.src || '';
-		const shouldResume = Boolean(video && !video.paused && !video.ended);
-		if (shouldResume) video.pause();
-		const nativeResult = applyNativeAudioTrackSelection({
-			video,
-			mediaTracks: audioTracks,
-			selectedTrackIndex: trackIndex
-		});
-		if (typeof appendPlaybackDiagnostic === 'function') {
-			appendPlaybackDiagnostic({
-				scope: 'audio-track',
-				stage: 'native-switch',
-				status: nativeResult.status,
-				reason: nativeResult.method,
-				message: nativeResult.applied
-					? `Selected native audio track ${nativeResult.index}.`
-					: 'Native audio track switching unavailable or failed.'
-			});
-		}
-		if (nativeResult.applied) {
-			setCurrentAudioTrack(trackIndex);
-			saveAudioSelection(trackIndex, audioTracks);
-			if (shouldResume) {
-				const readinessSignal = await waitForNativeAudioTrackReadiness(video);
-				const activeVideo = videoRef.current;
-				const activeSourceIdentity = activeVideo?.currentSrc || activeVideo?.src || '';
-				const sourceStillCurrent = sourceToken
-					? nativeSourceTokenRef?.current === sourceToken
-					: activeSourceIdentity === sourceIdentity;
-				if (activeVideo === video && sourceStillCurrent) {
-					try {
-						await Promise.resolve(video.play());
-						appendPlaybackDiagnostic?.({
-							scope: 'audio-track',
-							stage: 'native-resume',
-							status: 'applied',
-							reason: readinessSignal,
-							message: 'Resumed playback after the native audio track settled.'
-						});
-					} catch (error) {
-						appendPlaybackDiagnostic?.({
-							scope: 'audio-track',
-							stage: 'native-resume',
-							status: 'failed',
-							reason: error?.name || 'play-rejected',
-							message: 'Native audio track changed, but automatic playback resume failed.'
-						});
-						setToastMessage({
-							message: 'Audio track changed. Press Play to resume.',
-							severity: 'warning'
-						});
-					}
-				}
-			}
-			return;
-		}
-
-		setCurrentAudioTrack(trackIndex);
-		saveAudioSelection(trackIndex, audioTracks);
-		await reloadWithTrackSelection(trackIndex, currentSubtitleTrack, {
-			disableDirectPlay: true,
-			reason: nativeResult.status || 'native-audio-switch-failed'
-		});
+		dismissToast?.('audio-track-switch');
+		if (trackOperationIdRef.current !== operationId) return;
+		await requestAudioTransition?.(trackIndex);
 	}, [
 		appendPlaybackDiagnostic,
 		audioTracks,
 		closeAudioPopup,
-		currentSubtitleTrack,
+		currentAudioTrack,
+		dismissToast,
 		hlsRef,
+		isTrackTransitionActive,
 		nativeSourceTokenRef,
-		reloadWithTrackSelection,
+		requestAudioTransition,
 		saveAudioSelection,
 		setCurrentAudioTrack,
-		setToastMessage,
-		videoRef
+		setInlineAudioSwitchActive,
+		setToastMessage
 	]);
 
 	const handleSubtitleTrackChange = useCallback(async (trackIndex) => {
-		setCurrentSubtitleTrack(trackIndex);
+		if (isTrackTransitionActive?.() || trackIndex === currentSubtitleTrack) return;
+		const operationId = ++trackOperationIdRef.current;
 		closeSubtitlePopup();
-		saveSubtitleSelection(trackIndex, subtitleTracks);
 
 		if (shouldForceSubtitleReload(trackIndex)) {
 			setToastMessage({
 				message: 'Subtitle burn-in requires stream reload.',
 				severity: 'warning'
 			});
-			reloadWithTrackSelection(currentAudioTrack, trackIndex);
+			const burnInLoadResult = await reloadWithTrackSelection(currentAudioTrack, trackIndex);
+			if (trackOperationIdRef.current !== operationId || burnInLoadResult?.status !== 'attached') return;
+			setCurrentSubtitleTrack(trackIndex);
+			saveSubtitleSelection(trackIndex, subtitleTracks);
 			return;
 		}
 
 		if (shouldUseClientSubtitleRenderer(trackIndex)) {
+			setCurrentSubtitleTrack(trackIndex);
+			saveSubtitleSelection(trackIndex, subtitleTracks);
 			setToastMessage('Rendering subtitles in app.');
 			return;
 		}
 
 		if (hlsRef.current) {
 			if (typeof hlsRef.current.subtitleTrack === 'number' && hlsRef.current.subtitleTracks) {
+				const hls = hlsRef.current;
+				const sourceToken = nativeSourceTokenRef?.current || null;
 				const hlsTrackIndex = resolveRuntimeTrackIndex({
 					runtimeTracks: hlsRef.current.subtitleTracks,
 					mediaTracks: subtitleTracks,
 					selectedTrackIndex: trackIndex
 				});
 				if (hlsTrackIndex.index >= 0) {
-					hlsRef.current.subtitleTrack = hlsTrackIndex.index;
-					return;
+					const switchResult = await waitForHlsTrackSwitch({
+						hls,
+						eventName: Hls.Events.SUBTITLE_TRACK_LOADED,
+						expectedTrackId: hlsTrackIndex.index,
+						apply: () => {
+							hls.subtitleTrack = hlsTrackIndex.index;
+						},
+						isCurrent: () => (
+							trackOperationIdRef.current === operationId &&
+							hlsRef.current === hls &&
+							nativeSourceTokenRef?.current === sourceToken
+						)
+					});
+					if (
+						switchResult.reason === 'stale-source' ||
+						trackOperationIdRef.current !== operationId
+					) return;
+					if (switchResult.confirmed && trackOperationIdRef.current === operationId) {
+						setCurrentSubtitleTrack(trackIndex);
+						saveSubtitleSelection(trackIndex, subtitleTracks);
+						return;
+					}
 				}
 			}
 			setToastMessage({
@@ -364,11 +349,17 @@ export const usePlayerSeekAndTrackSwitching = ({
 			});
 		}
 
-		reloadWithTrackSelection(currentAudioTrack, trackIndex);
+		const loadResult = await reloadWithTrackSelection(currentAudioTrack, trackIndex);
+		if (trackOperationIdRef.current !== operationId || loadResult?.status !== 'attached') return;
+		setCurrentSubtitleTrack(trackIndex);
+		saveSubtitleSelection(trackIndex, subtitleTracks);
 	}, [
 		closeSubtitlePopup,
 		currentAudioTrack,
+		currentSubtitleTrack,
 		hlsRef,
+		isTrackTransitionActive,
+		nativeSourceTokenRef,
 		reloadWithTrackSelection,
 		saveSubtitleSelection,
 		setCurrentSubtitleTrack,

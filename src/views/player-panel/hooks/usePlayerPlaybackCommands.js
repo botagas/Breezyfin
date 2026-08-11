@@ -29,11 +29,17 @@ export const usePlayerPlaybackCommands = ({
 	attemptTranscodeFallback,
 	isCurrentTranscoding,
 	exitInProgressRef,
-	loadRequestIdRef
+	loadRequestIdRef,
+	isActionsLocked,
+	onBeforeBack,
+	playbackStartedRef,
+	playbackRecoveryLedger,
+	requestPlaybackStart
 }) => {
 	const syncPlay = useSyncPlay();
 	const syncPlayNext = syncPlay.group && syncPlay.followMode === 'following' ? syncPlay.next : null;
 	const handleEnded = useCallback(async () => {
+		if (isActionsLocked?.()) return;
 		await handleStop();
 		if (await runSyncPlayQueueAction({
 			action: syncPlayNext,
@@ -61,6 +67,7 @@ export const usePlayerPlaybackCommands = ({
 		handleStop,
 		hasNextEpisode,
 		item,
+		isActionsLocked,
 		onBack,
 		onPlay,
 		playbackSettingsRef,
@@ -69,7 +76,12 @@ export const usePlayerPlaybackCommands = ({
 	]);
 
 	const handlePlay = useCallback(async ({keepHidden = false} = {}) => {
+		if (isActionsLocked?.()) return;
 		if (!videoRef.current) return;
+		if (!playbackStartedRef.current && requestPlaybackStart) {
+			await requestPlaybackStart();
+			return;
+		}
 		try {
 			const resumeFromPaused = videoRef.current.currentTime > 0;
 			await videoRef.current.play();
@@ -87,26 +99,32 @@ export const usePlayerPlaybackCommands = ({
 		}
 	}, [
 		reportPlaybackProgressNow,
+		playbackStartedRef,
+		requestPlaybackStart,
 		setPlaying,
 		setShowControls,
 		setToastMessage,
 		showPlaybackError,
-		videoRef
+		videoRef,
+		isActionsLocked
 	]);
 
 	const handlePause = useCallback(async ({keepHidden = false} = {}) => {
+		if (isActionsLocked?.()) return;
 		if (!videoRef.current) return;
 		videoRef.current.pause();
 		setPlaying(false);
 		setShowControls(!keepHidden);
 
 		reportPlaybackProgressNow(true);
-	}, [reportPlaybackProgressNow, setPlaying, setShowControls, videoRef]);
+	}, [isActionsLocked, reportPlaybackProgressNow, setPlaying, setShowControls, videoRef]);
 
 	const handleRetryPlayback = useCallback(async () => {
+		if (isActionsLocked?.()) return;
 		setError(null);
 		setLoadingStatusMessage('Loading...');
 		setToastMessage('');
+		playbackRecoveryLedger?.resetForRetry(item?.Id);
 		resetRecoveryGuards();
 		playSessionRebuildAttemptsRef.current = 0;
 		transcodeFallbackAttemptedRef.current = false;
@@ -116,8 +134,11 @@ export const usePlayerPlaybackCommands = ({
 		loadVideo();
 	}, [
 		handleStop,
+		isActionsLocked,
 		loadVideo,
+		item?.Id,
 		playSessionRebuildAttemptsRef,
+		playbackRecoveryLedger,
 		reloadAttemptedRef,
 		resetRecoveryGuards,
 		setError,
@@ -129,6 +150,7 @@ export const usePlayerPlaybackCommands = ({
 
 	const handleBackButton = useCallback(() => {
 		if (exitInProgressRef.current) return;
+		onBeforeBack?.();
 		exitInProgressRef.current = true;
 		loadRequestIdRef.current += 1;
 		let didNavigate = false;
@@ -150,7 +172,7 @@ export const usePlayerPlaybackCommands = ({
 				clearTimeout(navigationTimeout);
 				navigateBack();
 			});
-	}, [exitInProgressRef, handleStop, loadRequestIdRef, onBack]);
+	}, [exitInProgressRef, handleStop, loadRequestIdRef, onBack, onBeforeBack]);
 
 	const tryPlaybackFallbackOnCanPlayError = useCallback(async (errorMessage) => {
 		if (!isCurrentTranscoding) {

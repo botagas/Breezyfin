@@ -15,22 +15,37 @@ All notable changes to Breezyfin are documented in this file.
 - Made selected audio, subtitle, and filter options use one persistent Selected marker
   and consistent active styling.
 - Kept explicit in-player audio and subtitle choices authoritative over cross-episode
-  track intent, with verified HLS.js switching and a bounded native audio settling pause.
+  track intent. HLS.js commits changes only after its switch event; native runtime audio
+  changes prepare and swap a server-selected source instead of guessing decoder readiness.
+- Rewrote repository documentation in controlled technical English and verified the
+  documented architecture, commands, checks, and plugin terminology against current
+  behavior.
 
 ### Fixed
 
-- Fixed native webOS DirectPlay startup waiting for `canplay` before requesting playback,
-  with one communicated DirectPlay-to-transcode recovery attempt when startup makes no
-  progress.
-- Separated native and HLS.js source ownership so HLS.js is not reset after attachment,
-  waits for a current buffered fragment, and gives cold server subtitle transcodes an
-  independent bootstrap deadline.
+- Stopped native webOS Direct Play startup from waiting for `canplay` before requesting
+  playback. When startup makes no progress, Breezyfin communicates one Direct Play to
+  Transcode recovery attempt.
+- Separated native and HLS.js source ownership. HLS.js is no longer reset after
+  attachment, waits for a current buffered fragment, and gives cold server subtitle
+  transcodes an independent bootstrap deadline.
 - Isolated native media events, HLS.js events, timers, and recovery callbacks by playback
   source generation.
 - Serialized Jellyfin playback start, progress, pause, seek, and stop reporting.
 - Kept PlaybackInfo-selected audio and subtitle tracks authoritative through Player startup.
 - Fixed same-item audio reloads being remapped back to a previous episode's semantic
   language intent, and restored the complete selected surface in track pickers.
+- Prevented Media Details from displaying an explicit audio choice before native webOS
+  selected the requested track. Initial Direct Play now discovers the native
+  track before startup or falls back to a communicated server remux/transcode.
+- Added generation-bound native audio replacement with position restoration, rollback to
+  a paused state, persistent switching feedback, control locking, and SyncPlay clock
+  authority.
+- Hardened audio replacement handoff so paused progress is a real reporting barrier,
+  prepared mount waits are cancellable, superseded/failed Jellyfin sessions close once,
+  and transient toasts cannot evict the persistent switching status.
+- Bound transcode and subtitle recovery restarts to their originating item, playback
+  generation, and load request so stale teardown continuations cannot restart newer media.
 - Allowed SyncPlay readiness after source preparation without waiting for native media
   readiness events that may require authoritative group playback to begin first.
 - Replaced ambiguous startup format errors on confirmed transcodes with bounded
@@ -41,14 +56,17 @@ All notable changes to Breezyfin are documented in this file.
 
 ### Added
 
-- Breezyfin plugin capability discovery with per-session invalidation.
-- Optional server-defined Home rows and a native Jellyfin Likes watchlist.
-- Discovery and Calendar panels backed by authenticated plugin contracts.
-- A shared Jellyfin WebSocket lifecycle with user-data cache invalidation.
-- Native Jellyfin SyncPlay group browsing, playback synchronization, participant state, and queue controls.
-- Authenticated JellyWatchParty room browsing, host-controlled playback synchronization, participants, and bounded chat.
+- Added Breezyfin plugin capability discovery with per-session invalidation.
+- Added optional server-defined Home rows and a native Jellyfin Likes Watchlist.
+- Added Discovery and Calendar panels backed by authenticated plugin contracts.
+- Added a shared Jellyfin WebSocket lifecycle with user-data cache invalidation.
+- Added native Jellyfin SyncPlay group browsing, playback synchronization, participant
+  state, and queue controls.
+- Added authenticated JellyWatchParty room browsing, host-controlled playback
+  synchronization, participant state, and bounded chat.
 
 ### Changed
 
 - Prepared client metadata for the coordinated `0.2.0` release candidate.
-- Kept provider communication server-side so the TV client only uses Jellyfin and authenticated plugin URLs.
+- Kept provider communication on the server. The TV client uses only Jellyfin URLs and
+  authenticated plugin URLs.

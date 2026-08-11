@@ -9,6 +9,7 @@ import {
 } from '../utils/playbackRuntimeContext';
 import {selectHlsEnginePreference} from '../utils/playerVideoLoaderHelpers';
 import {PLAYER_HLS_ENGINE_STARTUP_TIMEOUT_MS} from '../utils/playerStartupState';
+import {createHlsStartupMeasurements} from '../utils/hlsStartupMeasurements';
 
 const NATIVE_HLS_FALLBACK_TIMEOUT_MS = 3500;
 
@@ -36,6 +37,7 @@ export const usePlayerSourcePipeline = ({
 	playbackGenerationRef,
 	exitInProgressRef,
 	hlsConfig,
+	diagnosticsEnabled = false,
 	appendPlaybackDiagnostic,
 	onPlaybackSourceAttached,
 	onPlaybackSourceInvalidated,
@@ -48,6 +50,21 @@ export const usePlayerSourcePipeline = ({
 	const activeDescriptorRef = useRef(null);
 	const videoResetRef = useRef(false);
 	const callbackRefs = useRef({});
+	const hlsMeasurementsRef = useRef(null);
+	if (
+		!hlsMeasurementsRef.current ||
+		hlsMeasurementsRef.current.enabled !== diagnosticsEnabled ||
+		hlsMeasurementsRef.current.appendPlaybackDiagnostic !== appendPlaybackDiagnostic
+	) {
+		hlsMeasurementsRef.current = {
+			enabled: diagnosticsEnabled,
+			appendPlaybackDiagnostic,
+			tracker: createHlsStartupMeasurements({
+				enabled: diagnosticsEnabled,
+				appendDiagnostic: appendPlaybackDiagnostic
+			})
+		};
+	}
 	callbackRefs.current = {
 		onPlaybackSourceAttached,
 		onPlaybackSourceInvalidated,
@@ -94,6 +111,7 @@ export const usePlayerSourcePipeline = ({
 		reason = 'source-detached'
 	} = {}) => {
 		const video = videoRef.current;
+		const previousSourceToken = nativeSourceTokenRef.current;
 		const hadActiveSource = Boolean(
 			nativeSourceTokenRef.current ||
 			hlsRef.current ||
@@ -101,6 +119,7 @@ export const usePlayerSourcePipeline = ({
 			nativeHlsFallbackCleanupRef.current
 		);
 		clearNativeHlsFallback();
+		hlsMeasurementsRef.current?.tracker.clear(previousSourceToken);
 		activeDescriptorRef.current = null;
 		nativeSourceTokenRef.current = null;
 		if (clearRuntimeContext) {
@@ -205,6 +224,7 @@ export const usePlayerSourcePipeline = ({
 		const hls = new Hls(createHlsPlayerConfig(hlsConfig));
 		hlsRef.current = hls;
 		const sourceToken = createSourceToken(descriptor, 'hls.js');
+		hlsMeasurementsRef.current?.tracker.begin(sourceToken);
 		callbackRefs.current.onPlaybackSourceAttached?.(sourceToken, {engineReady: false});
 		descriptor.onEngineSelected?.('hls.js');
 		appendPlaybackDiagnostic?.({
@@ -221,6 +241,7 @@ export const usePlayerSourcePipeline = ({
 
 		hls.on(Hls.Events.MEDIA_ATTACHED, () => {
 			if (!isSourceTokenCurrent(sourceToken, hls)) return;
+			hlsMeasurementsRef.current?.tracker.mediaAttached(sourceToken);
 			appendPlaybackDiagnostic?.({
 				scope: 'hls-engine',
 				stage: 'media-attached',
@@ -233,6 +254,7 @@ export const usePlayerSourcePipeline = ({
 
 		hls.on(Hls.Events.MANIFEST_PARSED, () => {
 			if (!isSourceTokenCurrent(sourceToken, hls)) return;
+			hlsMeasurementsRef.current?.tracker.manifestParsed(sourceToken);
 			manifestAt = Date.now();
 			appendPlaybackDiagnostic?.({
 				scope: 'hls-engine',
@@ -243,7 +265,14 @@ export const usePlayerSourcePipeline = ({
 			});
 		});
 
-		hls.on(Hls.Events.FRAG_BUFFERED, () => {
+		hls.on(Hls.Events.FRAG_BUFFERED, (event, data) => {
+			if (isSourceTokenCurrent(sourceToken, hls)) {
+				hlsMeasurementsRef.current?.tracker.fragmentBuffered(
+					sourceToken,
+					data?.frag,
+					video
+				);
+			}
 			if (engineReady || !isSourceTokenCurrent(sourceToken, hls)) return;
 			engineReady = true;
 			clearHlsBootstrapDeadline();
@@ -260,6 +289,10 @@ export const usePlayerSourcePipeline = ({
 
 		hls.on(Hls.Events.ERROR, (event, data) => {
 			if (!isSourceTokenCurrent(sourceToken, hls)) return;
+			hlsMeasurementsRef.current?.tracker.recovery(
+				sourceToken,
+				data?.details || data?.type || 'hls-error'
+			);
 			Promise.resolve(callbackRefs.current.onHlsRuntimeError?.({
 				hls,
 				event,
@@ -275,6 +308,7 @@ export const usePlayerSourcePipeline = ({
 		hlsBootstrapTimerRef.current = setTimeout(() => {
 			hlsBootstrapTimerRef.current = null;
 			if (engineReady || !isSourceTokenCurrent(sourceToken, hls)) return;
+			hlsMeasurementsRef.current?.tracker.recovery(sourceToken, 'hls-bootstrap-timeout');
 			appendPlaybackDiagnostic?.({
 				scope: 'hls-engine',
 				stage: 'bootstrap-timeout',
@@ -500,6 +534,13 @@ export const usePlayerSourcePipeline = ({
 		detachSource,
 		isSourceTokenCurrent,
 		clearHlsBootstrapDeadline,
-		getActiveSource: () => nativeSourceTokenRef.current
+		getActiveSource: () => nativeSourceTokenRef.current,
+		getActiveDescriptor: () => activeDescriptorRef.current,
+		recordPlaybackSignal: (sourceToken, signal) => (
+			hlsMeasurementsRef.current?.tracker.playbackSignal(sourceToken, signal) ?? false
+		),
+		recordPlaybackRecovery: (sourceToken, reason) => (
+			hlsMeasurementsRef.current?.tracker.recovery(sourceToken, reason) ?? false
+		)
 	};
 };

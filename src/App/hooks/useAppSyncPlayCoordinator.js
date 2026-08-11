@@ -33,6 +33,8 @@ export const useAppSyncPlayCoordinator = ({
 	const coordinatorActiveRef = useRef(false);
 	const reconnectGenerationRef = useRef(0);
 	const waitParticipationRef = useRef({groupId: '', ignoreWait: null});
+	const pendingPlaybackOptionsRef = useRef(null);
+	const pendingPlaybackSessionKeyRef = useRef(getServiceSessionKey());
 	const queue = useMemo(() => getSyncPlayQueueSnapshot(group), [group]);
 	const groupRef = useRef(group);
 	const queueRef = useRef(queue);
@@ -62,6 +64,10 @@ export const useAppSyncPlayCoordinator = ({
 
 	useEffect(() => {
 		const queueWaiters = queueWaitersRef.current;
+		if (pendingPlaybackSessionKeyRef.current !== serviceSessionKey) {
+			pendingPlaybackSessionKeyRef.current = serviceSessionKey;
+			pendingPlaybackOptionsRef.current = null;
+		}
 		if (!authenticated) {
 			coordinatorActiveRef.current = false;
 			reconnectGenerationRef.current += 1;
@@ -72,6 +78,7 @@ export const useAppSyncPlayCoordinator = ({
 			commitGroup(null);
 			commitFollowMode('suspended');
 			setNotification(null);
+			pendingPlaybackOptionsRef.current = null;
 			return undefined;
 		}
 		coordinatorActiveRef.current = true;
@@ -85,6 +92,7 @@ export const useAppSyncPlayCoordinator = ({
 				lastNotificationRevisionRef.current = '';
 				lastCommandNotificationRevisionRef.current = '';
 				lastNavigationRevisionRef.current = '';
+				pendingPlaybackOptionsRef.current = null;
 			} else if (explicitJoinRef.current) {
 				explicitJoinRef.current = false;
 				commitFollowMode('following');
@@ -211,13 +219,19 @@ export const useAppSyncPlayCoordinator = ({
 				});
 				return;
 			}
+			const pendingPlayback = pendingPlaybackOptionsRef.current;
+			const localPlaybackOptions = pendingPlayback?.itemId === item.Id
+				? pendingPlayback.options
+				: null;
+			if (localPlaybackOptions) pendingPlaybackOptionsRef.current = null;
 			onOpenRemoteItem(item, {
 				groupId: group.GroupId,
 				playlistItemId: queue.activePlaylistItemId,
 				queueRevision: queue.revision,
 				playbackRevision: queue.playbackRevision,
 				startPositionTicks: queue.startPositionTicks,
-				isPlaying: queue.isPlaying
+				isPlaying: queue.isPlaying,
+				localPlaybackOptions
 			});
 		}).catch(() => {
 			if (generation === navigationGenerationRef.current) {
@@ -298,6 +312,7 @@ export const useAppSyncPlayCoordinator = ({
 		commitFollowMode('suspended');
 		setNotification(null);
 		setPlayDecision(null);
+		pendingPlaybackOptionsRef.current = null;
 	}, [commitFollowMode, commitGroup]);
 	const resumeSession = useCallback(async () => {
 		if (!groupRef.current?.GroupId) return;
@@ -353,7 +368,7 @@ export const useAppSyncPlayCoordinator = ({
 		});
 		await waitForQueueItem(itemId);
 	}, [commitFollowMode, waitForQueueItem]);
-	const requestPlay = useCallback(async (item) => {
+	const requestPlay = useCallback(async (item, options = null) => {
 		const decision = resolveSyncPlayPlayRequest({
 			groupId: group?.GroupId,
 			activeItemId: queue.activeItemId,
@@ -361,9 +376,11 @@ export const useAppSyncPlayCoordinator = ({
 		});
 		if (decision === 'local') return false;
 		if (decision === 'replace') {
+			pendingPlaybackOptionsRef.current = {itemId: item.Id, options};
 			try {
 				await replaceQueue(item.Id);
 			} catch (error) {
+				pendingPlaybackOptionsRef.current = null;
 				setNotification({
 					type: 'warning',
 					message: error?.message || 'SyncPlay could not replace the group queue.',
@@ -371,21 +388,28 @@ export const useAppSyncPlayCoordinator = ({
 				});
 			}
 		}
-		else if (decision === 'resume') await resumeSession();
-		else setPlayDecision({item, currentItemId: queue.activeItemId});
+		else if (decision === 'resume') {
+			pendingPlaybackOptionsRef.current = {itemId: item.Id, options};
+			await resumeSession();
+		}
+		else setPlayDecision({item, options, currentItemId: queue.activeItemId});
 		return true;
 	}, [group?.GroupId, queue.activeItemId, replaceQueue, resumeSession]);
 	const confirmReplacePlayback = useCallback(async () => {
 		const item = playDecision?.item;
+		const options = playDecision?.options || null;
 		setPlayDecision(null);
 		if (!item) return;
 		try {
+			pendingPlaybackOptionsRef.current = {itemId: item.Id, options};
 			await replaceQueue(item.Id);
 		} catch (error) {
+			pendingPlaybackOptionsRef.current = null;
 			setNotification({type: 'warning', message: error.message, revision: `error:${Date.now()}`});
 		}
-	}, [playDecision?.item, replaceQueue]);
+	}, [playDecision?.item, playDecision?.options, replaceQueue]);
 	const joinCurrentPlayback = useCallback(async () => {
+		pendingPlaybackOptionsRef.current = null;
 		setPlayDecision(null);
 		await resumeSession();
 	}, [resumeSession]);

@@ -26,6 +26,7 @@ export const usePlayerPlaybackDecision = ({
 	exitInProgressRef,
 	loadRequestIdRef,
 	playbackGenerationRef,
+	playbackGenerationAllocator,
 	onBack
 }) => {
 	const [playbackDecisionPrompt, setPlaybackDecisionPrompt] = useState(null);
@@ -76,13 +77,13 @@ export const usePlayerPlaybackDecision = ({
 		setLoading(true);
 		setLoadingStatusMessage(loadingMessage);
 		loadRequestIdRef.current += 1;
-		playbackGenerationRef.current += 1;
+		playbackGenerationAllocator.invalidate('playback-decision-restart');
 		try {
 			await handleStop();
 		} catch (fallbackError) {
 			console.warn('Failed while preparing playback decision restart:', fallbackError);
 		}
-		loadVideoRef.current?.();
+		return await loadVideoRef.current?.();
 	}, [
 		currentAudioTrack,
 		currentSubtitleTrack,
@@ -92,7 +93,7 @@ export const usePlayerPlaybackDecision = ({
 		loadRequestIdRef,
 		mediaSourceId,
 		playbackOptions,
-		playbackGenerationRef,
+		playbackGenerationAllocator,
 		playbackOverrideRef,
 		setLoading,
 		setLoadingStatusMessage,
@@ -273,13 +274,29 @@ export const usePlayerPlaybackDecision = ({
 			return;
 		}
 		const {subtitleStreamIndex, reason, type} = playbackDecisionPrompt;
+		const pendingAudioStreamIndex = Number.isInteger(playbackDecisionPrompt.audioStreamIndex)
+			? playbackDecisionPrompt.audioStreamIndex
+			: currentAudioTrack;
+		const restartForDecision = async (options = {}) => {
+			const result = await restartWithPlaybackOverride({
+				audioStreamIndex: pendingAudioStreamIndex,
+				...options
+			});
+			if (
+				playbackDecisionPrompt.pendingAudioSelection === true &&
+				result?.status === 'attached' &&
+				Number.isInteger(pendingAudioStreamIndex)
+			) {
+				setCurrentAudioTrack(pendingAudioStreamIndex);
+				saveAudioSelection?.(pendingAudioStreamIndex, audioTracks);
+			}
+			return result;
+		};
 		commitPlaybackDecisionPrompt(null);
 		if (type === 'unsupported-audio-switch') {
 			const proposedAudioIndex = playbackDecisionPrompt.proposedTrack?.index;
 			if (!Number.isInteger(proposedAudioIndex)) return;
-			setCurrentAudioTrack(proposedAudioIndex);
-			saveAudioSelection?.(proposedAudioIndex, audioTracks);
-			await restartWithPlaybackOverride({
+			const result = await restartForDecision({
 				audioStreamIndex: proposedAudioIndex,
 				decisionMediaSourceId: playbackDecisionPrompt.mediaSourceId || mediaSourceId,
 				seekSeconds: Number.isFinite(Number(playbackDecisionPrompt.resumeTicks))
@@ -291,11 +308,15 @@ export const usePlayerPlaybackDecision = ({
 				},
 				loadingMessage: 'Switching audio track...'
 			});
+			if (result?.status === 'attached') {
+				setCurrentAudioTrack(proposedAudioIndex);
+				saveAudioSelection?.(proposedAudioIndex, audioTracks);
+			}
 			return;
 		}
 		if (type === 'dynamic-range-fallback') {
 			const target = playbackDecisionPrompt.proposedRange === 'sdr' ? 'sdr' : 'hdr10';
-			await restartWithPlaybackOverride({
+			await restartForDecision({
 				decisionMediaSourceId: playbackDecisionPrompt.mediaSourceId || mediaSourceId,
 				seekSeconds: Number.isFinite(Number(playbackDecisionPrompt.resumeTicks))
 					? Math.max(0, Number(playbackDecisionPrompt.resumeTicks) / 10000000)
@@ -319,7 +340,7 @@ export const usePlayerPlaybackDecision = ({
 		}
 		if (type === 'dolby-vision-original-quality') {
 			const proposedBitrate = Number(playbackDecisionPrompt.proposedBitrateMbps) || 120;
-			await restartWithPlaybackOverride({
+			await restartForDecision({
 				decisionMediaSourceId: playbackDecisionPrompt.mediaSourceId || mediaSourceId,
 				seekSeconds: Number.isFinite(Number(playbackDecisionPrompt.resumeTicks))
 					? Math.max(0, Number(playbackDecisionPrompt.resumeTicks) / 10000000)
@@ -338,7 +359,7 @@ export const usePlayerPlaybackDecision = ({
 		}
 		if (type === 'no-subtitles') {
 			setCurrentSubtitleTrack(-1);
-			await restartWithPlaybackOverride({
+			await restartForDecision({
 				subtitleStreamIndex: -1,
 				extra: {
 					forceSubtitleBurnIn: false,
@@ -353,7 +374,7 @@ export const usePlayerPlaybackDecision = ({
 			});
 			return;
 		}
-		await restartWithPlaybackOverride({
+		await restartForDecision({
 			subtitleStreamIndex,
 			extra: {
 				forceSubtitleBurnIn: true,
@@ -370,6 +391,7 @@ export const usePlayerPlaybackDecision = ({
 	}, [
 		audioTracks,
 		commitPlaybackDecisionPrompt,
+		currentAudioTrack,
 		itemId,
 		mediaSourceId,
 		playbackDecisionPrompt,

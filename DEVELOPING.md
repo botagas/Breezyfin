@@ -33,7 +33,11 @@ After stable `npm run pack-p`, `ares-package dist` is the final webOS CLI smoke 
 For develop/non-stable packaging validation, run `REACT_APP_ENABLE_PERSISTENT_LOGS=1 REACT_APP_RELEASE_CHANNEL=develop npm run pack-p`, then immediately run `ares-package dist` against that flagged `dist/`.
 `REACT_APP_ENABLE_PERSISTENT_LOGS=1` provides logging capability only. `enableDiagnostics` remains the runtime authority and defaults off. `REACT_APP_DISABLE_PERSISTENT_LOGS=1` is an absolute build-time disable, including critical crash persistence.
 
-Home currently defaults to the cinematic content prototype. Build with `REACT_APP_HOME_DESIGN_VARIANT=current` to restore the previous Hero/row presentation for A/B performance and navigation testing without maintaining a duplicate panel implementation. Header geometry is theme-owned and is not selected by this flag.
+The cinematic Home design is the default. Set
+`REACT_APP_HOME_DESIGN_VARIANT=current` only to load the legacy Hero and row design for
+A/B performance and navigation tests. Despite its name, `current` identifies the legacy
+comparison path. The flag does not select header geometry; the active theme owns that
+geometry.
 
 Quick quality audit command:
 
@@ -112,6 +116,7 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Player playback negotiation and resolved-source descriptors: `src/views/player-panel/hooks/usePlayerVideoLoader.js`
 - Player native/native-HLS/HLS.js source ownership: `src/views/player-panel/hooks/usePlayerSourcePipeline.js`
 - Player engine/client-subtitle/SyncPlay readiness gate: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
+- Player native runtime audio replacement coordinator: `src/views/player-panel/hooks/usePlayerAudioTransition.js`
 - Player generation-aware serialized reporting: `src/views/player-panel/hooks/usePlayerPlaybackReporter.js`
 - Player playback option/session-context derivation: `src/views/player-panel/hooks/usePlayerPlaybackContext.js`
 - Player skip/prompt state machine: `src/views/player-panel/hooks/usePlayerSkipOverlayState.js`
@@ -147,29 +152,81 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   assignment and client-subtitle readiness; `canplay` is diagnostic evidence, not a gate.
 - Source ownership belongs to `usePlayerSourcePipeline`. `usePlayerVideoLoader` negotiates
   and supplies an immutable descriptor but must not assign `video.src`, call
-  `video.load()`, construct HLS.js, or detach media. HLS.js resets native media before
+  `video.load()`, or construct HLS.js directly. During an admitted commit, the loader may
+  request detach/attach operations through the source pipeline; only that pipeline mutates
+  the media element or HLS.js lifecycle. HLS.js resets native media before
   attachment, receives no native lifecycle reset while it owns the attached MediaSource,
   calls `loadSource` from `MEDIA_ATTACHED`, and becomes engine-ready only after the first
   current-generation `FRAG_BUFFERED`. Recovery hooks choose bounded policy actions
   through the pipeline instead of owning source adapters.
+- Playback negotiation now has an explicit prepare/commit boundary. Jellyfin networking
+  remains in `src/services/jellyfin/playbackApi.js`; `preparePlaybackNegotiation` decorates
+  the unchanged PlaybackInfo response, `buildPlaybackPlan` converts it into a pure frozen
+  plan, and `usePlayerVideoLoader` validates the admitted request/item/override before
+  delegating commit to `playerPlaybackPlanCommit.js`. Preparing a plan must not mutate
+  the active video; commit publishes negotiated state and attaches exactly one source,
+  while a required decision attaches no source.
+- Video-surface availability is an awaitable admission barrier before commit. The admitted
+  request retains its exact prepared plan and transition options while waiting; replacement,
+  Back, unmount, timeout, or exit settles that same caller without allocating a playback
+  generation or detaching the current source.
+- Playback identity has three intentionally separate domains. `loadRequestId` cancels
+  request and mount work, `playbackGeneration` identifies a logical playback attempt, and
+  `sourceGeneration` identifies a physical adapter attachment. Only
+  `createPlaybackGenerationAllocator` may advance the playback generation; callers
+  invalidate or allocate through that boundary instead of mutating its ref.
+- Recovery attempts are admitted through a recovery transaction before intentional
+  teardown. The transaction captures item, playback-generation, and load-request ownership;
+  after teardown it must still be current before publishing an override or starting a load.
+  Recovery budgets are then claimed atomically through `createPlaybackRecoveryLedger`
+  before replacement side effects. HLS, subtitle, dynamic-range, reload, and terminal state reset per
+  generation. Session rebuild, transcode fallback, and native-audio fallback carry across
+  replacement generations for the same item and reset only for a new item or explicit
+  Retry.
 - Player startup authority belongs to `usePlayerStartupCoordinator`. Source and loader
   hooks must not add competing playback-start timers. Engine bootstrap, client-subtitle
   preparation, and post-`play()` progress have independent deadlines. The subtitle
   deadline is keyed to the source/track and must not restart when engine readiness or
-  renderer diagnostics rerender. Playback completion and Jellyfin `PlaybackStart`
+  renderer diagnostics rerender. Playback startup completion and Jellyfin `PlaybackStart`
   reporting are committed once from the active generation after its engine is ready,
   its `play()` request has been issued, and that request resolves or produces `playing`
   or genuine timeline advancement.
+- The startup coordinator's reducer is authority only for visible lifecycle phase and
+  legal generation/source transitions. Media objects, source tokens, timers, current
+  time, and final event-validity checks remain in refs. `sourceVersion` remains an effect
+  trigger and is not lifecycle authority.
+- Runtime native audio selection belongs to `usePlayerAudioTransition`. Preparation may
+  request PlaybackInfo while the paused old source/frame remains attached, but only
+  `usePlayerVideoLoader` may commit the prepared result through `usePlayerSourcePipeline`.
+  A committed replacement must restore metadata position before startup, preserve the
+  previous play state, and roll back in a new paused generation on failure. Fixed delays,
+  `loadeddata`, and `canplay` do not prove audible-track readiness. HLS.js may switch in
+  place only after the matching current-instance `AUDIO_TRACK_SWITCHED` event.
+  Forced paused-progress reporting is a real barrier before negotiation. Once a replacement
+  is ready, close the superseded Jellyfin PlaySession without affecting active reporting;
+  on rollback close the failed replacement first, and on cancellation close whichever
+  non-active prepared/superseded session normal Player teardown will not own.
+- Initial explicit DirectPlay audio selection is a separate pre-start exception: the
+  startup coordinator may inspect `AudioTrackList` through metadata/addtrack/change and
+  apply it before playback. Its bounded discovery deadline triggers a communicated
+  server remux/transcode; it must never be treated as audible readiness.
+- The SyncPlay startup bridge also exposes the current server-clock playback target for
+  local source replacement. A transition reports Ready after restoration and waits for
+  authoritative Unpause rather than starting playback locally.
 - Playback runtime isolation: create the immutable context in
   `src/views/player-panel/utils/playbackRuntimeContext.js` before source attachment.
   Every adapter replacement creates a new immutable source token. Native media events
   must match that token, video element, and attachment time; HLS.js media errors stay
-  on its generation-bound `Hls.Events.ERROR` path. HLS callbacks, timers, renderer-ready state,
-  and asynchronous recovery continuations must match the active token, runtime context,
-  and playback generation before taking action.
+  on its generation-bound `Hls.Events.ERROR` path. HLS callbacks, timers, and renderer-ready
+  state must match the active token, runtime context, and playback generation. A recovery
+  continuation that intentionally invalidated its source token must instead retain its
+  recovery transaction across teardown and revalidate item/generation/request ownership
+  before changing playback.
 - Playback reporting is serialized by `usePlayerPlaybackReporter`; direct reporting calls
   from controls, seek handlers, or timers would bypass pause-state coalescing and are not
-  allowed.
+  allowed. Forced callers await the queued snapshot they contributed. Explicit immutable
+  session-stop reporting is reserved for handoff cleanup and must not stop the active
+  replacement's progress interval.
 - Playback safety decisions must be returned from PlaybackInfo negotiation and handled
   before source URL resolution or attachment. Dolby Vision video transcoding is blocked
   unless it is validated video-copy/audio-only work. A bitrate-only DV encode may first
@@ -180,13 +237,74 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   describe accepted source capabilities.
   Playback decisions are serialized per generation so subtitle, audio, and range prompts
   cannot replace one another while teardown or Popup presentation is pending.
-- Smart/manual subtitle burn-in policy: `src/utils/playbackSelection.js` (`getSubtitleTranscodePolicy`)
-- Player client-side subtitle renderer/cue cache: `src/views/player-panel/hooks/usePlayerSubtitleRenderer.js`
-- ASS/SSA renderer lifecycle: `src/views/player-panel/utils/subtitle-renderers/`; Breezyfin lightweight parsing is centered in `src/views/player-panel/utils/subtitleRendererAss.js` with focused helpers for alignment, colors, font size, origin/position, karaoke, clipping, common vector drawing paths, `@font` vertical-writing intent, and `\t(...)` transform interpolation, including B-spline `s`/`p` conversion to SVG cubic paths and `\pbo` drawing baseline offsets. Lightweight ASS/SSA must prefer the raw subtitle document over Jellyfin `Stream.js` events because event payloads may omit script-level PlayRes and style metadata; `Stream.js` remains a degraded fallback when raw delivery fails. The lightweight overlay must map ASS coordinates and source dimensions onto the visible `object-fit: contain` video stage rather than the full TV viewport. `PlayResX/Y` remains the authored coordinate plane; valid `LayoutResX/Y` contributes source-layout/pixel-aspect scaling and must not replace PlayRes positioning. Preserve explicit positions, moves, origins, rotations, drawings, clips, and intentionally off-screen positions without applying style margins or safe-area correction. Only ordinary unpositioned cues use the bounded measured containment pass. The stage itself clips all output to the visible video surface. Breezyfin lightweight remains Auto, while libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in are explicit experimental/manual renderer options available in every release channel for troubleshooting. The manual-canvas libass and JASSUB modes are diagnostic paths for separating video-attached timing issues from native-video canvas compositor issues. JASSUB's packaged default font, sourcemap source, version-guarded webOS Canvas2D worker patch, and version-guarded static-asset entry patch are prepared by `scripts/prepare-subtitle-package-assets.cjs` and `scripts/subtitle-assets/jassubCanvas2dPatch.cjs`; the Canvas2D patch is required because JASSUB's WebGL path is unreliable on webOS, and the static-asset entry patch prevents Webpack from bundling JASSUB worker/WASM fallback chunks. libass workers, Breezyfin's fallback subtitle font, JASSUB static worker/WASM/font assets, libbitsub/libpgs bitmap subtitle assets, and external renderer chunks are copied into `dist/` by `scripts/copy-subtitle-assets.cjs` after `npm run pack` / `npm run pack-p`. Stable and develop builds preserve external renderer chunks, transpile ASS.js/JASSUB/libbitsub/libpgs renderer chunks for webOS packaging, validate copied JASSUB static assets, and fail if generated `chunk.jassub-worker.*` or `chunk.em-pthread.*` runtime chunks reappear.
-- Playback diagnostics: record optional probe/fallback outcomes via `src/utils/playbackDiagnostics.js` and expose them through PlayerPanel debug state instead of adding noisy user-facing toasts. Playback recovery metadata remains operational, but request snapshots, source summaries, decision trails, runtime diagnostic React state, and full external-renderer sampling must only run when `enableDiagnostics` is true. Tests that assert optional snapshots must opt in explicitly.
-- Runtime diagnostics/logging: `src/utils/appLogger.js` patches console only while Diagnostics is enabled, batches ordinary records, and writes critical AppCrashBoundary records immediately through a separate bounded path. AppCrashBoundary is the only owner of global error and unhandled-rejection listeners.
-- Sensitive-data handling: `src/utils/sensitiveData.js` is the single redaction boundary for URLs, request metadata, errors, objects, and console arguments. Never log raw media URLs or authorization/token headers; pass bounded summaries through this helper instead.
-- Runtime diagnostics ownership: `src/hooks/useRuntimeDiagnostics.js` publishes the master collection state and clears shared media metric state when disabled. Collect optional metrics only after checking this context; do not merely hide their UI.
+- Smart and manual subtitle burn-in policy:
+  `src/utils/playbackSelection.js` (`getSubtitleTranscodePolicy`).
+- Player client-side subtitle renderer and cue cache:
+  `src/views/player-panel/hooks/usePlayerSubtitleRenderer.js`.
+
+### Subtitle delivery
+
+- Breezyfin Lightweight must prefer the raw ASS/SSA document. Jellyfin `Stream.js`
+  events can omit script-level PlayRes and style metadata.
+- If raw ASS/SSA delivery fails, `Stream.js` provides a degraded fallback.
+- SRT and VTT retain event-first delivery.
+
+### Lightweight ASS geometry
+
+- `src/views/player-panel/utils/subtitleRendererAss.js` coordinates focused helpers for
+  alignment, color, font size, origin, position, karaoke, clipping, drawings, and
+  `\t(...)` transforms.
+- Map ASS coordinates and source dimensions to the visible `object-fit: contain` video
+  stage. Do not map them to the full TV viewport.
+- `PlayResX/Y` is the authored coordinate plane. Valid `LayoutResX/Y` contributes
+  source-layout and pixel-aspect scaling, but it must not replace PlayRes positioning.
+- Preserve authored positions, moves, origins, rotations, drawings, clips, and intentional
+  off-screen placement. Do not apply style margins or safe-area correction to those cues.
+- Apply the bounded measured containment pass only to ordinary unpositioned cues.
+- Clip all subtitle output to the visible video stage.
+
+### Renderer options and diagnostics
+
+- Auto selects Breezyfin Lightweight.
+- libass, libass Manual Canvas, JASSUB, JASSUB Manual Canvas, ASS.js, and Burn-in remain
+  explicit experimental or diagnostic options in every release channel.
+- The manual-canvas libass and JASSUB modes distinguish video-attached timing problems
+  from native-video canvas compositor problems.
+
+### Subtitle renderer packaging
+
+- `scripts/prepare-subtitle-package-assets.cjs` prepares JASSUB's default font and
+  package sources.
+- `scripts/subtitle-assets/jassubCanvas2dPatch.cjs` applies version-guarded patches. The
+  patches force Canvas2D on webOS and prevent Webpack from bundling JASSUB worker/WASM
+  fallback chunks.
+- `scripts/copy-subtitle-assets.cjs` copies libass workers, the Breezyfin fallback font,
+  JASSUB worker/WASM/font assets, libbitsub/libpgs assets, and external renderer chunks to
+  `dist/` after `npm run pack` or `npm run pack-p`.
+- Stable and develop builds must preserve and transpile the external renderer assets for
+  webOS. Packaging must fail if `chunk.jassub-worker.*` or `chunk.em-pthread.*` runtime
+  chunks reappear.
+- Playback diagnostics: record optional probe and fallback outcomes through
+  `src/utils/playbackDiagnostics.js`. Expose these outcomes through PlayerPanel debug state
+  instead of user-facing toasts.
+- Playback recovery metadata remains operational when Diagnostics is off. Request snapshots,
+  source summaries, decision trails, runtime diagnostic React state, and full
+  external-renderer sampling must run only when `enableDiagnostics` is true. Tests that
+  assert optional snapshots must enable Diagnostics explicitly.
+- HLS startup characterization is source-token and diagnostics gated. It records bounded
+  first-fragment/buffer/start evidence and early recovery only while Diagnostics is on;
+  disabling Diagnostics must allocate no measurement timers or trails. One current-source
+  `FRAG_BUFFERED` remains the readiness rule until TV evidence justifies changing it.
+- Runtime diagnostics and logging: `src/utils/appLogger.js` patches the console only while
+  Diagnostics is enabled. It batches ordinary records. It writes critical
+  AppCrashBoundary records immediately through a separate bounded path. AppCrashBoundary
+  is the only owner of global error and unhandled-rejection listeners.
+- Sensitive-data handling: `src/utils/sensitiveData.js` is the single redaction boundary for
+  URLs, request metadata, errors, objects, and console arguments. Never log raw media URLs
+  or authorization and token headers. Pass bounded summaries through this helper.
+- Runtime diagnostics ownership: `src/hooks/useRuntimeDiagnostics.js` publishes the master
+  collection state and clears shared media metrics when Diagnostics is disabled. Check this
+  context before collecting optional metrics. Hiding the diagnostics UI is not sufficient.
 - Rendered integration tests: `src/testUtils/renderWithBreezyfin.js` installs the Sandstone theme and Spotlight root. Use it for Popup lifecycle, Toolbar focus, Player prompt Back, and virtual-grid restoration contracts after pure helper coverage is in place.
 - Player recovery policy: pure subtitle/burn-in recovery classification lives in `src/views/player-panel/utils/playerRecoveryPolicy.js`; `usePlayerRecoveryHandlers` owns side effects and must not duplicate policy derivation.
 - Initial failures on a confirmed Transcode path are reported as probable server-transcoder
@@ -194,8 +312,14 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   fragment `5xx` or native media code 4. The user-facing message must not assert an exact
   FFmpeg cause; exit-code 159/systemd guidance belongs in diagnostics because Jellyfin
   does not normally expose the FFmpeg exit reason through the media response.
-- Runtime suspension: App and paused-Player screensavers publish suspension reasons through `src/hooks/useRuntimeSuspension.js`. Covered animation, clock, optional diagnostic, progress, stall, and manual subtitle-sync work must subscribe to that shared signal rather than adding screen-specific global flags.
-- Inactivity handling: App and paused-Player screensavers share deadline scheduling through `src/hooks/useInactivityDeadline.js`; activity extends one deadline instead of rebuilding a timer per input event. Prefer pointer events, use mouse fallback only when Pointer Events are unavailable, and keep idle listeners passive.
+- Runtime suspension: App and paused-Player screensavers publish suspension reasons through
+  `src/hooks/useRuntimeSuspension.js`. Covered animation, clock, optional diagnostic,
+  progress, stall, and manual subtitle-sync work must subscribe to that shared signal. Do
+  not add screen-specific global flags.
+- Inactivity handling: App and paused-Player screensavers share deadline scheduling through
+  `src/hooks/useInactivityDeadline.js`. Activity extends one deadline instead of rebuilding
+  a timer for each input event. Prefer pointer events. Use mouse events only when Pointer
+  Events are unavailable. Keep idle listeners passive.
 - Jellyfin subtitle fetch contract: `src/services/jellyfin/subtitleApi.js` returns structured event and raw text results for client-side rendering.
 - Plugin integration preferences: `src/utils/integrationPreferences.js` persists only
   server/user-scoped Home source and Likes-watchlist choices. Capabilities remain
@@ -205,7 +329,17 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   separate protocol state while sharing player timing/drift policy from
   `src/utils/syncTiming.js`.
 - Sandstone Popup lifecycle: keep the Popup and its owning controls mounted through close, commit reload-causing state from `onHide`, and let Sandstone restore Spotlight before replacing result content.
-- Shared Sandstone virtual grids: Search, Favorites, Home View More, and Library use `src/components/MediaVirtualGrid.js`. Do not add panel-specific DOM row calculations, manual pointer/5-way Spotlight disabling, app-owned coordinate navigation, or load-more sentinels. Panels own query/results paging and cache loaded pages plus focused item ID; Enact owns rendered-item virtualization and directional grid navigation. Keep the same grid mounted and Spotlight-disabled with empty items during query/filter reloads so pending Sandstone scroll updates cannot target an unmounted scroller. Keep overhang mode-aware and treat mounted virtual items as the image-loading window rather than layering native lazy loading on top.
+- Shared Sandstone virtual grids: Search, Favorites, Home View More, and Library use
+  `src/components/MediaVirtualGrid.js`.
+  - Panels own queries, result paging, loaded-page caches, and the focused item ID.
+  - Enact owns rendered-item virtualization and directional grid navigation.
+  - Do not add panel-specific DOM row calculations, manual pointer/5-way Spotlight
+    disabling, app-owned coordinate navigation, or load-more sentinels.
+  - Keep the grid mounted and Spotlight-disabled with no items during query or filter
+    reloads. This prevents pending Sandstone scroll updates from targeting an unmounted
+    scroller.
+  - Keep overhang mode-aware. Treat mounted virtual items as the image-loading window. Do
+    not add native lazy loading to these items.
 - Home View More normalizes both array responses and plugin page envelopes through
   `src/views/home-section-panel/utils/homeSectionPaging.js`. Filtered scans must carry
   the server-provided cursor and `hasMore` state forward; when a bounded scan window has
@@ -239,7 +373,11 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Settings boolean toggle/persistence handlers: `src/views/settings-panel/hooks/useSettingsToggleHandlers.js`
 - Settings display/label/panel-back handlers: `src/views/settings-panel/hooks/useSettingsDisplayHandlers.js`
 - Settings pure presentation decisions: `src/views/settings-panel/utils/settingsViewModel.js`
-- Settings rows use the panel-local static variants in `SettingsStaticItems.js`, composed from Sandstone `ItemBase` / `SwitchBase` and standard Enact touch/Spotlight decorators without Sandstone's marquee controller or measurement decorator. Keep stable ellipsis and complete accessible labels/popup values; do not replace these controls with custom HTML focus implementations.
+- Settings rows use the panel-local static variants in `SettingsStaticItems.js`. These
+  variants combine Sandstone `ItemBase` or `SwitchBase` with standard Enact touch and
+  Spotlight decorators. They omit Sandstone's marquee controller and measurement
+  decorator. Keep stable ellipsis and complete accessible labels and popup values. Do not
+  replace these controls with custom HTML focus implementations.
 
 Preferred panel scroll cache wiring:
 - `src/hooks/usePanelScrollState.js`
@@ -264,8 +402,21 @@ Preferred toolbar wiring pattern:
 Preferred panel scroll-state pattern:
 - Use `usePanelScrollState()` for panel `Scroller` restore/save and cached `scrollTop` persistence.
 - For a uniform grid inside `Panels`, use `MediaVirtualGrid` rather than layering `usePanelScrollState()` over Sandstone. Keep app cache only for query, filters, loaded pages, pagination cursors, and stable focused item ID.
-- Home rows load images progressively by row. Do not add one observer or load-state hook per card, and do not perform panel-wide top-chrome/layout scans for every horizontal focus move. Horizontal focus correction uses cached row offsets and immediate, animation-frame-coalesced scrolling; do not reintroduce per-card rectangle measurement or queued smooth scrolling.
-- Server-configured Home publishes enabled descriptor titles before row data, represents each row as `pending`, `loading`, `ready`, `empty`, or `error`, and loads at most two rows concurrently near the active viewport. Resolved-empty rows are removed while the loading window advances to later descriptors. Individual row failures remain local and retryable; only descriptor/capability failure may select built-in Home. Keep distant row artwork deferred and expand descriptor rendering ahead of the viewport rather than mounting every configured row's cards at once. Retain fresh mounted Home content across short panel switches and revalidate it on user-data/integration invalidation or bounded staleness.
+- Home rows load images progressively by row. Do not add an observer or load-state hook for
+  each card. Do not perform panel-wide top-chrome or layout scans for each horizontal focus
+  move. Horizontal correction uses cached row offsets and immediate scrolling that is
+  coalesced by animation frame. Do not restore per-card rectangle measurement or queued
+  smooth scrolling.
+- Server-configured Home publishes enabled descriptor titles before row data. Each row has
+  one of these states: `pending`, `loading`, `ready`, `empty`, or `error`.
+  - Load at most two rows concurrently near the active viewport.
+  - Remove rows that resolve empty, then advance the loading window.
+  - Keep individual row failures local and retryable.
+  - Use built-in Home only after a descriptor or capability failure.
+  - Defer distant row artwork. Expand descriptor rendering ahead of the viewport instead of
+    mounting all configured cards.
+  - Retain fresh mounted Home content across short panel switches. Revalidate it after
+    user-data or integration invalidation, or after the bounded freshness period.
 - Treat `setScrollTop()` as an explicit programmatic restore/reset request. Feed user movement through `handleScroll`/`handleScrollStop`; committing observed movement must not start another restore cycle.
 - Consider a Sandstone restore complete only after the actual scroller offset reaches the target or bounded retries determine the reachable clamped offset.
 - Only use `useScrollerScrollMemory()` directly when panel behavior is non-standard.

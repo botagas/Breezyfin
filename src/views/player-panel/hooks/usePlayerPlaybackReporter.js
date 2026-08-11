@@ -8,6 +8,12 @@ const getPositionTicks = (video) => Math.floor(
 	Math.max(0, Number(video?.currentTime) || 0) * JELLYFIN_TICKS_PER_SECOND
 );
 
+const MAX_STOPPED_SESSION_KEYS = 32;
+
+const getPlaySessionId = (snapshot) => (
+	snapshot?.playSessionId || snapshot?.session?.playSessionId || snapshot?.session?.PlaySessionId || null
+);
+
 export const usePlayerPlaybackReporter = ({
 	item,
 	videoRef,
@@ -19,7 +25,9 @@ export const usePlayerPlaybackReporter = ({
 	const reportChainRef = useRef(Promise.resolve());
 	const progressPendingRef = useRef(false);
 	const queuedProgressRef = useRef(null);
+	const progressEpochRef = useRef(0);
 	const startedKeyRef = useRef('');
+	const stoppedSessionKeysRef = useRef(new Set());
 
 	const isSnapshotCurrent = useCallback((snapshot) => (
 		snapshot?.itemId === item?.Id &&
@@ -65,9 +73,14 @@ export const usePlayerPlaybackReporter = ({
 		});
 	}, [createSnapshot, enqueue, isSnapshotCurrent]);
 
+	const settleQueuedProgress = useCallback((queued, result) => {
+		queued?.waiters?.forEach((resolve) => resolve(result));
+	}, []);
+
 	const flushProgress = useCallback((snapshot) => {
+		const epoch = progressEpochRef.current;
 		progressPendingRef.current = true;
-		return enqueue(async () => {
+		const reportPromise = enqueue(async () => {
 			try {
 				if (!isSnapshotCurrent(snapshot)) return false;
 				await jellyfinService.reportPlaybackProgress(
@@ -78,22 +91,37 @@ export const usePlayerPlaybackReporter = ({
 				);
 				return true;
 			} finally {
-				progressPendingRef.current = false;
-				const queued = queuedProgressRef.current;
-				queuedProgressRef.current = null;
-				if (queued) {
-					flushProgress(queued);
+				if (progressEpochRef.current === epoch) {
+					progressPendingRef.current = false;
+					const queued = queuedProgressRef.current;
+					queuedProgressRef.current = null;
+					if (queued) {
+						flushProgress(queued.snapshot).then((result) => {
+							settleQueuedProgress(queued, result);
+						});
+					}
 				}
 			}
 		});
-	}, [enqueue, isSnapshotCurrent]);
+		return reportPromise;
+	}, [enqueue, isSnapshotCurrent, settleQueuedProgress]);
 
 	const reportPlaybackProgressNow = useCallback((isPaused = false, {force = true} = {}) => {
 		const snapshot = createSnapshot({isPaused});
 		if (!snapshot.itemId) return Promise.resolve(false);
 		if (progressPendingRef.current) {
-			if (force) queuedProgressRef.current = snapshot;
-			return reportChainRef.current;
+			if (!force) return reportChainRef.current;
+			return new Promise((resolve) => {
+				if (queuedProgressRef.current) {
+					queuedProgressRef.current.snapshot = snapshot;
+					queuedProgressRef.current.waiters.push(resolve);
+					return;
+				}
+				queuedProgressRef.current = {
+					snapshot,
+					waiters: [resolve]
+				};
+			});
 		}
 		return flushProgress(snapshot);
 	}, [createSnapshot, flushProgress]);
@@ -114,10 +142,22 @@ export const usePlayerPlaybackReporter = ({
 		}, 10000);
 	}, [progressIntervalRef, reportPlaybackProgressNow, stopProgressReporting, videoRef]);
 
-	const reportPlaybackStopped = useCallback((overrides = {}) => {
-		const snapshot = createSnapshot(overrides);
-		stopProgressReporting();
-		if (!snapshot.itemId) return Promise.resolve(false);
+	const enqueuePlaybackStopped = useCallback((snapshot, {requirePlaySessionId = false} = {}) => {
+		const playSessionId = getPlaySessionId(snapshot);
+		if (!snapshot?.itemId || (requirePlaySessionId && !playSessionId)) {
+			return Promise.resolve(false);
+		}
+		const stopKey = playSessionId ? `${snapshot.itemId}:${playSessionId}` : '';
+		if (stopKey && stoppedSessionKeysRef.current.has(stopKey)) {
+			return Promise.resolve(false);
+		}
+		if (stopKey) {
+			stoppedSessionKeysRef.current.add(stopKey);
+			while (stoppedSessionKeysRef.current.size > MAX_STOPPED_SESSION_KEYS) {
+				const oldestKey = stoppedSessionKeysRef.current.values().next().value;
+				stoppedSessionKeysRef.current.delete(oldestKey);
+			}
+		}
 		return enqueue(async () => {
 			await jellyfinService.reportPlaybackStopped(
 				snapshot.itemId,
@@ -126,19 +166,42 @@ export const usePlayerPlaybackReporter = ({
 			);
 			return true;
 		});
-	}, [createSnapshot, enqueue, stopProgressReporting]);
+	}, [enqueue]);
+
+	const reportPlaybackSessionStopped = useCallback((snapshot = {}) => (
+		enqueuePlaybackStopped({
+			itemId: snapshot.itemId || null,
+			positionTicks: Math.max(0, Number(snapshot.positionTicks) || 0),
+			playSessionId: getPlaySessionId(snapshot),
+			session: {...(snapshot.session || {})}
+		}, {requirePlaySessionId: true})
+	), [enqueuePlaybackStopped]);
+
+	const reportPlaybackStopped = useCallback((overrides = {}) => {
+		const snapshot = createSnapshot(overrides);
+		stopProgressReporting();
+		return enqueuePlaybackStopped(snapshot);
+	}, [createSnapshot, enqueuePlaybackStopped, stopProgressReporting]);
 
 	useEffect(() => {
 		startedKeyRef.current = '';
+		progressEpochRef.current += 1;
+		settleQueuedProgress(queuedProgressRef.current, false);
 		queuedProgressRef.current = null;
 		progressPendingRef.current = false;
-	}, [item?.Id]);
+	}, [item?.Id, settleQueuedProgress]);
 
-	useEffect(() => stopProgressReporting, [stopProgressReporting]);
+	useEffect(() => () => {
+		progressEpochRef.current += 1;
+		settleQueuedProgress(queuedProgressRef.current, false);
+		queuedProgressRef.current = null;
+		stopProgressReporting();
+	}, [settleQueuedProgress, stopProgressReporting]);
 
 	return {
 		reportPlaybackStartedOnce,
 		reportPlaybackProgressNow,
+		reportPlaybackSessionStopped,
 		reportPlaybackStopped,
 		startProgressReporting,
 		stopProgressReporting

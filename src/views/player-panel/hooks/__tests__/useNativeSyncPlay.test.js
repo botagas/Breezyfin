@@ -64,17 +64,17 @@ const renderNativeSyncPlay = ({video, setToastMessage = jest.fn()} = {}) => {
 	const wrapper = ({children}) => (
 		<SyncPlayProvider value={value}>{children}</SyncPlayProvider>
 	);
-	const view = renderHook(() => useNativeSyncPlay({
+	const view = renderHook(({generation}) => useNativeSyncPlay({
 		isActive: true,
 		item: {Id: 'item-1'},
-		playbackGeneration: 1,
+		playbackGeneration: generation,
 		videoRef: {current: video},
 		handleLocalPause: jest.fn(),
 		handleLocalPlay: jest.fn(),
 		handleLocalSeek: jest.fn(),
 		syncPlayStartupBridge,
 		setToastMessage
-	}), {wrapper});
+	}), {initialProps: {generation: 1}, wrapper});
 	view.syncPlayStartupBridge = syncPlayStartupBridge;
 	return view;
 };
@@ -168,6 +168,7 @@ describe('useNativeSyncPlay', () => {
 		});
 
 		expect(positionsAtPlay).toEqual([50]);
+		expect(view.syncPlayStartupBridge.getAuthoritativePosition(0)).toBeCloseTo(50, 1);
 		view.unmount();
 	});
 
@@ -239,6 +240,43 @@ describe('useNativeSyncPlay', () => {
 		act(() => {
 			jest.advanceTimersByTime(0);
 		});
+
+		expect(video.currentTime).toBe(25);
+		expect(video.play).toHaveBeenCalledTimes(1);
+		view.unmount();
+	});
+
+	it('preserves a queued Unpause command across a same-item source generation change', async () => {
+		let resolveClock;
+		jellyfinService.sampleSyncPlayClock.mockReturnValue(new Promise((resolve) => {
+			resolveClock = resolve;
+		}));
+		const video = buildVideo();
+		const view = renderNativeSyncPlay({video});
+
+		websocketListeners.SyncPlayCommand({
+			Data: {
+				Command: 'Unpause',
+				When: 'invalid',
+				PositionTicks: 250000000,
+				PlaylistItemId: 'playlist-1'
+			}
+		});
+		view.rerender({generation: 2});
+
+		await act(async () => {
+			const now = Date.now();
+			resolveClock({
+				requestSentAtMs: now,
+				requestReceivedServerTime: new Date(now + 10).toISOString(),
+				responseSentServerTime: new Date(now + 12).toISOString(),
+				responseReceivedAtMs: now + 22
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+		await reportInitialReady(view);
+		act(() => jest.advanceTimersByTime(0));
 
 		expect(video.currentTime).toBe(25);
 		expect(video.play).toHaveBeenCalledTimes(1);

@@ -32,7 +32,8 @@ const JS_LOW_SIGNAL_LINE_REGEX = /^(?:\.\.\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\s*:\s*
 const JS_LOW_SIGNAL_SCAFFOLD_REGEX = /^(?:const\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*use[A-Za-z0-9_$]+\(\{|}\);|}\) => \{)$/;
 const JS_LOW_SIGNAL_OBJECT_ARG_REGEX = /^(?:if\s*\()?[$A-Za-z_][A-Za-z0-9_$]*\(\{$|^\}\)\)?\s*\{?$/;
 const JS_LOW_SIGNAL_SIMPLE_STATEMENT_REGEX = /^(?:[A-Za-z_$][A-Za-z0-9_$]*\(\);|\})$/;
-const JS_LOW_SIGNAL_ASSIGNMENT_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+ = [A-Za-z_$][A-Za-z0-9_$]*;$/;
+const JS_LOW_SIGNAL_ASSIGNMENT_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+ = [A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*;$/;
+const JS_LOW_SIGNAL_IMMUTABLE_FIXTURE_REGEX = /^(?:[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)* = Object\.freeze\(\{|\.\.\.[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*,)$/;
 const JS_LOW_SIGNAL_HOOK_OBJECT_REGEX = /^(?:const \{|[A-Za-z_$][A-Za-z0-9_$]*:\s*\(\)\s*=>\s*\{|}\);?)$/;
 const JS_LOW_SIGNAL_HOOK_DESTRUCTURE_REGEX = /^(?:const \{[^}]+} = use[A-Za-z0-9_$]+\(\{|\} = use[A-Za-z0-9_$]+\(\{)$/;
 const JS_LOW_SIGNAL_GUARD_REGEX = /^(?:if \(![A-Za-z_$][A-Za-z0-9_$]*\) return false;|return true;)$/;
@@ -41,11 +42,15 @@ const JS_LOW_SIGNAL_JSX_SCAFFOLD_REGEX = /^(?:const [A-Za-z_$][A-Za-z0-9_$]* = \
 const JS_LOW_SIGNAL_IMPORT_EXPORT_REGEX = /^(?:import \{|import .+ from .+;|export \{|} from .+;)$/;
 const JS_LOW_SIGNAL_PUNCTUATION_REGEX = /^[()[\]{};,]+$/;
 
-const isLowSignalSnippet = (extension, snippetKey) => {
+const isTestFilePath = (filePath) => (
+	/(?:^|\/)__tests__\//.test(filePath) || /\.(?:spec|test)\.[^.]+$/.test(filePath)
+);
+
+const isLowSignalSnippet = (extension, snippetKey, locations = []) => {
 	if (extension !== '.js') return false;
 	const lines = snippetKey.split('\n').map((line) => line.trim()).filter(Boolean);
 	if (lines.length === 0) return true;
-	const lowSignalLineCount = lines.filter((line) => (
+	const isGenerallyLowSignalLine = (line) => (
 		JS_LOW_SIGNAL_LINE_REGEX.test(line) ||
 		JS_LOW_SIGNAL_SCAFFOLD_REGEX.test(line) ||
 		JS_LOW_SIGNAL_OBJECT_ARG_REGEX.test(line) ||
@@ -58,9 +63,18 @@ const isLowSignalSnippet = (extension, snippetKey) => {
 		JS_LOW_SIGNAL_JSX_SCAFFOLD_REGEX.test(line) ||
 		JS_LOW_SIGNAL_IMPORT_EXPORT_REGEX.test(line) ||
 		JS_LOW_SIGNAL_PUNCTUATION_REGEX.test(line)
-	)).length;
+	);
+	const lowSignalLineCount = lines.filter(isGenerallyLowSignalLine).length;
 	// Ignore windows that are primarily prop lists / hook-helper object arguments / JSX scaffolding and carry little structural value.
-	return lowSignalLineCount / lines.length >= 0.85;
+	if (lowSignalLineCount / lines.length >= 0.85) return true;
+	const testFixtureOnly = locations.length > 0 && locations.every(
+		(location) => isTestFilePath(location.filePath || '')
+	);
+	if (!testFixtureOnly) return false;
+	const fixtureLineCount = lines.filter((line) => (
+		isGenerallyLowSignalLine(line) || JS_LOW_SIGNAL_IMMUTABLE_FIXTURE_REGEX.test(line)
+	)).length;
+	return fixtureLineCount / lines.length >= 0.85;
 };
 
 const getFiles = () => {
@@ -115,7 +129,11 @@ const buildReport = (store) => {
 		});
 	}
 
-	const filteredReport = report.filter((entry) => !isLowSignalSnippet(entry.extension, entry.snippet));
+	const filteredReport = report.filter((entry) => !isLowSignalSnippet(
+		entry.extension,
+		entry.snippet,
+		entry.locations
+	));
 	filteredReport.sort((a, b) => b.fileCount - a.fileCount || b.rawOccurrenceCount - a.rawOccurrenceCount);
 	return filteredReport.slice(0, MAX_REPORTS);
 };
@@ -148,4 +166,10 @@ const main = () => {
 	}
 };
 
-main();
+if (require.main === module) {
+	main();
+}
+
+module.exports = {
+	isLowSignalSnippet
+};

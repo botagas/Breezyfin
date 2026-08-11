@@ -20,6 +20,7 @@ const rendererNeedsStartupGate = ({currentSubtitleTrack, subtitleRendererPolicy}
 export const getPlayerStartupState = ({
 	sourceAttached = false,
 	engineReady = true,
+	audioSelectionReady = true,
 	currentSubtitleTrack = -1,
 	subtitleRendererPolicy = null,
 	subtitleRendererStatus = 'off',
@@ -27,6 +28,7 @@ export const getPlayerStartupState = ({
 } = {}) => {
 	if (!sourceAttached) return 'waiting-source';
 	if (!engineReady) return 'waiting-engine';
+	if (!audioSelectionReady) return 'waiting-audio';
 	if (!rendererNeedsStartupGate({currentSubtitleTrack, subtitleRendererPolicy})) return 'starting';
 	if (subtitleRendererStatus === 'ready' && subtitleRendererReadyForSource) return 'starting';
 	if (subtitleRendererStatus === 'timed-out') return 'timed-out';

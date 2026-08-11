@@ -60,13 +60,14 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - Use `usePanelToolbarActions` for toolbar + layered back flow.
 - Use `usePanelScrollState` for panel scroll restore/cache.
 - Keep section snap/focus orchestration in panel-local hooks when a panel has multi-section directional navigation behavior.
-- Keep callbacks event-driven (`data-*` payloads) and avoid ad-hoc DOM querying unless focus orchestration requires it.
+- Keep callbacks event-driven with `data-*` payloads. Use direct DOM queries only when
+  focus orchestration requires them.
 - Prefer shared badge primitives from `src/styles/cardStyles.less` for watched/favorite/count overlays across panels.
 - Keep comments minimal and only for non-obvious constraints.
 - Keep provider failure states retryable and separate from authoritative empty results;
   never replace Calendar failures with unfiltered data or infer server visibility mode.
-- In-flight provider and group requests must use a panel/session generation guard so
-  stale completions cannot repopulate inactive panels.
+- In-flight provider and group requests must use a panel or session generation guard.
+  Stale completions must not repopulate inactive panels.
 
 ## Related docs
 
