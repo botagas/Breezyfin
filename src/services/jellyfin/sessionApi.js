@@ -1,6 +1,7 @@
 import serverManager from '../serverManager';
 import {getAppVersion} from '../../utils/appInfo';
 import {getDeviceId} from '../../utils/deviceIdentity';
+import {buildClientAuthHeaders} from '../../utils/auth';
 
 const LEGACY_AUTH_KEY = 'jellyfinAuth';
 
@@ -78,7 +79,7 @@ export const authenticateWithServer = async (service, username, password) => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'X-Emby-Authorization': `MediaBrowser Client="Breezyfin", Device="webOS", DeviceId="${deviceId}", Version="${appVersion}"`
+					...buildClientAuthHeaders(deviceId, appVersion)
 				},
 				body: JSON.stringify({
 					Username: username,

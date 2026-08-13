@@ -224,7 +224,7 @@ describe('playbackApi', () => {
 		const parsed = new URL(url);
 		expect(parsed.origin).toBe('http://media.local');
 		expect(parsed.pathname).toBe('/Videos/item-1/stream');
-		expect(parsed.searchParams.get('api_key')).toBe('token-1');
+		expect(parsed.searchParams.get('ApiKey')).toBe('token-1');
 		expect(parsed.searchParams.get('static')).toBe('true');
 		expect(parsed.searchParams.get('container')).toBe('mp4');
 		expect(parsed.searchParams.get('mediaSourceId')).toBe('source-1');

@@ -1,4 +1,5 @@
 import {applyPreferredImageFormatToParams} from './imageFormat';
+import {AUTH_QUERY_PARAM} from './auth';
 
 export const getFirstImageTag = (value) => (
 	Array.isArray(value) && typeof value[0] === 'string' && value[0]
@@ -11,7 +12,7 @@ export const buildItemImageUrl = ({ baseUrl, itemId, imageType, accessToken, wid
 	const normalizedBase = baseUrl.replace(/\/+$/, '');
 	const params = new URLSearchParams({
 		width: String(width),
-		api_key: accessToken
+		[AUTH_QUERY_PARAM]: accessToken
 	});
 	if (tag) {
 		params.set('tag', tag);
@@ -26,7 +27,7 @@ export const buildUserPrimaryImageUrl = ({ baseUrl, userId, accessToken, width, 
 	const normalizedBase = baseUrl.replace(/\/+$/, '');
 	const params = new URLSearchParams({
 		width: String(width),
-		api_key: accessToken
+		[AUTH_QUERY_PARAM]: accessToken
 	});
 	if (tag) {
 		params.set('tag', tag);

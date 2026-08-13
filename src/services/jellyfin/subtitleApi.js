@@ -1,5 +1,6 @@
 import {toInteger} from '../../utils/numberParsing';
 import {redactSensitiveUrl} from '../../utils/sensitiveData';
+import {AUTH_QUERY_PARAM} from '../../utils/auth';
 
 export const BITMAP_SUBTITLE_DELIVERY_FORMATS = ['sup', 'pgs', 'pgssub'];
 
@@ -125,7 +126,7 @@ export const redactSubtitleUrl = (url) => {
 const appendApiKeyToUrl = (url, accessToken) => {
 	if (!url || !accessToken || hasAuthQueryParam(url)) return url || null;
 	const separator = String(url).includes('?') ? '&' : '?';
-	return `${url}${separator}${new URLSearchParams({api_key: accessToken}).toString()}`;
+	return `${url}${separator}${new URLSearchParams({[AUTH_QUERY_PARAM]: accessToken}).toString()}`;
 };
 
 const joinServerUrl = (serverUrl, path) => {
