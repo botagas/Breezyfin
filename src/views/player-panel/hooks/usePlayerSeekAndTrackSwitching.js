@@ -336,7 +336,7 @@ export const usePlayerSeekAndTrackSwitching = ({
 						switchResult.reason === 'stale-source' ||
 						trackOperationIdRef.current !== operationId
 					) return;
-					if (switchResult.confirmed && trackOperationIdRef.current === operationId) {
+					if (switchResult.confirmed) {
 						setCurrentSubtitleTrack(trackIndex);
 						saveSubtitleSelection(trackIndex, subtitleTracks);
 						return;

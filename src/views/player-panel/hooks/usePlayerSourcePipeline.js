@@ -80,10 +80,13 @@ export const usePlayerSourcePipeline = ({
 	}, []);
 
 	const clearNativeHlsFallback = useCallback(() => {
-		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
-			nativeHlsFallbackCleanupRef.current();
+		const cleanup = nativeHlsFallbackCleanupRef?.current;
+		if (typeof cleanup === 'function') {
+			cleanup();
 		}
-		nativeHlsFallbackCleanupRef.current = null;
+		if (nativeHlsFallbackCleanupRef) {
+			nativeHlsFallbackCleanupRef.current = null;
+		}
 	}, [nativeHlsFallbackCleanupRef]);
 
 	const destroyHls = useCallback(() => {
