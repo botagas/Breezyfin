@@ -21,9 +21,10 @@ describe('sensitive data redaction', () => {
 
 	it('redacts headers and serialized key/value content', () => {
 		const value = redactSensitiveText(
-			'Authorization: Bearer bearer-secret, X-Emby-Token=emby-secret, {"apiKey":"json-secret"}'
+			'Authorization: Bearer bearer-secret, Authorization: MediaBrowser Token="media-browser-secret", X-Emby-Token=emby-secret, {"apiKey":"json-secret"}'
 		);
 		expect(value).not.toContain('bearer-secret');
+		expect(value).not.toContain('media-browser-secret');
 		expect(value).not.toContain('emby-secret');
 		expect(value).not.toContain('json-secret');
 	});

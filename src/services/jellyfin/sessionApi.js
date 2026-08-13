@@ -2,6 +2,7 @@ import serverManager from '../serverManager';
 import {getAppVersion} from '../../utils/appInfo';
 import {getDeviceId} from '../../utils/deviceIdentity';
 import {buildClientAuthHeaders} from '../../utils/auth';
+import {createJellyfinRequestError} from './requestErrors';
 
 const LEGACY_AUTH_KEY = 'jellyfinAuth';
 
@@ -38,6 +39,22 @@ const clearRuntimeSession = (service) => {
 	service.serverName = null;
 	service.username = null;
 	service.sessionExpiredNotified = false;
+};
+
+const readAuthenticationResponse = async (response) => {
+	const bodyText = await response.text();
+	if (!response.ok) {
+		throw createJellyfinRequestError({
+			status: response.status,
+			context: 'Authentication',
+			bodyText
+		});
+	}
+	try {
+		return JSON.parse(bodyText);
+	} catch (_) {
+		throw new Error('Authentication response was not valid JSON');
+	}
 };
 
 export const applySessionFromStore = (service, entry) => {
@@ -88,7 +105,7 @@ export const authenticateWithServer = async (service, username, password) => {
 			}
 		);
 
-		const data = await response.json();
+		const data = await readAuthenticationResponse(response);
 
 		if (data.AccessToken) {
 			service.accessToken = data.AccessToken;
@@ -116,6 +133,7 @@ export const authenticateWithServer = async (service, username, password) => {
 
 			return data.User;
 		}
+		throw new Error('Authentication response did not include an access token');
 	} catch (error) {
 		console.error('Authentication failed:', error);
 		throw error;

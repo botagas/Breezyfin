@@ -30,10 +30,20 @@ import {
 	setActiveServiceServer
 } from '../jellyfin/sessionApi';
 
-const jsonResponse = (data, ok = true, status = 200) => ({
+const jsonResponse = (data, ok = true, status = 200) => {
+	const bodyText = JSON.stringify(data);
+	return {
+		ok,
+		status,
+		json: async () => data,
+		text: async () => bodyText
+	};
+};
+
+const textResponse = (bodyText, ok = false, status = 400) => ({
 	ok,
 	status,
-	json: async () => data
+	text: async () => bodyText
 });
 
 const createService = () => ({
@@ -173,6 +183,32 @@ describe('sessionApi', () => {
 			Username: 'Alice',
 			Pw: ''
 		});
+	});
+
+	it('reports a status-aware error for a non-JSON authentication failure', async () => {
+		const service = createService();
+		service.serverUrl = 'http://server.local';
+		service.api = {};
+		global.fetch.mockResolvedValue(textResponse('<html>Bad request</html>', false, 400));
+
+		await expect(authenticateWithServer(service, 'Alice', 'secret')).rejects.toMatchObject({
+			name: 'JellyfinRequestError',
+			status: 400,
+			message: 'Authentication failed with status 400'
+		});
+		expect(service.accessToken).toBe(null);
+	});
+
+	it('reports malformed JSON in an otherwise successful authentication response', async () => {
+		const service = createService();
+		service.serverUrl = 'http://server.local';
+		service.api = {};
+		global.fetch.mockResolvedValue(textResponse('<html>Unexpected response</html>', true, 200));
+
+		await expect(authenticateWithServer(service, 'Alice', 'secret')).rejects.toThrow(
+			'Authentication response was not valid JSON'
+		);
+		expect(service.accessToken).toBe(null);
 	});
 
 	it('restores active session from server manager before legacy storage', () => {

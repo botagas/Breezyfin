@@ -25,11 +25,15 @@ import jellyfinService from '../jellyfinService';
 import serverManager from '../serverManager';
 import {getDeviceId} from '../../utils/deviceIdentity';
 
-const jsonResponse = (data, ok = true, status = 200) => ({
-	ok,
-	status,
-	json: async () => data
-});
+const jsonResponse = (data, ok = true, status = 200) => {
+	const bodyText = JSON.stringify(data);
+	return {
+		ok,
+		status,
+		json: async () => data,
+		text: async () => bodyText
+	};
+};
 
 const resetServiceState = () => {
 	jellyfinService.api = null;

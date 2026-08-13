@@ -8,6 +8,8 @@ All notable changes to Breezyfin are documented in this file.
 
 ### Changed
 
+- Replaced legacy Jellyfin authentication headers and lowercase API-key query parameters
+  with the standard forms required by Jellyfin 12 while retaining Jellyfin 10 compatibility.
 - Migrated successful authentication and session restoration to the managed multi-server
   store while retaining the bounded legacy-session migration path for older installs.
 - Hardened generated managed-server identifiers with Web Crypto when available and a
@@ -23,6 +25,8 @@ All notable changes to Breezyfin are documented in this file.
 
 ### Fixed
 
+- Added status-aware login failures for non-JSON Jellyfin responses so reverse proxies and
+  incompatible servers do not surface an unrelated JSON parser error.
 - Stopped native webOS Direct Play startup from waiting for `canplay` before requesting
   playback. When startup makes no progress, Breezyfin communicates one Direct Play to
   Transcode recovery attempt.

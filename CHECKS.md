@@ -130,7 +130,12 @@ Run these before packaging a release candidate:
 
 ### Login flow validation
 
-- None.
+- Sign in to Jellyfin 10 with legacy authorization disabled. Verify login, image loading,
+  WebSocket updates, subtitles, and playback use the standard authorization forms.
+- Sign in to Jellyfin 12. Verify login, image loading, WebSocket updates, subtitles, and
+  playback succeed without legacy `X-Emby-*` headers or lowercase `api_key` parameters.
+- Return a non-JSON `400` or `401` response from the authentication endpoint. Verify the
+  Login panel reports the HTTP failure instead of a JSON parser error.
 
 ### Browse and Home regression validation
 
