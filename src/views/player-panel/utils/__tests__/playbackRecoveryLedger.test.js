@@ -99,6 +99,26 @@ describe('playbackRecoveryLedger', () => {
 		expect(next.claims.transcodeFallback).toBe(false);
 	});
 
+	it('allows native-audio fallback again after explicit Retry for the same item', () => {
+		const {currentGenerationRef, ledger} = createLedger();
+		ledger.beginGeneration(1, {itemId: 'item-1'});
+		expect(ledger.claim(1, PLAYBACK_RECOVERY_KEYS.nativeAudioFallback)).toEqual(
+			expect.objectContaining({accepted: true})
+		);
+
+		currentGenerationRef.current = 2;
+		let replacement = ledger.beginGeneration(2, {itemId: 'item-1'});
+		expect(replacement.claims.nativeAudioFallback).toBe(true);
+
+		ledger.resetForRetry('item-1');
+		currentGenerationRef.current = 3;
+		replacement = ledger.beginGeneration(3, {itemId: 'item-1'});
+		expect(replacement.claims.nativeAudioFallback).toBe(false);
+		expect(ledger.claim(3, PLAYBACK_RECOVERY_KEYS.nativeAudioFallback)).toEqual(
+			expect.objectContaining({accepted: true})
+		);
+	});
+
 	it('applies grouped claims atomically', () => {
 		const {currentGenerationRef, ledger} = createLedger();
 		ledger.beginGeneration(1, {itemId: 'item-1'});

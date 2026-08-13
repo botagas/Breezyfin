@@ -1,6 +1,31 @@
 import {createPlaybackRecoveryTransactionManager} from '../playbackRecoveryTransaction';
 
 describe('playbackRecoveryTransaction', () => {
+	it('supersedes an initial native-audio fallback before it can publish its override', () => {
+		const manager = createPlaybackRecoveryTransactionManager();
+		const nativeAudioFallback = manager.begin({
+			kind: 'initial-native-audio-fallback',
+			itemId: 'item-1',
+			playbackGeneration: 3,
+			loadRequestId: 7,
+			overrideCandidate: {audioStreamIndex: 2, disableDirectPlay: true}
+		});
+
+		manager.begin({
+			kind: 'transcode-fallback',
+			itemId: 'item-1',
+			playbackGeneration: 3,
+			loadRequestId: 7
+		});
+
+		expect(manager.isCurrent(nativeAudioFallback, {
+			itemId: 'item-1',
+			playbackGeneration: 3,
+			loadRequestId: 7
+		})).toBe(false);
+		expect(nativeAudioFallback.cancelReason).toBe('superseded');
+	});
+
 	it('keeps an operation current while its ownership identity is unchanged', () => {
 		const manager = createPlaybackRecoveryTransactionManager();
 		const overrideCandidate = Object.freeze({forceTranscoding: true});

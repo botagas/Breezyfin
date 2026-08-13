@@ -4,6 +4,7 @@ import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
 import {buildPlaybackOverride, resolveVideoSeekSeconds} from '../utils/playbackOverride';
 
 const SWITCH_TOAST_KEY = 'audio-track-switch';
+export const AUDIO_TRANSITION_PROGRESS_BARRIER_TIMEOUT_MS = 5000;
 
 const getPlaySessionId = (session) => session?.playSessionId || session?.PlaySessionId || null;
 
@@ -48,6 +49,7 @@ export const usePlayerAudioTransition = ({
 	const [phase, setPhase] = useState(null);
 	const operationRef = useRef(null);
 	const nextIdRef = useRef(0);
+	const progressBarrierRef = useRef(null);
 	const itemIdRef = useRef(String(itemId || ''));
 	itemIdRef.current = String(itemId || '');
 
@@ -82,12 +84,42 @@ export const usePlayerAudioTransition = ({
 		);
 	}, [isOperationOwned, loadRequestIdRef, nativeSourceTokenRef, playbackGenerationRef]);
 
+	const cancelProgressBarrier = useCallback((operation, reason = 'cancelled') => {
+		const barrier = progressBarrierRef.current;
+		if (!barrier || (operation && barrier.operation !== operation)) return false;
+		barrier.settle(reason);
+		return true;
+	}, []);
+
+	const waitForPausedProgress = useCallback((operation) => new Promise((resolve) => {
+		let settled = false;
+		let timer = null;
+		const settle = (status) => {
+			if (settled) return;
+			settled = true;
+			if (timer) clearTimeout(timer);
+			if (progressBarrierRef.current?.operation === operation) {
+				progressBarrierRef.current = null;
+			}
+			resolve(status);
+		};
+		timer = setTimeout(
+			() => settle('timed-out'),
+			AUDIO_TRANSITION_PROGRESS_BARRIER_TIMEOUT_MS
+		);
+		progressBarrierRef.current = {operation, settle};
+		Promise.resolve()
+			.then(() => reportPlaybackProgressNow(true))
+			.then(() => settle('reported'), () => settle('failed'));
+	}), [reportPlaybackProgressNow]);
+
 	const finishOperation = useCallback((operation) => {
 		if (operationRef.current !== operation) return;
+		cancelProgressBarrier(operation);
 		operationRef.current = null;
 		setPhase(null);
 		dismissToast?.(SWITCH_TOAST_KEY);
-	}, [dismissToast]);
+	}, [cancelProgressBarrier, dismissToast]);
 
 	const stopTransitionSession = useCallback((operation, session, counterpartSession, {
 		skipIfActive = false
@@ -196,17 +228,26 @@ export const usePlayerAudioTransition = ({
 		operationRef.current = operation;
 		setPhase('preparing');
 		video.pause();
-		await reportPlaybackProgressNow(true);
-		if (!isOperationCurrent(operation)) {
-			finishOperation(operation);
-			return false;
-		}
 		setToastMessage({
 			key: SWITCH_TOAST_KEY,
 			message: 'Switching audio...',
 			severity: 'warning',
 			persistent: true
 		});
+		const progressBarrierStatus = await waitForPausedProgress(operation);
+		if (progressBarrierStatus === 'timed-out') {
+			appendPlaybackDiagnostic?.({
+				scope: 'audio-track',
+				stage: 'paused-progress-barrier',
+				status: 'warning',
+				reason: 'report-timeout',
+				message: 'Audio transition continued after the paused progress report exceeded 5000 ms.'
+			});
+		}
+		if (!isOperationCurrent(operation)) {
+			finishOperation(operation);
+			return false;
+		}
 		const override = buildPlaybackOverride({
 			baseOptions: playbackOptions,
 			mediaSourceId: mediaSourceData?.Id,
@@ -316,6 +357,7 @@ export const usePlayerAudioTransition = ({
 			return rollback(operation, error?.message || 'audio-transition-failed');
 		}
 	}, [
+		appendPlaybackDiagnostic,
 		audioTracks,
 		captureSourceDescriptor,
 		currentAudioTrack,
@@ -332,13 +374,13 @@ export const usePlayerAudioTransition = ({
 		playbackOverrideRef,
 		playbackSessionRef,
 		preparePlaybackPlan,
-		reportPlaybackProgressNow,
 		requestPlaybackDecision,
 		resolveTransitionPosition,
 		rollback,
 		saveAudioSelection,
 		setCurrentAudioTrack,
 		setToastMessage,
+		waitForPausedProgress,
 		stopTransitionSession,
 		subtitleTracks,
 		videoRef
@@ -362,6 +404,7 @@ export const usePlayerAudioTransition = ({
 		const operation = operationRef.current;
 		if (!operation) return false;
 		operation.cancelled = true;
+		cancelProgressBarrier(operation);
 		if (operation.replacementAttached) {
 			stopTransitionSession(
 				operation,
@@ -378,7 +421,7 @@ export const usePlayerAudioTransition = ({
 		operation.completion.resolve({success: false, reason: 'cancelled'});
 		finishOperation(operation);
 		return true;
-	}, [finishOperation, stopTransitionSession]);
+	}, [cancelProgressBarrier, finishOperation, stopTransitionSession]);
 
 	useEffect(() => cancelAudioTransition, [cancelAudioTransition, itemId]);
 

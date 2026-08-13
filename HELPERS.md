@@ -500,6 +500,8 @@ usePlayerInteractionReveal({
 - File: `src/views/player-panel/hooks/usePlayerAudioTransition.js`
 - Purpose:
   - pause native playback while preserving the attached frame during PlaybackInfo preparation
+  - show persistent switching status immediately and bound the best-effort paused-progress
+    reporting barrier to five seconds
   - serialize one runtime audio transition and lock Player actions other than Back
   - commit one replacement source only after negotiation succeeds
   - restore metadata position before releasing startup and preserve the prior play state
@@ -1096,6 +1098,9 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
     teardown because the old source token has correctly been invalidated.
   - executes pure actions from `buildPlayerRecoveryAction`; current transactions claim the
     generation-aware recovery ledger before publishing a replacement override or load.
+  - owns the shared recovery transaction used by Transcode, subtitle, initial native-audio,
+    and session-rebuild continuations. Session rebuilds await loader admission and treat
+    the admitted load as the identity handoff.
 - `src/views/player-panel/hooks/usePlayerLifecycleEffects.js`
   - centralizes player lifecycle effects (item bootstrap, control hide timers, stall watchdog, focus/cleanup timers).
 - `src/views/player-panel/hooks/useNativeSyncPlay.js`

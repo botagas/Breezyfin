@@ -24,16 +24,7 @@ jest.mock('../serverManager', () => ({
 import jellyfinService from '../jellyfinService';
 import serverManager from '../serverManager';
 import {getDeviceId} from '../../utils/deviceIdentity';
-
-const jsonResponse = (data, ok = true, status = 200) => {
-	const bodyText = JSON.stringify(data);
-	return {
-		ok,
-		status,
-		json: async () => data,
-		text: async () => bodyText
-	};
-};
+import {createJsonResponse} from '../../testUtils/fetchResponse';
 
 const resetServiceState = () => {
 	jellyfinService.api = null;
@@ -80,7 +71,7 @@ describe('jellyfinService', () => {
 	});
 
 	it('connects to server and stores server metadata', async () => {
-		global.fetch.mockResolvedValue(jsonResponse({ServerName: 'My Jellyfin'}));
+		global.fetch.mockResolvedValue(createJsonResponse({ServerName: 'My Jellyfin'}));
 
 		const info = await jellyfinService.connect('http://media.local:8096');
 
@@ -146,7 +137,7 @@ describe('jellyfinService', () => {
 	});
 
 	it('throws when server is not reachable during connect', async () => {
-		global.fetch.mockResolvedValue(jsonResponse({}, false, 500));
+		global.fetch.mockResolvedValue(createJsonResponse({}, false, 500));
 
 		await expect(jellyfinService.connect('http://bad-host')).rejects.toThrow('Server not reachable');
 	});
@@ -163,7 +154,7 @@ describe('jellyfinService', () => {
 		const getClientVersionSpy = jest.spyOn(jellyfinService, 'getClientVersion').mockReturnValue('9.9.9');
 		serverManager.addServer.mockReturnValue({serverId: 'srv1', userId: 'user1'});
 		global.fetch.mockResolvedValue(
-			jsonResponse({
+			createJsonResponse({
 				AccessToken: 'token-123',
 				User: {Id: 'user1', Name: 'Alice', PrimaryImageTag: 'avatar-tag-1'},
 				ServerName: 'Living Room'
@@ -294,7 +285,7 @@ describe('jellyfinService', () => {
 			id: 'srv1',
 			activeUser: {userId: 'user1', username: 'Old Name'}
 		});
-		global.fetch.mockResolvedValue(jsonResponse({
+		global.fetch.mockResolvedValue(createJsonResponse({
 			Id: 'user1',
 			Name: 'Alice',
 			PrimaryImageTag: 'avatar-tag-2'

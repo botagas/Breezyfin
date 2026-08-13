@@ -48,10 +48,16 @@ All notable changes to Breezyfin are documented in this file.
 - Hardened audio replacement handoff so paused progress is a real reporting barrier,
   prepared mount waits are cancellable, superseded/failed Jellyfin sessions close once,
   and transient toasts cannot evict the persistent switching status.
+- Bounded the audio-switch paused-progress barrier and prevented stale initial native-audio
+  fallback work from restarting replaced playback.
 - Bound transcode and subtitle recovery restarts to their originating item, playback
   generation, and load request so stale teardown continuations cannot restart newer media.
 - Allowed SyncPlay readiness after source preparation without waiting for native media
   readiness events that may require authoritative group playback to begin first.
+- Cleared initiating-client track options when same-item SyncPlay resume fails.
+- Routed session rebuilds through the shared recovery transaction, restored native-audio
+  fallback availability after explicit Retry, and prevented stale SyncPlay resume requests
+  from changing current membership state.
 - Replaced ambiguous startup format errors on confirmed transcodes with bounded
   server-transcoding guidance and optional systemd/FFmpeg diagnostics.
 - Aligned Watchlist loading and empty states across native and plugin-backed tabs.

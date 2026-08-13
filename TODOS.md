@@ -56,8 +56,25 @@ Expected scope: architectural work, a new feature surface, or changes spanning s
   - Share Movie and Episode filtering, provider warnings, and paging.
   - Use Breezyfin and Enact Spotlight primitives. Do not adopt an independent browser
     calendar focus model.
-- Use the advisory `npm run audit:hotspots` file/function rankings and baseline growth to plan incremental decomposition of the largest current hotspots, especially `subtitleRenderer`, `App`, `playbackApi` / `playbackSelection`, and Media Details focus/interaction hooks.
+- Use the advisory `npm run audit:hotspots` file/function rankings and baseline growth to plan incremental decomposition of the largest current hotspots, especially `subtitleRenderer`, `App`, and Media Details focus/interaction hooks.
   Metric growth alone must not block otherwise correct work.
+- Decompose `preparePlaybackNegotiation()` into ordered internal negotiation passes while
+  preserving the current decorated PlaybackInfo response and pure `PlaybackPlan` boundary.
+  - Separate request/source admission, selected-track resolution, subtitle delivery,
+    dynamic-range safety, URL validation, required decisions, and diagnostics.
+  - Keep request order, source-selection policy, consent precedence, fallback behavior,
+    and the public `jellyfinService.getPlaybackInfo()` contract unchanged.
+  - Add parity fixtures for Direct Play, Direct Stream, Transcode, client subtitles,
+    server burn-in, explicit audio selection, and Dolby Vision/HDR decisions before
+    moving each pass.
+- Decompose `usePlayerRecoveryHandlers` by recovery family without creating separate
+  recovery authorities.
+  - Keep one recovery transaction manager, one recovery ledger, and one pure recovery
+    policy boundary.
+  - Move HLS, session-rebuild, subtitle, dynamic-range, and terminal action execution
+    into focused internal executors that revalidate identity after asynchronous work.
+  - Remove compatibility attempt refs only after ledger-backed characterization tests
+    prove equivalent reset and carry behavior.
 - Add in-app settings help/details UI so users can understand what each option does, expected side effects, and recommended usage.
 - After the bounded placement slice passes TV validation, define the next Breezyfin Lightweight ASS/SSA compatibility slice.
   Candidate gaps are advanced collision behavior, arbitrary text vector masks, mixed inline `\org` transforms, advanced vertical layout/collision behavior, and transform/vector edge cases; avoid pursuing full libass parity without representative files and real-TV performance evidence.
@@ -79,13 +96,18 @@ Expected scope: unknown until profiling, API research, dependency analysis, or r
 - Investigate whether supported webOS generations expose a decoder-level readiness or
   cooldown signal after native audio changes or source replacement. Compare DirectPlay,
   DirectStream, and native HLS across TV models and codecs. Do not reintroduce a fixed
-  delay; only reconsider `WA-009` after proving audibility and A/V alignment with
-  repeatable TV evidence.
+  delay. Record detach-to-attach timing, early decoder errors, first audible output, and
+  A/V alignment. Only reconsider `WA-009` after repeatable TV evidence identifies an
+  affected runtime and supports an adaptive, scoped response.
 - Investigate the HLS/native-HLS readiness contract across supported webOS generations.
   Compare native-HLS error, `canplay`, `playing`, and timeline evidence with HLS.js
   `MEDIA_ATTACHED`, `MANIFEST_PARSED`, and `FRAG_BUFFERED` during cold/warm startup and
-  server subtitle burn-in. Do not collapse engine-ready and playback-start gates or
-  remove generation checks until real-TV evidence establishes an equivalent contract.
+  server subtitle burn-in. Use the diagnostics-gated first-fragment, buffered-seconds,
+  engine-to-playing, timeline-progress, and early-stall measurements. Keep one
+  current-generation buffered fragment as the readiness threshold unless repeated TV
+  captures show that another bounded condition reduces early stalls without materially
+  delaying startup. Do not collapse engine-ready and playback-start gates or remove
+  generation checks until real-TV evidence establishes an equivalent contract.
 - Investigate jagged large-glyph outlines in the Breezyfin Lightweight ASS renderer on webOS.
   - Preserve the synchronized effect and fill layers. They keep outlines out of the
     source-colored fill and preserve wrapping.

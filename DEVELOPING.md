@@ -178,6 +178,9 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Recovery attempts are admitted through a recovery transaction before intentional
   teardown. The transaction captures item, playback-generation, and load-request ownership;
   after teardown it must still be current before publishing an override or starting a load.
+  Runtime Transcode, subtitle, initial native-audio fallback, and session-rebuild paths
+  share the same transaction manager so a newer recovery supersedes older pending work.
+  A session rebuild must await load admission instead of scheduling an untracked restart.
   Recovery budgets are then claimed atomically through `createPlaybackRecoveryLedger`
   before replacement side effects. HLS, subtitle, dynamic-range, reload, and terminal state reset per
   generation. Session rebuild, transcode fallback, and native-audio fallback carry across
@@ -202,8 +205,9 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   previous play state, and roll back in a new paused generation on failure. Fixed delays,
   `loadeddata`, and `canplay` do not prove audible-track readiness. HLS.js may switch in
   place only after the matching current-instance `AUDIO_TRACK_SWITCHED` event.
-  Forced paused-progress reporting is a real barrier before negotiation. Once a replacement
-  is ready, close the superseded Jellyfin PlaySession without affecting active reporting;
+  Forced paused-progress reporting is a best-effort barrier before negotiation. The audio
+  transition continues after five seconds if Jellyfin does not settle the report. Once a
+  replacement is ready, close the superseded Jellyfin PlaySession without affecting active reporting;
   on rollback close the failed replacement first, and on cancellation close whichever
   non-active prepared/superseded session normal Player teardown will not own.
 - Initial explicit DirectPlay audio selection is a separate pre-start exception: the
@@ -222,6 +226,9 @@ Release packaging runs `prepare:release-notices` before either pack command and 
   continuation that intentionally invalidated its source token must instead retain its
   recovery transaction across teardown and revalidate item/generation/request ownership
   before changing playback.
+- SyncPlay resume requests must revalidate coordinator activity, group ID, reconnect
+  generation, and authenticated service session after the server request settles. An
+  obsolete completion must not change follow mode, participation, navigation, or notices.
 - Playback reporting is serialized by `usePlayerPlaybackReporter`; direct reporting calls
   from controls, seek handlers, or timers would bypass pause-state coalescing and are not
   allowed. Forced callers await the queued snapshot they contributed. Explicit immutable

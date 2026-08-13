@@ -34,6 +34,7 @@ export const useAppSyncPlayCoordinator = ({
 	const reconnectGenerationRef = useRef(0);
 	const waitParticipationRef = useRef({groupId: '', ignoreWait: null});
 	const pendingPlaybackOptionsRef = useRef(null);
+	const pendingPlaybackOperationIdRef = useRef(0);
 	const pendingPlaybackSessionKeyRef = useRef(getServiceSessionKey());
 	const queue = useMemo(() => getSyncPlayQueueSnapshot(group), [group]);
 	const groupRef = useRef(group);
@@ -46,6 +47,20 @@ export const useAppSyncPlayCoordinator = ({
 		lastUpdatedAt: group.LastUpdatedAt || null
 	}) : null, [group]);
 	const serviceSessionKey = getServiceSessionKey();
+	const createPendingPlaybackOptions = useCallback((itemId, options) => {
+		const pending = {
+			operationId: ++pendingPlaybackOperationIdRef.current,
+			itemId,
+			options
+		};
+		pendingPlaybackOptionsRef.current = pending;
+		return pending;
+	}, []);
+	const clearPendingPlaybackOptions = useCallback((pending = null) => {
+		if (pending && pendingPlaybackOptionsRef.current !== pending) return false;
+		pendingPlaybackOptionsRef.current = null;
+		return true;
+	}, []);
 	const commitGroup = useCallback((nextGroup) => {
 		const normalizedGroup = nextGroup || null;
 		groupRef.current = normalizedGroup;
@@ -220,10 +235,11 @@ export const useAppSyncPlayCoordinator = ({
 				return;
 			}
 			const pendingPlayback = pendingPlaybackOptionsRef.current;
-			const localPlaybackOptions = pendingPlayback?.itemId === item.Id
+			const pendingMatchesItem = pendingPlayback?.itemId === item.Id;
+			const localPlaybackOptions = pendingMatchesItem
 				? pendingPlayback.options
 				: null;
-			if (localPlaybackOptions) pendingPlaybackOptionsRef.current = null;
+			if (pendingMatchesItem) clearPendingPlaybackOptions(pendingPlayback);
 			onOpenRemoteItem(item, {
 				groupId: group.GroupId,
 				playlistItemId: queue.activePlaylistItemId,
@@ -241,7 +257,7 @@ export const useAppSyncPlayCoordinator = ({
 		return () => {
 			navigationGenerationRef.current += 1;
 		};
-	}, [authenticated, currentView, followMode, group?.GroupId, onOpenRemoteItem, queue, selectedItemId]);
+	}, [authenticated, clearPendingPlaybackOptions, currentView, followMode, group?.GroupId, onOpenRemoteItem, queue, selectedItemId]);
 
 	const waitForQueueItem = useCallback((itemId) => new Promise((resolve, reject) => {
 		if (!coordinatorActiveRef.current) {
@@ -315,22 +331,35 @@ export const useAppSyncPlayCoordinator = ({
 		pendingPlaybackOptionsRef.current = null;
 	}, [commitFollowMode, commitGroup]);
 	const resumeSession = useCallback(async () => {
-		if (!groupRef.current?.GroupId) return;
+		const requestedGroupId = String(groupRef.current?.GroupId || '');
+		if (!requestedGroupId) return false;
+		const requestedReconnectGeneration = reconnectGenerationRef.current;
+		const requestedSessionKey = getServiceSessionKey();
+		const isResumeCurrent = () => (
+			coordinatorActiveRef.current &&
+			reconnectGenerationRef.current === requestedReconnectGeneration &&
+			getServiceSessionKey() === requestedSessionKey &&
+			String(groupRef.current?.GroupId || '') === requestedGroupId
+		);
 		try {
 			await jellyfinService.syncPlaySetIgnoreWait(false);
+			if (!isResumeCurrent()) return false;
 			waitParticipationRef.current = {
-				groupId: groupRef.current.GroupId,
+				groupId: requestedGroupId,
 				ignoreWait: false
 			};
 			lastNavigationRevisionRef.current = '';
 			commitFollowMode('following');
 			setNotification(null);
+			return true;
 		} catch (_) {
+			if (!isResumeCurrent()) return false;
 			setNotification({
 				type: 'warning',
 				message: 'SyncPlay could not resume this device.',
 				revision: `resume-error:${Date.now()}`
 			});
+			return false;
 		}
 	}, [commitFollowMode]);
 	const suspend = useCallback(() => {
@@ -376,11 +405,11 @@ export const useAppSyncPlayCoordinator = ({
 		});
 		if (decision === 'local') return false;
 		if (decision === 'replace') {
-			pendingPlaybackOptionsRef.current = {itemId: item.Id, options};
+			const pending = createPendingPlaybackOptions(item.Id, options);
 			try {
 				await replaceQueue(item.Id);
 			} catch (error) {
-				pendingPlaybackOptionsRef.current = null;
+				clearPendingPlaybackOptions(pending);
 				setNotification({
 					type: 'warning',
 					message: error?.message || 'SyncPlay could not replace the group queue.',
@@ -389,25 +418,26 @@ export const useAppSyncPlayCoordinator = ({
 			}
 		}
 		else if (decision === 'resume') {
-			pendingPlaybackOptionsRef.current = {itemId: item.Id, options};
-			await resumeSession();
+			const pending = createPendingPlaybackOptions(item.Id, options);
+			const resumed = await resumeSession();
+			if (!resumed) clearPendingPlaybackOptions(pending);
 		}
 		else setPlayDecision({item, options, currentItemId: queue.activeItemId});
 		return true;
-	}, [group?.GroupId, queue.activeItemId, replaceQueue, resumeSession]);
+	}, [clearPendingPlaybackOptions, createPendingPlaybackOptions, group?.GroupId, queue.activeItemId, replaceQueue, resumeSession]);
 	const confirmReplacePlayback = useCallback(async () => {
 		const item = playDecision?.item;
 		const options = playDecision?.options || null;
 		setPlayDecision(null);
 		if (!item) return;
+		const pending = createPendingPlaybackOptions(item.Id, options);
 		try {
-			pendingPlaybackOptionsRef.current = {itemId: item.Id, options};
 			await replaceQueue(item.Id);
 		} catch (error) {
-			pendingPlaybackOptionsRef.current = null;
+			clearPendingPlaybackOptions(pending);
 			setNotification({type: 'warning', message: error.message, revision: `error:${Date.now()}`});
 		}
-	}, [playDecision?.item, playDecision?.options, replaceQueue]);
+	}, [clearPendingPlaybackOptions, createPendingPlaybackOptions, playDecision?.item, playDecision?.options, replaceQueue]);
 	const joinCurrentPlayback = useCallback(async () => {
 		pendingPlaybackOptionsRef.current = null;
 		setPlayDecision(null);

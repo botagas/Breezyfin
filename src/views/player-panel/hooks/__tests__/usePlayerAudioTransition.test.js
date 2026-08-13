@@ -1,6 +1,9 @@
 import {act, renderHook} from '@testing-library/react';
 
-import {usePlayerAudioTransition} from '../usePlayerAudioTransition';
+import {
+	AUDIO_TRANSITION_PROGRESS_BARRIER_TIMEOUT_MS,
+	usePlayerAudioTransition
+} from '../usePlayerAudioTransition';
 
 const createDeferred = () => {
 	let resolve;
@@ -69,6 +72,69 @@ const createProps = () => {
 };
 
 describe('usePlayerAudioTransition', () => {
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	it('continues after the paused progress barrier reaches its deadline', async () => {
+		jest.useFakeTimers();
+		const props = createProps();
+		const progress = createDeferred();
+		props.reportPlaybackProgressNow.mockReturnValue(progress.promise);
+		const {result} = renderHook(() => usePlayerAudioTransition(props));
+		let transition;
+
+		await act(async () => {
+			transition = result.current.requestAudioTransition(2);
+			await Promise.resolve();
+		});
+
+		expect(props.setToastMessage).toHaveBeenCalledWith(expect.objectContaining({
+			key: 'audio-track-switch',
+			persistent: true
+		}));
+		expect(props.preparePlaybackPlan).not.toHaveBeenCalled();
+
+		await act(async () => {
+			jest.advanceTimersByTime(AUDIO_TRANSITION_PROGRESS_BARRIER_TIMEOUT_MS);
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(props.preparePlaybackPlan).toHaveBeenCalledTimes(1);
+		expect(props.appendPlaybackDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+			stage: 'paused-progress-barrier',
+			reason: 'report-timeout'
+		}));
+		const transitionId = props.loadVideo.mock.calls[0][2].transitionId;
+		await act(async () => {
+			result.current.handleAudioTransitionReady({
+				runtimeContext: {audioTransition: {id: transitionId}}
+			});
+			await transition;
+		});
+	});
+
+	it('cancels the paused progress barrier without preparing playback', async () => {
+		jest.useFakeTimers();
+		const props = createProps();
+		props.reportPlaybackProgressNow.mockReturnValue(createDeferred().promise);
+		const {result} = renderHook(() => usePlayerAudioTransition(props));
+		let transition;
+
+		await act(async () => {
+			transition = result.current.requestAudioTransition(2);
+			await Promise.resolve();
+		});
+		act(() => result.current.cancelAudioTransition());
+		await act(async () => {
+			await transition;
+		});
+
+		expect(props.preparePlaybackPlan).not.toHaveBeenCalled();
+		expect(jest.getTimerCount()).toBe(0);
+	});
+
 	it('prepares before committing and updates selection only after startup readiness', async () => {
 		const props = createProps();
 		const preparation = createDeferred();

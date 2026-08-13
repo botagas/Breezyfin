@@ -133,7 +133,6 @@ const PlayerPanel = ({
 	const skipFocusRetryTimerRef = useRef(null);
 	const subtitleCompatibilityFallbackAttemptedRef = useRef(false);
 	const subtitleBurnInFallbackHandlerRef = useRef(null);
-	const nativeAudioFallbackAttemptedRef = useRef(false);
 	const hlsNetworkRecoveryAttemptsRef = useRef(0);
 	const hlsMediaRecoveryAttemptsRef = useRef(0);
 	const playSessionRebuildAttemptsRef = useRef(0);
@@ -235,10 +234,6 @@ const PlayerPanel = ({
 	useEffect(() => {
 		setDebugOverlayVisible(playerDiagnosticsEnabled);
 	}, [playerDiagnosticsEnabled]);
-
-	useEffect(() => {
-		nativeAudioFallbackAttemptedRef.current = false;
-	}, [item?.Id]);
 
 	useEffect(() => {
 		currentTimeRef.current = currentTime;
@@ -367,6 +362,9 @@ const PlayerPanel = ({
 	subtitleBurnInFallbackHandlerRef.current = handleSubtitleBurnInFallback;
 
 	const {
+		beginRecoveryTransaction,
+		isRecoveryTransactionCurrent,
+		completeRecoveryTransaction,
 		resetRecoveryGuards,
 		attemptPlaybackSessionRebuild,
 		showPlaybackError,
@@ -627,21 +625,7 @@ const PlayerPanel = ({
 		audioStreamIndex,
 		subtitleStreamIndex
 	}) => {
-		if (nativeAudioFallbackAttemptedRef.current) return;
-		const recoveryClaim = playbackRecoveryLedger.claim(
-			playbackGenerationRef.current,
-			PLAYBACK_RECOVERY_KEYS.nativeAudioFallback
-		);
-		if (!recoveryClaim.accepted) return;
-		nativeAudioFallbackAttemptedRef.current = true;
-		appendPlayerDiagnostic({
-			scope: 'audio-track',
-			stage: 'initial-directstream-fallback',
-			status: 'requested',
-			reason,
-			message: 'Restarting with DirectPlay disabled so Jellyfin can honor the selected audio stream.'
-		});
-		playbackOverrideRef.current = buildPlaybackOverride({
+		const overrideCandidate = buildPlaybackOverride({
 			baseOptions: playbackOptions,
 			mediaSourceId: mediaSourceData?.Id,
 			audioStreamIndex,
@@ -652,15 +636,49 @@ const PlayerPanel = ({
 				initialNativeAudioFallback: true
 			}
 		});
-		setLoading(true);
-		setLoadingStatusMessage('Restarting stream...');
+		const recoveryOperation = beginRecoveryTransaction(
+			'initial-native-audio-fallback',
+			overrideCandidate
+		);
+		appendPlayerDiagnostic({
+			scope: 'audio-track',
+			stage: 'initial-directstream-fallback',
+			status: 'requested',
+			reason,
+			message: 'Restarting with DirectPlay disabled so Jellyfin can honor the selected audio stream.'
+		});
 		try {
 			await handleStop();
 		} catch (fallbackError) {
 			console.warn('Failed while preparing native audio fallback:', fallbackError);
 		}
-		const result = await loadVideo();
-		if (result?.status === 'attached') {
+		if (!isRecoveryTransactionCurrent(recoveryOperation)) {
+			completeRecoveryTransaction(recoveryOperation);
+			return;
+		}
+		const recoveryClaim = playbackRecoveryLedger.claim(
+			playbackGenerationRef.current,
+			PLAYBACK_RECOVERY_KEYS.nativeAudioFallback
+		);
+		if (!recoveryClaim.accepted) {
+			completeRecoveryTransaction(recoveryOperation);
+			return;
+		}
+		playbackOverrideRef.current = recoveryOperation.overrideCandidate;
+		setLoading(true);
+		setLoadingStatusMessage('Restarting stream...');
+		let result;
+		try {
+			result = await loadVideo();
+		} finally {
+			completeRecoveryTransaction(recoveryOperation);
+		}
+		if (
+			result?.status === 'attached' &&
+			result.sourceToken === nativeSourceTokenRef.current &&
+			result.sourceToken?.itemId === String(item?.Id || '') &&
+			!exitInProgressRef.current
+		) {
 			setToastMessage({
 				message: result.playMethod === 'DirectStream'
 					? 'The selected audio track requires server remuxing.'
@@ -670,14 +688,20 @@ const PlayerPanel = ({
 		}
 	}, [
 		appendPlayerDiagnostic,
+		beginRecoveryTransaction,
+		completeRecoveryTransaction,
 		currentTime,
+		exitInProgressRef,
 		handleStop,
+		isRecoveryTransactionCurrent,
+		item?.Id,
 		loadVideo,
 		mediaSourceData?.Id,
 		playbackOptions,
 		playbackOverrideRef,
 		playbackRecoveryLedger,
 		playbackGenerationRef,
+		nativeSourceTokenRef,
 		setLoading,
 		setLoadingStatusMessage,
 		setToastMessage,
@@ -978,7 +1002,7 @@ const PlayerPanel = ({
 				break;
 			case 'session-rebuild':
 			case 'player-session-rebuild': {
-				const restarted = attemptPlaybackSessionRebuild('Debug forced session rebuild', {
+				const restarted = await attemptPlaybackSessionRebuild('Debug forced session rebuild', {
 					toast: 'Debug: restarting stream with a fresh session...'
 				});
 				if (!restarted) {

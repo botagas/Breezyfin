@@ -86,33 +86,55 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 		jest.useRealTimers();
 	});
 
-	it('does not run a delayed session rebuild after the generation is replaced', () => {
+	it('rejects a session rebuild from a replaced runtime generation', async () => {
 		const {props, runtimeContext} = createProps();
 		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+		props.playbackGenerationRef.current = 4;
 
-		act(() => {
-			expect(result.current.attemptPlaybackSessionRebuild('test rebuild', {
+		await act(async () => {
+			expect(await result.current.attemptPlaybackSessionRebuild('test rebuild', {
 				runtimeContext
-			})).toBe(true);
-			props.playbackGenerationRef.current = 4;
-			jest.runOnlyPendingTimers();
+			})).toBe(false);
 		});
 
 		expect(props.loadVideoRef.current).not.toHaveBeenCalled();
+		expect(props.playbackOverrideRef.current).toBeNull();
 	});
 
-	it('runs a delayed session rebuild once for the active context', () => {
+	it('awaits one admitted session rebuild for the active context', async () => {
 		const {props, runtimeContext} = createProps();
+		const loaded = createDeferred();
+		props.loadVideoRef.current.mockReturnValue(loaded.promise);
+		props.playbackRecoveryLedger = {
+			claimMany: jest.fn(() => ({
+				accepted: true,
+				claims: [
+					{key: 'playSessionRebuild', attempt: 1},
+					{key: 'reload', attempt: 1}
+				]
+			}))
+		};
 		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
+		let rebuildPromise;
 
 		act(() => {
-			expect(result.current.attemptPlaybackSessionRebuild('test rebuild', {
+			rebuildPromise = result.current.attemptPlaybackSessionRebuild('test rebuild', {
 				runtimeContext
-			})).toBe(true);
-			jest.runOnlyPendingTimers();
+			});
 		});
 
 		expect(props.loadVideoRef.current).toHaveBeenCalledTimes(1);
+		let settled = false;
+		rebuildPromise.then(() => {
+			settled = true;
+		});
+		await Promise.resolve();
+		expect(settled).toBe(false);
+
+		loaded.resolve({status: 'attached'});
+		await act(async () => {
+			expect(await rebuildPromise).toBe(true);
+		});
 	});
 
 	it('consumes a stale transcode continuation without publishing or loading it', async () => {
@@ -461,7 +483,7 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 		}));
 	});
 
-	it('reports an exhausted initial transcode fragment failure as a server startup failure', () => {
+	it('reports an exhausted initial transcode fragment failure as a server startup failure', async () => {
 		const {props} = createProps();
 		const runtimeContext = createPlaybackRuntimeContext({
 			generation: 3,
@@ -482,8 +504,8 @@ describe('usePlayerRecoveryHandlers runtime isolation', () => {
 
 		const {result} = renderHook(() => usePlayerRecoveryHandlers(props));
 
-		act(() => {
-			expect(result.current.attemptHlsFatalRecovery(
+		await act(async () => {
+			expect(await result.current.attemptHlsFatalRecovery(
 				hls,
 				{
 					type: 'networkError',

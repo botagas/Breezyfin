@@ -56,6 +56,11 @@ Run these before packaging a release candidate:
     notification never steals focus.
 - Reconnect SyncPlay while a newer `PlayQueue` update is arriving. Verify the delayed
   group lookup cannot restore an older item, queue revision, or participant session.
+- Fail same-item SyncPlay resume after selecting explicit tracks. Verify a later resume does
+  not reuse those failed local track options.
+- Delay a SyncPlay resume request, then leave the group, switch users, replace the server
+  session, or receive a newer reconnect. Verify the stale completion does not enter follow
+  mode or clear newer notices and playback options.
 
 ### Diagnostics/logging validation
 
@@ -81,6 +86,9 @@ Run these before packaging a release candidate:
 - Verify generation-scoped attempts reset when the source is replaced.
 - Verify item-scoped attempts remain for replacement generations of the same item.
 - Select Retry. Verify Retry resets the ledger.
+- After initial native-audio fallback has been used, select Retry for the same item. Verify
+  the fallback is available once again and remains limited across automatic replacement
+  generations.
 - Verify no recovery exceeds its configured budget.
 - Delay recovery teardown. During the delay, separately trigger Back, item replacement,
   episode replacement, a newer load, and a newer recovery.
@@ -88,6 +96,8 @@ Run these before packaging a release candidate:
   override, loading state, terminal error, or delayed attachment.
 - Verify the current recovery remains valid after its intentional source-token
   invalidation and loads exactly once.
+- Delay session-rebuild admission, then trigger Back, Retry, item replacement, or a newer
+  recovery. Verify the obsolete rebuild cannot attach a source or show a terminal error.
 
 - Force a server-side transcode startup failure and verify the Player reports
   `Server transcoding failed` rather than generic format support. With Diagnostics
@@ -116,6 +126,12 @@ Run these before packaging a release candidate:
 - Inspect Jellyfin sessions during successful replacement, rollback, and Back after swap.
   Verify the paused progress barrier is attempted before negotiation, the superseded or
   failed session is stopped exactly once, and the active replacement remains reportable.
+- Delay the paused progress report for more than five seconds. Verify the persistent
+  switching status appears immediately, negotiation continues after the deadline, and Back
+  cancels the wait without a later transition.
+- Trigger initial native-audio fallback, then use Back, replace the item, or begin another
+  recovery while teardown is pending. Verify no stale override, source, or compatibility
+  toast reaches the replacement playback.
 - In HLS.js, verify audio selection commits only after `AUDIO_TRACK_SWITCHED`, stale
   events cannot update the UI, and timeout falls back to controlled source replacement.
   Repeat during SyncPlay and confirm the server-clock position and authoritative Unpause

@@ -111,8 +111,12 @@ export const usePlayerRecoveryHandlers = ({
 	const completeRecoveryTransaction = useCallback((operation) => {
 		recoveryTransactionManagerRef.current.complete(operation);
 	}, []);
+	const invalidateRecoveryTransaction = useCallback((reason = 'invalidated') => (
+		recoveryTransactionManagerRef.current.invalidate(reason)
+	), []);
 
 	const resetRecoveryGuards = useCallback(() => {
+		invalidateRecoveryTransaction('recovery-reset');
 		playbackRecoveryLedger?.resetGeneration(playbackGenerationRef.current);
 		playbackFailureLockedRef.current = false;
 		hlsNetworkRecoveryAttemptsRef.current = 0;
@@ -122,6 +126,7 @@ export const usePlayerRecoveryHandlers = ({
 		dynamicRangeFallbackAttemptedRef,
 		hlsMediaRecoveryAttemptsRef,
 		hlsNetworkRecoveryAttemptsRef,
+		invalidateRecoveryTransaction,
 		playbackFailureLockedRef,
 		playbackGenerationRef,
 		playbackRecoveryLedger
@@ -135,7 +140,7 @@ export const usePlayerRecoveryHandlers = ({
 		});
 	}, [detachPlaybackSource]);
 
-	const attemptPlaybackSessionRebuild = useCallback((reason, options = {}) => {
+	const attemptPlaybackSessionRebuild = useCallback(async (reason, options = {}) => {
 		const {
 			toast = '',
 			errorData = null,
@@ -189,11 +194,24 @@ export const usePlayerRecoveryHandlers = ({
 		}
 
 		const generation = runtimeContext?.generation ?? playbackGenerationRef.current;
+		const seekSeconds = Math.max(0, (videoRef.current?.currentTime || 0) + seekOffsetRef.current);
+		const recoveryOperation = beginRecoveryTransaction(
+			'session-rebuild',
+			buildPlaybackOverride({
+				baseOptions: playbackOptions,
+				mediaSourceId: activeMediaSourceData?.Id,
+				audioStreamIndex: currentAudioTrackRef.current,
+				subtitleStreamIndex: currentSubtitleTrackRef.current,
+				seekSeconds
+			})
+		);
+		if (!isRecoveryTransactionCurrent(recoveryOperation)) return true;
 		const recoveryClaim = playbackRecoveryLedger?.claimMany(generation, [
 			{key: PLAYBACK_RECOVERY_KEYS.playSessionRebuild, max: maxPlaySessionRebuildAttempts},
 			{key: PLAYBACK_RECOVERY_KEYS.reload}
 		]);
 		if (recoveryClaim && !recoveryClaim.accepted) {
+			completeRecoveryTransaction(recoveryOperation);
 			appendPlaybackDiagnostic?.({
 				scope: 'runtime-fallback',
 				stage: 'session-rebuild',
@@ -209,7 +227,6 @@ export const usePlayerRecoveryHandlers = ({
 		playSessionRebuildAttemptsRef.current = claimedAttempt || (playSessionRebuildAttemptsRef.current + 1);
 		reloadAttemptedRef.current = true;
 		const rebuildAttempt = playSessionRebuildAttemptsRef.current;
-		const seekSeconds = Math.max(0, (videoRef.current?.currentTime || 0) + seekOffsetRef.current);
 
 		console.warn(
 			`[Player] ${reason}. Rebuilding session with fresh PlaySessionId (${rebuildAttempt}/${maxPlaySessionRebuildAttempts})`,
@@ -230,13 +247,7 @@ export const usePlayerRecoveryHandlers = ({
 			reason: 'session-rebuild'
 		});
 
-		playbackOverrideRef.current = buildPlaybackOverride({
-			baseOptions: playbackOptions,
-			mediaSourceId: activeMediaSourceData?.Id,
-			audioStreamIndex: currentAudioTrackRef.current,
-			subtitleStreamIndex: currentSubtitleTrackRef.current,
-			seekSeconds
-		});
+		playbackOverrideRef.current = recoveryOperation.overrideCandidate;
 
 		setError(null);
 		setLoading(true);
@@ -246,27 +257,23 @@ export const usePlayerRecoveryHandlers = ({
 			setToastMessage(toast);
 		}
 
-		if (typeof loadVideoRef.current === 'function') {
-			setTimeout(() => {
-				const runtimeStillCurrent = !runtimeContext || isPlaybackRuntimeContextCurrent({
-					runtimeContext,
-					activeRuntimeContext: playbackRuntimeContextRef.current,
-					generation: playbackGenerationRef.current,
-					exitInProgress: exitInProgressRef.current
-				});
-				if (
-					runtimeStillCurrent &&
-					!exitInProgressRef.current &&
-					!playbackFailureLockedRef.current
-				) {
-					loadVideoRef.current();
-				}
-			}, 0);
-			return true;
+		if (typeof loadVideoRef.current !== 'function') {
+			completeRecoveryTransaction(recoveryOperation);
+			return false;
 		}
-		return false;
+
+		// Load admission replaces request and playback identity. Its structured result
+		// is the ownership handoff; the old recovery transaction need not survive it.
+		try {
+			await loadVideoRef.current();
+		} finally {
+			completeRecoveryTransaction(recoveryOperation);
+		}
+		return true;
 	}, [
+		beginRecoveryTransaction,
 		clearStartupDeadline,
+		completeRecoveryTransaction,
 		currentAudioTrackRef,
 		currentSubtitleTrackRef,
 		detachPlaybackSource,
@@ -275,6 +282,7 @@ export const usePlayerRecoveryHandlers = ({
 		mediaSourceData,
 		playSessionRebuildAttemptsRef,
 		exitInProgressRef,
+		isRecoveryTransactionCurrent,
 		playbackFailureLockedRef,
 		playbackOptions,
 		playbackOverrideRef,
@@ -828,7 +836,7 @@ export const usePlayerRecoveryHandlers = ({
 		playbackRuntimeContextRef
 	]);
 
-	const attemptHlsFatalRecovery = useCallback((
+	const attemptHlsFatalRecovery = useCallback(async (
 		hls,
 		errorData,
 		source = 'HLS',
@@ -850,7 +858,7 @@ export const usePlayerRecoveryHandlers = ({
 
 		if (recoveryAction.type === PLAYER_RECOVERY_ACTIONS.REBUILD_SESSION) {
 			const statusCode = Number(errorData?.response?.code);
-			const rebuilt = attemptPlaybackSessionRebuild(
+			const rebuilt = await attemptPlaybackSessionRebuild(
 				`${source} fragment request failed with HTTP ${statusCode}`,
 				{
 					toast: 'Server stream failed. Rebuilding playback session...',
@@ -982,12 +990,12 @@ export const usePlayerRecoveryHandlers = ({
 			const handled = await attemptSubtitleCompatibilityFallback(data, runtimeContext);
 			if (!isHlsRuntimeActive(hls, runtimeContext, sourceToken)) return true;
 			if (!handled && hlsError.fatal) {
-				attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
+				await attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
 			}
 			return handled || hlsError.fatal;
 		}
 		if (hlsError.fatal) {
-			return attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
+			return await attemptHlsFatalRecovery(hls, data, sourceLabel, runtimeContext);
 		}
 		return false;
 	}, [
@@ -1008,7 +1016,7 @@ export const usePlayerRecoveryHandlers = ({
 		sourceToken = null
 	}) => {
 		if (!isHlsRuntimeActive(hls, runtimeContext, sourceToken)) return false;
-		const rebuilt = attemptPlaybackSessionRebuild(
+		const rebuilt = await attemptPlaybackSessionRebuild(
 			'HLS.js did not buffer a media fragment before startup',
 			{runtimeContext}
 		);
@@ -1032,6 +1040,10 @@ export const usePlayerRecoveryHandlers = ({
 	]);
 
 	return {
+		beginRecoveryTransaction,
+		isRecoveryTransactionCurrent,
+		completeRecoveryTransaction,
+		invalidateRecoveryTransaction,
 		resetRecoveryGuards,
 		stopHlsRecoveryLoop,
 		attemptPlaybackSessionRebuild,

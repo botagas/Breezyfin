@@ -29,22 +29,7 @@ import {
 	restoreServiceSession,
 	setActiveServiceServer
 } from '../jellyfin/sessionApi';
-
-const jsonResponse = (data, ok = true, status = 200) => {
-	const bodyText = JSON.stringify(data);
-	return {
-		ok,
-		status,
-		json: async () => data,
-		text: async () => bodyText
-	};
-};
-
-const textResponse = (bodyText, ok = false, status = 400) => ({
-	ok,
-	status,
-	text: async () => bodyText
-});
+import {createJsonResponse, createTextResponse} from '../../testUtils/fetchResponse';
 
 const createService = () => ({
 	jellyfin: {
@@ -101,7 +86,7 @@ describe('sessionApi', () => {
 
 	it('connects to server and stores resolved metadata', async () => {
 		const service = createService();
-		global.fetch.mockResolvedValue(jsonResponse({Name: 'Server Public Name'}));
+		global.fetch.mockResolvedValue(createJsonResponse({Name: 'Server Public Name'}));
 
 		await expect(connectToServer(service, 'http://server.local')).resolves.toEqual({Name: 'Server Public Name'});
 		expect(service.jellyfin.createApi).toHaveBeenCalledWith('http://server.local');
@@ -118,7 +103,7 @@ describe('sessionApi', () => {
 		service.getDeviceId = jest.fn().mockReturnValue('service-device-id');
 		serverManager.addServer.mockReturnValue({serverId: 'srv-1', userId: 'user-1'});
 		global.fetch.mockResolvedValue(
-			jsonResponse({
+			createJsonResponse({
 				AccessToken: 'token-1',
 				User: {
 					Id: 'user-1',
@@ -164,7 +149,7 @@ describe('sessionApi', () => {
 		service.api = {};
 		serverManager.addServer.mockReturnValue({serverId: 'srv-1', userId: 'user-1'});
 		global.fetch.mockResolvedValue(
-			jsonResponse({
+			createJsonResponse({
 				AccessToken: 'token-1',
 				User: {
 					Id: 'user-1',
@@ -189,7 +174,7 @@ describe('sessionApi', () => {
 		const service = createService();
 		service.serverUrl = 'http://server.local';
 		service.api = {};
-		global.fetch.mockResolvedValue(textResponse('<html>Bad request</html>', false, 400));
+		global.fetch.mockResolvedValue(createTextResponse('<html>Bad request</html>', false, 400));
 
 		await expect(authenticateWithServer(service, 'Alice', 'secret')).rejects.toMatchObject({
 			name: 'JellyfinRequestError',
@@ -203,7 +188,7 @@ describe('sessionApi', () => {
 		const service = createService();
 		service.serverUrl = 'http://server.local';
 		service.api = {};
-		global.fetch.mockResolvedValue(textResponse('<html>Unexpected response</html>', true, 200));
+		global.fetch.mockResolvedValue(createTextResponse('<html>Unexpected response</html>', true, 200));
 
 		await expect(authenticateWithServer(service, 'Alice', 'secret')).rejects.toThrow(
 			'Authentication response was not valid JSON'
