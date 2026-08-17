@@ -255,9 +255,15 @@ video and create persistent A/V desynchronization.
 
 **Implementation:**
 
-- `usePlayerAudioTransition` pauses on the current frame, keeps the active source attached
-  during PlaybackInfo preparation, then commits one generation-bound server-selected
-  replacement source with the prior position and play/pause state.
+- `usePlayerAudioTransition` pauses on the current frame and keeps the active source attached
+  during PlaybackInfo preparation. It then commits one generation-bound replacement source
+  and restores the prior position and play/pause state.
+- The replacement uses DirectPlay, DirectStream, or Transcode negotiation for the requested
+  audio track.
+- For a non-default DirectPlay track, the startup coordinator selects the native
+  `AudioTrackList` track before startup completes.
+- If native audio selection fails during a runtime transition, the transition uses the
+  controlled rollback path.
 - The paused progress snapshot is awaited before preparation. Successful readiness closes
   the captured old PlaySession; rollback closes the failed replacement before restoring the
   old paused session. Cancelled or decision-blocked preparations close only the session that
@@ -268,9 +274,11 @@ video and create persistent A/V desynchronization.
 - `usePlayerStartupCoordinator` requires replacement metadata and position restoration
   before startup. A failed committed swap restores the previous source in a fresh paused
   generation; preparation failure leaves the original paused source attached.
-- Initial explicit DirectPlay selection may use `AudioTrackList` before playback starts.
-  Its bounded discovery deadline is not an audible-readiness timer; failure negotiates a
-  server remux/transcode instead.
+- During initial DirectPlay startup, the startup coordinator can select an explicit native
+  audio track through `AudioTrackList`. Its bounded discovery deadline is not an
+  audible-readiness timer.
+- If the client cannot select the native audio track during initial DirectPlay startup, it
+  can use the server remux/transcode fallback.
 - HLS.js remains in-place only when the current instance emits the matching
   `AUDIO_TRACK_SWITCHED` event. Timeout or stale events enter the controlled replacement.
 - SyncPlay obtains the replacement position from its server-clock target and returns to
@@ -283,10 +291,9 @@ lifecycle investigation in `TODOS.md` before replacing this workaround with a co
 or readiness-based path.
 
 **Validation:** During native DirectPlay/DirectStream/native HLS, switch repeatedly while
-playing and paused. Confirm the old frame remains visible during preparation. Confirm all
-controls except Back remain locked. Verify the transition restores position and the prior
-pause state. A failed replacement must roll back to a paused state, and an item change must
-not complete a stale transition.
+playing and paused. Confirm the old frame remains visible during PlaybackInfo preparation.
+Confirm all controls except Back remain locked. Verify the transition restores position and
+the prior pause state.
 
 Verify HLS.js commits only after the matching event. Verify SyncPlay waits for server
 authority. Delay the video mount and confirm that it commits once. Press Back and confirm

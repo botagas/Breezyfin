@@ -512,6 +512,8 @@ usePlayerInteractionReveal({
   - close the superseded Jellyfin session after successful readiness, and close an unused
     or failed replacement session before decision handoff, cancellation, or rollback
   - use the SyncPlay bridge's server-clock position and wait for Ready/Unpause authority
+  - use DirectPlay, DirectStream, or Transcode negotiation for replacement playback
+  - select the native audio track before startup completes for a non-default DirectPlay track
 
   Native runtime changes must use this hook rather than enabling `AudioTrackList` and
   waiting an arbitrary delay. HLS.js remains in `usePlayerSeekAndTrackSwitching` because
