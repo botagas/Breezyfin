@@ -39,6 +39,10 @@ import {useAppSyncPlayNavigation} from './hooks/useAppSyncPlayNavigation';
 import {SyncPlayProvider} from '../contexts/SyncPlayContext';
 import SyncPlayGlobalOverlays from '../components/SyncPlayGlobalOverlays';
 import {emitAppDebugEvent, isEditableTarget} from './utils/appInput';
+import {
+	captureRuntimeSessionIdentity,
+	isRuntimeSessionIdentityCurrent
+} from '../utils/savedSessionIdentity';
 
 import css from './App.module.less';
 
@@ -403,8 +407,10 @@ const App = (props) => {
 				}
 				const restored = jellyfinService.restoreSession();
 				if (!restored) return;
+				const restoredSessionIdentity = captureRuntimeSessionIdentity(jellyfinService);
+				if (!restoredSessionIdentity) return;
 				const user = await jellyfinService.getCurrentUser();
-				if (cancelled) return;
+				if (cancelled || !isRuntimeSessionIdentityCurrent(restoredSessionIdentity, jellyfinService)) return;
 				if (user) {
 					setSessionActive(true);
 					setCurrentView('home');

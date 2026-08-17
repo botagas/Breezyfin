@@ -10,6 +10,10 @@ import jellyfinService from '../services/jellyfinService';
 import {getUserErrorMessage} from '../utils/errorMessages';
 import { useMapById } from '../hooks/useMapById';
 import { useImageErrorFallback } from '../hooks/useImageErrorFallback';
+import {
+	captureRuntimeSessionIdentity,
+	isRuntimeSessionIdentityCurrent
+} from '../utils/savedSessionIdentity';
 import {buildUserPrimaryImageUrl} from './login-panel/utils/loginImageUrls';
 import {useLoginBackdrops} from './login-panel/hooks/useLoginBackdrops';
 import LoginBackdropLayer from './login-panel/components/LoginBackdropLayer';
@@ -246,22 +250,38 @@ const LoginPanel = ({
 		setLoading(true);
 		setError(null);
 		setStatus('Restoring saved session...');
+		let resumedSessionIdentity = null;
 		try {
 			jellyfinService.setActiveServer(entry.serverId, entry.userId);
+			resumedSessionIdentity = captureRuntimeSessionIdentity(jellyfinService);
+			if (!resumedSessionIdentity) {
+				throw new Error('Saved session could not be activated');
+			}
 			const user = await jellyfinService.getCurrentUser();
+			if (!isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService)) return;
 			if (!user) {
 				throw new Error('Session is no longer valid');
 			}
 			onLogin();
 		} catch (err) {
+			if (
+				resumedSessionIdentity &&
+				!isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService)
+			) {
+				return;
+			}
 			console.error('Failed to resume session:', err);
 			setError(getUserErrorMessage(err, 'Could not resume saved session. Please sign in again.'));
 			setStep(savedServers.length > 0 ? 'saved' : 'server');
 		} finally {
-			setLoading(false);
-			setResumingKey(null);
-			setStatus('');
-			refreshSavedServers();
+			const resumedSessionIsCurrent = !resumedSessionIdentity ||
+				isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService);
+			if (resumedSessionIsCurrent) {
+				setLoading(false);
+				setResumingKey(null);
+				setStatus('');
+				refreshSavedServers();
+			}
 		}
 	}, [onLogin, refreshSavedServers, savedServers.length]);
 

@@ -77,6 +77,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Apply mode-aware width, quality, and server blur to authenticated plugin image URLs | `buildExternalImageVariantUrl` |
 | Build duplicate-safe media list React keys | `buildMediaListItemKey` |
 | Centralize LoginPanel rotating backdrop state, startup-restore deferral, and load/error handling | `useLoginBackdrops` |
+| Guard delayed saved-session restoration against a replacement runtime session | `captureRuntimeSessionIdentity` / `isRuntimeSessionIdentityCurrent` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
 | Match Jellyfin, HLS, native media tracks, and cross-episode audio/subtitle intents with duplicate-language safety | `resolveRuntimeTrackIndex` / `resolveAudioTrackIndex` / `resolveSubtitleTrackIndex` / `applyNativeAudioTrackSelection` |
 | Derive Settings runtime capability labels from capability snapshot | `useRuntimeCapabilityLabels` |
