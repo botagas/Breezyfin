@@ -7,10 +7,10 @@ import {createJellyfinRequestError} from './requestErrors';
 const LEGACY_AUTH_KEY = 'jellyfinAuth';
 
 const advanceSessionGeneration = (service) => {
-	if (typeof service?._advanceSessionGeneration === 'function') {
+	if (typeof service._advanceSessionGeneration === 'function') {
 		return service._advanceSessionGeneration();
 	}
-	service.sessionGeneration = Number(service?.sessionGeneration || 0) + 1;
+	service.sessionGeneration = Number(service.sessionGeneration || 0) + 1;
 	return service.sessionGeneration;
 };
 
