@@ -1181,7 +1181,11 @@ const PlayerPanel = ({
 			loading,
 			loadingStatusMessage,
 			backdropUrls: getPlayerBackdropCandidates(item, jellyfinService),
-			showBackdrop: Boolean(loading || error || playbackDecisionPrompt),
+			showBackdrop: Boolean(
+			    error ||
+    			playbackDecisionPrompt ||
+    			(loading && !audioTransition.active)
+			),
 			seekFeedback,
 			externalSubtitleLayerRef,
 			showControls,
