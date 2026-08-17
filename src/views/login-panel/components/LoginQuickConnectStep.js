@@ -1,6 +1,6 @@
 import BodyText from '@enact/sandstone/BodyText';
-import Spinner from '@enact/sandstone/Spinner';
 import Button from '../../../components/BreezyButton';
+import BreezyLoadingOverlay from '../../../components/BreezyLoadingOverlay';
 
 const LoginQuickConnectStep = ({phase, code, error, onRetry, onBack, css}) => {
 	const waiting = phase === 'starting' || phase === 'waiting' || phase === 'completing';
@@ -18,16 +18,14 @@ const LoginQuickConnectStep = ({phase, code, error, onRetry, onBack, css}) => {
 				</BodyText>
 			) : null}
 			{waiting ? (
-				<div className={css.quickConnectStatus} role="status">
-					<Spinner />
-					<BodyText>
-						{phase === 'starting'
-							? 'Generating code...'
-							: phase === 'completing'
-								? 'Signing in...'
-								: 'Waiting for approval...'}
-					</BodyText>
-				</div>
+				<BreezyLoadingOverlay
+					className={css.quickConnectStatus}
+					label={phase === 'starting'
+						? 'Generating code...'
+						: phase === 'completing'
+							? 'Signing in...'
+							: 'Waiting for approval...'}
+				/>
 			) : null}
 			{error ? <BodyText className={css.quickConnectError}>{error}</BodyText> : null}
 			<div className={css.buttonRow}>

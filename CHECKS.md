@@ -166,8 +166,9 @@ Run these before packaging a release candidate:
   a code from another signed-in client and verify Breezyfin saves and activates the
   approved user.
 - While Quick Connect waits, verify requests do not overlap and Back returns to credentials.
-  Verify Retry creates a new code after failure or five-minute expiry. Verify Back,
-  server change, panel deactivation, and app exit cannot complete an old sign-in.
+  Verify the shared wind loading status shows the current operation. Verify Retry creates
+  a new code after failure or five-minute expiry. Verify Back, server change, panel
+  deactivation, and app exit cannot complete an old sign-in.
 - Verify the Quick Connect Back and Retry actions receive initial 5-way focus and remain
   usable with pointer input.
 

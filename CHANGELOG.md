@@ -9,7 +9,8 @@ All notable changes to Breezyfin are documented in this file.
 ### Changed
 
 - Added Jellyfin Quick Connect to connected password-login and expired-account recovery
-  forms, with bounded polling, cancellation, and TV-focused Back and Retry actions.
+  forms, with the shared wind loading status, bounded polling, cancellation, and
+  TV-focused Back and Retry actions.
 - Changed expired saved accounts to reopen the credential form with the username filled
   in instead of requiring Add User.
 - Replaced legacy Jellyfin authentication headers and lowercase API-key query parameters

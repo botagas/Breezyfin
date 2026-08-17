@@ -112,7 +112,12 @@ export const getUnavailablePluginResult = (error, prefix = 'plugin') => {
 	};
 };
 
-export const requestBreezyfinPluginJson = async (service, path, context) => {
+export const requestBreezyfinPluginJson = async (
+	service,
+	path,
+	context,
+	{suppressAuthHandling = false} = {}
+) => {
 	const controller = typeof AbortController === 'function' ? new AbortController() : null;
 	let timeoutId = null;
 	const timeoutPromise = new Promise((_, reject) => {
@@ -127,6 +132,7 @@ export const requestBreezyfinPluginJson = async (service, path, context) => {
 		return await Promise.race([
 			service._request(path, {
 				context,
+				suppressAuthHandling,
 				...(controller ? {signal: controller.signal} : {})
 			}),
 			timeoutPromise
@@ -170,10 +176,12 @@ const loadPluginCapabilities = async (service) => {
 		data = await requestBreezyfinPluginJson(
 			service,
 			CAPABILITIES_PLUGIN_ENDPOINT,
-			'getBreezyfinCapabilities plugin'
+			'getBreezyfinCapabilities plugin',
+			{suppressAuthHandling: true}
 		);
 	} catch (error) {
-		if (shouldPropagatePluginError(error)) throw error;
+		const status = getPluginErrorStatus(error);
+		if (![401, 403].includes(status) && shouldPropagatePluginError(error)) throw error;
 		const failure = getPluginFailureDetails(error, 'plugin-capabilities');
 		return {
 			available: false,

@@ -1,4 +1,4 @@
-import {getMyRequestItems} from '../jellyfin/requestsApi';
+import {getBreezyfinCapabilities, getMyRequestItems} from '../jellyfin/requestsApi';
 
 let serviceCounter = 0;
 
@@ -280,13 +280,30 @@ describe('requestsApi', () => {
 		);
 	});
 
-	it.each([400, 401, 403])('propagates capability HTTP %i without tag fallback', async (status) => {
+	it('propagates a malformed capabilities request without tag fallback', async () => {
 		const service = createService();
-		const error = makeRequestError(status);
+		const error = makeRequestError(400);
 		service._request.mockRejectedValueOnce(error);
 
 		await expect(getMyRequestItems(service, {username: 'requester'})).rejects.toBe(error);
 		expect(service.getLibraryItems).not.toHaveBeenCalled();
+	});
+
+	it.each([401, 403])('treats capability HTTP %i as optional feature unavailability', async (status) => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(status));
+
+		await expect(getBreezyfinCapabilities(service)).resolves.toMatchObject({
+			available: false,
+			diagnosticReason: 'plugin-capabilities-unavailable',
+			status,
+			retryable: false
+		});
+		expectCapabilitiesRequest(service);
+		expect(service._request).toHaveBeenCalledWith(
+			'/Breezyfin/Capabilities',
+			expect.objectContaining({suppressAuthHandling: true})
+		);
 	});
 
 	it.each([400, 401, 403])('propagates My Requests HTTP %i without tag fallback', async (status) => {

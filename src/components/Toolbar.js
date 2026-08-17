@@ -47,7 +47,8 @@ const Toolbar = ({
 	onExit,
 	onNavigateDown,
 	onBack,
-	panelTitle = ''
+	panelTitle = '',
+	isActive = false
 }) => {
 	const runtimeSuspended = useRuntimeSuspended();
 	const [libraries, setLibraries] = useState([]);
@@ -138,11 +139,13 @@ const Toolbar = ({
 	}, [buildUserAvatarUrl]);
 
 	useEffect(() => {
+		if (!isActive) return;
 		loadLibraries();
 		loadUserInfo();
-	}, [loadLibraries, loadUserInfo, serviceSessionKey]);
+	}, [isActive, loadLibraries, loadUserInfo, serviceSessionKey]);
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		let cancelled = false;
 		let retryTimer = null;
 		setPluginFeatures((current) => ({...current, calendar: false}));
@@ -166,7 +169,7 @@ const Toolbar = ({
 			cancelled = true;
 			if (retryTimer) clearTimeout(retryTimer);
 		};
-	}, [serviceSessionKey]);
+	}, [isActive, serviceSessionKey]);
 
 	useEffect(() => {
 		const updateWatchlistPreference = () => {
@@ -178,6 +181,7 @@ const Toolbar = ({
 	}, [serviceSessionKey]);
 
 	useEffect(() => {
+		if (!isActive) return undefined;
 		let cancelled = false;
 		jellyfinService.detectJellyWatchParty().then((availability) => {
 			if (cancelled) return;
@@ -195,7 +199,7 @@ const Toolbar = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [serviceSessionKey]);
+	}, [isActive, serviceSessionKey]);
 
 	useEffect(() => {
 		if (runtimeSuspended) return undefined;

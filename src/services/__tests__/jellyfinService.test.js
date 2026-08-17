@@ -193,6 +193,21 @@ describe('jellyfinService', () => {
 		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
 	});
 
+	it('does not expire the active session when optional handling is suppressed', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'active-token';
+		global.fetch.mockResolvedValue(createJsonResponse({}, false, 401));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+
+		await expect(jellyfinService._request('/Breezyfin/Capabilities', {
+			context: 'optional capability request',
+			suppressAuthHandling: true
+		})).rejects.toMatchObject({status: 401});
+		expect(expiredListener).not.toHaveBeenCalled();
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+	});
+
 	it('authenticates and persists active session', async () => {
 		jellyfinService.serverUrl = 'http://media.local';
 		jellyfinService.api = {};

@@ -7,8 +7,8 @@ jest.mock('@enact/sandstone/BodyText', () => function TestBodyText({children, ..
 	return <div {...props}>{children}</div>;
 });
 
-jest.mock('@enact/sandstone/Spinner', () => function TestSpinner() {
-	return <span data-testid="spinner" />;
+jest.mock('../../../../components/BreezyLoadingOverlay', () => function TestLoading({label}) {
+	return <div role="status">{label}</div>;
 });
 
 jest.mock('@enact/sandstone/Input', () => function TestInput({autoFocus, ...props}) {
@@ -90,6 +90,7 @@ describe('Login steps', () => {
 			/>
 		);
 		expect(screen.getByText('Back').getAttribute('data-autofocus')).toBe('true');
+		expect(screen.getByRole('status').textContent).toBe('Waiting for approval...');
 
 		rerender(
 			<LoginQuickConnectStep

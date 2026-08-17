@@ -508,10 +508,15 @@ describe('plugin feature APIs', () => {
 		}
 	});
 
-	it('propagates authentication failures', async () => {
+	it('treats optional plugin authentication failures as feature unavailability', async () => {
 		const service = createService();
 		const error = Object.assign(new Error('status 401'), {status: 401});
 		service._request.mockRejectedValueOnce(error);
-		await expect(getDiscoveryFeed(service, 'Trending')).rejects.toBe(error);
+		await expect(getDiscoveryFeed(service, 'Trending')).resolves.toMatchObject({
+			available: false,
+			diagnosticReason: 'plugin-capabilities-unavailable',
+			status: 401,
+			retryable: false
+		});
 	});
 });
