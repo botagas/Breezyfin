@@ -16,6 +16,13 @@ regression risk.
 
 - Remove the deprecated `jellyfinAuth` read-and-migrate path no earlier than `0.4.0`, after the managed `breezyfin_servers` migration has shipped for multiple release cycles.
   Before removal, document that users upgrading directly from older releases may need to sign in again and verify logout, switch-user, cache clearing, and multi-server restoration remain correct.
+- Add regression coverage for runtime DirectPlay audio transitions:
+  - confirm a non-default DirectPlay replacement waits for native audio selection
+  - confirm runtime audio negotiation does not force DirectPlay off
+  - confirm a paused DirectPlay replacement restores the selected audio track and
+    playback position before transition readiness
+  - confirm native audio-selection failure enters the controlled runtime rollback
+    path instead of the initial-startup server fallback
 
 ## Medium changes / issues
 
