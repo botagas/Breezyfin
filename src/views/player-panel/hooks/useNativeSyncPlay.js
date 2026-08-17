@@ -41,6 +41,7 @@ export const useNativeSyncPlay = ({
 	const readyPendingRef = useRef(false);
 	const bufferingTimerRef = useRef(null);
 	const bufferingReportedRef = useRef(false);
+	const seekReadyPendingRef = useRef(false);
 	const readyGenerationRef = useRef(0);
 	const reportReadyRef = useRef(() => Promise.resolve(false));
 	const flushQueuedCommandRef = useRef(() => {});
@@ -139,9 +140,17 @@ export const useNativeSyncPlay = ({
 						forceNextSeekRef.current = false;
 					}
 					Promise.resolve(
-						syncPlayStartupBridge?.startAuthoritativePlayback() ||
-						video.play()
+						syncPlayStartupBridge?.startAuthoritativePlayback()
 					)
+						.then(async (startedByCoordinator) => {
+							if (startedByCoordinator === true) {
+								return;
+							}
+
+							if (video.paused) {
+								await video.play();
+							}
+						})
 						.then(() => applyTargetCorrection(false))
 						.catch(() => setToastMessage({
 							message: 'SyncPlay could not start local playback.',
@@ -150,8 +159,15 @@ export const useNativeSyncPlay = ({
 					break;
 				case 'Seek':
 					if (Number.isFinite(positionTicks)) {
-						video.currentTime = Math.max(0, positionTicks / TICKS_PER_SECOND);
+						seekReadyPendingRef.current = true;
+						lastReadyKeyRef.current = '';
+
+						video.currentTime = Math.max(
+							0,
+							positionTicks / TICKS_PER_SECOND
+						);
 					}
+
 					targetRef.current = null;
 					resetRate();
 					break;
@@ -159,6 +175,7 @@ export const useNativeSyncPlay = ({
 					video.pause();
 					video.currentTime = 0;
 					targetRef.current = null;
+				    seekReadyPendingRef.current = false;
 					resetRate();
 					break;
 				default:
@@ -323,6 +340,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
+	    seekReadyPendingRef.current = false;
 		clearTimeout(bufferingTimerRef.current);
 		resetRate();
 	}, [group?.GroupId, resetRate]);
@@ -344,6 +362,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
+	    seekReadyPendingRef.current = false;
 		resetRate();
 	}, [item?.Id, playbackGeneration, resetRate]);
 
@@ -360,6 +379,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
+	    seekReadyPendingRef.current = false;
 		resetRate();
 	}, [resetRate, syncPlay.followMode]);
 
@@ -424,6 +444,17 @@ export const useNativeSyncPlay = ({
 				});
 			}, BUFFERING_REPORT_DELAY_MS);
 		};
+		const onSeeked = () => {
+			if (!seekReadyPendingRef.current) {
+				return;
+			}
+
+			reportReadyRef.current().then((reported) => {
+				if (reported) {
+					seekReadyPendingRef.current = false;
+				}
+			});
+		};
 		const onPlaying = () => {
 			clearBufferingTimer();
 			if (bufferingReportedRef.current) {
@@ -433,11 +464,13 @@ export const useNativeSyncPlay = ({
 		};
 		video.addEventListener('waiting', onWaiting);
 		video.addEventListener('playing', onPlaying);
+		video.addEventListener('seeked', onSeeked);
 		if (!video.paused) onPlaying();
 		return () => {
 			clearBufferingTimer();
 			video.removeEventListener('waiting', onWaiting);
 			video.removeEventListener('playing', onPlaying);
+			video.removeEventListener('seeked', onSeeked);
 		};
 	}, [
 		group?.GroupId,

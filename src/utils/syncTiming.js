@@ -63,11 +63,13 @@ export const getSyncPlayDriftCorrection = (driftMs, {forceSeek = false} = {}) =>
 	const numericDrift = Number(driftMs);
 	if (!Number.isFinite(numericDrift)) return {action: 'none', playbackRate: 1};
 	const magnitude = Math.abs(numericDrift);
-	if (forceSeek || magnitude >= 2000) return {action: 'seek', playbackRate: 1};
-	if (magnitude <= 250) return {action: 'none', playbackRate: 1};
+	if (forceSeek || magnitude >= 2000) {
+		return {action: 'seek', playbackRate: 1};
+	}
+
 	return {
-		action: 'rate',
-		playbackRate: numericDrift > 0 ? 1.03 : 0.97
+		action: 'none',
+		playbackRate: 1
 	};
 };
 
@@ -78,9 +80,12 @@ export const getBoundedSyncPlayDriftCorrection = (
 	const correction = getSyncPlayDriftCorrection(driftMs, {
 		forceSeek: forceSeek && !hardSeekApplied
 	});
-	if (correction.action !== 'seek' || !hardSeekApplied) return correction;
+	if (correction.action !== 'seek' || !hardSeekApplied) {
+		return correction;
+	}
+
 	return {
-		action: 'rate',
-		playbackRate: Number(driftMs) > 0 ? 1.03 : 0.97
+		action: 'none',
+		playbackRate: 1
 	};
 };

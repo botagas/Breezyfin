@@ -23,6 +23,8 @@ regression risk.
     playback position before transition readiness
   - confirm native audio-selection failure enters the controlled runtime rollback
     path instead of the initial-startup server fallback
+- Fix SyncPlay resume after the initial playback start. Ensure that an `Unpause` command calls `video.play()` when the startup coordinator does not start playback.
+- Add a regression test for the SyncPlay pause, resume sequence after the initial playback start as well as a regression test for syncTiming.
 
 ## Medium changes / issues
 

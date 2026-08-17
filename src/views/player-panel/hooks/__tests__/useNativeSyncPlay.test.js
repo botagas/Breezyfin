@@ -172,8 +172,7 @@ describe('useNativeSyncPlay', () => {
 		view.unmount();
 	});
 
-	it('hard-seeks at most once for one authoritative Unpause command', async () => {
-		const video = buildVideo({trackCurrentTimeWrites: true});
+	it('hard-seeks at most once and keeps playback at 1x for one authoritative Unpause command', async () => {		const video = buildVideo({trackCurrentTimeWrites: true});
 		const view = renderNativeSyncPlay({video});
 		await flushClockSample();
 		await reportInitialReady(view);
@@ -200,7 +199,7 @@ describe('useNativeSyncPlay', () => {
 		});
 
 		expect(video.currentTimeWrites).toEqual([]);
-		expect(video.playbackRate).toBe(1.03);
+		expect(video.playbackRate).toBe(1);
 		view.unmount();
 	});
 
