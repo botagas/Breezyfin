@@ -6,6 +6,14 @@ import {createJellyfinRequestError} from './requestErrors';
 
 const LEGACY_AUTH_KEY = 'jellyfinAuth';
 
+const advanceSessionGeneration = (service) => {
+	if (typeof service?._advanceSessionGeneration === 'function') {
+		return service._advanceSessionGeneration();
+	}
+	service.sessionGeneration = Number(service?.sessionGeneration || 0) + 1;
+	return service.sessionGeneration;
+};
+
 const normalizeAuthPassword = (password) => {
 	if (password === null || password === undefined) return '';
 	return typeof password === 'string' ? password : String(password);
@@ -31,7 +39,14 @@ const resolveAuthDeviceId = (service) => {
 	return getDeviceId();
 };
 
+export const resolveClientAuthHeaders = async (service) => {
+	const appVersion = await resolveAuthVersion(service);
+	const deviceId = resolveAuthDeviceId(service);
+	return buildClientAuthHeaders(deviceId, appVersion);
+};
+
 const clearRuntimeSession = (service) => {
+	advanceSessionGeneration(service);
 	service.api = null;
 	service.userId = null;
 	service.serverUrl = null;
@@ -59,6 +74,7 @@ const readAuthenticationResponse = async (response) => {
 
 export const applySessionFromStore = (service, entry) => {
 	if (!entry) return false;
+	advanceSessionGeneration(service);
 	service.serverUrl = entry.url;
 	service.accessToken = entry.accessToken;
 	service.userId = entry.userId;
@@ -71,6 +87,11 @@ export const applySessionFromStore = (service, entry) => {
 
 export const connectToServer = async (service, serverUrl) => {
 	try {
+		advanceSessionGeneration(service);
+		service.accessToken = null;
+		service.userId = null;
+		service.username = null;
+		service.sessionExpiredNotified = false;
 		service.serverUrl = serverUrl;
 		service.api = service.jellyfin.createApi(serverUrl);
 		const response = await fetch(`${serverUrl}/System/Info/Public`);
@@ -87,8 +108,7 @@ export const connectToServer = async (service, serverUrl) => {
 
 export const authenticateWithServer = async (service, username, password) => {
 	try {
-		const appVersion = await resolveAuthVersion(service);
-		const deviceId = resolveAuthDeviceId(service);
+		const clientAuthHeaders = await resolveClientAuthHeaders(service);
 		const normalizedPassword = normalizeAuthPassword(password);
 		const response = await fetch(
 			`${service.serverUrl}/Users/AuthenticateByName`,
@@ -96,7 +116,7 @@ export const authenticateWithServer = async (service, username, password) => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					...buildClientAuthHeaders(deviceId, appVersion)
+					...clientAuthHeaders
 				},
 				body: JSON.stringify({
 					Username: username,
@@ -107,38 +127,47 @@ export const authenticateWithServer = async (service, username, password) => {
 
 		const data = await readAuthenticationResponse(response);
 
-		if (data.AccessToken) {
-			service.accessToken = data.AccessToken;
-			service.userId = data.User.Id;
-			service.username = data.User?.Name || username;
-			service.serverName = data?.ServerName || service.serverName || service.serverUrl;
-			service.sessionExpiredNotified = false;
-
-			service.api.accessToken = service.accessToken;
-
-			const saved = serverManager.addServer({
-				serverUrl: service.serverUrl,
-				serverName: service.serverName,
-				userId: service.userId,
-				username: service.username,
-				accessToken: service.accessToken,
-				avatarTag: data.User?.PrimaryImageTag || null
-			});
-			if (saved) {
-				const active = serverManager.setActiveServer(saved.serverId, saved.userId);
-				if (active) {
-					localStorage.removeItem(LEGACY_AUTH_KEY);
-				}
-			}
-
-			return data.User;
-		}
-		throw new Error('Authentication response did not include an access token');
+		return commitAuthenticationResult(service, data, {fallbackUsername: username});
 	} catch (error) {
 		console.error('Authentication failed:', error);
 		throw error;
 	}
 };
+
+export function commitAuthenticationResult (service, data, options = {}) {
+	const accessToken = data?.AccessToken;
+	const userId = data?.User?.Id;
+	if (!accessToken || !userId) {
+		throw new Error('Authentication response did not include an access token and user');
+	}
+
+	advanceSessionGeneration(service);
+	service.accessToken = accessToken;
+	service.userId = userId;
+	service.username = data.User?.Name || options.fallbackUsername || 'User';
+	service.serverName = data?.ServerName || service.serverName || service.serverUrl;
+	service.sessionExpiredNotified = false;
+	if (service.api) {
+		service.api.accessToken = accessToken;
+	}
+
+	const saved = serverManager.addServer({
+		serverUrl: service.serverUrl,
+		serverName: service.serverName,
+		userId,
+		username: service.username,
+		accessToken,
+		avatarTag: data.User?.PrimaryImageTag || null
+	});
+	if (saved) {
+		const active = serverManager.setActiveServer(saved.serverId, saved.userId);
+		if (active) {
+			localStorage.removeItem(LEGACY_AUTH_KEY);
+		}
+	}
+
+	return data.User;
+}
 
 export const restoreServiceSession = (service, serverId = null, userId = null) => {
 	const active = serverManager.getActiveServer(serverId, userId);
@@ -169,6 +198,7 @@ export const restoreServiceSession = (service, serverId = null, userId = null) =
 			return false;
 		}
 		service.serverUrl = serverUrl;
+		advanceSessionGeneration(service);
 		service.accessToken = accessToken;
 		service.userId = storedUserId;
 		service.api = service.jellyfin.createApi(serverUrl, accessToken);

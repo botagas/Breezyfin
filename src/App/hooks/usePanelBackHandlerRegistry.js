@@ -2,6 +2,7 @@ import { useRef, useCallback } from 'react';
 
 export const usePanelBackHandlerRegistry = () => {
 	const playerBackHandlerRef = useRef(null);
+	const loginBackHandlerRef = useRef(null);
 	const detailsBackHandlerRef = useRef(null);
 	const homeBackHandlerRef = useRef(null);
 	const homeSectionBackHandlerRef = useRef(null);
@@ -25,6 +26,10 @@ export const usePanelBackHandlerRegistry = () => {
 
 	const registerPlayerBackHandler = useCallback((handler) => {
 		playerBackHandlerRef.current = handler;
+	}, []);
+
+	const registerLoginBackHandler = useCallback((handler) => {
+		loginBackHandlerRef.current = handler;
 	}, []);
 
 	const registerHomeBackHandler = useCallback((handler) => {
@@ -70,6 +75,7 @@ export const usePanelBackHandlerRegistry = () => {
 	return {
 		refs: {
 			playerBackHandlerRef,
+			loginBackHandlerRef,
 			detailsBackHandlerRef,
 			homeBackHandlerRef,
 			homeSectionBackHandlerRef,
@@ -85,6 +91,7 @@ export const usePanelBackHandlerRegistry = () => {
 		runPanelBackHandler,
 		registerDetailsBackHandler,
 		registerPlayerBackHandler,
+		registerLoginBackHandler,
 		registerHomeBackHandler,
 		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,

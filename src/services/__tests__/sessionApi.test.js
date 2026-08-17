@@ -86,11 +86,18 @@ describe('sessionApi', () => {
 
 	it('connects to server and stores resolved metadata', async () => {
 		const service = createService();
+		service.accessToken = 'expired-token';
+		service.userId = 'expired-user';
+		service.username = 'Expired User';
 		global.fetch.mockResolvedValue(createJsonResponse({Name: 'Server Public Name'}));
 
 		await expect(connectToServer(service, 'http://server.local')).resolves.toEqual({Name: 'Server Public Name'});
 		expect(service.jellyfin.createApi).toHaveBeenCalledWith('http://server.local');
 		expect(service.serverName).toBe('Server Public Name');
+		expect(service.accessToken).toBe(null);
+		expect(service.userId).toBe(null);
+		expect(service.username).toBe(null);
+		expect(service.sessionExpiredNotified).toBe(false);
 		expect(global.fetch).toHaveBeenCalledWith('http://server.local/System/Info/Public');
 	});
 

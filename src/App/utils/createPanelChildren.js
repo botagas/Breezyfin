@@ -34,7 +34,8 @@ export const createPanelChildren = ({
 	} = selection;
 	const {
 		login: loginNotice,
-		loginNonce: loginNoticeNonce
+		loginNonce: loginNoticeNonce,
+		loginReauthenticationKey
 	} = notices;
 	const {
 		home: homePanelState,
@@ -102,6 +103,8 @@ export const createPanelChildren = ({
 			deferBackdrops={sessionRestorePending}
 			sessionNotice={loginNotice}
 			sessionNoticeNonce={loginNoticeNonce}
+			sessionReauthenticationKey={loginReauthenticationKey}
+			registerBackHandler={backHandlers.login}
 		/>,
 		<HomePanel
 			key="home"

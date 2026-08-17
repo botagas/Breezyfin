@@ -1,16 +1,24 @@
 import {buildTokenAuthHeaders} from '../../../utils/auth';
 
 export const fetchPlaybackInfo = async (service, itemId, payload) => {
-	const response = await fetch(`${service.serverUrl}/Items/${itemId}/PlaybackInfo?userId=${service.userId}`, {
+	const requestServerUrl = service.serverUrl;
+	const requestAccessToken = service.accessToken;
+	const requestUserId = service.userId;
+	const requestSessionGeneration = service.sessionGeneration;
+	const response = await fetch(`${requestServerUrl}/Items/${itemId}/PlaybackInfo?userId=${requestUserId}`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			...buildTokenAuthHeaders(service.accessToken)
+			...buildTokenAuthHeaders(requestAccessToken)
 		},
 		body: JSON.stringify(payload)
 	});
 	if (!response.ok) {
-		service._handleAuthFailureStatus(response.status);
+		service._handleAuthFailureStatus(response.status, {
+			accessToken: requestAccessToken,
+			serverUrl: requestServerUrl,
+			sessionGeneration: requestSessionGeneration
+		});
 		const errorText = await response.text();
 		console.error('PlaybackInfo error response:', errorText);
 		const compactError = String(errorText || '').replace(/\s+/g, ' ').trim().slice(0, 280);

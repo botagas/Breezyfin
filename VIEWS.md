@@ -50,6 +50,10 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - `src/views/WatchPartyPanel.js` browses, creates, and password-joins authenticated rooms before playback.
 - `src/views/library-panel/` (`hooks/`)
 - `src/views/login-panel/` (`components/`, `hooks/`, `utils/`)
+  - Expired saved accounts open the credential step with the saved username and password
+    focus. Connected credential steps may start Quick Connect when the server advertises
+    support. Login owns layered Back navigation and cancels Quick Connect before leaving
+    its waiting step.
 - `src/views/player-panel/`
 - `src/views/media-details-panel/`
 - `src/views/settings-panel/` (`components/`, `hooks/`, `constants.js`, `labels.js`, panel-local formatting helpers)

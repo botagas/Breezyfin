@@ -77,6 +77,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 | Apply mode-aware width, quality, and server blur to authenticated plugin image URLs | `buildExternalImageVariantUrl` |
 | Build duplicate-safe media list React keys | `buildMediaListItemKey` |
 | Centralize LoginPanel rotating backdrop state, startup-restore deferral, and load/error handling | `useLoginBackdrops` |
+| Own Login Quick Connect polling, cancellation, expiry, and authentication exchange | `useLoginQuickConnect` |
 | Guard delayed saved-session restoration against a replacement runtime session | `captureRuntimeSessionIdentity` / `isRuntimeSessionIdentityCurrent` |
 | Audio/subtitle preference pick + persist | `useTrackPreferences` |
 | Match Jellyfin, HLS, native media tracks, and cross-episode audio/subtitle intents with duplicate-language safety | `resolveRuntimeTrackIndex` / `resolveAudioTrackIndex` / `resolveSubtitleTrackIndex` / `applyNativeAudioTrackSelection` |
@@ -1008,6 +1009,16 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/login-panel/hooks/useLoginBackdrops.js`
   - centralizes saved-server backdrop loading, saved-user fallback backdrops, rotation timers, transition state, and image fallback/error handling.
   - `deferLoading` suppresses saved-account network work only while App validates automatic startup restoration; normal Login and Switch User views leave it disabled.
+- `src/views/login-panel/hooks/useLoginQuickConnect.js`
+  - checks server availability without delaying password login;
+  - keeps the Quick Connect secret outside React state and persistence;
+  - polls every five seconds without overlapping requests;
+  - invalidates requests and timers on Back, Retry, server change, panel deactivation,
+    successful login, and unmount;
+  - expires an operation after five minutes and requires a new code on Retry.
+- `src/utils/savedSessionIdentity.js`
+  - resolves the active saved `serverId:userId` key before runtime session teardown;
+  - allows Login to route only the expired saved account through credential recovery.
 
 ### Player panel local components
 - `src/views/player-panel/components/PlayerErrorPopup.js`

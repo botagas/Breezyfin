@@ -8,6 +8,10 @@ All notable changes to Breezyfin are documented in this file.
 
 ### Changed
 
+- Added Jellyfin Quick Connect to connected password-login and expired-account recovery
+  forms, with bounded polling, cancellation, and TV-focused Back and Retry actions.
+- Changed expired saved accounts to reopen the credential form with the username filled
+  in instead of requiring Add User.
 - Replaced legacy Jellyfin authentication headers and lowercase API-key query parameters
   with the standard forms required by Jellyfin 12 while retaining Jellyfin 10 compatibility.
 - Migrated successful authentication and session restoration to the managed multi-server
@@ -25,6 +29,9 @@ All notable changes to Breezyfin are documented in this file.
 
 ### Fixed
 
+- Prevented reconnecting and Add User flows from retaining a stale session-expired notice.
+- Prevented late `401` and `403` responses from an old runtime session from expiring a
+  replacement session, including when Jellyfin reuses the same device token.
 - Added status-aware login failures for non-JSON Jellyfin responses so reverse proxies and
   incompatible servers do not surface an unrelated JSON parser error.
 - Stopped native webOS Direct Play startup from waiting for `canplay` before requesting

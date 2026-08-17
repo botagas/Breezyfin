@@ -229,6 +229,14 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - SyncPlay resume requests must revalidate coordinator activity, group ID, reconnect
   generation, and authenticated service session after the server request settles. An
   obsolete completion must not change follow mode, participation, navigation, or notices.
+- Authenticated request failures must retain the request server, access token, and runtime
+  session generation. A late `401` or `403` may expire the session only when all three
+  values still match the active runtime session. The generation check remains necessary
+  when Jellyfin reuses a device token after reauthentication. Login reconnects must clear
+  runtime authentication without removing saved accounts.
+- Login Quick Connect owns its secret in a ref and polls through one recursive timeout.
+  Back, Retry, server replacement, panel deactivation, and unmount must abort the active
+  request, clear timers, and invalidate stale responses before they can authenticate.
 - Playback reporting is serialized by `usePlayerPlaybackReporter`; direct reporting calls
   from controls, seek handlers, or timers would bypass pause-state coalescing and are not
   allowed. Forced callers await the queued snapshot they contributed. Explicit immutable
@@ -482,6 +490,8 @@ Media details section components:
 Jellyfin service paths:
 - `src/services/jellyfinService.js` (public facade and shared request/auth failure handling)
 - `src/services/jellyfin/sessionApi.js` (connect/auth/session restore/logout/server switching)
+- `src/services/jellyfin/quickConnectApi.js` (unauthenticated availability, initiation,
+  polling, and authentication exchange through the shared session commit path)
 - `src/services/jellyfin/libraryApi.js` (library, item, search, favorites, system info, segments)
 - `src/services/jellyfin/itemStateApi.js` (favorite/watched mutation operations)
 - `src/services/jellyfin/playbackApi.js` (playback info, playback URLs, playback progress reporting)

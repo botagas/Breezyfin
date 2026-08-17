@@ -25,6 +25,7 @@ import jellyfinService from '../jellyfinService';
 import serverManager from '../serverManager';
 import {getDeviceId} from '../../utils/deviceIdentity';
 import {createJsonResponse} from '../../testUtils/fetchResponse';
+import {SESSION_EXPIRED_EVENT} from '../../constants/session';
 
 const resetServiceState = () => {
 	jellyfinService.api = null;
@@ -34,6 +35,7 @@ const resetServiceState = () => {
 	jellyfinService.serverName = null;
 	jellyfinService.username = null;
 	jellyfinService.sessionExpiredNotified = false;
+	jellyfinService.sessionGeneration = 0;
 	jellyfinService.clientVersionPromise = null;
 };
 
@@ -140,6 +142,55 @@ describe('jellyfinService', () => {
 		global.fetch.mockResolvedValue(createJsonResponse({}, false, 500));
 
 		await expect(jellyfinService.connect('http://bad-host')).rejects.toThrow('Server not reachable');
+	});
+
+	it('does not expire a replacement session from an old request failure', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'old-token';
+		let resolveRequest;
+		global.fetch.mockImplementation(() => new Promise((resolve) => {
+			resolveRequest = resolve;
+		}));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+		const request = jellyfinService._request('/Users/old-user', {context: 'stale request'});
+		jellyfinService.accessToken = 'new-token';
+
+		resolveRequest(createJsonResponse({}, false, 401));
+		await expect(request).rejects.toMatchObject({status: 401});
+		expect(expiredListener).not.toHaveBeenCalled();
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+	});
+
+	it('does not expire a reauthenticated session when Jellyfin reuses the same token', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'reused-token';
+		let resolveRequest;
+		global.fetch.mockImplementation(() => new Promise((resolve) => {
+			resolveRequest = resolve;
+		}));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+		const request = jellyfinService._request('/Users/old-user', {context: 'stale request'});
+		jellyfinService._advanceSessionGeneration();
+
+		resolveRequest(createJsonResponse({}, false, 401));
+		await expect(request).rejects.toMatchObject({status: 401});
+		expect(expiredListener).not.toHaveBeenCalled();
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+	});
+
+	it('expires the session for a failure owned by the active token and server', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'active-token';
+		global.fetch.mockResolvedValue(createJsonResponse({}, false, 403));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+
+		await expect(jellyfinService._request('/Users/user-1', {context: 'active request'}))
+			.rejects.toMatchObject({status: 403});
+		expect(expiredListener).toHaveBeenCalledTimes(1);
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
 	});
 
 	it('authenticates and persists active session', async () => {

@@ -152,6 +152,24 @@ Run these before packaging a release candidate:
   playback succeed without legacy `X-Emby-*` headers or lowercase `api_key` parameters.
 - Return a non-JSON `400` or `401` response from the authentication endpoint. Verify the
   Login panel reports the HTTP failure instead of a JSON parser error.
+- Expire one saved account. Verify that account displays `Sign in again`, opens with its
+  username filled in, clears the password, and focuses the password field. Verify other
+  saved accounts still resume with their tokens.
+- Start Add User or expired-account recovery after an expiration. Verify the old session
+  notice clears and does not reappear after authentication starts.
+- Start a request with an old token, authenticate another account, then complete the old
+  request with `401` or `403`. Verify the new session remains active.
+- Start a request from an expired runtime, reauthenticate through Quick Connect with the
+  same returned device token, then complete the old request with `401` or `403`. Verify
+  Breezyfin keeps the new session active.
+- On Jellyfin 10.11 and 12, verify `Use Quick Connect` appears only when enabled. Approve
+  a code from another signed-in client and verify Breezyfin saves and activates the
+  approved user.
+- While Quick Connect waits, verify requests do not overlap and Back returns to credentials.
+  Verify Retry creates a new code after failure or five-minute expiry. Verify Back,
+  server change, panel deactivation, and app exit cannot complete an old sign-in.
+- Verify the Quick Connect Back and Retry actions receive initial 5-way focus and remain
+  usable with pointer input.
 
 ### Browse and Home regression validation
 
