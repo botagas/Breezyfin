@@ -240,6 +240,10 @@ describe('useNativeSyncPlay', () => {
 			jest.advanceTimersByTime(0);
 		});
 
+		await act(async () => {
+			await Promise.resolve();
+		});
+
 		expect(video.currentTime).toBe(25);
 		expect(video.play).toHaveBeenCalledTimes(1);
 		view.unmount();
@@ -276,6 +280,10 @@ describe('useNativeSyncPlay', () => {
 		});
 		await reportInitialReady(view);
 		act(() => jest.advanceTimersByTime(0));
+
+		await act(async () => {
+			await Promise.resolve();
+		});
 
 		expect(video.currentTime).toBe(25);
 		expect(video.play).toHaveBeenCalledTimes(1);
