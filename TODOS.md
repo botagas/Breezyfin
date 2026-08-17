@@ -109,8 +109,6 @@ Expected scope: unknown until profiling, API research, dependency analysis, or r
   - Consider a one-time DirectStream/Transcode retry when native track selection
     is unavailable, rather than forcing transcoding for every audio change.
   - Improve readiness/error classification for native audio selection.
-  - Add regression tests for DirectPlay transition negotiation, track application,
-    position restore, rollback, and repeated switches.
   - Later separate audio-transition loading UI from full-player loading/backdrop.
 - Investigate whether supported webOS generations expose a decoder-level readiness or
   cooldown signal after native audio changes or source replacement. Compare DirectPlay,
