@@ -93,6 +93,18 @@ Expected scope: architectural work, a new feature surface, or changes spanning s
 
 Expected scope: unknown until profiling, API research, dependency analysis, or real-device reproduction establishes the cause and constraints.
 
+- Investigate a single-surface Player transition presentation for audio replacements.
+  Freeze and retain the current video surface, then delay the loading overlay for a short
+  threshold and commit the replacement only after readiness. Do not pre-load a second native
+  surface without webOS evidence that the approach is safe.
+  - Validate DirectPlay audio replacement and A/V sync across webOS generations.
+  - Verify native AudioTrackList availability/reliability for non-default tracks.
+  - Consider a one-time DirectStream/Transcode retry when native track selection
+    is unavailable, rather than forcing transcoding for every audio change.
+  - Improve readiness/error classification for native audio selection.
+  - Add regression tests for DirectPlay transition negotiation, track application,
+    position restore, rollback, and repeated switches.
+  - Later separate audio-transition loading UI from full-player loading/backdrop.
 - Investigate whether supported webOS generations expose a decoder-level readiness or
   cooldown signal after native audio changes or source replacement. Compare DirectPlay,
   DirectStream, and native HLS across TV models and codecs. Do not reintroduce a fixed

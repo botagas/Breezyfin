@@ -255,7 +255,6 @@ export const usePlayerAudioTransition = ({
 			subtitleStreamIndex: currentSubtitleTrack,
 			seekSeconds: resolvedPosition,
 			extra: {
-				disableDirectPlay: true,
 				audioTransition: {
 					id: operation.id,
 					startPaused: !wasPlaying,

@@ -37,30 +37,34 @@ const PlayerTrackPopup = ({
 			>
 				<BodyText className={css.popupTitle}>{title}</BodyText>
 				<Scroller className={css.trackList}>
-					{includeOffOption && (
-						<SelectionOptionButton
-							className={css.trackOption}
-							data-track-index={-1}
-							selected={offSelected}
-							onClick={onTrackClick}
-						>
-							{offLabel}
-						</SelectionOptionButton>
-					)}
-					{tracks.map((track) => {
-						const selected = currentTrack === track.Index;
-						return (
+					<div className={css.trackOptionList}>
+						{includeOffOption && (
 							<SelectionOptionButton
-								key={track.Index}
 								className={css.trackOption}
-								data-track-index={track.Index}
-								selected={selected}
+								data-track-index={-1}
+								selected={offSelected}
 								onClick={onTrackClick}
 							>
-								{getTrackLabel(track)}
+								{offLabel}
 							</SelectionOptionButton>
-						);
-					})}
+						)}
+
+						{tracks.map((track) => {
+							const selected = currentTrack === track.Index;
+
+							return (
+								<SelectionOptionButton
+									key={track.Index}
+									className={css.trackOption}
+									data-track-index={track.Index}
+									selected={selected}
+									onClick={onTrackClick}
+								>
+									{getTrackLabel(track)}
+								</SelectionOptionButton>
+							);
+						})}
+					</div>
 				</Scroller>
 			</div>
 		</Popup>

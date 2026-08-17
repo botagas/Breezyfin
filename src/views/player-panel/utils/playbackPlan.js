@@ -162,8 +162,7 @@ export const buildPlaybackPlan = ({
 	const requiresInitialNativeAudioSelection = (
 		resolvedPlayMethod === 'DirectPlay' &&
 		Number.isInteger(selectedTracks.selectedAudio) &&
-		selectedTracks.selectedAudio !== defaultAudioStreamIndex &&
-		!playbackOverride?.audioTransition
+		selectedTracks.selectedAudio !== defaultAudioStreamIndex
 	);
 	const planItemId = String(itemId || item?.Id || '');
 
