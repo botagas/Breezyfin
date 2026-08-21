@@ -18,6 +18,7 @@ export const useAppSyncPlayNavigation = ({
 		if (currentView !== 'player') pushPanelHistory();
 		setSelectedItem(item);
 		setPlaybackOptions({
+			...(metadata.localPlaybackOptions || {}),
 			startTimeTicks: metadata.startPositionTicks,
 			syncPlay: metadata
 		});
@@ -32,7 +33,7 @@ export const useAppSyncPlayNavigation = ({
 	});
 	const handlePlay = useCallback(async (item, options = null) => {
 		try {
-			if (await coordinator.requestPlay(item)) return;
+			if (await coordinator.requestPlay(item, options)) return;
 		} catch (error) {
 			console.warn('Could not start SyncPlay group playback:', error);
 			return;

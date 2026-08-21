@@ -28,6 +28,9 @@ import { usePlayerPlaybackContext } from './player-panel/hooks/usePlayerPlayback
 import { usePlayerTrackPopupHandlers } from './player-panel/hooks/usePlayerTrackPopupHandlers';
 import {usePlayerSubtitleRenderer} from './player-panel/hooks/usePlayerSubtitleRenderer';
 import {usePlayerStartupCoordinator} from './player-panel/hooks/usePlayerStartupCoordinator';
+import {usePlayerSourcePipeline} from './player-panel/hooks/usePlayerSourcePipeline';
+import {usePlayerAudioTransition} from './player-panel/hooks/usePlayerAudioTransition';
+import {usePlayerPlaybackReporter} from './player-panel/hooks/usePlayerPlaybackReporter';
 import {usePlayerInteractionReveal} from './player-panel/hooks/usePlayerInteractionReveal';
 import {usePlayerPlaybackDecision} from './player-panel/hooks/usePlayerPlaybackDecision';
 import {usePlayerPausedScreensaver} from './player-panel/hooks/usePlayerPausedScreensaver';
@@ -38,6 +41,13 @@ import {
 	resolveVideoSeekSeconds
 } from './player-panel/utils/playbackOverride';
 import {createSyncPlayStartupBridge} from './player-panel/utils/syncPlayStartupBridge';
+import {createPlaybackRuntimeContext} from './player-panel/utils/playbackRuntimeContext';
+import {resolveDefaultAudioStreamIndex} from './player-panel/utils/playerVideoLoaderHelpers';
+import {createPlaybackGenerationAllocator} from './player-panel/utils/playbackGeneration';
+import {
+	createPlaybackRecoveryLedger,
+	PLAYBACK_RECOVERY_KEYS
+} from './player-panel/utils/playbackRecoveryLedger';
 import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {normalizeScreensaverTimeoutMinutes} from '../utils/screensaver';
@@ -84,7 +94,8 @@ const PlayerPanel = ({
 	const currentAudioTrackRef = useRef(null);
 	const currentSubtitleTrackRef = useRef(null);
 	const currentTimeRef = useRef(0);
-	const startupFallbackTimerRef = useRef(null);
+	const startupDeadlineTimerRef = useRef(null);
+	const videoMountRetryTimerRef = useRef(null);
 	const transcodeFallbackAttemptedRef = useRef(false);
 	const dynamicRangeFallbackAttemptedRef = useRef(false);
 	const reloadAttemptedRef = useRef(false);
@@ -95,6 +106,9 @@ const PlayerPanel = ({
 	const playbackGenerationRef = useRef(0);
 	const playbackStartedRef = useRef(false);
 	const playbackRuntimeContextRef = useRef(null);
+	const nativeSourceTokenRef = useRef(null);
+	const startupCoordinatorControlRef = useRef(null);
+	const sourcePipelineControlRef = useRef(null);
 	const syncPlayStartupBridgeRef = useRef(null);
 	if (!syncPlayStartupBridgeRef.current) {
 		syncPlayStartupBridgeRef.current = createSyncPlayStartupBridge();
@@ -108,8 +122,6 @@ const PlayerPanel = ({
 	const controlsRef = useRef(null);
 	const lastInteractionRef = useRef(0);
 	const pausedScreensaverActiveRef = useRef(false);
-	const startWatchTimerRef = useRef(null);
-	const failStartTimerRef = useRef(null);
 	const pendingOverrideClearRef = useRef(false);
 
 	useEffect(() => {
@@ -121,7 +133,6 @@ const PlayerPanel = ({
 	const skipFocusRetryTimerRef = useRef(null);
 	const subtitleCompatibilityFallbackAttemptedRef = useRef(false);
 	const subtitleBurnInFallbackHandlerRef = useRef(null);
-	const nativeAudioFallbackAttemptedRef = useRef(false);
 	const hlsNetworkRecoveryAttemptsRef = useRef(0);
 	const hlsMediaRecoveryAttemptsRef = useRef(0);
 	const playSessionRebuildAttemptsRef = useRef(0);
@@ -131,7 +142,8 @@ const PlayerPanel = ({
 		toastSeverity,
 		toastVisible,
 		toastMessages,
-		setToastMessage
+		setToastMessage,
+		dismissToast
 	} = useToastMessage(PLAYER_PANEL_TOAST_CONFIG);
 	const {
 		loadTrackPreferences,
@@ -165,6 +177,28 @@ const PlayerPanel = ({
 	} = usePlayerDisclosures();
 	const [mediaSourceData, setMediaSourceData] = useState(null);
 	const [playbackGeneration, setPlaybackGeneration] = useState(0);
+	const playbackRecoveryLedgerRef = useRef(null);
+	if (!playbackRecoveryLedgerRef.current) {
+		playbackRecoveryLedgerRef.current = createPlaybackRecoveryLedger({
+			getCurrentGeneration: () => playbackGenerationRef.current
+		});
+	}
+	const playbackGenerationAllocatorRef = useRef(null);
+	if (!playbackGenerationAllocatorRef.current) {
+		playbackGenerationAllocatorRef.current = createPlaybackGenerationAllocator({
+			generationRef: playbackGenerationRef,
+			publishGeneration: setPlaybackGeneration
+		});
+	}
+	const playbackGenerationAllocator = playbackGenerationAllocatorRef.current;
+	const playbackRecoveryLedger = playbackRecoveryLedgerRef.current;
+	const [inlineAudioSwitchActive, setInlineAudioSwitchActiveState] = useState(false);
+	const inlineAudioSwitchActiveRef = useRef(false);
+	const setInlineAudioSwitchActive = useCallback((active) => {
+		const nextActive = active === true;
+		inlineAudioSwitchActiveRef.current = nextActive;
+		setInlineAudioSwitchActiveState(nextActive);
+	}, []);
 	const {
 		append: appendPlayerDiagnostic,
 		diagnostics: runtimeDiagnostics
@@ -202,10 +236,6 @@ const PlayerPanel = ({
 	}, [playerDiagnosticsEnabled]);
 
 	useEffect(() => {
-		nativeAudioFallbackAttemptedRef.current = false;
-	}, [item?.Id]);
-
-	useEffect(() => {
 		currentTimeRef.current = currentTime;
 	}, [currentTime]);
 
@@ -239,41 +269,62 @@ const PlayerPanel = ({
 		currentAudioTrackRef,
 		currentSubtitleTrackRef
 	});
+	const {
+		reportPlaybackStartedOnce,
+		reportPlaybackProgressNow,
+		reportPlaybackSessionStopped,
+		reportPlaybackStopped,
+		startProgressReporting,
+		stopProgressReporting
+	} = usePlayerPlaybackReporter({
+		item,
+		videoRef,
+		progressIntervalRef,
+		playbackGenerationRef,
+		playbackSessionRef,
+		getPlaybackSessionContext
+	});
 
 	const {
 		hasNextEpisode,
 		hasPreviousEpisode,
 		nextEpisodeData,
 		getNextEpisode,
-		getPreviousEpisode,
-		startProgressReporting
+		getPreviousEpisode
 	} = usePlayerEpisodeProgress({
-		item,
-		videoRef,
-		progressIntervalRef,
-		getPlaybackSessionContext
+		item
 	});
+	const handlePlaybackSourceAttached = useCallback((sourceToken, options) => (
+		startupCoordinatorControlRef.current?.registerPlaybackSource?.(sourceToken, options) ?? false
+	), []);
+	const handlePlaybackSourceInvalidated = useCallback(() => {
+		startupCoordinatorControlRef.current?.invalidatePlaybackSource?.();
+	}, []);
+	const handlePlaybackEngineReady = useCallback((sourceToken, signal) => (
+		startupCoordinatorControlRef.current?.reportPlaybackEngineReady?.(sourceToken, signal) ?? false
+	), []);
+	const detachPlaybackSource = useCallback((options) => (
+		sourcePipelineControlRef.current?.detachSource?.(options) ?? false
+	), []);
 
 	const {
-		clearStartWatch,
+		clearStartupDeadline,
 		focusPlayerWakeAction,
 		focusSkipOverlayAction,
 		handleStop
 	} = usePlayerCoreControls({
 		item,
 		videoRef,
-		hlsRef,
-		nativeHlsFallbackCleanupRef,
 		playbackSessionRef,
-		progressIntervalRef,
-		startupFallbackTimerRef,
-		startWatchTimerRef,
-		failStartTimerRef,
+		startupDeadlineTimerRef,
+		videoMountRetryTimerRef,
+		detachPlaybackSource,
+		stopProgressReporting,
+		reportPlaybackStopped,
 		skipFocusRetryTimerRef,
 		skipButtonRef,
 		skipOverlayRef,
-		playPauseButtonRef,
-		getPlaybackSessionContext
+		playPauseButtonRef
 	});
 	const {
 		playbackDecisionPrompt,
@@ -305,24 +356,29 @@ const PlayerPanel = ({
 		exitInProgressRef,
 		loadRequestIdRef,
 		playbackGenerationRef,
+		playbackGenerationAllocator,
 		onBack
 	});
 	subtitleBurnInFallbackHandlerRef.current = handleSubtitleBurnInFallback;
 
 	const {
+		beginRecoveryTransaction,
+		isRecoveryTransactionCurrent,
+		completeRecoveryTransaction,
 		resetRecoveryGuards,
 		attemptPlaybackSessionRebuild,
 		showPlaybackError,
 		attemptTranscodeFallback,
 		isSubtitleCompatibilityError,
 		attemptSubtitleCompatibilityFallback,
-		attachHlsPlayback
+		handleHlsRuntimeError,
+		handleHlsBootstrapTimeout
 	} = usePlayerRecoveryHandlers({
+		itemId: item?.Id,
 		maxHlsNetworkRecoveryAttempts: MAX_HLS_NETWORK_RECOVERY_ATTEMPTS,
 		maxHlsMediaRecoveryAttempts: MAX_HLS_MEDIA_RECOVERY_ATTEMPTS,
 		maxPlaySessionRebuildAttempts: MAX_PLAY_SESSION_REBUILD_ATTEMPTS,
-		hlsConfig: HLS_PLAYER_CONFIG,
-		clearStartWatch,
+		clearStartupDeadline,
 		playbackOptions,
 		setToastMessage,
 		setError,
@@ -337,14 +393,13 @@ const PlayerPanel = ({
 		hlsNetworkRecoveryAttemptsRef,
 		hlsMediaRecoveryAttemptsRef,
 		hlsRef,
-		nativeHlsFallbackCleanupRef,
 		reloadAttemptedRef,
 		playSessionRebuildAttemptsRef,
 		videoRef,
 		seekOffsetRef,
-		startupFallbackTimerRef,
 		playbackOverrideRef,
 		loadVideoRef,
+		loadRequestIdRef,
 		mediaSourceData,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		playbackSettingsRef,
@@ -355,15 +410,37 @@ const PlayerPanel = ({
 		requestSubtitleBurnInFallback,
 		requestPlaybackDecision,
 		exitInProgressRef,
+		playbackStartedRef,
 		playbackGenerationRef,
-		playbackRuntimeContextRef
+		playbackGenerationAllocator,
+		playbackRecoveryLedger,
+		playbackRuntimeContextRef,
+		nativeSourceTokenRef,
+		detachPlaybackSource
 	});
+
+	const sourcePipeline = usePlayerSourcePipeline({
+		videoRef,
+		hlsRef,
+		nativeHlsFallbackCleanupRef,
+		nativeSourceTokenRef,
+		playbackRuntimeContextRef,
+		playbackGenerationRef,
+		exitInProgressRef,
+		hlsConfig: HLS_PLAYER_CONFIG,
+		diagnosticsEnabled,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic,
+		onPlaybackSourceAttached: handlePlaybackSourceAttached,
+		onPlaybackSourceInvalidated: handlePlaybackSourceInvalidated,
+		onPlaybackEngineReady: handlePlaybackEngineReady,
+		onHlsRuntimeError: handleHlsRuntimeError,
+		onHlsBootstrapTimeout: handleHlsBootstrapTimeout
+	});
+	sourcePipelineControlRef.current = sourcePipeline;
 
 	const loadVideo = usePlayerVideoLoader({
 		item,
 		videoRef,
-		hlsRef,
-		nativeHlsFallbackCleanupRef,
 		loadVideoRef,
 		loadRequestIdRef,
 		playbackStartedRef,
@@ -388,32 +465,181 @@ const PlayerPanel = ({
 		pickPreferredSubtitle,
 		setCurrentAudioTrack,
 		setCurrentSubtitleTrack,
-		startupFallbackTimerRef,
-		attemptTranscodeFallback,
-		attachHlsPlayback,
+		attachPlaybackSource: sourcePipeline.attachSource,
+		detachPlaybackSource: sourcePipeline.detachSource,
 		pendingOverrideClearRef,
 		showPlaybackError,
-		startWatchTimerRef,
-		playing,
-		attemptPlaybackSessionRebuild,
-		playbackFailureLockedRef,
-		failStartTimerRef,
 		playbackSessionRef,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		requestPlaybackDecision,
 		exitInProgressRef,
-		playbackGenerationRef,
+		playbackGenerationAllocator,
+		playbackRecoveryLedger,
 		playbackRuntimeContextRef,
-		setPlaybackGeneration
+		videoMountRetryTimerRef
 	});
+
+	const restoreAudioTransitionSnapshot = useCallback(async (snapshot, transitionId) => {
+		if (!snapshot?.sourceDescriptor || exitInProgressRef.current) return false;
+		const snapshotAudioStreams = snapshot.mediaSourceData?.MediaStreams?.filter(
+			(stream) => stream?.Type === 'Audio'
+		) || [];
+		const defaultAudioStreamIndex = resolveDefaultAudioStreamIndex({
+			mediaSource: snapshot.mediaSourceData,
+			audioStreams: snapshotAudioStreams
+		});
+		const requiresNativeAudioSelection = (
+			snapshot.sourceDescriptor.playMethod === 'DirectPlay' &&
+			Number.isInteger(snapshot.currentAudioTrack) &&
+			snapshot.currentAudioTrack !== defaultAudioStreamIndex
+		);
+		loadRequestIdRef.current += 1;
+		detachPlaybackSource({
+			clearRuntimeContext: true,
+			resetVideo: true,
+			reason: 'audio-transition-rollback'
+		});
+		const generation = playbackGenerationAllocator.allocate('audio-transition-rollback');
+		playbackRecoveryLedger.beginGeneration(generation, {itemId: item?.Id});
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation,
+			itemId: item?.Id,
+			mediaSourceData: snapshot.mediaSourceData,
+			playMethod: snapshot.sourceDescriptor.playMethod,
+			dynamicRange: snapshot.sourceDescriptor.runtimeContext?.dynamicRange,
+			subtitlePolicy: snapshot.sourceDescriptor.runtimeContext?.subtitlePolicy,
+			selectedAudioTrack: snapshot.currentAudioTrack,
+			selectedSubtitleTrack: snapshot.currentSubtitleTrack,
+			playbackOptions: snapshot.sourceDescriptor.runtimeContext?.playbackOptions || playbackOptions,
+			requiresInitialNativeAudioSelection: requiresNativeAudioSelection,
+			audioTransition: {
+				id: transitionId,
+				startPaused: true,
+				rollback: true,
+				seekSeconds: snapshot.position
+			}
+		});
+		playbackRuntimeContextRef.current = runtimeContext;
+		playbackSessionRef.current = {...snapshot.playbackSession};
+		playbackStartedRef.current = false;
+		playbackOverrideRef.current = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: snapshot.mediaSourceData?.Id,
+			audioStreamIndex: snapshot.currentAudioTrack,
+			subtitleStreamIndex: snapshot.currentSubtitleTrack,
+			seekSeconds: snapshot.position,
+			extra: {
+				audioTransition: {
+					id: transitionId,
+					startPaused: true,
+					rollback: true,
+					seekSeconds: snapshot.position
+				}
+			}
+		});
+		pendingOverrideClearRef.current = true;
+		setMediaSourceData({...snapshot.mediaSourceData, __playbackGeneration: generation});
+		setAudioTracks(snapshot.audioTracks || []);
+		setSubtitleTracks(snapshot.subtitleTracks || []);
+		setCurrentAudioTrack(snapshot.currentAudioTrack);
+		setCurrentSubtitleTrack(snapshot.currentSubtitleTrack);
+		setCurrentTime(snapshot.position);
+		setLoading(true);
+		setLoadingStatusMessage('Restoring previous audio...');
+		const token = sourcePipeline.attachSource({
+			...snapshot.sourceDescriptor,
+			runtimeContext,
+			onEngineSelected: undefined
+		});
+		return Boolean(token);
+	}, [
+		detachPlaybackSource,
+		item?.Id,
+		loadRequestIdRef,
+		pendingOverrideClearRef,
+		playbackGenerationAllocator,
+		playbackRecoveryLedger,
+		playbackOptions,
+		playbackOverrideRef,
+		playbackRuntimeContextRef,
+		playbackSessionRef,
+		playbackStartedRef,
+		setAudioTracks,
+		setSubtitleTracks,
+		setCurrentAudioTrack,
+		setCurrentSubtitleTrack,
+		setCurrentTime,
+		setLoading,
+		setLoadingStatusMessage,
+		setMediaSourceData,
+		sourcePipeline
+	]);
+
+	const audioTransition = usePlayerAudioTransition({
+		itemId: item?.Id,
+		videoRef,
+		playbackOptions,
+		playbackOverrideRef,
+		playbackGenerationRef,
+		loadRequestIdRef,
+		nativeSourceTokenRef,
+		exitInProgressRef,
+		mediaSourceData,
+		currentAudioTrack,
+		currentSubtitleTrack,
+		audioTracks,
+		subtitleTracks,
+		playbackSessionRef,
+		preparePlaybackPlan: loadVideo.preparePlaybackPlan,
+		requestPlaybackDecision,
+		loadVideo,
+		captureSourceDescriptor: sourcePipeline.getActiveDescriptor,
+		restorePlaybackSnapshot: restoreAudioTransitionSnapshot,
+		reportPlaybackProgressNow,
+		reportPlaybackSessionStopped,
+		saveAudioSelection,
+		setCurrentAudioTrack,
+		setToastMessage,
+		dismissToast,
+		resolveTransitionPosition: (fallbackSeconds) => (
+			syncPlayStartupBridge.getAuthoritativePosition(fallbackSeconds)
+		),
+		onTerminalFailure: (message) => showPlaybackError(message, {detachMedia: true}),
+		appendPlaybackDiagnostic: appendPlayerDiagnostic
+	});
+	const {
+		isTrackTransitionActive: isAudioTransitionActive,
+		cancelAudioTransition
+	} = audioTransition;
+	const isTrackTransitionActive = useCallback(() => (
+		isAudioTransitionActive() || inlineAudioSwitchActiveRef.current
+	), [isAudioTransitionActive]);
+	const cancelTrackTransition = useCallback(() => {
+		setInlineAudioSwitchActive(false);
+		return cancelAudioTransition();
+	}, [cancelAudioTransition, setInlineAudioSwitchActive]);
+	const trackTransitionActive = audioTransition.active || inlineAudioSwitchActive;
 
 	const handleInitialNativeAudioFallback = useCallback(async ({
 		reason,
 		audioStreamIndex,
 		subtitleStreamIndex
 	}) => {
-		if (nativeAudioFallbackAttemptedRef.current) return;
-		nativeAudioFallbackAttemptedRef.current = true;
+		const overrideCandidate = buildPlaybackOverride({
+			baseOptions: playbackOptions,
+			mediaSourceId: mediaSourceData?.Id,
+			audioStreamIndex,
+			subtitleStreamIndex,
+			seekSeconds: resolveVideoSeekSeconds(videoRef.current) || currentTime || 0,
+			extra: {
+				disableDirectPlay: true,
+				initialNativeAudioFallback: true
+			}
+		});
+		const recoveryOperation = beginRecoveryTransaction(
+			'initial-native-audio-fallback',
+			overrideCandidate
+		);
 		appendPlayerDiagnostic({
 			scope: 'audio-track',
 			stage: 'initial-directstream-fallback',
@@ -421,34 +647,64 @@ const PlayerPanel = ({
 			reason,
 			message: 'Restarting with DirectPlay disabled so Jellyfin can honor the selected audio stream.'
 		});
-		playbackOverrideRef.current = buildPlaybackOverride({
-			baseOptions: playbackOptions,
-			mediaSourceId: mediaSourceData?.Id,
-			audioStreamIndex,
-			subtitleStreamIndex,
-			seekSeconds: resolveVideoSeekSeconds(videoRef.current) || currentTime || 0,
-			extra: {
-				disableDirectPlay: true
-			}
-		});
-		setLoading(true);
-		setLoadingStatusMessage('Restarting stream...');
 		try {
 			await handleStop();
 		} catch (fallbackError) {
 			console.warn('Failed while preparing native audio fallback:', fallbackError);
 		}
-		loadVideo();
+		if (!isRecoveryTransactionCurrent(recoveryOperation)) {
+			completeRecoveryTransaction(recoveryOperation);
+			return;
+		}
+		const recoveryClaim = playbackRecoveryLedger.claim(
+			playbackGenerationRef.current,
+			PLAYBACK_RECOVERY_KEYS.nativeAudioFallback
+		);
+		if (!recoveryClaim.accepted) {
+			completeRecoveryTransaction(recoveryOperation);
+			return;
+		}
+		playbackOverrideRef.current = recoveryOperation.overrideCandidate;
+		setLoading(true);
+		setLoadingStatusMessage('Restarting stream...');
+		let result;
+		try {
+			result = await loadVideo();
+		} finally {
+			completeRecoveryTransaction(recoveryOperation);
+		}
+		if (
+			result?.status === 'attached' &&
+			result.sourceToken === nativeSourceTokenRef.current &&
+			result.sourceToken?.itemId === String(item?.Id || '') &&
+			!exitInProgressRef.current
+		) {
+			setToastMessage({
+				message: result.playMethod === 'DirectStream'
+					? 'The selected audio track requires server remuxing.'
+					: 'The selected audio track requires server transcoding.',
+				severity: 'warning'
+			});
+		}
 	}, [
 		appendPlayerDiagnostic,
+		beginRecoveryTransaction,
+		completeRecoveryTransaction,
 		currentTime,
+		exitInProgressRef,
 		handleStop,
+		isRecoveryTransactionCurrent,
+		item?.Id,
 		loadVideo,
 		mediaSourceData?.Id,
 		playbackOptions,
 		playbackOverrideRef,
+		playbackRecoveryLedger,
+		playbackGenerationRef,
+		nativeSourceTokenRef,
 		setLoading,
 		setLoadingStatusMessage,
+		setToastMessage,
 		videoRef
 	]);
 
@@ -478,11 +734,16 @@ const PlayerPanel = ({
 	), [requestSubtitleRendererFallback]);
 	const {
 		status: playbackStartupStatus,
-		markVideoReady
+		registerPlaybackSource,
+		invalidatePlaybackSource,
+		reportPlaybackEngineReady,
+		reportPlaybackEvidence,
+		requestPlaybackStart
 	} = usePlayerStartupCoordinator({
-		item,
-		playbackGeneration,
 		videoRef,
+		nativeSourceTokenRef,
+		playbackRuntimeContextRef,
+		playbackGenerationRef,
 		currentSubtitleTrack,
 		subtitleRendererPolicy,
 		subtitleRendererState,
@@ -490,11 +751,11 @@ const PlayerPanel = ({
 		playbackStartedRef,
 		playbackOverrideRef,
 		pendingOverrideClearRef,
-		startupFallbackTimerRef,
-		clearStartWatch,
-		getPlaybackSessionContext,
+		startupDeadlineTimerRef,
+		reportPlaybackStartedOnce,
 		startProgressReporting,
 		syncPlayStartupBridge,
+		appendPlaybackDiagnostic: appendPlayerDiagnostic,
 		setLoading,
 		setLoadingStatusMessage,
 		setPlaying,
@@ -502,8 +763,22 @@ const PlayerPanel = ({
 		showPlaybackError,
 		attemptTranscodeFallback,
 		isCurrentTranscoding,
-		onSubtitleTimeout: handleSubtitleStartupTimeout
+		onSubtitleTimeout: handleSubtitleStartupTimeout,
+		onInitialAudioSelectionFallback: handleInitialNativeAudioFallback,
+		onAudioTransitionReady: audioTransition.handleAudioTransitionReady,
+		onAudioTransitionFailed: audioTransition.handleAudioTransitionFailed
 	});
+	startupCoordinatorControlRef.current = {
+		registerPlaybackSource,
+		invalidatePlaybackSource,
+		reportPlaybackEngineReady,
+		reportPlaybackEvidence,
+		requestPlaybackStart
+	};
+	const handlePlaybackEvidence = useCallback((signal, sourceToken = nativeSourceTokenRef.current) => {
+		sourcePipelineControlRef.current?.recordPlaybackSignal?.(sourceToken, signal);
+		return reportPlaybackEvidence(signal, sourceToken);
+	}, [reportPlaybackEvidence]);
 
 	const {
 		handleEnded,
@@ -521,8 +796,7 @@ const PlayerPanel = ({
 		playbackSettingsRef,
 		videoRef,
 		handleStop,
-		getPlaybackSessionContext,
-		startProgressReporting,
+		reportPlaybackProgressNow,
 		setPlaying,
 		setShowControls,
 		setError,
@@ -539,6 +813,11 @@ const PlayerPanel = ({
 		isCurrentTranscoding,
 		exitInProgressRef,
 		loadRequestIdRef,
+		isActionsLocked: isTrackTransitionActive,
+		onBeforeBack: cancelTrackTransition,
+		playbackStartedRef,
+		playbackRecoveryLedger,
+		requestPlaybackStart
 	});
 
 	const {
@@ -547,8 +826,6 @@ const PlayerPanel = ({
 		handleVideoSurfaceClick,
 		handleVolumeChange,
 		toggleMute,
-		handleVideoPlaying,
-		handleVideoPause,
 		clearError
 	} = usePlayerEpisodeAndSurfaceHandlers({
 		item,
@@ -574,7 +851,6 @@ const PlayerPanel = ({
 		muted,
 		setMuted,
 		setVolume,
-		setPlaying,
 		setError,
 		setToastMessage
 	});
@@ -612,9 +888,9 @@ const PlayerPanel = ({
 		handleAudioTrackChange,
 		handleSubtitleTrackChange
 	} = usePlayerSeekAndTrackSwitching({
-		item,
 		videoRef,
 		hlsRef,
+		nativeSourceTokenRef,
 		duration,
 		isCurrentTranscoding,
 		mediaSourceData,
@@ -623,7 +899,7 @@ const PlayerPanel = ({
 		playbackSettingsRef,
 		currentAudioTrack,
 		currentSubtitleTrack,
-		getPlaybackSessionContext,
+		reportPlaybackProgressNow,
 		handleStop,
 		loadVideo,
 		playbackOverrideRef,
@@ -642,6 +918,10 @@ const PlayerPanel = ({
 		setCurrentAudioTrack,
 		setCurrentSubtitleTrack,
 		setToastMessage,
+		dismissToast,
+		requestAudioTransition: audioTransition.requestAudioTransition,
+		isTrackTransitionActive,
+		setInlineAudioSwitchActive,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic
 	});
 
@@ -650,6 +930,8 @@ const PlayerPanel = ({
 		handleLoadedData,
 		handleCanPlay,
 		handleTimeUpdate,
+		handleVideoPlaying,
+		handleVideoPause,
 		handleVideoError
 	} = usePlayerMediaEventHandlers({
 		item,
@@ -670,13 +952,15 @@ const PlayerPanel = ({
 		attemptTranscodeFallback,
 		handleStop,
 		mediaSourceData,
-		audioTracks,
-		currentAudioTrack,
 		currentSubtitleTrack,
 		appendPlaybackDiagnostic: appendPlayerDiagnostic,
-		onNativeAudioSwitchFallback: handleInitialNativeAudioFallback,
-		onVideoCanPlay: markVideoReady,
-		exitInProgressRef
+		onPlaybackEvidence: handlePlaybackEvidence,
+		setPlaying,
+		exitInProgressRef,
+		nativeSourceTokenRef,
+		playbackRuntimeContextRef,
+		playbackGenerationRef,
+		onAudioTransitionFailed: audioTransition.handleAudioTransitionFailed
 	});
 
 	const {
@@ -697,7 +981,8 @@ const PlayerPanel = ({
 		handleLocalSeek: handleSeek,
 		handleLocalSurfaceClick: handleVideoSurfaceClick,
 		syncPlayStartupBridge,
-		setToastMessage
+		setToastMessage,
+		blocked: trackTransitionActive
 	});
 
 	const handleToggleDebugOverlay = useCallback(() => {
@@ -717,7 +1002,7 @@ const PlayerPanel = ({
 				break;
 			case 'session-rebuild':
 			case 'player-session-rebuild': {
-				const restarted = attemptPlaybackSessionRebuild('Debug forced session rebuild', {
+				const restarted = await attemptPlaybackSessionRebuild('Debug forced session rebuild', {
 					toast: 'Debug: restarting stream with a fresh session...'
 				});
 				if (!restarted) {
@@ -770,6 +1055,7 @@ const PlayerPanel = ({
 		playbackStarted: playbackStartedRef.current,
 		blocked: Boolean(
 			playbackDecisionPrompt ||
+			trackTransitionActive ||
 			showAudioPopup ||
 			showSubtitlePopup ||
 			skipOverlayVisible ||
@@ -802,7 +1088,8 @@ const PlayerPanel = ({
 		pausedScreensaverActive,
 		dismissPausedScreensaver,
 		handleSubtitlePromptBack: handlePlaybackDecisionBack,
-		handleGroupSessionBack: groupSessions.handleBack
+		handleGroupSessionBack: groupSessions.handleBack,
+		actionsLocked: trackTransitionActive
 	});
 	const getMediaSegmentsForItem = useCallback((itemId, options = {}) => {
 		return jellyfinService.getMediaSegments(itemId, options);
@@ -845,7 +1132,9 @@ const PlayerPanel = ({
 		focusPlayerWakeAction,
 		playPauseButtonRef,
 		loadRequestIdRef,
-		playbackStartedRef
+		playbackStartedRef,
+		playbackRecoveryLedger,
+		cancelTrackTransition
 	});
 
 	usePanelBackHandler(registerBackHandler, handlePlayerInternalBack, {enabled: isActive});
@@ -871,7 +1160,8 @@ const PlayerPanel = ({
 		skipOverlayRef,
 		focusSkipOverlayAction,
 		isProgressSliderTarget,
-		screensaverActive: pausedScreensaverActive
+		screensaverActive: pausedScreensaverActive,
+		actionsLocked: trackTransitionActive
 	});
 	const playerContentProps = {
 		startupStatus: playbackStartupStatus,
@@ -886,12 +1176,16 @@ const PlayerPanel = ({
 			onError: handleVideoError,
 			onPlaying: handleVideoPlaying,
 			onPause: handleVideoPause,
-			onClick: groupSessions.handleSurfaceClick,
+			onClick: trackTransitionActive ? undefined : groupSessions.handleSurfaceClick,
 			error,
 			loading,
 			loadingStatusMessage,
 			backdropUrls: getPlayerBackdropCandidates(item, jellyfinService),
-			showBackdrop: Boolean(loading || error || playbackDecisionPrompt),
+			showBackdrop: Boolean(
+				error ||
+				playbackDecisionPrompt ||
+				(loading && !audioTransition.active)
+			),
 			seekFeedback,
 			externalSubtitleLayerRef,
 			showControls,
@@ -908,7 +1202,7 @@ const PlayerPanel = ({
 			onBack: handleBackButton
 		},
 		skipOverlay: {
-			visible: skipOverlayVisible,
+			visible: skipOverlayVisible && !trackTransitionActive,
 			currentSkipSegment,
 			showNextEpisodePrompt,
 			skipCountdown,
@@ -973,6 +1267,7 @@ const PlayerPanel = ({
 				volume,
 				debugOverlayEnabled: playerDiagnosticsEnabled,
 				debugOverlayVisible,
+				actionsLocked: trackTransitionActive,
 				...groupSessions.controlsState
 			},
 			actions: {

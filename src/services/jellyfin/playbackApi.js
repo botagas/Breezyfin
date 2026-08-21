@@ -1,3 +1,4 @@
+import {AUTH_QUERY_PARAM} from '../../utils/auth';
 import { getPlaystateApi } from '@jellyfin/sdk/lib/utils/api/playstate-api';
 import {
 	determinePlayMethod,
@@ -146,7 +147,7 @@ const probeSafeHdrCopyPath = async ({
 	};
 };
 
-export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
+export const preparePlaybackNegotiation = async (service, itemId, options = {}) => {
 	try {
 		const collectDiagnostics = options.enableDiagnostics === true;
 		const {
@@ -349,15 +350,17 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			});
 		}
 
-		const audioIntentResult = await attemptAudioTrackIntentRemap({
-			service,
-			itemId,
-			activePayload,
-			selectedSource,
-			audioTrackIntent: options.audioTrackIntent,
-			createSourceSelectionOptions,
-			diagnostics: collectDiagnostics ? diagnostics : null
-		});
+		const audioIntentResult = Number.isInteger(options.audioStreamIndex)
+			? null
+			: await attemptAudioTrackIntentRemap({
+				service,
+				itemId,
+				activePayload,
+				selectedSource,
+				audioTrackIntent: options.audioTrackIntent,
+				createSourceSelectionOptions,
+				diagnostics: collectDiagnostics ? diagnostics : null
+			});
 		if (audioIntentResult) {
 			data = audioIntentResult.data || data;
 			selectedSource = audioIntentResult.selectedSource || selectedSource;
@@ -1117,10 +1120,12 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			subtitlePolicy: playbackSubtitlePolicy
 		}) : null;
 
-		return attachPlaybackInfoMetadata(data, {
+		const playbackInfo = attachPlaybackInfoMetadata(data, {
 			playMethod,
 			selectedSource,
 			selectedAudioStreamIndex: requestedAudioStreamIndex,
+			selectedSubtitleStreamIndex,
+			clientRenderedSubtitleStreamIndex,
 			adjustments,
 			dynamicRange,
 			dynamicRangeCap,
@@ -1132,6 +1137,11 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 			safeSdrFallbackProfile,
 			requiredDecision: requiredDecision || subtitlePolicy?.requiredDecision || null
 		});
+		return Object.freeze({
+			playbackInfo,
+			selectedSource: playbackInfo.MediaSources?.[0] || null,
+			playbackMetadata: playbackInfo.__breezyfin || null
+		});
 	} catch (error) {
 		if (!(error instanceof PlaybackNegotiationError)) {
 			console.error('Failed to get playback info:', error);
@@ -1140,10 +1150,14 @@ export const getItemPlaybackInfo = async (service, itemId, options = {}) => {
 	}
 };
 
+export const getItemPlaybackInfo = async (service, itemId, options = {}) => (
+	(await preparePlaybackNegotiation(service, itemId, options)).playbackInfo
+);
+
 export const getPlaybackStreamUrl = (service, itemId, mediaSourceId, playSessionId, tag, container, liveStreamId) => {
 	const params = new URLSearchParams({
 		static: 'true',
-		api_key: service.accessToken
+		[AUTH_QUERY_PARAM]: service.accessToken
 	});
 	if (container) {
 		params.set('container', container);

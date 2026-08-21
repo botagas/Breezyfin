@@ -17,6 +17,7 @@ import {
 	getItemPlaybackInfo,
 	getPlaybackStreamUrl,
 	getTranscodePlaybackUrl,
+	preparePlaybackNegotiation,
 	reportPlaybackProgressState,
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
@@ -223,7 +224,7 @@ describe('playbackApi', () => {
 		const parsed = new URL(url);
 		expect(parsed.origin).toBe('http://media.local');
 		expect(parsed.pathname).toBe('/Videos/item-1/stream');
-		expect(parsed.searchParams.get('api_key')).toBe('token-1');
+		expect(parsed.searchParams.get('ApiKey')).toBe('token-1');
 		expect(parsed.searchParams.get('static')).toBe('true');
 		expect(parsed.searchParams.get('container')).toBe('mp4');
 		expect(parsed.searchParams.get('mediaSourceId')).toBe('source-1');
@@ -257,6 +258,27 @@ describe('playbackApi', () => {
 		expect(playbackInfo?.__breezyfin?.diagnostics).toEqual([]);
 		expect(playbackInfo?.__breezyfin?.decision).toBeNull();
 		expect(playbackInfo?.__breezyfin?.requestDebug).toBeNull();
+	});
+
+	it('keeps getItemPlaybackInfo compatible with the prepared negotiation response', async () => {
+		const service = createService();
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [createMediaSource('SDR')]
+			})
+		});
+
+		const negotiation = await preparePlaybackNegotiation(service, 'item-1');
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1');
+
+		expect(negotiation).toEqual(expect.objectContaining({
+			playbackInfo: negotiation.playbackInfo,
+			selectedSource: negotiation.playbackInfo.MediaSources[0],
+			playbackMetadata: negotiation.playbackInfo.__breezyfin
+		}));
+		expect(playbackInfo).toEqual(negotiation.playbackInfo);
 	});
 
 	it('reports playback start/progress/stop with merged session metadata', async () => {
@@ -1036,6 +1058,47 @@ describe('playbackApi', () => {
 			selectedTrack: expect.objectContaining({index: 0, codec: 'dts-hd'}),
 			proposedTrack: expect.objectContaining({index: 1, codec: 'ac3'})
 		}));
+	});
+
+	it('keeps an explicit audio index authoritative over stale cross-item intent', async () => {
+		const service = createService();
+		const source = createMediaSource('SDR', {
+			defaultAudioStreamIndex: 0,
+			audioStreams: [
+				{Codec: 'aac', Index: 0, IsDefault: true},
+				{Codec: 'aac', Index: 1}
+			]
+		});
+		Object.assign(source.MediaStreams.find((stream) => stream.Index === 0), {
+			Language: 'eng',
+			DisplayTitle: 'English'
+		});
+		Object.assign(source.MediaStreams.find((stream) => stream.Index === 1), {
+			Language: 'jpn',
+			DisplayTitle: 'Japanese'
+		});
+		global.fetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				PlaySessionId: 'session-1',
+				MediaSources: [source]
+			})
+		});
+
+		const playbackInfo = await getItemPlaybackInfo(service, 'item-1', {
+			audioStreamIndex: 1,
+			audioTrackIntent: {
+				index: 0,
+				language: 'eng',
+				displayTitle: 'English',
+				codec: 'aac'
+			}
+		});
+		const requestPayload = JSON.parse(global.fetch.mock.calls[0][1].body);
+
+		expect(global.fetch).toHaveBeenCalledTimes(1);
+		expect(requestPayload.AudioStreamIndex).toBe(1);
+		expect(playbackInfo?.__breezyfin?.selectedAudioStreamIndex).toBe(1);
 	});
 
 	it('probes compatible audio tracks to keep Force DV on a direct playback path', async () => {

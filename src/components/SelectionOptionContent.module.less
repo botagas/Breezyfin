@@ -1,0 +1,49 @@
+.selectedControl.selectedControl {
+	border-radius: 999px !important;
+	overflow: hidden !important;
+
+	:global(.bf-button-bg),
+	:global(.bg) {
+		background: var(--bf-theme-tab-hover-bg) !important;
+		border: none !important;
+		border-radius: 999px !important;
+		box-shadow: none !important;
+	}
+}
+
+.content {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	box-sizing: border-box;
+	gap: 1rem;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.indicator {
+	display: inline-flex;
+	align-items: center;
+	flex: none;
+	gap: 0.2rem;
+	padding-inline-end: 0.2rem;
+	color: var(--bf-theme-button-fg-active);
+	font-size: 0.72em;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.icon {
+	margin: 0;
+	font-size: 0.8em;
+}

@@ -30,7 +30,7 @@ describe('login image url helpers', () => {
 
 		expect(parsedUrl.origin).toBe('http://media.local');
 		expect(parsedUrl.pathname).toBe('/Users/user-1/Images/Primary');
-		expect(parsedUrl.searchParams.get('api_key')).toBe('token-1');
+		expect(parsedUrl.searchParams.get('ApiKey')).toBe('token-1');
 		expect(parsedUrl.searchParams.get('width')).toBe('88');
 		expect(parsedUrl.searchParams.has('tag')).toBe(false);
 	});

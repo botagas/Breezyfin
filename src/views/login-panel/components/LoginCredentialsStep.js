@@ -7,12 +7,15 @@ const LoginCredentialsStep = ({
 	username,
 	password,
 	loading,
+	focusPassword = false,
+	quickConnectAvailable = false,
 	onUsernameChange,
 	onUsernameKeyDown,
 	onPasswordChange,
 	onPasswordKeyDown,
 	onBack,
 	onLogin,
+	onQuickConnect,
 	css
 }) => (
 	<div className={css.form}>
@@ -27,6 +30,7 @@ const LoginCredentialsStep = ({
 		/>
 		<Input
 			type="password"
+			autoFocus={focusPassword}
 			placeholder="Password (optional)"
 			value={password}
 			onChange={onPasswordChange}
@@ -54,6 +58,17 @@ const LoginCredentialsStep = ({
 				{loading ? 'Signing In...' : 'Sign In'}
 			</Button>
 		</div>
+		{quickConnectAvailable ? (
+			<Button
+				onClick={onQuickConnect}
+				disabled={loading}
+				size="large"
+				focusEffect="static"
+				className={css.authTextButton}
+			>
+				Use Quick Connect
+			</Button>
+		) : null}
 	</div>
 );
 

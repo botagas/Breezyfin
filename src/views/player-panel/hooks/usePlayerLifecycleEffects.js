@@ -38,10 +38,13 @@ export const usePlayerLifecycleEffects = ({
 	focusPlayerWakeAction,
 	playPauseButtonRef,
 	loadRequestIdRef,
-	playbackStartedRef
+	playbackStartedRef,
+	playbackRecoveryLedger,
+	cancelTrackTransition
 }) => {
 	useEffect(() => {
 		if (item) {
+			playbackRecoveryLedger?.resetForItem(item.Id);
 			playbackStartedRef.current = false;
 			resetRecoveryGuards();
 			playSessionRebuildAttemptsRef.current = 0;
@@ -66,6 +69,7 @@ export const usePlayerLifecycleEffects = ({
 			});
 		}
 		return () => {
+			cancelTrackTransition?.();
 			loadRequestIdRef.current += 1;
 			playbackStartedRef.current = false;
 			handleStop();

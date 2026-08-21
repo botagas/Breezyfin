@@ -33,7 +33,8 @@ export const usePlayerKeyboardShortcuts = ({
 	skipOverlayRef,
 	focusSkipOverlayAction,
 	isProgressSliderTarget,
-	screensaverActive = false
+	screensaverActive = false,
+	actionsLocked = false
 }) => {
 	useEffect(() => {
 		if (!isActive) return undefined;
@@ -60,6 +61,10 @@ export const usePlayerKeyboardShortcuts = ({
 					isNodeInsidePopupFocusScope(document.activeElement)
 				);
 			if (popupOwnsActivation) return;
+			if (actionsLocked && !BACK_KEYS.includes(code)) {
+				consumeEvent();
+				return;
+			}
 
 			if (
 				showControls &&
@@ -146,6 +151,7 @@ export const usePlayerKeyboardShortcuts = ({
 		return () => document.removeEventListener('keydown', handleKeyDown, true);
 	}, [
 		controlsRef,
+		actionsLocked,
 		focusSkipOverlayAction,
 		handleBackButton,
 		handleInternalBack,

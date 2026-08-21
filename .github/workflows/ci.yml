@@ -11,6 +11,9 @@ on:
       - develop
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint-test-build:
     runs-on: ubuntu-latest

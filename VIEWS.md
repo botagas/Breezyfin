@@ -50,6 +50,10 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - `src/views/WatchPartyPanel.js` browses, creates, and password-joins authenticated rooms before playback.
 - `src/views/library-panel/` (`hooks/`)
 - `src/views/login-panel/` (`components/`, `hooks/`, `utils/`)
+  - Expired saved accounts open the credential step with the saved username and password
+    focus. Connected credential steps may start Quick Connect when the server advertises
+    support. Login owns layered Back navigation and cancels Quick Connect before leaving
+    its waiting step.
 - `src/views/player-panel/`
 - `src/views/media-details-panel/`
 - `src/views/settings-panel/` (`components/`, `hooks/`, `constants.js`, `labels.js`, panel-local formatting helpers)
@@ -60,13 +64,14 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
 - Use `usePanelToolbarActions` for toolbar + layered back flow.
 - Use `usePanelScrollState` for panel scroll restore/cache.
 - Keep section snap/focus orchestration in panel-local hooks when a panel has multi-section directional navigation behavior.
-- Keep callbacks event-driven (`data-*` payloads) and avoid ad-hoc DOM querying unless focus orchestration requires it.
+- Keep callbacks event-driven with `data-*` payloads. Use direct DOM queries only when
+  focus orchestration requires them.
 - Prefer shared badge primitives from `src/styles/cardStyles.less` for watched/favorite/count overlays across panels.
 - Keep comments minimal and only for non-obvious constraints.
 - Keep provider failure states retryable and separate from authoritative empty results;
   never replace Calendar failures with unfiltered data or infer server visibility mode.
-- In-flight provider and group requests must use a panel/session generation guard so
-  stale completions cannot repopulate inactive panels.
+- In-flight provider and group requests must use a panel or session generation guard.
+  Stale completions must not repopulate inactive panels.
 
 ## Related docs
 

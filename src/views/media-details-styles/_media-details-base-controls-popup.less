@@ -21,6 +21,8 @@
 
 .popupButton {
 	width: 100%;
+	box-sizing: border-box;
+	margin-inline: 0 !important;
 	text-align: left;
 	border-radius: 0.8rem !important;
 	background: transparent !important;
@@ -60,11 +62,4 @@
 	.mdControlFocusExpandReset();
 
 	.mdControlHoverSurface(var(--bf-theme-tab-hover-bg));
-
-	&:global(.selected) :global(.bf-button-bg),
-	&:global(.selected) :global(.bg) {
-		background: rgba(var(--bf-theme-accent-rgb), 0.2) !important;
-		border: 1px solid rgba(var(--bf-theme-accent-rgb), 0.52) !important;
-		border-radius: 0.8rem !important;
-	}
 }

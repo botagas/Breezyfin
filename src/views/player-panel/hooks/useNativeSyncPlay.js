@@ -22,7 +22,8 @@ export const useNativeSyncPlay = ({
 	handleLocalPlay,
 	handleLocalSeek,
 	syncPlayStartupBridge,
-	setToastMessage
+	setToastMessage,
+	blocked = false
 }) => {
 	const syncPlay = useSyncPlay();
 	const group = syncPlay.group;
@@ -40,9 +41,12 @@ export const useNativeSyncPlay = ({
 	const readyPendingRef = useRef(false);
 	const bufferingTimerRef = useRef(null);
 	const bufferingReportedRef = useRef(false);
+	const seekReadyPendingRef = useRef(false);
 	const readyGenerationRef = useRef(0);
 	const reportReadyRef = useRef(() => Promise.resolve(false));
 	const flushQueuedCommandRef = useRef(() => {});
+	const blockedRef = useRef(blocked);
+	blockedRef.current = blocked;
 
 	const resetRate = useCallback(() => {
 		if (videoRef.current) videoRef.current.playbackRate = 1;
@@ -88,6 +92,20 @@ export const useNativeSyncPlay = ({
 		video.playbackRate = correction.playbackRate;
 	}, [resetRate, videoRef]);
 
+	const getAuthoritativePosition = useCallback(() => {
+		const video = videoRef.current;
+		const target = targetRef.current;
+		if (!target) return Number(video?.currentTime) || 0;
+		const targetSeconds = getSyncPlayCommandTargetSeconds({
+			positionTicks: target.positionTicks,
+			when: target.when,
+			serverNowMs: Date.now() + estimatorRef.current.offsetMs
+		});
+		return Number.isFinite(targetSeconds)
+			? Math.max(0, targetSeconds)
+			: (Number(video?.currentTime) || 0);
+	}, [videoRef]);
+
 	const executeCommand = useCallback((command) => {
 		const video = videoRef.current;
 		if (!video || !command?.Command || syncPlay.followMode !== 'following') return;
@@ -98,6 +116,11 @@ export const useNativeSyncPlay = ({
 		const whenMs = Date.parse(command.When);
 		const positionTicks = Number(command.PositionTicks);
 		const run = () => {
+			if (blockedRef.current) {
+				lastCommandKeyRef.current = '';
+				queuedCommandRef.current = command;
+				return;
+			}
 			switch (command.Command) {
 				case 'Pause':
 					video.pause();
@@ -117,9 +140,17 @@ export const useNativeSyncPlay = ({
 						forceNextSeekRef.current = false;
 					}
 					Promise.resolve(
-						syncPlayStartupBridge?.startAuthoritativePlayback() ||
-						video.play()
+						syncPlayStartupBridge?.startAuthoritativePlayback()
 					)
+						.then(async (startedByCoordinator) => {
+							if (startedByCoordinator === true) {
+								return;
+							}
+
+							if (video.paused) {
+								await video.play();
+							}
+						})
 						.then(() => applyTargetCorrection(false))
 						.catch(() => setToastMessage({
 							message: 'SyncPlay could not start local playback.',
@@ -128,8 +159,15 @@ export const useNativeSyncPlay = ({
 					break;
 				case 'Seek':
 					if (Number.isFinite(positionTicks)) {
-						video.currentTime = Math.max(0, positionTicks / TICKS_PER_SECOND);
+						seekReadyPendingRef.current = true;
+						lastReadyKeyRef.current = '';
+
+						video.currentTime = Math.max(
+							0,
+							positionTicks / TICKS_PER_SECOND
+						);
 					}
+
 					targetRef.current = null;
 					resetRate();
 					break;
@@ -137,6 +175,7 @@ export const useNativeSyncPlay = ({
 					video.pause();
 					video.currentTime = 0;
 					targetRef.current = null;
+					seekReadyPendingRef.current = false;
 					resetRate();
 					break;
 				default:
@@ -224,6 +263,7 @@ export const useNativeSyncPlay = ({
 		const video = videoRef.current;
 		if (!command?.Command || syncPlay.followMode !== 'following') return;
 		if (
+			blocked ||
 			!clockReadyRef.current ||
 			!video ||
 			!isSyncPlayVideoReady(video) ||
@@ -233,7 +273,11 @@ export const useNativeSyncPlay = ({
 			return;
 		}
 		executeCommand(command);
-	}, [executeCommand, syncPlay.followMode, videoRef]);
+	}, [blocked, executeCommand, syncPlay.followMode, videoRef]);
+
+	useEffect(() => {
+		if (!blocked) flushQueuedCommand();
+	}, [blocked, flushQueuedCommand]);
 
 	useEffect(() => {
 		reportReadyRef.current = reportReady;
@@ -249,10 +293,12 @@ export const useNativeSyncPlay = ({
 		);
 		return syncPlayStartupBridge.registerSyncPlayHandlers({
 			shouldBlockAutomaticStart,
-			reportVideoReady: reportReady
+			reportVideoReady: reportReady,
+			getAuthoritativePosition
 		});
 	}, [
 		group?.GroupId,
+		getAuthoritativePosition,
 		isActive,
 		reportReady,
 		syncPlay.followMode,
@@ -294,9 +340,14 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
+		seekReadyPendingRef.current = false;
 		clearTimeout(bufferingTimerRef.current);
 		resetRate();
 	}, [group?.GroupId, resetRate]);
+
+	useEffect(() => {
+		queuedCommandRef.current = null;
+	}, [item?.Id]);
 
 	useEffect(() => {
 		clearTimeout(scheduledCommandRef.current);
@@ -305,13 +356,13 @@ export const useNativeSyncPlay = ({
 		scheduledCommandRef.current = null;
 		bufferingTimerRef.current = null;
 		targetRef.current = null;
-		queuedCommandRef.current = null;
 		forceNextSeekRef.current = true;
 		lastCommandKeyRef.current = '';
 		lastReadyKeyRef.current = '';
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
+		seekReadyPendingRef.current = false;
 		resetRate();
 	}, [item?.Id, playbackGeneration, resetRate]);
 
@@ -328,6 +379,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
+		seekReadyPendingRef.current = false;
 		resetRate();
 	}, [resetRate, syncPlay.followMode]);
 
@@ -392,6 +444,17 @@ export const useNativeSyncPlay = ({
 				});
 			}, BUFFERING_REPORT_DELAY_MS);
 		};
+		const onSeeked = () => {
+			if (!seekReadyPendingRef.current) {
+				return;
+			}
+
+			reportReadyRef.current().then((reported) => {
+				if (reported) {
+					seekReadyPendingRef.current = false;
+				}
+			});
+		};
 		const onPlaying = () => {
 			clearBufferingTimer();
 			if (bufferingReportedRef.current) {
@@ -401,11 +464,13 @@ export const useNativeSyncPlay = ({
 		};
 		video.addEventListener('waiting', onWaiting);
 		video.addEventListener('playing', onPlaying);
+		video.addEventListener('seeked', onSeeked);
 		if (!video.paused) onPlaying();
 		return () => {
 			clearBufferingTimer();
 			video.removeEventListener('waiting', onWaiting);
 			video.removeEventListener('playing', onPlaying);
+			video.removeEventListener('seeked', onSeeked);
 		};
 	}, [
 		group?.GroupId,
@@ -417,15 +482,18 @@ export const useNativeSyncPlay = ({
 	]);
 
 	const handlePause = useCallback(() => {
+		if (blocked) return;
 		if (!group) return handleLocalPause();
 		resetRate();
 		return jellyfinService.syncPlayPause().catch(() => setToastMessage('SyncPlay pause failed'));
-	}, [group, handleLocalPause, resetRate, setToastMessage]);
+	}, [blocked, group, handleLocalPause, resetRate, setToastMessage]);
 	const handlePlay = useCallback(() => {
+		if (blocked) return;
 		if (!group) return handleLocalPlay();
 		return jellyfinService.syncPlayPlay().catch(() => setToastMessage('SyncPlay play failed'));
-	}, [group, handleLocalPlay, setToastMessage]);
+	}, [blocked, group, handleLocalPlay, setToastMessage]);
 	const handleSeek = useCallback((event) => {
+		if (blocked) return;
 		if (!group) return handleLocalSeek(event);
 		const position = Number(event?.value);
 		if (!Number.isFinite(position)) return undefined;
@@ -433,7 +501,7 @@ export const useNativeSyncPlay = ({
 		return jellyfinService.syncPlaySeek({
 			PositionTicks: Math.floor(position * TICKS_PER_SECOND)
 		}).catch(() => setToastMessage('SyncPlay seek failed'));
-	}, [group, handleLocalSeek, resetRate, setToastMessage]);
+	}, [blocked, group, handleLocalSeek, resetRate, setToastMessage]);
 	const leaveGroup = useCallback(async () => {
 		await syncPlay.leaveGroup();
 		setPopupOpen(false);

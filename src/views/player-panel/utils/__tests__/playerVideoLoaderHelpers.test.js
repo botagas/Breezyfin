@@ -1,10 +1,11 @@
 import {
 	buildMediaSourceDebugData,
 	buildPlayerPlaybackSettingsSnapshot,
-	getPlaybackStartupFailureMessage,
+	cancelVideoMountAdmission,
 	resolveInitialTrackSelection,
 	resolvePlaybackVideoUrl,
-	selectHlsEnginePreference
+	selectHlsEnginePreference,
+	waitForVideoMount
 } from '../playerVideoLoaderHelpers';
 
 describe('playerVideoLoaderHelpers', () => {
@@ -88,6 +89,24 @@ describe('playerVideoLoaderHelpers', () => {
 		expect(selection).toEqual({
 			selectedAudio: 1,
 			selectedSubtitle: 3
+		});
+	});
+
+	it('uses PlaybackInfo-selected tracks as the authoritative runtime selection', () => {
+		const selection = resolveInitialTrackSelection({
+			audioStreams: [{Index: 1}, {Index: 7}],
+			subtitleStreams: [{Index: 2}, {Index: 8}],
+			playbackOverride: {audioStreamIndex: 1, subtitleStreamIndex: 2},
+			negotiatedAudioStreamIndex: 7,
+			negotiatedSubtitleStreamIndex: 8,
+			clientRenderedSubtitleStreamIndex: 8,
+			pickPreferredAudio: () => 1,
+			pickPreferredSubtitle: () => 2
+		});
+
+		expect(selection).toEqual({
+			selectedAudio: 7,
+			selectedSubtitle: 8
 		});
 	});
 
@@ -287,21 +306,77 @@ describe('playerVideoLoaderHelpers', () => {
 		});
 	});
 
-	it.each([
-		['DV', 'Dolby Vision'],
-		['HDR10', 'HDR'],
-		['HDR10_PLUS', 'HDR'],
-		['HLG', 'HDR']
-	])('explains runtime startup failures for %s streams', (id, expectedLabel) => {
-		expect(getPlaybackStartupFailureMessage({id})).toContain(
-			`${expectedLabel} playback did not become ready`
-		);
-		expect(getPlaybackStartupFailureMessage({id})).toContain('test on TV hardware');
+	it('waits for the video surface and resolves the original admission promise', async () => {
+		jest.useFakeTimers();
+		const video = {};
+		const videoRef = {current: null};
+		const pendingRef = {current: null};
+		const admission = waitForVideoMount({
+			videoRef,
+			pendingRef,
+			isStale: () => false,
+			maxAttempts: 2,
+			intervalMs: 10
+		});
+		videoRef.current = video;
+		jest.advanceTimersByTime(10);
+
+		await expect(admission).resolves.toEqual({status: 'ready', video});
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
 	});
 
-	it('keeps the generic startup failure for SDR playback', () => {
-		expect(getPlaybackStartupFailureMessage({id: 'SDR'})).toBe(
-			'Playback failed after session rebuild attempt. Please retry or go back.'
-		);
+	it('settles a cancelled mount admission as stale without delayed retries', async () => {
+		jest.useFakeTimers();
+		const pendingRef = {current: null};
+		const admission = waitForVideoMount({
+			videoRef: {current: null},
+			pendingRef,
+			isStale: () => false,
+			maxAttempts: 2,
+			intervalMs: 10
+		});
+
+		expect(cancelVideoMountAdmission(pendingRef)).toBe(true);
+		jest.advanceTimersByTime(100);
+		await expect(admission).resolves.toEqual({
+			status: 'stale',
+			reason: 'video-surface-wait-cancelled'
+		});
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
 	});
+
+	it('clears a legacy timer-only mount retry during teardown', () => {
+		jest.useFakeTimers();
+		const callback = jest.fn();
+		const pendingRef = {current: setTimeout(callback, 10)};
+
+		expect(cancelVideoMountAdmission(pendingRef)).toBe(true);
+		jest.advanceTimersByTime(20);
+		expect(callback).not.toHaveBeenCalled();
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
+	});
+
+	it('returns a bounded mount failure without leaving a pending timer', async () => {
+		jest.useFakeTimers();
+		const pendingRef = {current: null};
+		const admission = waitForVideoMount({
+			videoRef: {current: null},
+			pendingRef,
+			isStale: () => false,
+			maxAttempts: 2,
+			intervalMs: 10
+		});
+		jest.advanceTimersByTime(20);
+
+		await expect(admission).resolves.toEqual({
+			status: 'failed',
+			reason: 'video-surface-unavailable'
+		});
+		expect(pendingRef.current).toBeNull();
+		jest.useRealTimers();
+	});
+
 });

@@ -81,6 +81,26 @@ describe('JellyWatchParty protocol client', () => {
 		expect(FakeWebSocket.instances).toHaveLength(0);
 	});
 
+	it.each([401, 403])('treats token endpoint HTTP %i as feature unavailability', async (status) => {
+		const service = createService(tokenResponse());
+		service._request.mockRejectedValueOnce(Object.assign(
+			new Error(`JellyWatchParty token failed with status ${status}`),
+			{status}
+		));
+
+		await expect(detectJellyWatchParty(service)).resolves.toMatchObject({
+			available: false,
+			reason: 'token-unauthorized'
+		});
+		expect(service._request).toHaveBeenCalledWith(
+			'/JellyWatchParty/Token',
+			expect.objectContaining({
+				context: 'get JellyWatchParty token',
+				suppressAuthHandling: true
+			})
+		);
+	});
+
 	it('persists only a scoped client UUID and keeps the JWT out of the socket URL', async () => {
 		const service = createService(tokenResponse({hide_native_sync_button: true}));
 		await expect(detectJellyWatchParty(service)).resolves.toMatchObject({
@@ -150,4 +170,3 @@ describe('JellyWatchParty protocol client', () => {
 		stopJellyWatchParty(service);
 	});
 });
-

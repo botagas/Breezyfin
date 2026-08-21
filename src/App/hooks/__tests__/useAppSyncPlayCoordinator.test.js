@@ -32,6 +32,16 @@ const buildGroup = (itemId = '') => ({
 	}
 });
 
+const createDeferred = () => {
+	let resolve;
+	let reject;
+	const promise = new Promise((next, fail) => {
+		resolve = next;
+		reject = fail;
+	});
+	return {promise, reject, resolve};
+};
+
 describe('useAppSyncPlayCoordinator', () => {
 	let currentGroup;
 	let stateListener;
@@ -39,6 +49,9 @@ describe('useAppSyncPlayCoordinator', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		jellyfinService.serverUrl = null;
+		jellyfinService.userId = null;
+		jellyfinService.accessToken = null;
 		currentGroup = buildGroup();
 		stateListener = null;
 		websocketListeners = {};
@@ -91,6 +104,158 @@ describe('useAppSyncPlayCoordinator', () => {
 			PlayingQueue: ['item-2']
 		}));
 		expect(jellyfinService.syncPlayPlay).not.toHaveBeenCalled();
+	});
+
+	it('carries initiating-client track choices into authoritative Player navigation', async () => {
+		const onOpenRemoteItem = jest.fn();
+		const item = {Id: 'item-2', Type: 'Movie'};
+		const playbackOptions = {audioStreamIndex: 2, subtitleStreamIndex: 4};
+		jellyfinService.getItem.mockResolvedValue(item);
+		jellyfinService.syncPlaySetQueue.mockImplementation(async () => {
+			currentGroup = buildGroup('item-2');
+			stateListener(currentGroup);
+		});
+		const {result} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'home',
+			selectedItemId: null,
+			onOpenRemoteItem
+		}));
+
+		await act(async () => {
+			await result.current.requestPlay(item, playbackOptions);
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(onOpenRemoteItem).toHaveBeenCalledWith(item, expect.objectContaining({
+			localPlaybackOptions: playbackOptions
+		}));
+	});
+
+	it('does not retain track choices after same-item resume fails', async () => {
+		currentGroup = buildGroup('item-1');
+		const item = {Id: 'item-1', Type: 'Movie'};
+		const onOpenRemoteItem = jest.fn();
+		jellyfinService.getItem.mockResolvedValue(item);
+		jellyfinService.syncPlaySetIgnoreWait
+			.mockRejectedValueOnce(new Error('resume failed'))
+			.mockResolvedValue(undefined);
+		const {result} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'home',
+			selectedItemId: null,
+			onOpenRemoteItem
+		}));
+
+		await act(async () => {
+			await result.current.requestPlay(item, {audioStreamIndex: 2});
+		});
+		expect(result.current.notification).toEqual(expect.objectContaining({
+			message: 'SyncPlay could not resume this device.'
+		}));
+
+		await act(async () => {
+			await expect(result.current.resumeSession()).resolves.toBe(true);
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(onOpenRemoteItem).toHaveBeenCalledWith(item, expect.objectContaining({
+			localPlaybackOptions: null
+		}));
+	});
+
+	it('does not let an older failed resume clear newer track choices', async () => {
+		currentGroup = buildGroup('item-1');
+		const item = {Id: 'item-1', Type: 'Movie'};
+		const firstResume = createDeferred();
+		const secondResume = createDeferred();
+		const onOpenRemoteItem = jest.fn();
+		jellyfinService.getItem.mockResolvedValue(item);
+		jellyfinService.syncPlaySetIgnoreWait
+			.mockReturnValueOnce(firstResume.promise)
+			.mockReturnValueOnce(secondResume.promise);
+		const {result} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'home',
+			selectedItemId: null,
+			onOpenRemoteItem
+		}));
+		let firstRequest;
+		let secondRequest;
+
+		act(() => {
+			firstRequest = result.current.requestPlay(item, {audioStreamIndex: 1});
+			secondRequest = result.current.requestPlay(item, {audioStreamIndex: 2});
+		});
+		await act(async () => {
+			firstResume.reject(new Error('older resume failed'));
+			await firstRequest;
+			secondResume.resolve();
+			await secondRequest;
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(onOpenRemoteItem).toHaveBeenCalledWith(item, expect.objectContaining({
+			localPlaybackOptions: {audioStreamIndex: 2}
+		}));
+	});
+
+	it('ignores a resume completion after the group is left', async () => {
+		currentGroup = buildGroup('item-1');
+		const resumeRequest = createDeferred();
+		jellyfinService.syncPlaySetIgnoreWait.mockReturnValue(resumeRequest.promise);
+		const {result} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'home',
+			selectedItemId: null,
+			onOpenRemoteItem: jest.fn()
+		}));
+		let resumePromise;
+
+		act(() => {
+			resumePromise = result.current.resumeSession();
+			currentGroup = null;
+			stateListener(null);
+		});
+		await act(async () => {
+			resumeRequest.resolve();
+			expect(await resumePromise).toBe(false);
+		});
+
+		expect(result.current.followMode).toBe('suspended');
+		expect(result.current.notification).toBeNull();
+	});
+
+	it('ignores a resume completion after the authenticated session changes', async () => {
+		currentGroup = buildGroup('item-1');
+		jellyfinService.serverUrl = 'https://one.example';
+		jellyfinService.userId = 'user-1';
+		jellyfinService.accessToken = 'token-1';
+		const resumeRequest = createDeferred();
+		jellyfinService.syncPlaySetIgnoreWait.mockReturnValue(resumeRequest.promise);
+		const {result, rerender} = renderHook(() => useAppSyncPlayCoordinator({
+			authenticated: true,
+			currentView: 'home',
+			selectedItemId: null,
+			onOpenRemoteItem: jest.fn()
+		}));
+		let resumePromise;
+
+		resumePromise = result.current.resumeSession();
+		jellyfinService.accessToken = 'token-2';
+		rerender();
+		await act(async () => {
+			resumeRequest.resolve();
+			expect(await resumePromise).toBe(false);
+		});
+
+		expect(result.current.followMode).toBe('suspended');
+		expect(result.current.notification).toEqual(expect.objectContaining({
+			type: 'remote-playback'
+		}));
 	});
 
 	it('forces a waiting group to start only through the explicit override', async () => {

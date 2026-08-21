@@ -2,34 +2,28 @@ import {useCallback} from 'react';
 import Spotlight from '@enact/spotlight';
 
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
-import jellyfinService from '../../../services/jellyfinService';
+import {cancelVideoMountAdmission} from '../utils/playerVideoLoaderHelpers';
 
 export const usePlayerCoreControls = ({
 	item,
 	videoRef,
-	hlsRef,
-	nativeHlsFallbackCleanupRef,
 	playbackSessionRef,
-	progressIntervalRef,
-	startupFallbackTimerRef,
-	startWatchTimerRef,
-	failStartTimerRef,
+	startupDeadlineTimerRef,
+	videoMountRetryTimerRef,
+	detachPlaybackSource,
+	stopProgressReporting,
+	reportPlaybackStopped,
 	skipFocusRetryTimerRef,
 	skipButtonRef,
 	skipOverlayRef,
-	playPauseButtonRef,
-	getPlaybackSessionContext
+	playPauseButtonRef
 }) => {
-	const clearStartWatch = useCallback(() => {
-		if (startWatchTimerRef.current) {
-			clearTimeout(startWatchTimerRef.current);
-			startWatchTimerRef.current = null;
+	const clearStartupDeadline = useCallback(() => {
+		if (startupDeadlineTimerRef.current) {
+			clearTimeout(startupDeadlineTimerRef.current);
+			startupDeadlineTimerRef.current = null;
 		}
-		if (failStartTimerRef.current) {
-			clearTimeout(failStartTimerRef.current);
-			failStartTimerRef.current = null;
-		}
-	}, [failStartTimerRef, startWatchTimerRef]);
+	}, [startupDeadlineTimerRef]);
 
 	const focusSkipOverlayAction = useCallback(() => {
 		if (skipFocusRetryTimerRef.current) {
@@ -91,60 +85,35 @@ export const usePlayerCoreControls = ({
 		const positionTicks = video && item
 			? Math.floor(video.currentTime * JELLYFIN_TICKS_PER_SECOND)
 			: 0;
-		const sessionContext = getPlaybackSessionContext();
-		if (progressIntervalRef.current) {
-			clearInterval(progressIntervalRef.current);
-			progressIntervalRef.current = null;
-		}
-		if (startupFallbackTimerRef.current) {
-			clearTimeout(startupFallbackTimerRef.current);
-			startupFallbackTimerRef.current = null;
-		}
-		if (typeof nativeHlsFallbackCleanupRef?.current === 'function') {
-			nativeHlsFallbackCleanupRef.current();
-		}
-		clearStartWatch();
-
-		if (hlsRef.current) {
-			try {
-				hlsRef.current.destroy();
-			} catch (error) {
-				console.warn('Error destroying HLS instance:', error);
-			}
-			hlsRef.current = null;
-		}
-
-		if (video) {
-			video.removeAttribute('src');
-			video.load();
+		cancelVideoMountAdmission(videoMountRetryTimerRef);
+		stopProgressReporting();
+		clearStartupDeadline();
+		detachPlaybackSource?.({
+			clearRuntimeContext: true,
+			resetVideo: true,
+			reason: 'player-stop'
+		});
+		if (item) {
+			reportPlaybackStopped({positionTicks});
 		}
 		playbackSessionRef.current = {
 			playSessionId: null,
 			mediaSourceId: null,
 			playMethod: 'DirectStream'
 		};
-
-		if (item) {
-			try {
-				await jellyfinService.reportPlaybackStopped(item.Id, positionTicks, sessionContext);
-			} catch (error) {
-				console.warn('Failed to report playback stopped:', error);
-			}
-		}
 	}, [
-		clearStartWatch,
-		getPlaybackSessionContext,
-		hlsRef,
+		clearStartupDeadline,
+		detachPlaybackSource,
 		item,
-		nativeHlsFallbackCleanupRef,
 		playbackSessionRef,
-		progressIntervalRef,
-		startupFallbackTimerRef,
+		reportPlaybackStopped,
+		stopProgressReporting,
+		videoMountRetryTimerRef,
 		videoRef
 	]);
 
 	return {
-		clearStartWatch,
+		clearStartupDeadline,
 		focusPlayerWakeAction,
 		focusSkipOverlayAction,
 		handleStop

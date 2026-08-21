@@ -1,6 +1,6 @@
 # Breezyfin Themes Guide
 
-This file documents how theming works in Breezyfin, which files own each part, and how to extend themes safely.
+This guide explains Breezyfin theme ownership and the safe extension process.
 
 ## 1) Overview
 
@@ -19,7 +19,7 @@ All theme files are loaded from `src/index.js`.
 
 The app sets the theme/mode/platform attributes in `src/App/App.js`.
 
-These attributes are what CSS listens to:
+CSS selectors use these attributes:
 
 - `data-bf-nav-theme`: `classic` or `elegant`
 - `data-bf-animations`: `on` or `off` (Performance Mode)
@@ -119,9 +119,16 @@ Examples:
 - Keeps readability and key visual structure.
 - Selective blur reductions happen in global and panel-specific shared tails.
 - The compact Elegant header keeps its backdrop blur but disables SVG distortion; Performance+ and webOS 6 use the static non-blurred fallback.
-- The shared Breezyfin wind loading mark remains animated; only Performance+ makes it static.
+- The shared three-stroke gust loading indicator remains animated; only Performance+ makes it static.
 
-Shared Hero backdrop, media-panel atmosphere, text-fallback contrast, Elegant liquid-glass specular, card-placeholder, and loading colors are defined as semantic tokens in `src/styles/global-styles/_global-root.css` and the Classic/Elegant token packs rather than repeated in component styles. Media-panel backdrops use low-resolution Jellyfin-preblurred representative artwork with darkening in Normal mode, a smaller/lighter pre-blurred image in Performance mode, and a lower-opacity unblurred image in Performance+; authenticated plugin artwork requests the equivalent width/quality/blur variant from the plugin. Full-screen CSS blur is intentionally avoided.
+Semantic tokens define Hero backdrops, media-panel atmosphere, fallback-title contrast,
+Elegant glass effects, card placeholders, and loading colors. The tokens live in
+`src/styles/global-styles/_global-root.css` and the Classic and Elegant token packs.
+
+Normal mode uses a low-resolution, server-blurred Jellyfin image with darkening.
+Performance uses a smaller image with less server blur. Performance+ uses an unblurred
+image at lower opacity. Authenticated plugin artwork requests an equivalent width,
+quality, and blur variant from the plugin. Do not apply full-screen CSS blur.
 
 ### Performance+ Mode (`data-bf-all-animations='off'`)
 
@@ -176,15 +183,18 @@ Default theme is Elegant unless settings explicitly switch to Classic.
 
 ## 8) Adding new theme features
 
-Use this sequence to keep it clean and maintainable:
+Use this sequence:
 
-1. Add/extend a token first in theme token files (Classic + Elegant as needed).
+1. Add or extend a token in the applicable Classic and Elegant token files.
 2. Consume the token with `var(--token, fallback)` in panel/component styles.
 3. Put structural/default rules in `_base.less`.
 4. Put Elegant-only styling in `_elegant.less` behind `:global([data-bf-nav-theme='elegant'])` when necessary.
-5. Add capability-specific fallbacks only in compat files keyed by `data-bf-webos-*` / `data-bf-flex-gap` / `data-bf-backdrop-filter`.
-6. Put performance reductions in `_shared-tail.less` for `data-bf-animations` / `data-bf-all-animations` so they apply last.
-7. Avoid hardcoded colors in panel files when a token exists or should exist.
+5. Add capability-specific fallbacks only to compatibility files. Scope them with
+   `data-bf-webos-*`, `data-bf-flex-gap`, or `data-bf-backdrop-filter`.
+6. Put performance reductions in `_shared-tail.less`. Scope them with
+   `data-bf-animations` or `data-bf-all-animations` so they apply last.
+7. Do not hardcode a panel color when a suitable token exists. Add a reusable token when
+   the color represents shared semantics.
 
 ## 9) Validation procedures
 

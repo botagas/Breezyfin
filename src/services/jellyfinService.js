@@ -16,6 +16,12 @@ import {
 	switchUserSession
 } from './jellyfin/sessionApi';
 import {
+	authenticateWithQuickConnect,
+	getQuickConnectEnabled,
+	getQuickConnectState,
+	initiateQuickConnect
+} from './jellyfin/quickConnectApi';
+import {
 	getFavoriteMediaItems,
 	getItemDetails,
 	getItemMediaSegments,
@@ -50,6 +56,7 @@ import {
 	reportPlaybackStarted,
 	reportPlaybackStoppedState
 } from './jellyfin/playbackApi';
+import {AUTH_QUERY_PARAM, buildTokenAuthHeaders} from '../utils/auth';
 import {getBreezyfinCapabilities, getMyRequestItems} from './jellyfin/requestsApi';
 import {getHomeSectionDescriptors, getHomeSectionItems} from './jellyfin/homeSectionsApi';
 import {getDiscoveryDetails, getDiscoveryFeed} from './jellyfin/discoveryApi';
@@ -89,6 +96,7 @@ class JellyfinService {
 		this.serverName = null;
 		this.username = null;
 		this.sessionExpiredNotified = false;
+		this.sessionGeneration = 0;
 		this.webSocketSession = null;
 		void this.resolveClientVersion();
 	}
@@ -142,6 +150,11 @@ class JellyfinService {
 		return status === 401 || status === 403;
 	}
 
+	_advanceSessionGeneration() {
+		this.sessionGeneration += 1;
+		return this.sessionGeneration;
+	}
+
 	_notifySessionExpired(message = SESSION_EXPIRED_MESSAGE) {
 		if (this.sessionExpiredNotified) return;
 		this.sessionExpiredNotified = true;
@@ -153,8 +166,19 @@ class JellyfinService {
 		);
 	}
 
-	_handleAuthFailureStatus(status) {
-		if (this._isAuthFailureStatus(status)) {
+	_handleAuthFailureStatus(status, requestContext = {}) {
+		const requestToken = requestContext.accessToken || null;
+		const requestServerUrl = String(requestContext.serverUrl || '').replace(/\/+$/, '');
+		const activeServerUrl = String(this.serverUrl || '').replace(/\/+$/, '');
+		const requestSessionGeneration = requestContext.sessionGeneration;
+		if (
+			this._isAuthFailureStatus(status) &&
+			requestSessionGeneration === this.sessionGeneration &&
+			requestToken &&
+			requestToken === this.accessToken &&
+			requestServerUrl &&
+			requestServerUrl === activeServerUrl
+		) {
 			this._notifySessionExpired();
 			return true;
 		}
@@ -168,13 +192,6 @@ class JellyfinService {
 		return `${this.serverUrl}${normalizedPath}`;
 	}
 
-	_getAuthHeaders(extraHeaders = {}) {
-		return {
-			'X-Emby-Token': this.accessToken,
-			...extraHeaders
-		};
-	}
-
 	_buildImageAssetUrl(path, params = {}, options = {}) {
 		if (!this.serverUrl || !this.accessToken || !path) return null;
 		const search = new URLSearchParams();
@@ -182,7 +199,7 @@ class JellyfinService {
 			if (value === undefined || value === null || value === '') return;
 			search.set(key, String(value));
 		});
-		search.set('api_key', this.accessToken);
+		search.set(AUTH_QUERY_PARAM, this.accessToken);
 		applyPreferredImageFormatToParams(search, options);
 		return `${this.serverUrl}${path}?${search.toString()}`;
 	}
@@ -198,17 +215,27 @@ class JellyfinService {
 			context = 'request',
 			suppressAuthHandling = false
 		} = options;
+		const requestServerUrl = this.serverUrl;
+		const requestAccessToken = includeAuth ? this.accessToken : null;
+		const requestSessionGeneration = this.sessionGeneration;
 		const url = this._buildRequestUrl(pathOrUrl);
 		const response = await fetch(url, {
 			method,
-			headers: includeAuth ? this._getAuthHeaders(headers) : headers,
+			headers: includeAuth ? {
+				...buildTokenAuthHeaders(requestAccessToken),
+				...headers
+			} : headers,
 			body,
 			...(signal ? {signal} : {})
 		});
 
 		if (!response.ok) {
 			if (!suppressAuthHandling) {
-				this._handleAuthFailureStatus(response.status);
+				this._handleAuthFailureStatus(response.status, {
+					accessToken: requestAccessToken,
+					serverUrl: requestServerUrl,
+					sessionGeneration: requestSessionGeneration
+				});
 			}
 			const errorText = await response.text().catch(() => '');
 			throw createJellyfinRequestError({
@@ -239,6 +266,25 @@ class JellyfinService {
 	async authenticate(username, password) {
 		watchPartyApi.stopJellyWatchParty(this);
 		const user = await authenticateWithServer(this, username, password);
+		if (this.accessToken) startJellyfinWebSocket(this);
+		return user;
+	}
+
+	async getQuickConnectEnabled(options = {}) {
+		return getQuickConnectEnabled(this, options);
+	}
+
+	async initiateQuickConnect(options = {}) {
+		return initiateQuickConnect(this, options);
+	}
+
+	async getQuickConnectState(secret, options = {}) {
+		return getQuickConnectState(this, secret, options);
+	}
+
+	async authenticateWithQuickConnect(secret, options = {}) {
+		watchPartyApi.stopJellyWatchParty(this);
+		const user = await authenticateWithQuickConnect(this, secret, options);
 		if (this.accessToken) startJellyfinWebSocket(this);
 		return user;
 	}

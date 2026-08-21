@@ -387,10 +387,15 @@ const getStatus = (error) => {
 const loadToken = async (entry) => {
 	let data;
 	try {
-		data = await entry.service._request(TOKEN_ENDPOINT, {context: 'get JellyWatchParty token'});
+		data = await entry.service._request(TOKEN_ENDPOINT, {
+			context: 'get JellyWatchParty token',
+			suppressAuthHandling: true
+		});
 	} catch (error) {
-		if ([401, 403].includes(getStatus(error))) throw error;
-		return {available: false, reason: getStatus(error) === 404 ? 'plugin-missing' : 'token-unavailable'};
+		const status = getStatus(error);
+		if (status === 404) return {available: false, reason: 'plugin-missing'};
+		if ([401, 403].includes(status)) return {available: false, reason: 'token-unauthorized'};
+		return {available: false, reason: 'token-unavailable'};
 	}
 	if (!data || typeof data !== 'object' || Array.isArray(data)) {
 		return {available: false, reason: 'invalid-token-response'};

@@ -5,6 +5,7 @@ const LoginSavedAccountsStep = ({
 	SavedItemComponent,
 	savedServers,
 	resumingKey,
+	reauthenticationKey,
 	loading,
 	getSavedUserAvatarUrl,
 	onResumeClick,
@@ -47,7 +48,11 @@ const LoginSavedAccountsStep = ({
 							{entry.username || 'User'}
 						</BodyText>
 						<BodyText className={css.savedState}>
-							{isResuming ? 'Opening...' : (entry.serverName || 'Jellyfin Server')}
+							{isResuming
+								? 'Opening...'
+								: reauthenticationKey === key
+									? 'Sign in again'
+									: (entry.serverName || 'Jellyfin Server')}
 						</BodyText>
 					</SavedItemComponent>
 				);

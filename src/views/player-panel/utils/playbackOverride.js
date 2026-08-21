@@ -28,9 +28,11 @@ export const buildPlaybackOverride = ({
 	assignIfDefined(override, 'mediaSourceId', resolvedMediaSourceId);
 	if (Number.isInteger(audioStreamIndex)) {
 		override.audioStreamIndex = audioStreamIndex;
+		delete override.audioTrackIntent;
 	}
 	if (isValidSubtitleIndex(subtitleStreamIndex)) {
 		override.subtitleStreamIndex = subtitleStreamIndex;
+		delete override.subtitleTrackIntent;
 	}
 	if (Number.isFinite(seekSeconds)) {
 		override.seekSeconds = Math.max(0, seekSeconds);

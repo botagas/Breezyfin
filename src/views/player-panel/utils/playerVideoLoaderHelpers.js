@@ -6,6 +6,71 @@ import {resolveAudioTrackIndex, resolveSubtitleTrackIndex} from '../../../utils/
 
 const DEBUG_SOURCE_SUMMARY_LIMIT = 8;
 
+export const cancelVideoMountAdmission = (pendingRef, result = {
+	status: 'stale',
+	reason: 'video-surface-wait-cancelled'
+}) => {
+	const admission = pendingRef?.current;
+	if (!admission) return false;
+	if (typeof admission.cancel === 'function') {
+		admission.cancel(result);
+	} else {
+		clearTimeout(admission);
+		pendingRef.current = null;
+	}
+	return true;
+};
+
+export const waitForVideoMount = ({
+	videoRef,
+	pendingRef,
+	isStale,
+	maxAttempts = 20,
+	intervalMs = 100
+} = {}) => {
+	if (videoRef?.current) {
+		return Promise.resolve({status: 'ready', video: videoRef.current});
+	}
+
+	return new Promise((resolve) => {
+		let attempts = 0;
+		const admission = {
+			timerId: null,
+			settled: false,
+			cancel: null
+		};
+		const settle = (result) => {
+			if (admission.settled) return;
+			admission.settled = true;
+			if (admission.timerId !== null) clearTimeout(admission.timerId);
+			admission.timerId = null;
+			if (pendingRef?.current === admission) pendingRef.current = null;
+			resolve(result);
+		};
+		admission.cancel = settle;
+		const check = () => {
+			admission.timerId = null;
+			if (isStale?.()) {
+				settle({status: 'stale', reason: 'video-surface-wait-stale'});
+				return;
+			}
+			if (videoRef?.current) {
+				settle({status: 'ready', video: videoRef.current});
+				return;
+			}
+			if (attempts >= maxAttempts) {
+				settle({status: 'failed', reason: 'video-surface-unavailable'});
+				return;
+			}
+			attempts += 1;
+			admission.timerId = setTimeout(check, intervalMs);
+		};
+
+		if (pendingRef) pendingRef.current = admission;
+		check();
+	});
+};
+
 export const buildSourceDebugSummary = (mediaSources = []) => {
 	if (!Array.isArray(mediaSources) || mediaSources.length === 0) return [];
 	return mediaSources.slice(0, DEBUG_SOURCE_SUMMARY_LIMIT).map((source) => {
@@ -112,6 +177,9 @@ export const resolveInitialTrackSelection = ({
 	subtitleStreams = [],
 	playbackOptions = {},
 	playbackOverride = null,
+	negotiatedAudioStreamIndex = null,
+	negotiatedSubtitleStreamIndex = null,
+	clientRenderedSubtitleStreamIndex = null,
 	pickPreferredAudio,
 	pickPreferredSubtitle
 } = {}) => {
@@ -150,12 +218,26 @@ export const resolveInitialTrackSelection = ({
 			? playbackOverride.subtitleStreamIndex
 			: null;
 	return {
-		selectedAudio: Number.isInteger(overrideAudio) ? overrideAudio : initialAudio,
+		selectedAudio: Number.isInteger(negotiatedAudioStreamIndex)
+			? negotiatedAudioStreamIndex
+			: (Number.isInteger(overrideAudio) ? overrideAudio : initialAudio),
 		selectedSubtitle:
-			(overrideSubtitle === -1 || Number.isInteger(overrideSubtitle))
-				? overrideSubtitle
-				: initialSubtitle
+			(clientRenderedSubtitleStreamIndex === -1 || Number.isInteger(clientRenderedSubtitleStreamIndex))
+				? clientRenderedSubtitleStreamIndex
+				: (negotiatedSubtitleStreamIndex === -1 || Number.isInteger(negotiatedSubtitleStreamIndex))
+					? negotiatedSubtitleStreamIndex
+					: (overrideSubtitle === -1 || Number.isInteger(overrideSubtitle))
+						? overrideSubtitle
+						: initialSubtitle
 	};
+};
+
+export const resolveDefaultAudioStreamIndex = ({mediaSource, audioStreams = []} = {}) => {
+	if (Number.isInteger(mediaSource?.DefaultAudioStreamIndex)) {
+		return mediaSource.DefaultAudioStreamIndex;
+	}
+	const defaultStream = audioStreams.find((stream) => stream?.IsDefault) || audioStreams[0];
+	return Number.isInteger(defaultStream?.Index) ? defaultStream.Index : null;
 };
 
 export const resolvePlaybackVideoUrl = ({
@@ -236,14 +318,4 @@ export const selectHlsEnginePreference = ({
 		return {engine: 'hls.js', allowNativeFallback: false, reason: 'hlsjs-available'};
 	}
 	return {engine: null, allowNativeFallback: false, reason: 'hls-unavailable'};
-};
-
-export const getPlaybackStartupFailureMessage = (dynamicRangeInfo = null) => {
-	const rangeId = String(dynamicRangeInfo?.id || '').toUpperCase();
-	if (['DV', 'HDR10', 'HDR10_PLUS', 'HLG'].includes(rangeId)) {
-		const label = dynamicRangeInfo?.label || (rangeId === 'DV' ? 'Dolby Vision' : 'HDR');
-		return `${label} playback did not become ready after rebuilding the session. ` +
-			'This runtime may not support the selected stream; try Force Transcoding or test on TV hardware.';
-	}
-	return 'Playback failed after session rebuild attempt. Please retry or go back.';
 };

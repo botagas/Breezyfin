@@ -14,9 +14,14 @@ export const usePlayerBackNavigation = ({
 	pausedScreensaverActive = false,
 	dismissPausedScreensaver,
 	handleSubtitlePromptBack,
-	handleGroupSessionBack
+	handleGroupSessionBack,
+	actionsLocked = false
 }) => {
 	const handleInternalBack = useCallback(() => {
+		if (actionsLocked) {
+			handleBackButton();
+			return true;
+		}
 		if (pausedScreensaverActive) {
 			dismissPausedScreensaver?.();
 			return true;
@@ -47,6 +52,7 @@ export const usePlayerBackNavigation = ({
 		return true;
 	}, [
 		closeAudioPopup,
+		actionsLocked,
 		closeSubtitlePopup,
 		dismissPausedScreensaver,
 		handleBackButton,

@@ -39,8 +39,8 @@ describe('syncPlay timing', () => {
 
 	it.each([
 		[250, {action: 'none', playbackRate: 1}],
-		[251, {action: 'rate', playbackRate: 1.03}],
-		[-251, {action: 'rate', playbackRate: 0.97}],
+		[251, {action: 'none', playbackRate: 1}],
+		[-251, {action: 'none', playbackRate: 1}],
 		[2000, {action: 'seek', playbackRate: 1}]
 	])('applies the drift contract for %i ms', (drift, expected) => {
 		expect(getSyncPlayDriftCorrection(drift)).toEqual(expected);

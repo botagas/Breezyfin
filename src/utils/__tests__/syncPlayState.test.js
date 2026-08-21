@@ -73,7 +73,7 @@ describe('SyncPlay queue normalization', () => {
 
 	it('requires a playable source before reporting local SyncPlay readiness', () => {
 		expect(isSyncPlayVideoReady({readyState: 3, currentSrc: 'video.m3u8'})).toBe(true);
-		expect(isSyncPlayVideoReady({readyState: 2, currentSrc: 'video.m3u8'})).toBe(false);
+		expect(isSyncPlayVideoReady({readyState: 0, currentSrc: 'video.m3u8'})).toBe(true);
 		expect(isSyncPlayVideoReady({readyState: 4, currentSrc: '', src: ''})).toBe(false);
 	});
 

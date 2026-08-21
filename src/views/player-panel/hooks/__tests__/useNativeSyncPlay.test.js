@@ -64,17 +64,17 @@ const renderNativeSyncPlay = ({video, setToastMessage = jest.fn()} = {}) => {
 	const wrapper = ({children}) => (
 		<SyncPlayProvider value={value}>{children}</SyncPlayProvider>
 	);
-	const view = renderHook(() => useNativeSyncPlay({
+	const view = renderHook(({generation}) => useNativeSyncPlay({
 		isActive: true,
 		item: {Id: 'item-1'},
-		playbackGeneration: 1,
+		playbackGeneration: generation,
 		videoRef: {current: video},
 		handleLocalPause: jest.fn(),
 		handleLocalPlay: jest.fn(),
 		handleLocalSeek: jest.fn(),
 		syncPlayStartupBridge,
 		setToastMessage
-	}), {wrapper});
+	}), {initialProps: {generation: 1}, wrapper});
 	view.syncPlayStartupBridge = syncPlayStartupBridge;
 	return view;
 };
@@ -168,10 +168,66 @@ describe('useNativeSyncPlay', () => {
 		});
 
 		expect(positionsAtPlay).toEqual([50]);
+		expect(view.syncPlayStartupBridge.getAuthoritativePosition(0)).toBeCloseTo(50, 1);
 		view.unmount();
 	});
 
-	it('hard-seeks at most once for one authoritative Unpause command', async () => {
+	it('resumes established playback after an authoritative Pause and Unpause sequence', async () => {
+		const video = buildVideo();
+		const view = renderNativeSyncPlay({video});
+		await flushClockSample();
+		await reportInitialReady(view);
+
+		act(() => {
+			websocketListeners.SyncPlayCommand({
+				Data: {
+					Command: 'Unpause',
+					When: 'invalid',
+					PositionTicks: 500000000,
+					PlaylistItemId: 'playlist-1'
+				}
+			});
+			jest.advanceTimersByTime(0);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+		expect(video.play).toHaveBeenCalledTimes(1);
+
+		act(() => {
+			websocketListeners.SyncPlayCommand({
+				Data: {
+					Command: 'Pause',
+					When: 'invalid',
+					PositionTicks: 500000000,
+					PlaylistItemId: 'playlist-1'
+				}
+			});
+			jest.advanceTimersByTime(0);
+		});
+		expect(video.pause).toHaveBeenCalledTimes(1);
+
+		act(() => {
+			websocketListeners.SyncPlayCommand({
+				Data: {
+					Command: 'Unpause',
+					When: 'invalid',
+					PositionTicks: 520000000,
+					PlaylistItemId: 'playlist-1'
+				}
+			});
+			jest.advanceTimersByTime(0);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(video.currentTime).toBe(52);
+		expect(video.play).toHaveBeenCalledTimes(2);
+		view.unmount();
+	});
+
+	it('hard-seeks at most once and keeps playback at 1x for one authoritative Unpause command', async () => {
 		const video = buildVideo({trackCurrentTimeWrites: true});
 		const view = renderNativeSyncPlay({video});
 		await flushClockSample();
@@ -199,7 +255,7 @@ describe('useNativeSyncPlay', () => {
 		});
 
 		expect(video.currentTimeWrites).toEqual([]);
-		expect(video.playbackRate).toBe(1.03);
+		expect(video.playbackRate).toBe(1);
 		view.unmount();
 	});
 
@@ -238,6 +294,51 @@ describe('useNativeSyncPlay', () => {
 		await reportInitialReady(view);
 		act(() => {
 			jest.advanceTimersByTime(0);
+		});
+
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(video.currentTime).toBe(25);
+		expect(video.play).toHaveBeenCalledTimes(1);
+		view.unmount();
+	});
+
+	it('preserves a queued Unpause command across a same-item source generation change', async () => {
+		let resolveClock;
+		jellyfinService.sampleSyncPlayClock.mockReturnValue(new Promise((resolve) => {
+			resolveClock = resolve;
+		}));
+		const video = buildVideo();
+		const view = renderNativeSyncPlay({video});
+
+		websocketListeners.SyncPlayCommand({
+			Data: {
+				Command: 'Unpause',
+				When: 'invalid',
+				PositionTicks: 250000000,
+				PlaylistItemId: 'playlist-1'
+			}
+		});
+		view.rerender({generation: 2});
+
+		await act(async () => {
+			const now = Date.now();
+			resolveClock({
+				requestSentAtMs: now,
+				requestReceivedServerTime: new Date(now + 10).toISOString(),
+				responseSentServerTime: new Date(now + 12).toISOString(),
+				responseReceivedAtMs: now + 22
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+		await reportInitialReady(view);
+		act(() => jest.advanceTimersByTime(0));
+
+		await act(async () => {
+			await Promise.resolve();
 		});
 
 		expect(video.currentTime).toBe(25);

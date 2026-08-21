@@ -240,9 +240,7 @@
 	&:global(.spottable):focus :global(.bf-button-bg),
 	&:hover :global(.bg),
 	&:focus :global(.bg),
-	&:global(.spottable):focus :global(.bg),
-	&:global(.selected) :global(.bf-button-bg),
-	&:global(.selected) :global(.bg) {
+	&:global(.spottable):focus :global(.bg) {
 		background: var(--bf-theme-tab-hover-bg) !important;
 		border: none !important;
 	}
@@ -250,13 +248,6 @@
 	&:global(.focusExpand) {
 		margin: 0 !important;
 		transform: none !important;
-	}
-}
-
-.filterPopupOptionButtonSelected {
-	:global(.bf-button-bg),
-	:global(.bg) {
-		background: var(--bf-theme-tab-hover-bg) !important;
 	}
 }
 

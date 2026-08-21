@@ -1,3 +1,4 @@
+import {buildTokenAuthHeaders} from '../../../utils/auth';
 import {shuffleArray} from '../../../utils/arrayUtils';
 import {
 	LOGIN_BACKDROP_IMAGE_FIELDS,
@@ -28,9 +29,7 @@ export const fetchBackdropsForSavedServer = async (entry, signal) => {
 		const responses = await Promise.all(
 			requestUrls.map((requestUrl) => (
 				fetch(requestUrl, {
-					headers: {
-						'X-Emby-Token': entry.accessToken
-					},
+					headers: buildTokenAuthHeaders(entry.accessToken),
 					signal
 				}).catch(() => null)
 			))
@@ -102,9 +101,7 @@ export const resolveSavedUserBackdrop = async (entry, signal) => {
 	if (!tag) {
 		try {
 			const response = await fetch(`${baseUrl}/Users/${entry.userId}`, {
-				headers: {
-					'X-Emby-Token': entry.accessToken
-				},
+				headers: buildTokenAuthHeaders(entry.accessToken),
 				signal
 			});
 			if (response?.ok) {

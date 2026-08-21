@@ -160,8 +160,8 @@ empty/loading Statistics state has no scrollable content, and placing that state
 - `src/components/IntegrationPanelLayout.js` remains the shared owner of the surrounding
   toolbar-safe layout.
 
-This is why Statistics cannot simply use the same unconditional `scrollable` value as
-the populated Statistics view.
+Therefore, empty and loading Statistics states cannot use the populated view's
+unconditional `scrollable` value.
 
 **Removal condition:** Replace when the shared integration layout can render loading,
 empty, and error states in one consistent viewport independent of whether `AppScroller`
@@ -198,3 +198,104 @@ base path reliable.
 
 **Validation:** Run the style audits and the legacy checks in `CHECKS.md`, then verify
 Classic/Elegant layout, popups, rows, and virtual grids on the affected TV generation.
+
+## WA-008: Split native and HLS.js startup evidence
+
+**Status:** Active for supported webOS media runtimes.
+
+**Constraint:** Native webOS playback may not emit `canplay` until `video.play()` is
+requested, while HLS.js must exclusively own its attached MediaSource and can buffer
+while playback remains paused. Calling native `video.load()` after HLS.js attachment can
+detach or reset that MediaSource. Cold Jellyfin subtitle burn-in can also take longer
+than the normal post-`play()` progress deadline before producing its first segment.
+
+**Implementation:**
+
+- `src/views/player-panel/hooks/usePlayerSourcePipeline.js` owns native media reset,
+  native source assignment, and the required `video.load()` calls. It resets native
+  media before HLS.js attachment, does not call native lifecycle methods while HLS.js
+  owns the attached MediaSource, and destroys HLS.js before resetting media during
+  teardown or replacement.
+- Native playback becomes engine-ready immediately and requests playback without waiting
+  for `canplay`.
+- HLS.js becomes engine-ready only after the first current-generation `FRAG_BUFFERED`
+  event and uses a separate 30-second bootstrap deadline.
+- `src/views/player-panel/hooks/usePlayerStartupCoordinator.js` starts the 12-second
+  no-progress deadline only after `video.play()` is requested; its 15-second client
+  subtitle deadline remains independent and is not restarted by readiness rerenders.
+- Startup evidence is ignored until the current engine is ready and its `play()` request
+  has been issued. Media events created before the active source attachment are rejected,
+  and HLS.js media errors stay on its generation-bound callback path.
+- Recovery callbacks use source-token identity before teardown.
+- A recovery that intentionally tears down its source retains a separate transaction for
+  the item, playback generation, and load request. The recovery may publish a replacement
+  only while that transaction remains current.
+
+**Removal condition:** Revisit only when all supported webOS generations provide a
+consistent pre-play native readiness signal and the selected HLS.js integration can
+prove that native media lifecycle calls after attachment no longer reset its
+MediaSource. Keep separate engine and playback deadlines unless both adapters expose an
+equivalent readiness contract. Track the remaining HLS readiness investigation in
+`TODOS.md` before relaxing this workaround.
+
+**Validation:** Run the source-pipeline/startup tests, then test cold and warm server ASS
+burn-in in the Simulator and native DirectPlay/DirectStream/native-HLS on TV. Confirm
+HLS.js waits for one buffered fragment, native playback does not wait for `canplay`, and
+Back/replacement cannot leave stale HLS callbacks, recovery continuations, or background
+audio active.
+
+## WA-009: Native runtime audio changes require source replacement
+
+**Status:** Active for supported webOS media runtimes.
+
+**Constraint:** Native webOS exposes `AudioTrackList` membership and change events, but
+no dependable event proving that a newly enabled decoder output is audible and aligned
+with the current video frame. Pausing for a fixed delay can resume stale audio behind the
+video and create persistent A/V desynchronization.
+
+**Implementation:**
+
+- `usePlayerAudioTransition` pauses on the current frame and keeps the active source attached
+  during PlaybackInfo preparation. It then commits one generation-bound replacement source
+  and restores the prior position and play/pause state.
+- The replacement uses DirectPlay, DirectStream, or Transcode negotiation for the requested
+  audio track.
+- For a non-default DirectPlay track, the startup coordinator selects the native
+  `AudioTrackList` track before startup completes.
+- If native audio selection fails during a runtime transition, the transition uses the
+  controlled rollback path.
+- The paused progress snapshot is awaited before preparation. Successful readiness closes
+  the captured old PlaySession; rollback closes the failed replacement before restoring the
+  old paused session. Cancelled or decision-blocked preparations close only the session that
+  normal Player teardown does not own.
+- Video-surface mount waiting is awaitable and cancellable. It preserves the exact prepared
+  transaction and cannot detach the old source or allocate a generation before the surface
+  exists.
+- `usePlayerStartupCoordinator` requires replacement metadata and position restoration
+  before startup. A failed committed swap restores the previous source in a fresh paused
+  generation; preparation failure leaves the original paused source attached.
+- During initial DirectPlay startup, the startup coordinator can select an explicit native
+  audio track through `AudioTrackList`. Its bounded discovery deadline is not an
+  audible-readiness timer.
+- If the client cannot select the native audio track during initial DirectPlay startup, it
+  can use the server remux/transcode fallback.
+- HLS.js remains in-place only when the current instance emits the matching
+  `AUDIO_TRACK_SWITCHED` event. Timeout or stale events enter the controlled replacement.
+- SyncPlay obtains the replacement position from its server-clock target and returns to
+  authoritative Ready/Unpause handling rather than starting locally.
+
+**Removal condition:** Permit native in-place runtime changes only if every supported
+webOS generation provides a tested event or promise proving the selected decoder output
+is audible and synchronized, not merely present in `AudioTrackList`. Track the decoder
+lifecycle investigation in `TODOS.md` before replacing this workaround with a cooldown
+or readiness-based path.
+
+**Validation:** During native DirectPlay/DirectStream/native HLS, switch repeatedly while
+playing and paused. Confirm the old frame remains visible during PlaybackInfo preparation.
+Confirm all controls except Back remain locked. Verify the transition restores position and
+the prior pause state.
+
+Verify HLS.js commits only after the matching event. Verify SyncPlay waits for server
+authority. Delay the video mount and confirm that it commits once. Press Back and confirm
+that no delayed attachment occurs. Each superseded or failed Jellyfin PlaySession must
+receive at most one stop report.

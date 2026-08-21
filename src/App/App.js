@@ -39,6 +39,11 @@ import {useAppSyncPlayNavigation} from './hooks/useAppSyncPlayNavigation';
 import {SyncPlayProvider} from '../contexts/SyncPlayContext';
 import SyncPlayGlobalOverlays from '../components/SyncPlayGlobalOverlays';
 import {emitAppDebugEvent, isEditableTarget} from './utils/appInput';
+import {
+	captureRuntimeSessionIdentity,
+	isRuntimeSessionIdentityCurrent,
+	resolveExpiredSavedSessionKey
+} from '../utils/savedSessionIdentity';
 
 import css from './App.module.less';
 
@@ -96,6 +101,7 @@ const App = (props) => {
 	const inputMode = useInputMode(Spotlight);
 	const [loginNotice, setLoginNotice] = useState('');
 	const [loginNoticeNonce, setLoginNoticeNonce] = useState(0);
+	const [loginReauthenticationKey, setLoginReauthenticationKey] = useState(null);
 	const handleUserDataInvalidated = useCallback(() => {
 		setHomePanelState(null);
 		setHomeSectionPanelStateById({});
@@ -123,6 +129,7 @@ const App = (props) => {
 	const {
 		refs: {
 			playerBackHandlerRef,
+			loginBackHandlerRef,
 			detailsBackHandlerRef,
 			homeBackHandlerRef,
 			homeSectionBackHandlerRef,
@@ -138,6 +145,7 @@ const App = (props) => {
 		runPanelBackHandler,
 		registerDetailsBackHandler,
 		registerPlayerBackHandler,
+		registerLoginBackHandler,
 		registerHomeBackHandler,
 		registerHomeSectionBackHandler,
 		registerLibraryBackHandler,
@@ -329,6 +337,16 @@ const App = (props) => {
 	]);
 
 	const handleSessionExpired = useCallback((message = SESSION_EXPIRED_MESSAGE) => {
+		const expiredSessionKey = resolveExpiredSavedSessionKey(
+			jellyfinService.getSavedServers(),
+			{
+				serverUrl: jellyfinService.serverUrl,
+				userId: jellyfinService.userId
+			}
+		);
+		if (expiredSessionKey) {
+			setLoginReauthenticationKey(expiredSessionKey);
+		}
 		jellyfinService.switchUser();
 		resetSessionState();
 		setCurrentView('login');
@@ -403,8 +421,10 @@ const App = (props) => {
 				}
 				const restored = jellyfinService.restoreSession();
 				if (!restored) return;
+				const restoredSessionIdentity = captureRuntimeSessionIdentity(jellyfinService);
+				if (!restoredSessionIdentity) return;
 				const user = await jellyfinService.getCurrentUser();
-				if (cancelled) return;
+				if (cancelled || !isRuntimeSessionIdentityCurrent(restoredSessionIdentity, jellyfinService)) return;
 				if (user) {
 					setSessionActive(true);
 					setCurrentView('home');
@@ -514,6 +534,7 @@ const App = (props) => {
 				if (runPanelBackHandler(homeBackHandlerRef)) return true;
 				return false;
 			case 'login':
+				return runPanelBackHandler(loginBackHandlerRef);
 			default:
 				return false;
 		}
@@ -528,6 +549,7 @@ const App = (props) => {
 			homeBackHandlerRef,
 			homeSectionBackHandlerRef,
 			libraryBackHandlerRef,
+			loginBackHandlerRef,
 			navigateBackFromDetails,
 			navigateBackInHistory,
 			playerBackHandlerRef,
@@ -586,6 +608,7 @@ const App = (props) => {
 	const handleLogin = useCallback(() => {
 		clearPanelHistory();
 		setLoginNotice('');
+		setLoginReauthenticationKey(null);
 		setSessionActive(true);
 		setCurrentView('home');
 	}, [clearPanelHistory]);
@@ -594,6 +617,7 @@ const App = (props) => {
 		jellyfinService.logout();
 		resetSessionState();
 		setLoginNotice('');
+		setLoginReauthenticationKey(null);
 		setCurrentView('login');
 	}, [resetSessionState]);
 
@@ -601,6 +625,7 @@ const App = (props) => {
 		jellyfinService.logout();
 		resetSessionState();
 		setLoginNotice('');
+		setLoginReauthenticationKey(null);
 		setCurrentView('login');
 	}, [resetSessionState]);
 
@@ -608,6 +633,7 @@ const App = (props) => {
 		jellyfinService.switchUser();
 		resetSessionState();
 		setLoginNotice('');
+		setLoginReauthenticationKey(null);
 		setCurrentView('login');
 	}, [resetSessionState]);
 
@@ -883,7 +909,8 @@ const App = (props) => {
 		},
 		notices: {
 			login: loginNotice,
-			loginNonce: loginNoticeNonce
+			loginNonce: loginNoticeNonce,
+			loginReauthenticationKey
 		},
 		cacheState: {
 			home: homePanelState,
@@ -918,6 +945,7 @@ const App = (props) => {
 			details: handleDetailsPanelStateChange
 		},
 		backHandlers: {
+			login: registerLoginBackHandler,
 			home: registerHomeBackHandler,
 			homeSection: registerHomeSectionBackHandler,
 			library: registerLibraryBackHandler,

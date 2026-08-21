@@ -1,4 +1,5 @@
 import {invalidateWatchlistCache, notifyUserDataInvalidated} from './watchlistApi';
+import {AUTH_QUERY_PARAM} from '../../utils/auth';
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 30000;
@@ -9,7 +10,7 @@ const getSocketUrl = (service) => {
 	base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
 	base.pathname = `${base.pathname.replace(/\/$/, '')}/socket`;
 	base.search = '';
-	base.searchParams.set('api_key', service.accessToken);
+	base.searchParams.set(AUTH_QUERY_PARAM, service.accessToken);
 	base.searchParams.set('deviceId', service.getDeviceId());
 	return base.toString();
 };

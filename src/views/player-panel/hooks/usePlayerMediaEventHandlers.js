@@ -2,12 +2,17 @@ import {useCallback} from 'react';
 import {redactSensitiveUrl} from '../../../utils/sensitiveData';
 
 import {JELLYFIN_TICKS_PER_SECOND} from '../../../constants/time';
-import {applyNativeAudioTrackSelection} from '../../../utils/trackMatching';
 import {
 	getSubtitleStreamByIndex,
 	isBitmapSubtitleCodec,
 	normalizeSubtitleCodec
 } from '../../../utils/playbackSelection';
+import {
+	isServerTranscodingStartupFailure,
+	SERVER_TRANSCODING_FAILURE_DIAGNOSTIC,
+	SERVER_TRANSCODING_FAILURE_MESSAGE
+} from '../utils/playerRecoveryPolicy';
+import {isPlaybackSourceMediaEventCurrent} from '../utils/playbackRuntimeContext';
 
 const isImageSubtitleBurnInPlaybackPath = ({video, mediaSourceData, currentSubtitleTrack}) => {
 	const values = [
@@ -48,69 +53,34 @@ export const usePlayerMediaEventHandlers = ({
 	attemptTranscodeFallback,
 	handleStop,
 	mediaSourceData,
-	audioTracks,
-	currentAudioTrack,
 	currentSubtitleTrack,
 	appendPlaybackDiagnostic,
-	onNativeAudioSwitchFallback,
-	onVideoCanPlay,
-	exitInProgressRef
+	onPlaybackEvidence,
+	setPlaying,
+	exitInProgressRef,
+	nativeSourceTokenRef,
+	playbackRuntimeContextRef,
+	playbackGenerationRef,
+	onAudioTransitionFailed
 }) => {
-	const applyInitialNativeAudioSelection = useCallback((phase) => {
-		const defaultAudioTrack = Number.isInteger(mediaSourceData?.DefaultAudioStreamIndex)
-			? mediaSourceData.DefaultAudioStreamIndex
-			: audioTracks.find((track) => track?.IsDefault === true)?.Index;
-		if (
-			mediaSourceData?.__selectedPlayMethod !== 'DirectPlay' ||
-			!Number.isInteger(currentAudioTrack) ||
-			currentAudioTrack < 0 ||
-			currentAudioTrack === defaultAudioTrack ||
-			!Array.isArray(audioTracks) ||
-			audioTracks.length <= 1
-		) {
-			return false;
-		}
-		const nativeResult = applyNativeAudioTrackSelection({
-			video: videoRef.current,
-			mediaTracks: audioTracks,
-			selectedTrackIndex: currentAudioTrack
-		});
-		if (typeof appendPlaybackDiagnostic === 'function') {
-			appendPlaybackDiagnostic({
-				scope: 'audio-track',
-				stage: `initial-native-switch-${phase}`,
-				status: nativeResult.status,
-				reason: nativeResult.method,
-				message: nativeResult.applied
-					? `Selected native audio track ${nativeResult.index} from ${nativeResult.tracks.length} tracks.`
-					: `Native initial audio selection failed with ${nativeResult.tracks.length} tracks.`
-			});
-		}
-		if (nativeResult.applied) return false;
-		if (nativeResult.status === 'native-unavailable' && phase === 'metadata') {
-			return false;
-		}
-		if (typeof onNativeAudioSwitchFallback !== 'function') return false;
-		Promise.resolve(onNativeAudioSwitchFallback({
-			reason: nativeResult.status || 'native-initial-audio-switch-failed',
-			audioStreamIndex: currentAudioTrack,
-			subtitleStreamIndex: currentSubtitleTrack
-		})).catch((error) => {
-			console.warn('Failed to run native audio fallback:', error);
-		});
-		return true;
-	}, [
-		appendPlaybackDiagnostic,
-		audioTracks,
-		currentAudioTrack,
-		currentSubtitleTrack,
-		mediaSourceData?.DefaultAudioStreamIndex,
-		mediaSourceData?.__selectedPlayMethod,
-		onNativeAudioSwitchFallback,
-		videoRef
+	const isCurrentNativeEvent = useCallback((event, sourceToken = nativeSourceTokenRef.current) => (
+		isPlaybackSourceMediaEventCurrent({
+			event,
+			sourceToken,
+			activeSourceToken: nativeSourceTokenRef.current,
+			activeRuntimeContext: playbackRuntimeContextRef.current,
+			generation: playbackGenerationRef.current,
+			exitInProgress: exitInProgressRef.current
+		})
+	), [
+		exitInProgressRef,
+		nativeSourceTokenRef,
+		playbackGenerationRef,
+		playbackRuntimeContextRef
 	]);
 
-	const handleLoadedMetadata = useCallback(() => {
+	const handleLoadedMetadata = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
 		if (videoRef.current) {
 			const overrideSeek = playbackOverrideRef.current?.seekSeconds;
 			if (typeof overrideSeek === 'number') {
@@ -122,41 +92,77 @@ export const usePlayerMediaEventHandlers = ({
 				setCurrentTime(startPosition);
 			}
 		}
-		applyInitialNativeAudioSelection('metadata');
-	}, [applyInitialNativeAudioSelection, item, playbackOverrideRef, setCurrentTime, videoRef]);
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'loadedmetadata',
+			status: 'ready',
+			reason: nativeSourceTokenRef.current?.engine || 'native',
+			message: 'Current playback source emitted loadedmetadata.'
+		});
+	}, [appendPlaybackDiagnostic, isCurrentNativeEvent, item, nativeSourceTokenRef, playbackOverrideRef, setCurrentTime, videoRef]);
 
-	const handleLoadedData = useCallback(() => {
+	const handleLoadedData = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
 		if (!videoRef.current || !loading) return;
-		// `canplay` owns startup finalization. `loadeddata` can fire too early on webOS.
 		lastProgressRef.current = {
 			time: videoRef.current.currentTime || 0,
 			timestamp: Date.now()
 		};
-	}, [lastProgressRef, loading, videoRef]);
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'loadeddata',
+			status: 'ready',
+			reason: nativeSourceTokenRef.current?.engine || 'native',
+			message: 'Current playback source emitted loadeddata.'
+		});
+	}, [appendPlaybackDiagnostic, isCurrentNativeEvent, lastProgressRef, loading, nativeSourceTokenRef, videoRef]);
 
-	const handleCanPlay = useCallback(() => {
-		if (!videoRef.current || playbackStartedRef.current || exitInProgressRef.current) return;
-		applyInitialNativeAudioSelection('canplay');
-		onVideoCanPlay?.();
+	const handleCanPlay = useCallback((event) => {
+		if (!isCurrentNativeEvent(event) || !videoRef.current || exitInProgressRef.current) return;
+		appendPlaybackDiagnostic?.({
+			scope: 'startup',
+			stage: 'canplay',
+			status: 'ready',
+			reason: nativeSourceTokenRef.current?.engine || 'native',
+			message: 'Current playback source emitted canplay.'
+		});
 	}, [
-		applyInitialNativeAudioSelection,
+		appendPlaybackDiagnostic,
 		exitInProgressRef,
-		onVideoCanPlay,
-		playbackStartedRef,
+		isCurrentNativeEvent,
+		nativeSourceTokenRef,
 		videoRef
 	]);
 
-	const handleTimeUpdate = useCallback(() => {
+	const handleTimeUpdate = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
 		if (videoRef.current) {
 			const actualTime = videoRef.current.currentTime + seekOffsetRef.current;
+			const previousTime = Number(lastProgressRef.current?.time) || 0;
 			setCurrentTime(actualTime);
 			checkSkipSegments(actualTime);
 			lastProgressRef.current = {time: actualTime, timestamp: Date.now()};
+			if (videoRef.current.paused === false && Math.abs(actualTime - previousTime) >= 0.25) {
+				onPlaybackEvidence?.('timeline-progress', nativeSourceTokenRef.current);
+			}
 		}
-	}, [checkSkipSegments, lastProgressRef, seekOffsetRef, setCurrentTime, videoRef]);
+	}, [checkSkipSegments, isCurrentNativeEvent, lastProgressRef, nativeSourceTokenRef, onPlaybackEvidence, seekOffsetRef, setCurrentTime, videoRef]);
+
+	const handleVideoPlaying = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
+		setPlaying(true);
+		onPlaybackEvidence?.('playing-event', nativeSourceTokenRef.current);
+	}, [isCurrentNativeEvent, nativeSourceTokenRef, onPlaybackEvidence, setPlaying]);
+
+	const handleVideoPause = useCallback((event) => {
+		if (!isCurrentNativeEvent(event)) return;
+		setPlaying(false);
+	}, [isCurrentNativeEvent, setPlaying]);
 
 	const handleVideoError = useCallback(async (event) => {
 		if (playbackFailureLockedRef.current || exitInProgressRef.current) return;
+		const sourceToken = nativeSourceTokenRef.current;
+		if (!isCurrentNativeEvent(event, sourceToken)) return;
 		const video = videoRef.current;
 		const mediaError = video?.error;
 
@@ -185,40 +191,64 @@ export const usePlayerMediaEventHandlers = ({
 			}
 			console.error('MediaError code:', mediaError.code, '-', errorMessage);
 		}
+		if (await onAudioTransitionFailed?.(sourceToken, errorMessage)) return;
 		if (isSubtitleCompatibilityError(errorMessage) && playbackSettingsRef.current.strictTranscodingMode) {
 			showPlaybackError('Subtitle burn-in failed while strict transcoding is enabled.');
 			return;
 		}
 
 		const subtitleFallbackWorked = await attemptSubtitleCompatibilityFallback(errorMessage);
-		if (subtitleFallbackWorked) {
+		if (!isCurrentNativeEvent(null, sourceToken) || subtitleFallbackWorked) {
 			return;
 		}
 
 		if (!isCurrentTranscoding) {
 			const didFallback = await attemptTranscodeFallback(errorMessage);
-			if (didFallback) {
+			if (!isCurrentNativeEvent(null, sourceToken) || didFallback) {
 				return;
 			}
 		}
 
+		const serverTranscodingStartupFailure = isServerTranscodingStartupFailure({
+			isTranscoding: isCurrentTranscoding,
+			playbackStarted: playbackStartedRef.current,
+			mediaErrorCode: mediaError?.code
+		});
+		if (serverTranscodingStartupFailure) {
+			appendPlaybackDiagnostic?.({
+				scope: 'transcode',
+				stage: 'startup-failure',
+				status: 'error',
+				reason: 'server-transcoder-startup-failure',
+				message: SERVER_TRANSCODING_FAILURE_DIAGNOSTIC
+			});
+		}
 		try {
 			await handleStop();
 		} catch (stopErr) {
 			console.warn('Error while handling playback failure:', stopErr);
 		}
-		showPlaybackError(errorMessage);
+		showPlaybackError(
+			serverTranscodingStartupFailure
+				? SERVER_TRANSCODING_FAILURE_MESSAGE
+				: errorMessage
+		);
 	}, [
+		appendPlaybackDiagnostic,
 		attemptSubtitleCompatibilityFallback,
 		attemptTranscodeFallback,
 		currentSubtitleTrack,
 		exitInProgressRef,
 		handleStop,
 		isCurrentTranscoding,
+		isCurrentNativeEvent,
 		isSubtitleCompatibilityError,
 		mediaSourceData,
+		nativeSourceTokenRef,
 		playbackFailureLockedRef,
+		playbackStartedRef,
 		playbackSettingsRef,
+		onAudioTransitionFailed,
 		showPlaybackError,
 		videoRef
 	]);
@@ -228,6 +258,8 @@ export const usePlayerMediaEventHandlers = ({
 		handleLoadedData,
 		handleCanPlay,
 		handleTimeUpdate,
+		handleVideoPlaying,
+		handleVideoPause,
 		handleVideoError
 	};
 };

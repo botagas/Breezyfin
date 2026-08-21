@@ -379,6 +379,8 @@ const WatchlistPanel = ({
 	const title = nestedView?.title || 'Watchlist';
 	const statistics = insightEntry.statistics;
 	const statisticsUsesStaticViewport = activeTab === 'statistics' && !statistics;
+	const nativeWatchlistIsEmpty = activeTab === 'watchlist' && !loading && shows.length === 0 && movies.length === 0;
+	const nativeWatchlistUsesStaticViewport = activeTab === 'watchlist' && (loading || nativeWatchlistIsEmpty);
 	const insightChildProps = useMemo(() => ({
 		items: insightEntry.items,
 		onItemClick: handleInsightItemClick,
@@ -400,7 +402,12 @@ const WatchlistPanel = ({
 			errorMessage={error}
 			captureScrollTo={captureScrollTo}
 			onScrollStop={handleScrollStop}
-			scrollable={!nestedView && !VIRTUAL_TABS.includes(activeTab) && !statisticsUsesStaticViewport}
+			scrollable={
+				!nestedView &&
+				!VIRTUAL_TABS.includes(activeTab) &&
+				!statisticsUsesStaticViewport &&
+				!nativeWatchlistUsesStaticViewport
+			}
 		>
 			{!nestedView ? (
 				<PanelTabNavigation
@@ -413,7 +420,12 @@ const WatchlistPanel = ({
 			) : null}
 			{!nestedView && activeTab === 'watchlist' && !error ? (
 				<div className={css.watchlistContent}>
-					{loading ? <BreezyLoadingOverlay label="Loading Watchlist..." /> : null}
+					{loading ? (
+						<BreezyLoadingOverlay
+							className={css.loadingState}
+							label="Loading Watchlist..."
+						/>
+					) : null}
 					<MediaRow
 						title="Shows"
 						items={shows}
@@ -430,7 +442,7 @@ const WatchlistPanel = ({
 						onMoreClick={viewMore}
 						getImageCandidates={getImageCandidates}
 					/>
-					{!loading && shows.length === 0 && movies.length === 0 ? (
+					{nativeWatchlistIsEmpty ? (
 						<BodyText className={css.empty}>Your Watchlist is empty.</BodyText>
 					) : null}
 				</div>
@@ -454,7 +466,10 @@ const WatchlistPanel = ({
 			{!nestedView && VIRTUAL_TABS.includes(activeTab) ? (
 				<div className={css.listViewport}>
 					{insightEntry.loading ? (
-						<BreezyLoadingOverlay label={`Loading ${TABS.find((tab) => tab.id === activeTab)?.label || 'Watchlist'}...`} />
+						<BreezyLoadingOverlay
+							className={css.loadingState}
+							label={`Loading ${TABS.find((tab) => tab.id === activeTab)?.label || 'Watchlist'}...`}
+						/>
 					) : null}
 					{insightEntry.error ? (
 						<div className={css.inlineState} role="alert">
@@ -482,7 +497,12 @@ const WatchlistPanel = ({
 			) : null}
 			{!nestedView && activeTab === 'statistics' ? (
 				<div className={css.listViewport}>
-					{insightEntry.loading ? <BreezyLoadingOverlay label="Loading Statistics..." /> : null}
+					{insightEntry.loading ? (
+						<BreezyLoadingOverlay
+							className={css.loadingState}
+							label="Loading Statistics..."
+						/>
+					) : null}
 					{insightEntry.error ? (
 						<div className={css.inlineState} role="alert">
 							<BodyText>{insightEntry.error}</BodyText>

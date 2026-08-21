@@ -24,12 +24,8 @@ jest.mock('../serverManager', () => ({
 import jellyfinService from '../jellyfinService';
 import serverManager from '../serverManager';
 import {getDeviceId} from '../../utils/deviceIdentity';
-
-const jsonResponse = (data, ok = true, status = 200) => ({
-	ok,
-	status,
-	json: async () => data
-});
+import {createJsonResponse} from '../../testUtils/fetchResponse';
+import {SESSION_EXPIRED_EVENT} from '../../constants/session';
 
 const resetServiceState = () => {
 	jellyfinService.api = null;
@@ -39,6 +35,7 @@ const resetServiceState = () => {
 	jellyfinService.serverName = null;
 	jellyfinService.username = null;
 	jellyfinService.sessionExpiredNotified = false;
+	jellyfinService.sessionGeneration = 0;
 	jellyfinService.clientVersionPromise = null;
 };
 
@@ -60,6 +57,7 @@ describe('jellyfinService', () => {
 		localStorage.clear();
 		resetServiceState();
 		global.fetch = jest.fn();
+		serverManager.setActiveServer.mockReturnValue({id: 'srv1'});
 		errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 	});
@@ -75,7 +73,7 @@ describe('jellyfinService', () => {
 	});
 
 	it('connects to server and stores server metadata', async () => {
-		global.fetch.mockResolvedValue(jsonResponse({ServerName: 'My Jellyfin'}));
+		global.fetch.mockResolvedValue(createJsonResponse({ServerName: 'My Jellyfin'}));
 
 		const info = await jellyfinService.connect('http://media.local:8096');
 
@@ -98,7 +96,7 @@ describe('jellyfinService', () => {
 		const parsedImageUrl = new URL(imageUrl);
 		expect(parsedImageUrl.origin).toBe('http://media.local');
 		expect(parsedImageUrl.pathname).toBe('/Items/item-1/Images/Primary');
-		expect(parsedImageUrl.searchParams.get('api_key')).toBe('token-123');
+		expect(parsedImageUrl.searchParams.get('ApiKey')).toBe('token-123');
 		expect(parsedImageUrl.searchParams.get('width')).toBe('320');
 		expect(parsedImageUrl.searchParams.get('tag')).toBe('tag-1');
 		expect(parsedImageUrl.searchParams.get('format')).toBe('Jpg');
@@ -128,7 +126,7 @@ describe('jellyfinService', () => {
 
 		expect(parsedImageUrl.origin).toBe('http://media.local');
 		expect(parsedImageUrl.pathname).toBe('/Users/user-1/Images/Primary');
-		expect(parsedImageUrl.searchParams.get('api_key')).toBe('token-123');
+		expect(parsedImageUrl.searchParams.get('ApiKey')).toBe('token-123');
 		expect(parsedImageUrl.searchParams.get('width')).toBe('96');
 		expect(parsedImageUrl.searchParams.has('tag')).toBe(false);
 	});
@@ -141,19 +139,88 @@ describe('jellyfinService', () => {
 	});
 
 	it('throws when server is not reachable during connect', async () => {
-		global.fetch.mockResolvedValue(jsonResponse({}, false, 500));
+		global.fetch.mockResolvedValue(createJsonResponse({}, false, 500));
 
 		await expect(jellyfinService.connect('http://bad-host')).rejects.toThrow('Server not reachable');
+	});
+
+	it('does not expire a replacement session from an old request failure', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'old-token';
+		let resolveRequest;
+		global.fetch.mockImplementation(() => new Promise((resolve) => {
+			resolveRequest = resolve;
+		}));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+		const request = jellyfinService._request('/Users/old-user', {context: 'stale request'});
+		jellyfinService.accessToken = 'new-token';
+
+		resolveRequest(createJsonResponse({}, false, 401));
+		await expect(request).rejects.toMatchObject({status: 401});
+		expect(expiredListener).not.toHaveBeenCalled();
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+	});
+
+	it('does not expire a reauthenticated session when Jellyfin reuses the same token', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'reused-token';
+		let resolveRequest;
+		global.fetch.mockImplementation(() => new Promise((resolve) => {
+			resolveRequest = resolve;
+		}));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+		const request = jellyfinService._request('/Users/old-user', {context: 'stale request'});
+		jellyfinService._advanceSessionGeneration();
+
+		resolveRequest(createJsonResponse({}, false, 401));
+		await expect(request).rejects.toMatchObject({status: 401});
+		expect(expiredListener).not.toHaveBeenCalled();
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+	});
+
+	it('expires the session for a failure owned by the active token and server', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'active-token';
+		global.fetch.mockResolvedValue(createJsonResponse({}, false, 403));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+
+		await expect(jellyfinService._request('/Users/user-1', {context: 'active request'}))
+			.rejects.toMatchObject({status: 403});
+		expect(expiredListener).toHaveBeenCalledTimes(1);
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+	});
+
+	it('does not expire the active session when optional handling is suppressed', async () => {
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.accessToken = 'active-token';
+		global.fetch.mockResolvedValue(createJsonResponse({}, false, 401));
+		const expiredListener = jest.fn();
+		window.addEventListener(SESSION_EXPIRED_EVENT, expiredListener);
+
+		await expect(jellyfinService._request('/Breezyfin/Capabilities', {
+			context: 'optional capability request',
+			suppressAuthHandling: true
+		})).rejects.toMatchObject({status: 401});
+		expect(expiredListener).not.toHaveBeenCalled();
+		window.removeEventListener(SESSION_EXPIRED_EVENT, expiredListener);
 	});
 
 	it('authenticates and persists active session', async () => {
 		jellyfinService.serverUrl = 'http://media.local';
 		jellyfinService.api = {};
+		localStorage.setItem('jellyfinAuth', JSON.stringify({
+			serverUrl: 'http://legacy.local',
+			accessToken: 'legacy-token',
+			userId: 'legacy-user'
+		}));
 		const resolveClientVersionSpy = jest.spyOn(jellyfinService, 'resolveClientVersion').mockResolvedValue('9.9.9');
 		const getClientVersionSpy = jest.spyOn(jellyfinService, 'getClientVersion').mockReturnValue('9.9.9');
 		serverManager.addServer.mockReturnValue({serverId: 'srv1', userId: 'user1'});
 		global.fetch.mockResolvedValue(
-			jsonResponse({
+			createJsonResponse({
 				AccessToken: 'token-123',
 				User: {Id: 'user1', Name: 'Alice', PrimaryImageTag: 'avatar-tag-1'},
 				ServerName: 'Living Room'
@@ -167,12 +234,12 @@ describe('jellyfinService', () => {
 				expect.objectContaining({
 					method: 'POST',
 					headers: expect.objectContaining({
-						'X-Emby-Authorization': expect.stringContaining(`DeviceId="${jellyfinService.getDeviceId()}"`)
+						'Authorization': expect.stringContaining(`DeviceId="${jellyfinService.getDeviceId()}"`)
 					}),
 					body: JSON.stringify({Username: 'Alice', Pw: 'secret'})
 				})
 			);
-			const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.['X-Emby-Authorization'] || '';
+			const authHeader = global.fetch.mock.calls[0]?.[1]?.headers?.Authorization || '';
 			expect(authHeader).toContain('Version="9.9.9"');
 			expect(resolveClientVersionSpy).toHaveBeenCalledTimes(1);
 			expect(getClientVersionSpy).toHaveBeenCalled();
@@ -193,13 +260,7 @@ describe('jellyfinService', () => {
 				})
 			);
 			expect(serverManager.setActiveServer).toHaveBeenCalledWith('srv1', 'user1');
-
-			const savedAuth = JSON.parse(localStorage.getItem('jellyfinAuth'));
-			expect(savedAuth).toEqual({
-				serverUrl: 'http://media.local',
-				accessToken: 'token-123',
-				userId: 'user1'
-			});
+			expect(localStorage.getItem('jellyfinAuth')).toBe(null);
 		} finally {
 			resolveClientVersionSpy.mockRestore();
 			getClientVersionSpy.mockRestore();
@@ -255,6 +316,7 @@ describe('jellyfinService', () => {
 			})
 		);
 		expect(serverManager.setActiveServer).toHaveBeenCalledWith('legacy-srv', 'legacy-user');
+		expect(localStorage.getItem('jellyfinAuth')).toBe(null);
 	});
 
 	it('clears malformed legacy jellyfinAuth payload and does not restore session', () => {
@@ -289,7 +351,7 @@ describe('jellyfinService', () => {
 			id: 'srv1',
 			activeUser: {userId: 'user1', username: 'Old Name'}
 		});
-		global.fetch.mockResolvedValue(jsonResponse({
+		global.fetch.mockResolvedValue(createJsonResponse({
 			Id: 'user1',
 			Name: 'Alice',
 			PrimaryImageTag: 'avatar-tag-2'

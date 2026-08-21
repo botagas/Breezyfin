@@ -1,7 +1,10 @@
 import {act, renderHook} from '@testing-library/react';
 import {usePlayerPlaybackDecision} from '../usePlayerPlaybackDecision';
+import {createPlaybackGenerationAllocator} from '../../utils/playbackGeneration';
 
-const createProps = () => ({
+const createProps = () => {
+	const playbackGenerationRef = {current: 4};
+	return ({
 	itemId: 'item-1',
 	mediaSourceId: 'source-1',
 	playbackOptions: {},
@@ -24,9 +27,11 @@ const createProps = () => ({
 	saveAudioSelection: jest.fn(),
 	exitInProgressRef: {current: false},
 	loadRequestIdRef: {current: 0},
-	playbackGenerationRef: {current: 4},
+	playbackGenerationRef,
+	playbackGenerationAllocator: createPlaybackGenerationAllocator({playbackGenerationRef}),
 	onBack: jest.fn()
-});
+	});
+};
 
 describe('usePlayerPlaybackDecision', () => {
 	it('ignores confirmation after the playback generation changes', async () => {
@@ -77,6 +82,33 @@ describe('usePlayerPlaybackDecision', () => {
 			avoidDolbyVision: true,
 			confirmedDynamicRangeFallback: 'hdr10'
 		}));
+	});
+
+	it('preserves and commits a pending audio selection through a range decision', async () => {
+		const props = createProps();
+		props.loadVideoRef.current.mockResolvedValue({status: 'attached'});
+		const {result} = renderHook(() => usePlayerPlaybackDecision(props));
+		await act(async () => {
+			await result.current.requestPlaybackDecision({
+				type: 'dynamic-range-fallback',
+				itemId: 'item-1',
+				mediaSourceId: 'source-1',
+				generation: 4,
+				proposedRange: 'sdr',
+				audioStreamIndex: 2,
+				pendingAudioSelection: true
+			});
+		});
+		await act(async () => {
+			await result.current.handleConfirmPlaybackDecision();
+		});
+
+		expect(props.playbackOverrideRef.current).toEqual(expect.objectContaining({
+			audioStreamIndex: 2,
+			dynamicRangeCap: 'sdr'
+		}));
+		expect(props.setCurrentAudioTrack).toHaveBeenCalledWith(2);
+		expect(props.saveAudioSelection).toHaveBeenCalledWith(2, props.audioTracks);
 	});
 
 	it('does not replace an active subtitle prompt with a later range fallback', async () => {
