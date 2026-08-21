@@ -1,6 +1,6 @@
 # Breezyfin Quality Tooling Notes
 
-Last reviewed: 2026-07-30.
+Last reviewed: 2026-08-21.
 
 This document records the current lint, test, and audit coverage. It also defines how to
 evaluate external quality tools. Add a tool only when measured evidence shows that it
@@ -14,7 +14,7 @@ audits.
 - Unit tests run through `npm run test -- --watch=false --runInBand`.
 - Repository-specific checks run through `npm run audit`.
 - Current app-owned style surface is large: `src/` contains 217 CSS/LESS files.
-- Current app-owned JavaScript surface contains 341 production modules plus 118
+- Current app-owned JavaScript surface contains 357 production modules plus 138
   test/test-support modules.
 - Rendered integration tests use Testing Library through
   `src/testUtils/renderWithBreezyfin.js`. The helper installs the Breezyfin Sandstone theme

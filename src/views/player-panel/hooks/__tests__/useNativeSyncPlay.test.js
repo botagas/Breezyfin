@@ -172,7 +172,63 @@ describe('useNativeSyncPlay', () => {
 		view.unmount();
 	});
 
-	it('hard-seeks at most once and keeps playback at 1x for one authoritative Unpause command', async () => {		const video = buildVideo({trackCurrentTimeWrites: true});
+	it('resumes established playback after an authoritative Pause and Unpause sequence', async () => {
+		const video = buildVideo();
+		const view = renderNativeSyncPlay({video});
+		await flushClockSample();
+		await reportInitialReady(view);
+
+		act(() => {
+			websocketListeners.SyncPlayCommand({
+				Data: {
+					Command: 'Unpause',
+					When: 'invalid',
+					PositionTicks: 500000000,
+					PlaylistItemId: 'playlist-1'
+				}
+			});
+			jest.advanceTimersByTime(0);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+		expect(video.play).toHaveBeenCalledTimes(1);
+
+		act(() => {
+			websocketListeners.SyncPlayCommand({
+				Data: {
+					Command: 'Pause',
+					When: 'invalid',
+					PositionTicks: 500000000,
+					PlaylistItemId: 'playlist-1'
+				}
+			});
+			jest.advanceTimersByTime(0);
+		});
+		expect(video.pause).toHaveBeenCalledTimes(1);
+
+		act(() => {
+			websocketListeners.SyncPlayCommand({
+				Data: {
+					Command: 'Unpause',
+					When: 'invalid',
+					PositionTicks: 520000000,
+					PlaylistItemId: 'playlist-1'
+				}
+			});
+			jest.advanceTimersByTime(0);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(video.currentTime).toBe(52);
+		expect(video.play).toHaveBeenCalledTimes(2);
+		view.unmount();
+	});
+
+	it('hard-seeks at most once and keeps playback at 1x for one authoritative Unpause command', async () => {
+		const video = buildVideo({trackCurrentTimeWrites: true});
 		const view = renderNativeSyncPlay({video});
 		await flushClockSample();
 		await reportInitialReady(view);

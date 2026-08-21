@@ -158,6 +158,25 @@ describe('playbackPlan', () => {
 		expect(plan.runtimeInput.requiresInitialNativeAudioSelection).toBe(true);
 	});
 
+	it('preserves DirectPlay and native audio gating for a runtime audio transition', () => {
+		const plan = build({
+			playbackOverride: {
+				audioStreamIndex: 2,
+				audioTransition: {id: 'audio-1', startPaused: true, seekSeconds: 42}
+			}
+		});
+
+		expect(plan.playMethod).toBe('DirectPlay');
+		expect(plan.session.playMethod).toBe('DirectPlay');
+		expect(plan.tracks.selectedAudioStreamIndex).toBe(2);
+		expect(plan.runtimeInput.requiresInitialNativeAudioSelection).toBe(true);
+		expect(plan.runtimeInput.audioTransition).toEqual({
+			id: 'audio-1',
+			startPaused: true,
+			seekSeconds: 42
+		});
+	});
+
 	it('does not gate the IsDefault track when DefaultAudioStreamIndex is absent', () => {
 		const playbackInfo = createInfo();
 		delete playbackInfo.__breezyfin.selectedAudioStreamIndex;

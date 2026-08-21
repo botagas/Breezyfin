@@ -172,15 +172,9 @@ and packaged assets remain under their respective licenses, listed in
 
 ## Disclaimer
 
-Nowadays, I use AI assistance for a significant part of Breezyfin's development. I created the
-initial versions myself, but the project's scope and complexity eventually exceeded the
-time that I could give to manual implementation. I now direct the work, review the code,
-and test the resulting behavior on the webOS Simulator and real TVs.
+Nowadays, I use AI assistance for a significant part of Breezyfin's development. I created the initial versions myself, but the project's scope and complexity eventually exceeded the time that I could give to manual implementation. I now direct the work, review the code, and test the resulting behavior on the webOS Simulator and real TVs.
 
-I have experience with Python and basic HTML/CSS, but I do not claim expert knowledge of
-every system in this project. Breezyfin remains primarily a personal project that aims to
-provide a responsive Jellyfin client for webOS. As such, I'm often finding myself guiding the AI, verifying and testing the changes, and trying to prevent it from conquering the world.Reports, reviews, and specific improvement
-suggestions are welcome.
+I have experience with Python and basic HTML/CSS, but I do not claim expert knowledge of every system in this project. Breezyfin remains primarily a personal project that aims to provide a responsive Jellyfin client for webOS. As such, I'm often finding myself guiding the AI, verifying and testing the changes, and trying to prevent it from conquering the world. Reports, reviews, and specific improvement suggestions are welcome.
 
 ## FAQ
 
@@ -189,41 +183,30 @@ suggestions are welcome.
 <b>Do you plan to release the client on other platforms besides webOS?</b>
 </summary>
 
-No. webOS has platform-specific behavior that does not apply to most other targets. I can
-test Breezyfin extensively on an LG TV, so the project will remain exclusive to webOS.
+No. webOS has platform-specific behavior that does not apply to most other targets. I can test Breezyfin extensively on an LG TV, so the project will remain exclusive to webOS.
 </details>
 
 <details>
 <summary>
 <b>Is the app vibecoded?</b>
 </summary>
-AI assistance is now a substantial part of the development process. I use it because I do
-not have enough time to implement the entire application by hand.
+AI assistance is now a substantial part of the development process. I use it because I do not have enough time to implement the entire application by hand.
 
-I keep the application modular so that I can review and track changes. The repository also
-contains strict architecture, testing, and design rules for every contributor, including
-AI agents. This is my first webOS project, and the platform has many constraints that need
-explicit handling. Limiting the project to webOS keeps that scope manageable.
+I keep the application modular so that I can review and track changes. The repository also contains strict architecture, testing, and design rules for every contributor, including AI agents. This is my first webOS project, and the platform has many constraints that need explicit handling. Limiting the project to webOS keeps that scope manageable.
 </details>
 
 <details>
 <summary>
 <b>How long will you continue to develop the app?</b>
 </summary>
-I primarily use LG TVs, so I plan to support Breezyfin while it remains useful to me. AI
-assistance does not change that motivation.
+I primarily use LG TVs, so I plan to support Breezyfin while it remains useful to me. AI assistance does not change that motivation.
 </details>
 
 <details>
 <summary>
 <b>How do you test Breezyfin before a release?</b>
 </summary>
-Before each release, I test the affected behavior in the webOS Simulator. I then run the
-same checks on a TV. A successful candidate is published to the `develop` branch for
-continued testing. After the `develop` build remains stable on my TV and testers' TVs, I
-promote it to the stable release channel. Some urgent fixes can use a shorter validation
-cycle.
+Before each release, I test the affected behavior in the webOS Simulator. I then run the same checks on a TV. A successful candidate is published to the `develop` branch for continued testing. After the `develop` build remains stable on my TV and testers' TVs, I promote it to the stable release channel. Some urgent fixes can use a shorter validation cycle.
 
-If you find a problem, report it in GitHub Issues and include enough information to
-reproduce it.
+If you find a problem, report it in GitHub Issues and include enough information to reproduce it.
 </details>

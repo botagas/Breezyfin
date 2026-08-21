@@ -175,7 +175,7 @@ export const useNativeSyncPlay = ({
 					video.pause();
 					video.currentTime = 0;
 					targetRef.current = null;
-				    seekReadyPendingRef.current = false;
+					seekReadyPendingRef.current = false;
 					resetRate();
 					break;
 				default:
@@ -340,7 +340,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
-	    seekReadyPendingRef.current = false;
+		seekReadyPendingRef.current = false;
 		clearTimeout(bufferingTimerRef.current);
 		resetRate();
 	}, [group?.GroupId, resetRate]);
@@ -362,7 +362,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
-	    seekReadyPendingRef.current = false;
+		seekReadyPendingRef.current = false;
 		resetRate();
 	}, [item?.Id, playbackGeneration, resetRate]);
 
@@ -379,7 +379,7 @@ export const useNativeSyncPlay = ({
 		initialReadySentRef.current = false;
 		readyPendingRef.current = false;
 		bufferingReportedRef.current = false;
-	    seekReadyPendingRef.current = false;
+		seekReadyPendingRef.current = false;
 		resetRate();
 	}, [resetRate, syncPlay.followMode]);
 

@@ -40,9 +40,9 @@
 	color: var(--bf-button-fg-active) !important;
 }
 
-/* In 5-way mode, ignore stale mouse-hover paint so only Spotlight focus is visually active. */
-[data-bf-input-mode='5way'] .bf-button:hover,
-[data-bf-input-mode='5way'] .bf-button:hover .client,
-[data-bf-input-mode='5way'] .bf-button:hover .icon {
+/* In 5-way mode, ignore stale hover only when the button does not own focus. */
+[data-bf-input-mode='5way'] .bf-button:hover:not(:focus):not([data-webos-voice-focused='true']),
+[data-bf-input-mode='5way'] .bf-button:hover:not(:focus):not([data-webos-voice-focused='true']) .client,
+[data-bf-input-mode='5way'] .bf-button:hover:not(:focus):not([data-webos-voice-focused='true']) .icon {
 	color: var(--bf-button-fg) !important;
 }

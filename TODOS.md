@@ -16,16 +16,6 @@ regression risk.
 
 - Remove the deprecated `jellyfinAuth` read-and-migrate path no earlier than `0.4.0`, after the managed `breezyfin_servers` migration has shipped for multiple release cycles.
   Before removal, document that users upgrading directly from older releases may need to sign in again and verify logout, switch-user, cache clearing, and multi-server restoration remain correct.
-- Add regression coverage for runtime DirectPlay audio transitions:
-  - confirm a non-default DirectPlay replacement waits for native audio selection
-  - confirm runtime audio negotiation does not force DirectPlay off
-  - confirm a paused DirectPlay replacement restores the selected audio track and
-    playback position before transition readiness
-  - confirm native audio-selection failure enters the controlled runtime rollback
-    path instead of the initial-startup server fallback
-- Fix SyncPlay resume after the initial playback start. Ensure that an `Unpause` command calls `video.play()` when the startup coordinator does not start playback.
-- Add a regression test for the SyncPlay pause, resume sequence after the initial playback start as well as a regression test for syncTiming.
-
 ## Medium changes / issues
 
 Expected scope: bounded work spanning a small number of services, scripts, tests, or UI surfaces.
@@ -102,6 +92,15 @@ Expected scope: architectural work, a new feature surface, or changes spanning s
 
 Expected scope: unknown until profiling, API research, dependency analysis, or real-device reproduction establishes the cause and constraints.
 
+- Audit panel visual structure and interaction-style ownership before the next UI cleanup.
+  - Inventory popup surfaces, action buttons, selected states, focus, hover, active,
+    disabled, loading, empty, and error presentations across all panels.
+  - Identify equivalent panel-local markup, CSS modules, mixins, and token overrides that
+    can move to existing shared components or narrowly scoped new primitives.
+  - Preserve panel layout ownership, Sandstone Spotlight behavior, Classic and Elegant
+    semantics, Performance modes, and webOS compatibility files.
+  - Consolidate one primitive family at a time with rendered and real-TV validation. Do
+    not replace intentional panel-specific composition with one universal component.
 - Investigate a single-surface Player transition presentation for audio replacements.
   Freeze and retain the current video surface, then delay the loading overlay for a short
   threshold and commit the replacement only after readiness. Do not pre-load a second native

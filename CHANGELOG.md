@@ -33,6 +33,8 @@ All notable changes to Breezyfin are documented in this file.
 - Prevented reconnecting and Add User flows from retaining a stale session-expired notice.
 - Prevented late `401` and `403` responses from an old runtime session from expiring a
   replacement session, including when Jellyfin reuses the same device token.
+- Prevented optional plugin capability authorization failures from expiring the active
+  Jellyfin session or blocking the rest of the client.
 - Added status-aware login failures for non-JSON Jellyfin responses so reverse proxies and
   incompatible servers do not surface an unrelated JSON parser error.
 - Stopped native webOS Direct Play startup from waiting for `canplay` before requesting
@@ -62,6 +64,8 @@ All notable changes to Breezyfin are documented in this file.
   generation, and load request so stale teardown continuations cannot restart newer media.
 - Allowed SyncPlay readiness after source preparation without waiting for native media
   readiness events that may require authoritative group playback to begin first.
+- Fixed authoritative SyncPlay resume after startup, reported Ready after completed seeks,
+  and kept playback at 1x on runtimes that do not support rate-based drift correction.
 - Cleared initiating-client track options when same-item SyncPlay resume fails.
 - Routed session rebuilds through the shared recovery transaction, restored native-audio
   fallback availability after explicit Retry, and prevented stale SyncPlay resume requests
@@ -69,6 +73,8 @@ All notable changes to Breezyfin are documented in this file.
 - Replaced ambiguous startup format errors on confirmed transcodes with bounded
   server-transcoding guidance and optional systemd/FFmpeg diagnostics.
 - Aligned Watchlist loading and empty states across native and plugin-backed tabs.
+- Kept Media Details primary-action hover and 5-way focus foregrounds consistent without
+  allowing stale pointer hover to override the focused foreground.
 
 ## 0.2.0
 

@@ -238,18 +238,36 @@ describe('usePlayerStartupCoordinator state', () => {
 		expect(view.props.onInitialAudioSelectionFallback).toBeUndefined();
 	});
 
-	it('restores the audio replacement position before releasing a paused transition', async () => {
+	it('waits for native audio selection and position restoration before releasing a paused DirectPlay transition', async () => {
 		const view = createCoordinatorProps();
 		let readyState = 0;
 		Object.defineProperty(view.video, 'readyState', {
 			configurable: true,
 			get: () => readyState
 		});
+		const nativeTracks = [
+			{language: 'en', label: 'English', enabled: true},
+			{language: 'ja', label: 'Japanese', enabled: false}
+		];
+		nativeTracks.addEventListener = jest.fn();
+		nativeTracks.removeEventListener = jest.fn();
+		Object.defineProperty(view.video, 'audioTracks', {
+			configurable: true,
+			value: nativeTracks
+		});
 		const runtimeContext = createPlaybackRuntimeContext({
 			generation: 1,
 			itemId: 'item-1',
-			mediaSourceData: {Id: 'source-1'},
-			playMethod: 'DirectStream',
+			mediaSourceData: {
+				Id: 'source-1',
+				MediaStreams: [
+					{Type: 'Audio', Index: 1, Language: 'eng'},
+					{Type: 'Audio', Index: 2, Language: 'jpn'}
+				]
+			},
+			playMethod: 'DirectPlay',
+			selectedAudioTrack: 2,
+			requiresInitialNativeAudioSelection: true,
 			audioTransition: {id: 'audio-1', startPaused: true, seekSeconds: 42}
 		});
 		view.sourceToken = createNativePlaybackSourceToken({
@@ -267,6 +285,8 @@ describe('usePlayerStartupCoordinator state', () => {
 		});
 		await waitFor(() => expect(result.current.status).toBe('waiting-audio'));
 		expect(view.props.onAudioTransitionReady).not.toHaveBeenCalled();
+		expect(nativeTracks[0].enabled).toBe(true);
+		expect(nativeTracks[1].enabled).toBe(false);
 
 		act(() => {
 			readyState = 1;
@@ -278,7 +298,65 @@ describe('usePlayerStartupCoordinator state', () => {
 			{started: false}
 		));
 		expect(view.video.currentTime).toBe(42);
+		expect(nativeTracks[0].enabled).toBe(false);
+		expect(nativeTracks[1].enabled).toBe(true);
 		expect(view.video.play).not.toHaveBeenCalled();
+	});
+
+	it('routes native audio-selection failure through runtime rollback instead of initial fallback', async () => {
+		jest.useFakeTimers();
+		const view = createCoordinatorProps();
+		Object.defineProperty(view.video, 'readyState', {
+			configurable: true,
+			value: 1
+		});
+		const nativeTracks = [];
+		nativeTracks.addEventListener = jest.fn();
+		nativeTracks.removeEventListener = jest.fn();
+		Object.defineProperty(view.video, 'audioTracks', {
+			configurable: true,
+			value: nativeTracks
+		});
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 1,
+			itemId: 'item-1',
+			mediaSourceData: {
+				Id: 'source-1',
+				MediaStreams: [
+					{Type: 'Audio', Index: 1, Language: 'eng'},
+					{Type: 'Audio', Index: 2, Language: 'jpn'}
+				]
+			},
+			playMethod: 'DirectPlay',
+			selectedAudioTrack: 2,
+			requiresInitialNativeAudioSelection: true,
+			audioTransition: {id: 'audio-1', startPaused: true, seekSeconds: 42}
+		});
+		view.sourceToken = createNativePlaybackSourceToken({
+			runtimeContext,
+			video: view.video,
+			sourceUrl: 'video.mkv'
+		});
+		view.props.playbackRuntimeContextRef.current = runtimeContext;
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		view.props.onAudioTransitionFailed = jest.fn().mockResolvedValue(true);
+		view.props.onInitialAudioSelectionFallback = jest.fn().mockResolvedValue(true);
+		const {result, unmount} = renderHook(() => usePlayerStartupCoordinator(view.props));
+
+		act(() => result.current.registerPlaybackSource(view.sourceToken));
+		expect(result.current.status).toBe('waiting-audio');
+		act(() => jest.advanceTimersByTime(5000));
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(view.props.onAudioTransitionFailed).toHaveBeenCalledWith(
+			view.sourceToken,
+			'native-track-discovery-timeout'
+		);
+		expect(view.props.onInitialAudioSelectionFallback).not.toHaveBeenCalled();
+		expect(view.video.play).not.toHaveBeenCalled();
+		unmount();
 	});
 
 	it('restores a non-default native audio track and position before completing rollback', async () => {
