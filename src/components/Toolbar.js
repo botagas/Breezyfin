@@ -318,8 +318,9 @@ const Toolbar = ({
 
 	const handleUserAvatarError = useCallback((event) => {
 		if (applyImageFormatFallbackFromEvent(event)) return;
+		writeToolbarData(serviceSessionKey, {userAvatarUrl: ''});
 		setUserAvatarUrl('');
-	}, []);
+	}, [serviceSessionKey]);
 
 	const handleNavigateHome = useCallback(() => {
 		onNavigate('home');
