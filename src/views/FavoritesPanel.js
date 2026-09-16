@@ -137,7 +137,7 @@ const FavoritesPanel = ({
 		setLoading(true);
 		setLoadingMore(false);
 		setHasMore(false);
-		setFavorites([]);
+		setFavorites((currentFavorites) => (currentFavorites.length === 0 ? currentFavorites : []));
 		try {
 			const items = await jellyfinService.getFavorites(filterTypes, FAVORITES_PAGE_SIZE, 0, {
 				searchTerm: nextSearchTerm
