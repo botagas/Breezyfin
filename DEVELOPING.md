@@ -398,6 +398,12 @@ Preferred panel scroll cache wiring:
 - `src/hooks/usePanelScrollState.js`
 - `usePanelScrollState()` for normalized `scrollTop` state, `Scroller` restore/save wiring, and optional cache persistence.
 
+Panel cache snapshots:
+
+- `src/hooks/usePanelCacheOnUnmount.js`
+- `usePanelCacheOnUnmount()` persists a panel snapshot once on unmount. Do not call `onCacheState` from an effect on
+  every state change; each call re-renders `App`.
+
 Low-level scroll primitives (use only when panel behavior is custom):
 - `src/hooks/useScrollerScrollMemory.js`
 - `useScrollerScrollMemory()` for `Scroller` restore/save wiring.

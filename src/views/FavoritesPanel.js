@@ -12,6 +12,7 @@ import MediaVirtualGrid from '../components/MediaVirtualGrid';
 import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
 import {useMapById} from '../hooks/useMapById';
 import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
+import {usePanelCacheOnUnmount} from '../hooks/usePanelCacheOnUnmount';
 import {useDisclosureMap} from '../hooks/useDisclosureMap';
 import {usePopupInitialFocus} from '../hooks/usePopupInitialFocus';
 import {useCollapsibleBrowseSearch} from '../hooks/useCollapsibleBrowseSearch';
@@ -64,6 +65,7 @@ const FavoritesPanel = ({
 	isActive = false,
 	cachedState = null,
 	onCacheState = null,
+							resetToken = 0,
 	...rest
 }) => {
 	const cachedFavorites = normalizeCachedFavorites(cachedState);
@@ -78,7 +80,7 @@ const FavoritesPanel = ({
 	const filterPopupOpen = disclosures[FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP] === true;
 	const loadRequestIdRef = useRef(0);
 	const loadingMoreRef = useRef(false);
-	const lastCachedStateRef = useRef(cachedState);
+	const lastResetTokenRef = useRef(resetToken);
 	const skipInitialCachedLoadRef = useRef(cachedState?.loaded === true);
 	const paginationRef = useRef({
 		nextStartIndex: normalizeCachedNextStartIndex(cachedState, cachedFavorites),
@@ -202,9 +204,8 @@ const FavoritesPanel = ({
 	}, [activeFilter, appliedSearchTerm, loadFavorites]);
 
 	useEffect(() => {
-		const hadCachedState = lastCachedStateRef.current !== null;
-		lastCachedStateRef.current = cachedState;
-		if (!hadCachedState || cachedState !== null) return;
+		if (lastResetTokenRef.current === resetToken) return;
+		lastResetTokenRef.current = resetToken;
 		loadRequestIdRef.current += 1;
 		loadingMoreRef.current = false;
 		paginationRef.current = {
@@ -222,20 +223,18 @@ const FavoritesPanel = ({
 			return;
 		}
 		if (!hadActiveSearch) loadFavorites(FILTERS[0].id, '');
-	}, [activeFilter, appliedSearchTerm, cachedState, loadFavorites, restoreSearchState]);
+	}, [activeFilter, appliedSearchTerm, loadFavorites, resetToken, restoreSearchState]);
 
-	useEffect(() => {
-		if (typeof onCacheState !== 'function') return;
-		onCacheState({
-			favorites,
-			activeFilter,
-			hasMore,
-			nextStartIndex: paginationRef.current.nextStartIndex,
-			searchTerm: appliedSearchTerm,
-			loaded: !loading,
-			focusedItemId: lastFocusedCardIdRef.current
-		});
-	}, [activeFilter, appliedSearchTerm, favorites, hasMore, loading, onCacheState]);
+	const getCacheSnapshot = useCallback(() => ({
+		favorites,
+		activeFilter,
+		hasMore,
+		nextStartIndex: paginationRef.current.nextStartIndex,
+		searchTerm: appliedSearchTerm,
+		loaded: !loading,
+		focusedItemId: lastFocusedCardIdRef.current
+	}), [activeFilter, appliedSearchTerm, favorites, hasMore, loading]);
+	usePanelCacheOnUnmount(onCacheState, getCacheSnapshot);
 
 	const handleRemoveFavorite = useCallback(async (event, item) => {
 		event.stopPropagation();
@@ -284,19 +283,11 @@ const FavoritesPanel = ({
 	const handleFavoriteCardClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
 		lastFocusedCardIdRef.current = itemId || null;
-		onCacheState?.({
-			favorites,
-			activeFilter,
-			hasMore,
-			nextStartIndex: paginationRef.current.nextStartIndex,
-			searchTerm: appliedSearchTerm,
-			loaded: !loading,
-			focusedItemId: lastFocusedCardIdRef.current
-		});
+		onCacheState?.(getCacheSnapshot());
 		const item = favoritesById.get(itemId);
 		if (!item) return;
 		onItemSelect(item);
-	}, [activeFilter, appliedSearchTerm, favorites, favoritesById, hasMore, loading, onCacheState, onItemSelect]);
+	}, [favoritesById, getCacheSnapshot, onCacheState, onItemSelect]);
 
 	const handleUnfavoriteClick = useCallback((event) => {
 		const itemId = event.currentTarget.dataset.itemId;
