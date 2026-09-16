@@ -1,4 +1,5 @@
 import {useCallback} from 'react';
+import Spotlight from '@enact/spotlight';
 import {KeyCodes} from '../../../utils/keyCodes';
 import {scrollElementIntoHorizontalView} from '../../../utils/horizontalScroll';
 
@@ -275,7 +276,7 @@ export const useMediaDetailsInteractionHandlers = ({
 	}, [episodesById, handleEpisodeClick]);
 
 	const handleEpisodeCardFocus = useCallback((event) => {
-		if (!isSidewaysEpisodeLayout || !episodesListRef.current) return;
+		if (!isSidewaysEpisodeLayout || !episodesListRef.current || Spotlight.getPointerMode()) return;
 		const scroller = episodesListRef.current;
 		const card = event.currentTarget;
 		if (episodeFocusScrollTimeoutRef.current) {

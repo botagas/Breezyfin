@@ -1,9 +1,10 @@
-import {memo, useRef, useCallback, useEffect} from 'react';
+import {memo, useCallback, useEffect, useRef} from 'react';
+import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
 import Icon from '@enact/sandstone/Icon';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
-import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
+import {createLastFocusedSpotlightContainer} from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {getEpisodeLocator} from '../utils/mediaItemUtils';
@@ -203,6 +204,7 @@ const MediaRow = ({
 	const handleFocus = useCallback((e) => {
 		onRowVisible?.(rowIndex);
 		onRowFocus?.(rowIndex, rowRef.current);
+		if (Spotlight.getPointerMode()) return;
 		if (scrollerRef.current && scrollerRef.current.contains(e.target)) {
 			const scroller = scrollerRef.current;
 			const element = e.target.closest('.' + css.card);

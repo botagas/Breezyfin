@@ -404,6 +404,13 @@ Panel cache snapshots:
 - `usePanelCacheOnUnmount()` persists a panel snapshot once on unmount. Do not call `onCacheState` from an effect on
   every state change; each call re-renders `App`.
 
+nMagic Remote wheel scrolling:
+
+- `src/hooks/useWheelScrollSpotlightPause.js`
+- `useWheelScrollSpotlightPause()` pauses Spotlight pointer focus while a scroll runs and resumes it 400 ms after the
+  scroll stops. `AppScroller` and `MediaVirtualGrid` already use it. Skip scroll-on-focus corrections for pointer focus
+  with `Spotlight.getPointerMode()`.
+
 Low-level scroll primitives (use only when panel behavior is custom):
 - `src/hooks/useScrollerScrollMemory.js`
 - `useScrollerScrollMemory()` for `Scroller` restore/save wiring.

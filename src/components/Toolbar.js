@@ -1,4 +1,5 @@
 import {memo, useCallback, useEffect, useId, useMemo, useRef, useState} from 'react';
+import Spotlight from '@enact/spotlight';
 import {Spottable} from '@enact/spotlight/Spottable';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
@@ -258,7 +259,7 @@ const Toolbar = ({
 	}, [currentTime]);
 
 	const handleCenterFocus = useCallback((event) => {
-		if (!centerRef.current || !centerRef.current.contains(event.target)) return;
+		if (!centerRef.current || !centerRef.current.contains(event.target) || Spotlight.getPointerMode()) return;
 		const target = event.target.closest(`.${css.iconButton}, .${css.toolbarButton}`);
 		if (!target) return;
 

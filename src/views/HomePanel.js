@@ -553,6 +553,9 @@ const HomePanel = ({
 	}, [serverHomeRows]);
 
 	const handleRowFocus = useCallback((rowIndex, rowNode) => {
+		// Pointer focus follows cards moving under the Magic Remote cursor while wheel scrolling;
+		// correcting the scroll position there fights the wheel.
+		if (Spotlight.getPointerMode()) return;
 		if (!rowNode || lastFocusedRowRef.current === rowIndex) return;
 		lastFocusedRowRef.current = rowIndex;
 		window.cancelAnimationFrame(rowVisibilityFrameRef.current);
@@ -759,10 +762,7 @@ const HomePanel = ({
 								: undefined}
 							onItemClick={handleItemClick}
 							getImageCandidates={getMediaRowImageCandidates}
-							imagesActive={
-								rowIndex >= Math.max(0, activeRowIndex - HOME_IMAGE_ROWS_BEHIND) &&
-								rowIndex <= activeRowIndex + HOME_IMAGE_ROWS_AHEAD
-							}
+							imagesActive
 							onRowVisible={handleRowVisible}
 							onRowFocus={handleRowFocus}
 							showEpisodeProgress={row.showEpisodeProgress}

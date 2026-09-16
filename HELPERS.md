@@ -8,6 +8,7 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Save/restore non-virtual panel scroll + cache scrollTop                                                                                                                                                                                                            | `usePanelScrollState`                                                                                                                                                                                                                                                               |
 | Persist a panel cache snapshot once on unmount instead of on every change                                                                                                                                                                                          | `usePanelCacheOnUnmount`                                                                                                                                                                                                                                                            |
+| Pause Spotlight pointer focus while Magic Remote wheel scrolling                                                                                                                                                                                                   | `useWheelScrollSpotlightPause`                                                                                                                                                                                                                                                      |
 | Render paged uniform media grids with Enact-owned virtualization, focus restoration, visible-index prefetch, and overscroll disabled by default                                                                                                                    | `MediaVirtualGrid`                                                                                                                                                                                                                                                                  |
 | Library panel paged data loading (first page + incremental load-more)                                                                                                                                                                                              | `useLibraryPagination`                                                                                                                                                                                                                                                              |
 | Manage shared Library/Home Section media filter popup state                                                                                                                                                                                                        | `useMediaFilterState`                                                                                                                                                                                                                                                               |
@@ -185,6 +186,23 @@ usePanelCacheOnUnmount(onCacheState, getSnapshot)
 const getCacheSnapshot = useCallback(() => ({favorites, loaded: !loading}), [favorites, loading]);
 usePanelCacheOnUnmount(onCacheState, getCacheSnapshot);
 ```
+
+### `useWheelScrollSpotlightPause`
+
+- File: `src/hooks/useWheelScrollSpotlightPause.js`
+- Purpose: pause Spotlight while a scroll runs in pointer mode, so items passing under the Magic Remote cursor do not
+  take focus on every frame. Spotlight resumes `WHEEL_SCROLL_RESUME_DELAY_MS` (400 ms) after the scroll stops, which
+  bridges the gaps between wheel bursts.
+- Signature:
+
+```js
+const {handleScrollStart, handleScrollStop} = useWheelScrollSpotlightPause({onScrollStart, onScrollStop});
+```
+
+- Already applied by `AppScroller` and `MediaVirtualGrid`; pass their `onScrollStart` / `onScrollStop` props as usual.
+- Arrow-key scrolling is unaffected because the pause is only taken in pointer mode.
+- Scroll-on-focus corrections (e.g. horizontal row scrolling) should skip pointer focus via
+  `Spotlight.getPointerMode()`.
 
 ### `useLibraryPagination`
 - File: `src/views/library-panel/hooks/useLibraryPagination.js`
