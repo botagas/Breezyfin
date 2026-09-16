@@ -118,6 +118,7 @@ export const createPanelChildren = ({
 			onExit={handleExit}
 			cachedState={homePanelState}
 			onCacheState={handleHomePanelStateChange}
+			resetToken={resetTokens.home}
 			registerBackHandler={registerHomeBackHandler}
 			noCloseButton
 		/>,

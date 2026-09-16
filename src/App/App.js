@@ -87,6 +87,7 @@ const App = (props) => {
 	const [libraryPanelStateById, setLibraryPanelStateById] = useState({});
 	const [searchPanelState, setSearchPanelState] = useState(null);
 	const [favoritesPanelState, setFavoritesPanelState] = useState(null);
+	const [homeResetToken, setHomeResetToken] = useState(0);
 	const [searchResetToken, setSearchResetToken] = useState(0);
 	const [favoritesResetToken, setFavoritesResetToken] = useState(0);
 	const [settingsPanelState, setSettingsPanelState] = useState(null);
@@ -741,6 +742,7 @@ const App = (props) => {
 		switch (section) {
 			case 'home':
 				setHomePanelState(null);
+				setHomeResetToken((token) => token + 1);
 				break;
 			case 'homeSection':
 				if (nextHomeSectionId) {
@@ -937,6 +939,7 @@ const App = (props) => {
 			detailsByItemId: detailsPanelStateByItemId
 		},
 		resetTokens: {
+			home: homeResetToken,
 			search: searchResetToken,
 			favorites: favoritesResetToken
 		},

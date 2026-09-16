@@ -35,6 +35,12 @@ import {
 	shouldReloadHomeContent
 } from '../utils/serverHomeRows';
 import {normalizeDiscoveryMediaItem} from '../utils/discoveryMediaItems';
+import {
+	clearHomeContentCache,
+	getHomeContentSessionKey,
+	readHomeContentCache,
+	writeHomeContentCache
+} from '../utils/homeContentCache';
 
 import css from './HomePanel.module.less';
 
@@ -67,6 +73,14 @@ const pruneSeriesUnplayedCache = (cache, now = Date.now()) => {
 		.forEach(([seriesId]) => cache.delete(seriesId));
 };
 
+const resetUnsettledServerHomeRows = (rows) => (
+	(Array.isArray(rows) ? rows : []).map((row) => (
+		row.status === SERVER_HOME_ROW_STATUS.LOADING
+			? {...row, items: null, loading: false, status: SERVER_HOME_ROW_STATUS.PENDING, error: null}
+			: row
+	))
+);
+
 const HomePanel = ({
 	onItemSelect,
 	onNavigate,
@@ -78,19 +92,23 @@ const HomePanel = ({
 	screensaverActive = false,
 	cachedState = null,
 	onCacheState = null,
+					   resetToken = 0,
 	...rest
 }) => {
-	const [loading, setLoading] = useState(true);
-	const [heroItems, setHeroItems] = useState([]);
-	const [recentlyAdded, setRecentlyAdded] = useState([]);
-	const [continueWatching, setContinueWatching] = useState([]);
-	const [nextUp, setNextUp] = useState([]);
-	const [latestMovies, setLatestMovies] = useState([]);
-	const [latestShows, setLatestShows] = useState([]);
-	const [myRequests, setMyRequests] = useState([]);
-	const [watchlist, setWatchlist] = useState([]);
-	const [serverHomeRows, setServerHomeRows] = useState([]);
-	const [serverHomeActive, setServerHomeActive] = useState(false);
+	const contentSessionKey = getHomeContentSessionKey(jellyfinService);
+	const [cachedEntry] = useState(() => readHomeContentCache(contentSessionKey, resetToken));
+	const cachedContent = cachedEntry?.content;
+	const [loading, setLoading] = useState(() => !cachedContent);
+	const [heroItems, setHeroItems] = useState(() => cachedContent?.heroItems || []);
+	const [recentlyAdded, setRecentlyAdded] = useState(() => cachedContent?.recentlyAdded || []);
+	const [continueWatching, setContinueWatching] = useState(() => cachedContent?.continueWatching || []);
+	const [nextUp, setNextUp] = useState(() => cachedContent?.nextUp || []);
+	const [latestMovies, setLatestMovies] = useState(() => cachedContent?.latestMovies || []);
+	const [latestShows, setLatestShows] = useState(() => cachedContent?.latestShows || []);
+	const [myRequests, setMyRequests] = useState(() => cachedContent?.myRequests || []);
+	const [watchlist, setWatchlist] = useState(() => cachedContent?.watchlist || []);
+	const [serverHomeRows, setServerHomeRows] = useState(() => resetUnsettledServerHomeRows(cachedContent?.serverHomeRows));
+	const [serverHomeActive, setServerHomeActive] = useState(() => cachedContent?.serverHomeActive === true);
 	const [integrationPreferences, setIntegrationPreferences] = useState(() => (
 		readIntegrationPreferences(jellyfinService)
 	));
@@ -125,8 +143,13 @@ const HomePanel = ({
 	const rowVisibilityFrameRef = useRef(0);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
-	const contentLoadedRef = useRef(false);
-	const contentLoadedAtRef = useRef(0);
+	const contentLoadedRef = useRef(Boolean(cachedContent));
+	// Content restored with Back counts as freshly loaded unless it was marked stale, which triggers
+	// a background refresh without the loading overlay. Only the Home tab forces a full reload.
+	const cachedContentIsFresh = Boolean(cachedEntry && !cachedEntry.stale);
+	const contentLoadedAtRef = useRef(cachedContentIsFresh ? Date.now() : 0);
+	const contentLoadSucceededRef = useRef(cachedContentIsFresh);
+	const lastResetTokenRef = useRef(resetToken);
 	const contentLoadedVersionRef = useRef(0);
 	const contentInvalidationVersionRef = useRef(0);
 	const serverHomeFallbackRef = useRef(false);
@@ -325,6 +348,7 @@ const HomePanel = ({
 			setWatchlist((watchlistResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
 			if (!useServerHome) setServerHomeRows(resolvedServerRows);
 			setServerHomeActive(useServerHome);
+			contentLoadSucceededRef.current = true;
 		} catch (error) {
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
 			console.error('Failed to load content:', error);
@@ -483,6 +507,47 @@ const HomePanel = ({
 			});
 		});
 	}, [activatedRowCount, isActive, reportHomeSectionsDiagnostic, serverHomeActive, serverHomeRows]);
+
+	useEffect(() => {
+		if (loading || !contentLoadSucceededRef.current) return;
+		writeHomeContentCache(contentSessionKey, resetToken, {
+			heroItems,
+			recentlyAdded,
+			continueWatching,
+			nextUp,
+			latestMovies,
+			latestShows,
+			myRequests,
+			watchlist,
+			serverHomeRows,
+			serverHomeActive
+		});
+	}, [
+		contentSessionKey,
+		continueWatching,
+		heroItems,
+		latestMovies,
+		latestShows,
+		loading,
+		myRequests,
+		nextUp,
+		recentlyAdded,
+		resetToken,
+		serverHomeActive,
+		serverHomeRows,
+		watchlist
+	]);
+
+	// Clicking the Home tab while Home is open forces a full reload.
+	useEffect(() => {
+		if (lastResetTokenRef.current === resetToken) return;
+		lastResetTokenRef.current = resetToken;
+		clearHomeContentCache();
+		contentLoadedRef.current = false;
+		contentLoadSucceededRef.current = false;
+		contentInvalidationVersionRef.current += 1;
+		setContentRefreshVersion((version) => version + 1);
+	}, [resetToken]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
