@@ -26,6 +26,7 @@ const IntegrationPanelLayout = ({
 	retrySpotlightId = '',
 	scrollable = true,
 	captureScrollTo,
+									onScroll,
 	onScrollStop,
 	children,
 	...rest
@@ -76,6 +77,7 @@ const IntegrationPanelLayout = ({
 				<AppScroller
 					className={css.scroller}
 					cbScrollTo={captureScrollTo}
+					onScroll={onScroll}
 					onScrollStop={onScrollStop}
 				>
 					{content}

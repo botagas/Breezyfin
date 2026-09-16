@@ -156,6 +156,7 @@ const HomePanel = ({
 	});
 	const {
 		captureScrollTo: captureHomeScrollRestore,
+		handleScroll: handleHomeScrollMemory,
 		handleScrollStop: handleHomeScrollMemoryStop
 	} = usePanelScrollState({
 		cachedState,
@@ -730,6 +731,7 @@ const HomePanel = ({
 			<Scroller
 				className={`${css.scroller} ${useCinematicHome ? css.scrollerCinematic : ''}`}
 				cbScrollTo={captureHomeScrollTo}
+				onScroll={handleHomeScrollMemory}
 				onScrollStop={handleHomeScrollMemoryStop}
 				verticalScrollbar={useCinematicHome ? 'hidden' : 'auto'}
 			>

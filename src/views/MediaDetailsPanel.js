@@ -1,38 +1,34 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { Panel } from '../components/BreezyPanels';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Panel} from '../components/BreezyPanels';
 import Scroller from '../components/AppScroller';
 import Icon from '@enact/sandstone/Icon';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
-import {
-	getEpisodeAirDate,
-	getEpisodeBadge,
-	getEpisodeRuntime
-} from './media-details-panel/utils/mediaDetailsHelpers';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { useTrackPreferences } from '../hooks/useTrackPreferences';
-import { useToastMessage } from '../hooks/useToastMessage';
-import { useMapById } from '../hooks/useMapById';
-import { useItemMetadata } from '../hooks/useItemMetadata';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { PANEL_TOAST_CONFIG } from '../constants/toast';
-import { useMediaDetailsKeyboardShortcuts } from './media-details-panel/hooks/useMediaDetailsKeyboardShortcuts';
-import { useMediaDetailsTrackOptions } from './media-details-panel/hooks/useMediaDetailsTrackOptions';
-import { useMediaCredits } from './media-details-panel/hooks/useMediaCredits';
-import { useMediaDetailsDisclosures } from './media-details-panel/hooks/useMediaDetailsDisclosures';
-import { useMediaDetailsImages } from './media-details-panel/hooks/useMediaDetailsImages';
-import { useMediaDetailsInteractionHandlers } from './media-details-panel/hooks/useMediaDetailsInteractionHandlers';
-import { useMediaDetailsDataLoader } from './media-details-panel/hooks/useMediaDetailsDataLoader';
-import { useMediaDetailsItemActions } from './media-details-panel/hooks/useMediaDetailsItemActions';
-import { useMediaDetailsPickerHandlers } from './media-details-panel/hooks/useMediaDetailsPickerHandlers';
-import { useMediaDetailsPrimaryActions } from './media-details-panel/hooks/useMediaDetailsPrimaryActions';
-import { useMediaDetailsFocusDebug } from './media-details-panel/hooks/useMediaDetailsFocusDebug';
-import { useMediaDetailsFocusOrchestrator } from './media-details-panel/hooks/useMediaDetailsFocusOrchestrator';
-import { useMediaDetailsSectionNavigation } from './media-details-panel/hooks/useMediaDetailsSectionNavigation';
-import { useMediaDetailsDomHelpers } from './media-details-panel/hooks/useMediaDetailsDomHelpers';
-import { useMediaDetailsOverviewState } from './media-details-panel/hooks/useMediaDetailsOverviewState';
-import { useMediaDetailsPanelSync } from './media-details-panel/hooks/useMediaDetailsPanelSync';
-import { useMediaDetailsItemBootstrap } from './media-details-panel/hooks/useMediaDetailsItemBootstrap';
-import { useMediaDetailsStagedReveal } from './media-details-panel/hooks/useMediaDetailsStagedReveal';
+import {getEpisodeAirDate, getEpisodeBadge, getEpisodeRuntime} from './media-details-panel/utils/mediaDetailsHelpers';
+import {usePanelBackHandler} from '../hooks/usePanelBackHandler';
+import {useTrackPreferences} from '../hooks/useTrackPreferences';
+import {useToastMessage} from '../hooks/useToastMessage';
+import {useMapById} from '../hooks/useMapById';
+import {useItemMetadata} from '../hooks/useItemMetadata';
+import {usePanelScrollState} from '../hooks/usePanelScrollState';
+import {PANEL_TOAST_CONFIG} from '../constants/toast';
+import {useMediaDetailsKeyboardShortcuts} from './media-details-panel/hooks/useMediaDetailsKeyboardShortcuts';
+import {useMediaDetailsTrackOptions} from './media-details-panel/hooks/useMediaDetailsTrackOptions';
+import {useMediaCredits} from './media-details-panel/hooks/useMediaCredits';
+import {useMediaDetailsDisclosures} from './media-details-panel/hooks/useMediaDetailsDisclosures';
+import {useMediaDetailsImages} from './media-details-panel/hooks/useMediaDetailsImages';
+import {useMediaDetailsInteractionHandlers} from './media-details-panel/hooks/useMediaDetailsInteractionHandlers';
+import {useMediaDetailsDataLoader} from './media-details-panel/hooks/useMediaDetailsDataLoader';
+import {useMediaDetailsItemActions} from './media-details-panel/hooks/useMediaDetailsItemActions';
+import {useMediaDetailsPickerHandlers} from './media-details-panel/hooks/useMediaDetailsPickerHandlers';
+import {useMediaDetailsPrimaryActions} from './media-details-panel/hooks/useMediaDetailsPrimaryActions';
+import {useMediaDetailsFocusDebug} from './media-details-panel/hooks/useMediaDetailsFocusDebug';
+import {useMediaDetailsFocusOrchestrator} from './media-details-panel/hooks/useMediaDetailsFocusOrchestrator';
+import {useMediaDetailsSectionNavigation} from './media-details-panel/hooks/useMediaDetailsSectionNavigation';
+import {useMediaDetailsDomHelpers} from './media-details-panel/hooks/useMediaDetailsDomHelpers';
+import {useMediaDetailsOverviewState} from './media-details-panel/hooks/useMediaDetailsOverviewState';
+import {useMediaDetailsPanelSync} from './media-details-panel/hooks/useMediaDetailsPanelSync';
+import {useMediaDetailsItemBootstrap} from './media-details-panel/hooks/useMediaDetailsItemBootstrap';
+import {useMediaDetailsStagedReveal} from './media-details-panel/hooks/useMediaDetailsStagedReveal';
 import {readIntegrationPreferences} from '../utils/integrationPreferences';
 import jellyfinService from '../services/jellyfinService';
 import MediaDetailsToast from './media-details-panel/components/MediaDetailsToast';
@@ -101,6 +97,7 @@ const MediaDetailsPanel = ({
 	});
 	const {
 		captureScrollTo: captureDetailsScrollRestore,
+		handleScroll: handleDetailsScrollMemory,
 		handleScrollStop: handleDetailsScrollMemoryStop,
 		commitScrollTop: commitDetailsScrollTop
 	} = usePanelScrollState({
@@ -653,6 +650,7 @@ const MediaDetailsPanel = ({
 				<Scroller
 					className={`${css.scroller} ${isElegantTheme ? css.scrollerElegant : ''}`}
 					cbScrollTo={captureDetailsScrollTo}
+					onScroll={handleDetailsScrollMemory}
 					onScrollStop={handleDetailsScrollerScrollStop}
 				>
 					<div
