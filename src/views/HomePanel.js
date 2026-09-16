@@ -663,11 +663,15 @@ const HomePanel = ({
 		watchlist
 	]);
 	const panelBackdropItem = heroItems[0] || visibleRows.find(({row}) => row.items?.length > 0)?.row.items[0] || null;
+	const hasHeroActionRef = useRef(false);
+	useEffect(() => {
+		hasHeroActionRef.current = showMediaBar && heroItems.length > 0;
+	}, [heroItems.length, showMediaBar]);
 	const handleToolbarNavigateDown = useCallback(() => {
-		if (!showMediaBar || heroItems.length === 0) return false;
+		if (!hasHeroActionRef.current) return false;
 		focusHeroPrimaryAction();
 		return true;
-	}, [focusHeroPrimaryAction, heroItems.length, showMediaBar]);
+	}, [focusHeroPrimaryAction]);
 	const handleHomePanelKeyDownCapture = useCallback((event) => {
 		const code = event.keyCode || event.which;
 		if (code !== KeyCodes.DOWN) return;
