@@ -21,6 +21,7 @@ import css from './Toolbar.module.less';
 import {useRuntimeSuspended} from '../hooks/useRuntimeSuspension';
 import {popupShellCss} from '../styles/popupStyles';
 import {INTEGRATION_PREFERENCES_CHANGED_EVENT, readIntegrationPreferences} from '../utils/integrationPreferences';
+import {readToolbarData, writeToolbarData} from './toolbar/toolbarDataCache';
 
 const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
@@ -28,6 +29,17 @@ const TOOLBAR_THEME_ELEGANT = 'elegant';
 const TOOLBAR_DISCLOSURE_KEYS = {
 	USER_MENU: 'userMenu',
 	LIBRARIES_POPUP: 'librariesPopup'
+};
+const DEFAULT_PLUGIN_FEATURES = {
+	calendar: false,
+	syncPlay: false,
+	watchParty: false,
+	hideNativeSyncButton: false
+};
+const PLUGIN_FEATURE_KEYS = Object.keys(DEFAULT_PLUGIN_FEATURES);
+const mergePluginFeatures = (current, patch) => {
+	const next = {...current, ...patch};
+	return PLUGIN_FEATURE_KEYS.every((key) => next[key] === current[key]) ? current : next;
 };
 const INITIAL_TOOLBAR_DISCLOSURES = {
 	[TOOLBAR_DISCLOSURE_KEYS.USER_MENU]: false,
@@ -48,18 +60,15 @@ const Toolbar = ({
 	isActive = false
 }) => {
 	const runtimeSuspended = useRuntimeSuspended();
-	const [libraries, setLibraries] = useState([]);
-	const [currentTime, setCurrentTime] = useState(new Date());
-	const [userName, setUserName] = useState('User');
-	const [userAvatarUrl, setUserAvatarUrl] = useState('');
-	const [pluginFeatures, setPluginFeatures] = useState({
-		calendar: false,
-		syncPlay: false,
-		watchParty: false,
-		hideNativeSyncButton: false
-	});
-	const [watchlistEnabled, setWatchlistEnabled] = useState(() => readIntegrationPreferences(jellyfinService).watchlistEnabled);
 	const serviceSessionKey = `${jellyfinService.serverUrl || ''}|${jellyfinService.userId || ''}|${jellyfinService.accessToken || ''}`;
+	const [libraries, setLibraries] = useState(() => readToolbarData(serviceSessionKey)?.libraries || []);
+	const [currentTime, setCurrentTime] = useState(() => new Date());
+	const [userName, setUserName] = useState(() => readToolbarData(serviceSessionKey)?.userName || 'User');
+	const [userAvatarUrl, setUserAvatarUrl] = useState(() => readToolbarData(serviceSessionKey)?.userAvatarUrl || '');
+	const [pluginFeatures, setPluginFeatures] = useState(() => (
+		readToolbarData(serviceSessionKey)?.pluginFeatures || DEFAULT_PLUGIN_FEATURES
+	));
+	const [watchlistEnabled, setWatchlistEnabled] = useState(() => readIntegrationPreferences(jellyfinService).watchlistEnabled);
 	const {disclosures, openDisclosure, closeDisclosure, setDisclosure} = useDisclosureMap(INITIAL_TOOLBAR_DISCLOSURES);
 	const showUserMenu = disclosures[TOOLBAR_DISCLOSURE_KEYS.USER_MENU] === true;
 	const showLibrariesPopup = disclosures[TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP] === true;
@@ -108,8 +117,11 @@ const Toolbar = ({
 	}, []);
 	useBreezyfinSettingsSync(applyToolbarThemeFromSettings);
 
-	const loadLibraries = useCallback(async () => {
+	const loadLibraries = useCallback(async (sessionKey) => {
 		const libs = await jellyfinService.getLibraryViews();
+		if (Array.isArray(libs) && libs.length > 0) {
+			writeToolbarData(sessionKey, {libraries: libs});
+		}
 		setLibraries(libs);
 	}, []);
 
@@ -123,29 +135,43 @@ const Toolbar = ({
 		});
 	}, []);
 
-	const loadUserInfo = useCallback(async () => {
+	const loadUserInfo = useCallback(async (sessionKey) => {
 		const user = await jellyfinService.getCurrentUser();
+		const avatarUrl = buildUserAvatarUrl(user);
+		if (user) {
+			writeToolbarData(sessionKey, {
+				userLoaded: true,
+				userAvatarUrl: avatarUrl,
+				...(user.Name ? {userName: user.Name} : {})
+			});
+		}
 		if (user && user.Name) {
 			setUserName(user.Name);
 		}
-		setPluginFeatures((current) => ({
-			...current,
+		setPluginFeatures((current) => mergePluginFeatures(current, {
 			syncPlay: !current.hideNativeSyncButton && Boolean(user) && user?.Policy?.SyncPlayAccess !== 'None'
 		}));
-		setUserAvatarUrl(buildUserAvatarUrl(user));
+		setUserAvatarUrl(avatarUrl);
 	}, [buildUserAvatarUrl]);
 
 	useEffect(() => {
 		if (!isActive) return;
-		loadLibraries();
-		loadUserInfo();
+		const cachedData = readToolbarData(serviceSessionKey);
+		if (!cachedData?.libraries) loadLibraries(serviceSessionKey);
+		if (!cachedData?.userLoaded) loadUserInfo(serviceSessionKey);
 	}, [isActive, loadLibraries, loadUserInfo, serviceSessionKey]);
+
+	useEffect(() => {
+		writeToolbarData(serviceSessionKey, {pluginFeatures});
+	}, [pluginFeatures, serviceSessionKey]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
 		let cancelled = false;
 		let retryTimer = null;
-		setPluginFeatures((current) => ({...current, calendar: false}));
+		if (!readToolbarData(serviceSessionKey)?.calendarLoaded) {
+			setPluginFeatures((current) => mergePluginFeatures(current, {calendar: false}));
+		}
 		const loadCapabilities = () => {
 			jellyfinService.getBreezyfinCapabilities().then((capabilities) => {
 				if (cancelled) return;
@@ -155,8 +181,8 @@ const Toolbar = ({
 					}
 					return;
 				}
-				setPluginFeatures((current) => ({
-					...current,
+				writeToolbarData(serviceSessionKey, {calendarLoaded: true});
+				setPluginFeatures((current) => mergePluginFeatures(current, {
 					calendar: capabilities.features?.['calendar.v1'] === true
 				}));
 			}).catch(() => null);
@@ -182,15 +208,14 @@ const Toolbar = ({
 		let cancelled = false;
 		jellyfinService.detectJellyWatchParty().then((availability) => {
 			if (cancelled) return;
-			setPluginFeatures((current) => ({
-				...current,
+			setPluginFeatures((current) => mergePluginFeatures(current, {
 				watchParty: availability.available === true,
 				hideNativeSyncButton: availability.hideNativeSyncButton === true,
 				syncPlay: availability.hideNativeSyncButton === true ? false : current.syncPlay
 			}));
 		}).catch(() => {
 			if (!cancelled) {
-				setPluginFeatures((current) => ({...current, watchParty: false}));
+				setPluginFeatures((current) => mergePluginFeatures(current, {watchParty: false}));
 			}
 		});
 		return () => {
