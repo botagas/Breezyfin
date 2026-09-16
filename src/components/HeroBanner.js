@@ -72,13 +72,16 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	const [imageErrors, setImageErrors] = useState({});
 	const [loadedBackdropUrls, setLoadedBackdropUrls] = useState({});
 	const [performanceModeEnabled, setPerformanceModeEnabled] = useState(false);
-	const [heroVisible, setHeroVisible] = useState(true);
+	const heroVisibleRef = useRef(true);
+	const autoRotateTimerRef = useRef(null);
+	const syncAutoRotateRef = useRef(() => {
+	});
 	const heroRootRef = useRef(null);
 	const reducedMotionMode = performanceModeEnabled;
 	const useCinematicLayout = variant === 'cinematic';
 	const backdropWidth = reducedMotionMode ? 1280 : 1920;
 	const preloadAdjacentCount = reducedMotionMode ? 1 : HERO_PRELOAD_ADJACENT;
-	const shouldAutoRotate = itemCount > 1 && heroVisible;
+	const canAutoRotate = isActive && itemCount > 1;
 
 	const applyMotionSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
@@ -97,18 +100,21 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		const node = heroRootRef.current;
 		if (!node) return undefined;
 		if (typeof window === 'undefined' || typeof window.IntersectionObserver !== 'function') {
-			setHeroVisible(true);
+			heroVisibleRef.current = true;
+			syncAutoRotateRef.current();
 			return undefined;
 		}
 
+		// Visibility only drives the auto-rotate timer, so it is tracked in a ref to avoid re-renders.
 		const observer = new window.IntersectionObserver(
 			(entries) => {
 				const entry = entries[0];
 				if (!entry) return;
-				setHeroVisible(entry.isIntersecting && entry.intersectionRatio >= 0.18);
+				heroVisibleRef.current = entry.isIntersecting && entry.intersectionRatio >= 0.18;
+				syncAutoRotateRef.current();
 			},
 			{
-				threshold: [0, 0.12, 0.18, 0.28, 0.5]
+				threshold: [0, 0.18]
 			}
 		);
 
@@ -130,15 +136,26 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	}, [itemCount, reducedMotionMode]);
 
 	useEffect(() => {
-		if (!isActive) return undefined;
-		if (!shouldAutoRotate) return undefined;
-
-		const interval = setInterval(() => {
-			changeIndex((prev) => prev + 1);
-		}, AUTO_ROTATE_INTERVAL_MS);
-
-		return () => clearInterval(interval);
-	}, [changeIndex, isActive, shouldAutoRotate]);
+		const syncAutoRotate = () => {
+			const shouldRun = canAutoRotate && heroVisibleRef.current;
+			if (shouldRun && autoRotateTimerRef.current === null) {
+				autoRotateTimerRef.current = setInterval(() => {
+					changeIndex((prev) => prev + 1);
+				}, AUTO_ROTATE_INTERVAL_MS);
+			} else if (!shouldRun && autoRotateTimerRef.current !== null) {
+				clearInterval(autoRotateTimerRef.current);
+				autoRotateTimerRef.current = null;
+			}
+		};
+		syncAutoRotateRef.current = syncAutoRotate;
+		syncAutoRotate();
+		return () => {
+			clearInterval(autoRotateTimerRef.current);
+			autoRotateTimerRef.current = null;
+			syncAutoRotateRef.current = () => {
+			};
+		};
+	}, [canAutoRotate, changeIndex]);
 
 	useEffect(() => {
 		if (!reducedMotionMode) return;
