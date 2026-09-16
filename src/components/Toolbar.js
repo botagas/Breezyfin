@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react';
-import { Spottable } from '@enact/spotlight/Spottable';
+import {memo, useCallback, useEffect, useId, useMemo, useRef, useState} from 'react';
+import {Spottable} from '@enact/spotlight/Spottable';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import {KeyCodes} from '../utils/keyCodes';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { useDismissOnOutsideInteraction } from '../hooks/useDismissOnOutsideInteraction';
-import { useDisclosureMap } from '../hooks/useDisclosureMap';
-import { useMapById } from '../hooks/useMapById';
-import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
+import {usePanelBackHandler} from '../hooks/usePanelBackHandler';
+import {useDismissOnOutsideInteraction} from '../hooks/useDismissOnOutsideInteraction';
+import {useDisclosureMap} from '../hooks/useDisclosureMap';
+import {useMapById} from '../hooks/useMapById';
+import {usePopupInitialFocus} from '../hooks/usePopupInitialFocus';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 import {buildUserPrimaryImageUrl, normalizeImageTag} from '../utils/imageUrls';
@@ -20,10 +20,7 @@ import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
 import css from './Toolbar.module.less';
 import {useRuntimeSuspended} from '../hooks/useRuntimeSuspension';
 import {popupShellCss} from '../styles/popupStyles';
-import {
-	INTEGRATION_PREFERENCES_CHANGED_EVENT,
-	readIntegrationPreferences
-} from '../utils/integrationPreferences';
+import {INTEGRATION_PREFERENCES_CHANGED_EVENT, readIntegrationPreferences} from '../utils/integrationPreferences';
 
 const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
@@ -661,4 +658,4 @@ const Toolbar = ({
 	);
 };
 
-export default Toolbar;
+export default memo(Toolbar);

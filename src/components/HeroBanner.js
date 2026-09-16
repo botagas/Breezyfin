@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Button from './BreezyButton';
 import BodyText from '@enact/sandstone/BodyText';
 import Heading from '@enact/sandstone/Heading';
 import Marquee from '@enact/sandstone/Marquee';
 import jellyfinService from '../services/jellyfinService';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 
 import css from './HeroBanner.module.less';
@@ -440,4 +440,4 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	);
 };
 
-export default HeroBanner;
+export default memo(HeroBanner);

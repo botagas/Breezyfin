@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Panel } from '../components/BreezyPanels';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Panel} from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
 import Spotlight from '@enact/spotlight';
@@ -14,33 +14,24 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getHomeSectionDescriptor} from '../constants/homeSections';
 import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../constants/integrationEvents';
 import {KeyCodes} from '../utils/keyCodes';
-import {
-	getLandscapeCardImageUrls,
-	mergeMediaItemImageCandidates
-} from '../utils/mediaItemUtils';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import {getLandscapeCardImageUrls, mergeMediaItemImageCandidates} from '../utils/mediaItemUtils';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
+import {usePanelScrollState} from '../hooks/usePanelScrollState';
 import {useRuntimeDiagnosticsEnabled} from '../hooks/useRuntimeDiagnostics';
 import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
+import {findVerticalScrollableAncestor, getVerticalVisibilityDelta} from '../utils/verticalFocusScroll';
+import {INTEGRATION_PREFERENCES_CHANGED_EVENT, readIntegrationPreferences} from '../utils/integrationPreferences';
 import {
-	findVerticalScrollableAncestor,
-	getVerticalVisibilityDelta
-} from '../utils/verticalFocusScroll';
-import {
-	INTEGRATION_PREFERENCES_CHANGED_EVENT,
-	readIntegrationPreferences
-} from '../utils/integrationPreferences';
-import {
-	getServerHomeRowStatus,
 	getServerHomeRowsStatus,
+	getServerHomeRowStatus,
 	isServerHomeSectionEnabled,
 	loadServerHomeRowsProgressively,
-	SERVER_HOME_ROW_STATUS,
 	selectDisplayableServerHomeRows,
 	selectHomeRowsForSource,
 	selectServerHomeRowsToLoad,
+	SERVER_HOME_ROW_STATUS,
 	shouldReloadHomeContent
 } from '../utils/serverHomeRows';
 import {normalizeDiscoveryMediaItem} from '../utils/discoveryMediaItems';
@@ -149,6 +140,11 @@ const HomePanel = ({
 			onNavigate(section, data);
 		}
 	}, [onNavigate]);
+	const handlePanelBack = useCallback(() => {
+		if (!externalItemOpen) return false;
+		closeExternalItem();
+		return true;
+	}, [closeExternalItem, externalItemOpen]);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate: handleNavigation,
 		onSwitchUser,
@@ -156,11 +152,7 @@ const HomePanel = ({
 		onExit,
 		registerBackHandler,
 		isActive,
-		onPanelBack: () => {
-			if (!externalItemOpen) return false;
-			closeExternalItem();
-			return true;
-		}
+		onPanelBack: handlePanelBack
 	});
 	const {
 		captureScrollTo: captureHomeScrollRestore,
