@@ -49,7 +49,10 @@
 		"test-watch": "enact test --watch",
 		"audit:duplicates": "node scripts/duplicate-audit/find-duplicates.cjs",
 		"audit:jscpd": "jscpd --config .jscpd.json --no-tips --exit-code 1 src scripts",
-		"report:package-size": "node scripts/report-package-size.cjs"
+		"report:package-size": "node scripts/report-package-size.cjs",
+		"pack-dev": "REACT_APP_ENABLE_PERSISTENT_LOGS=1 REACT_APP_RELEASE_CHANNEL=develop npm run pack-p",
+		"package:ipk": "rm -rf build && cp appinfo.json icon.png dist/ && npx -p @webos-tools/cli ares-config --profile tv && npx -p @webos-tools/cli ares-package dist --outdir build",
+		"deploy:tv": "npm run pack-dev && npm run package:ipk && npx -p @webos-tools/cli ares-install --device tv build/*.ipk && npx -p @webos-tools/cli ares-launch --device tv com.breezyfin.app"
 	},
 	"license": "GPL-3.0-only",
 	"private": true,
