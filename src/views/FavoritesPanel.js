@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Panel, Header } from '../components/BreezyPanels';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {Header, Panel} from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import BodyText from '@enact/sandstone/BodyText';
 import jellyfinService from '../services/jellyfinService';
@@ -10,8 +10,8 @@ import PosterMediaCard from '../components/PosterMediaCard';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import MediaVirtualGrid from '../components/MediaVirtualGrid';
 import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
-import { useMapById } from '../hooks/useMapById';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
+import {useMapById} from '../hooks/useMapById';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
 import {useDisclosureMap} from '../hooks/useDisclosureMap';
 import {usePopupInitialFocus} from '../hooks/usePopupInitialFocus';
 import {useCollapsibleBrowseSearch} from '../hooks/useCollapsibleBrowseSearch';
@@ -89,6 +89,12 @@ const FavoritesPanel = ({
 	const filterPopupContentRef = useRef(null);
 	const pendingFilterRef = useRef(null);
 	usePopupInitialFocus(filterPopupOpen, filterPopupContentRef);
+	const handlePanelBack = useCallback(() => {
+		if (!filterPopupOpen) return false;
+		pendingFilterRef.current = null;
+		closeDisclosure(FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP);
+		return true;
+	}, [closeDisclosure, filterPopupOpen]);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -96,12 +102,7 @@ const FavoritesPanel = ({
 		onExit,
 		registerBackHandler,
 		isActive,
-		onPanelBack: () => {
-			if (!filterPopupOpen) return false;
-			pendingFilterRef.current = null;
-			closeDisclosure(FAVORITES_DISCLOSURE_KEYS.FILTER_POPUP);
-			return true;
-		}
+		onPanelBack: handlePanelBack
 	});
 	const favoritesById = useMapById(favorites);
 	const handleAppliedSearchChange = useCallback(() => {
