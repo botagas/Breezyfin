@@ -116,6 +116,30 @@ export const getLibraryChildItems = async (
 	}
 };
 
+// Each id adds ~33 characters to the URL; chunks keep requests well below common 8 KB request-line limits.
+const ITEMS_USER_DATA_CHUNK_SIZE = 50;
+
+export const getItemsUserData = async (service, itemIds) => {
+	const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).filter(Boolean))];
+	const chunks = [];
+	for (let index = 0; index < ids.length; index += ITEMS_USER_DATA_CHUNK_SIZE) {
+		chunks.push(ids.slice(index, index + ITEMS_USER_DATA_CHUNK_SIZE));
+	}
+	const results = await Promise.all(chunks.map(async (chunk) => {
+		try {
+			return await service._fetchItems(
+				`/Users/${service.userId}/Items?ids=${chunk.map(encodeURIComponent).join(',')}&enableImages=false`,
+				{},
+				'getItemsUserData'
+			);
+		} catch (error) {
+			console.error('getItemsUserData error:', error);
+			return [];
+		}
+	}));
+	return results.flat();
+};
+
 // Throws instead of returning [] so callers can tell "no tags" apart from "tag list unavailable".
 export const getItemFilterTags = async (service, parentId, itemTypes) => {
 	const params = new URLSearchParams();

@@ -207,19 +207,18 @@ const HomePanel = ({
 			return !(cached && now - cached.timestamp < SERIES_UNPLAYED_CACHE_TTL_MS);
 		});
 
-		await Promise.all(missingSeriesIds.map(async (seriesId) => {
-			try {
-				const series = await jellyfinService.getItem(seriesId);
+		if (missingSeriesIds.length > 0) {
+			const seriesItems = await jellyfinService.getItemsUserData(missingSeriesIds);
+			const fetchedAt = Date.now();
+			seriesItems.forEach((series) => {
 				const count = Number(series?.UserData?.UnplayedItemCount);
-				cache.set(seriesId, {
+				cache.set(series.Id, {
 					count: Number.isFinite(count) ? count : 0,
-					timestamp: Date.now()
+					timestamp: fetchedAt
 				});
-				pruneSeriesUnplayedCache(cache);
-			} catch (error) {
-				console.error('Failed to fetch series data:', error);
-			}
-		}));
+			});
+			pruneSeriesUnplayedCache(cache);
+		}
 
 		return normalizedGroups.map((episodes) => episodes.map((episode) => {
 			if (episode?.Type !== 'Episode' || !episode?.SeriesId) return episode;

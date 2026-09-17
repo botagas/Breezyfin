@@ -1,10 +1,12 @@
 import {
-	getLatestMediaItems,
 	getFavoriteMediaItems,
+	getItemFilterTags,
 	getItemMediaSegments,
+	getItemsUserData,
+	getLatestMediaItems,
 	getLibraryChildItems,
-	getNextUpItems,
 	getNextUpEpisodeForSeries,
+	getNextUpItems,
 	getPublicSystemInfo,
 	getRecentlyAddedItems,
 	getResumeMediaItems,
@@ -52,6 +54,62 @@ describe('libraryApi', () => {
 		expect(requestedUrl).toContain('startIndex=10');
 		expect(requestedParams.get('includeItemTypes')).toBe('Movie,Series');
 		expect(service._fetchItems).toHaveBeenCalledWith(requestedUrl, {}, 'getLibraryItems');
+	});
+
+	it('joins tag filters with a pipe when building library item requests', async () => {
+		const service = createService();
+		service._fetchItems.mockResolvedValue([]);
+
+		await getLibraryChildItems(service, null, ['Movie'], 10, 0, {tags: ['1 - requester', '2 - requester']});
+
+		const requestedParams = new URLSearchParams(service._fetchItems.mock.calls[0][0].split('?')[1]);
+		expect(requestedParams.get('tags')).toBe('1 - requester|2 - requester');
+	});
+
+	it('loads the tag list and throws when the server returns none', async () => {
+		const service = createService();
+		service._request
+			.mockResolvedValueOnce({Tags: ['drama', 7, '1 - requester']})
+			.mockResolvedValueOnce({Genres: []});
+
+		await expect(getItemFilterTags(service, 'parent-1', ['Movie', 'Series'])).resolves.toEqual([
+			'drama',
+			'1 - requester'
+		]);
+		expect(service._request).toHaveBeenCalledWith(
+			'/Items/Filters2?userId=user-1&parentId=parent-1&recursive=true&includeItemTypes=Movie%2CSeries',
+			{context: 'getItemFilterTags'}
+		);
+		await expect(getItemFilterTags(service, null, null)).rejects.toThrow('no tag list');
+	});
+
+	it('loads user data for unique ids in chunks of 50', async () => {
+		const service = createService();
+		const ids = Array.from({length: 120}, (_, index) => `id-${index}`);
+		service._fetchItems.mockImplementation(async (url) => (
+			new URLSearchParams(url.split('?')[1]).get('ids').split(',').map((id) => ({Id: id}))
+		));
+
+		const items = await getItemsUserData(service, [...ids, 'id-0', null]);
+
+		expect(service._fetchItems).toHaveBeenCalledTimes(3);
+		const chunkSizes = service._fetchItems.mock.calls.map(([url]) => (
+			new URLSearchParams(url.split('?')[1]).get('ids').split(',').length
+		));
+		expect(chunkSizes).toEqual([50, 50, 20]);
+		expect(items.map((item) => item.Id)).toEqual(ids);
+	});
+
+	it('keeps the other chunks when one user data request fails', async () => {
+		const service = createService();
+		const ids = Array.from({length: 60}, (_, index) => `id-${index}`);
+		service._fetchItems
+			.mockRejectedValueOnce(new Error('offline'))
+			.mockResolvedValueOnce([{Id: 'id-50'}]);
+
+		await expect(getItemsUserData(service, ids)).resolves.toEqual([{Id: 'id-50'}]);
+		await expect(getItemsUserData(service, [])).resolves.toEqual([]);
+		expect(service._fetchItems).toHaveBeenCalledTimes(2);
 	});
 
 	it('omits invalid parentId values when building library item requests', async () => {
