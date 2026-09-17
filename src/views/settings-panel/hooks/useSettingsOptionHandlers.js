@@ -20,12 +20,14 @@ import {
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
-import {getOptionLabel, getSubtitleBurnInTextCodecsLabel} from '../labels';
+import {getColorOptionLabel, getOptionLabel, getSubtitleBurnInTextCodecsLabel} from '../labels';
 import {
 	adjustNumericSetting,
 	getNumericSettingLabel,
 	getSignedNumericSettingLabel,
-	normalizeNumericSetting
+	normalizeHexColor,
+	normalizeNumericSetting,
+	SUBTITLE_CUSTOM_COLOR
 } from '../../../utils/subtitleAppearance';
 
 export const useSettingsOptionHandlers = ({
@@ -265,6 +267,35 @@ export const useSettingsOptionHandlers = ({
 		closeSubtitleOverlayBorderColorPopup();
 	}, [closeSubtitleOverlayBorderColorPopup, handleSettingChange]);
 
+	const applyCustomColor = useCallback((settingKey, hexKey, rawValue) => {
+		const hex = normalizeHexColor(rawValue);
+		if (!hex) return false;
+		setSettings((prevSettings) => {
+			const updated = {
+				...prevSettings,
+				[settingKey]: SUBTITLE_CUSTOM_COLOR,
+				[hexKey]: hex
+			};
+			if (!writeBreezyfinSettings(updated)) {
+				console.error(`Failed to save ${settingKey} setting`);
+			}
+			return updated;
+		});
+		return true;
+	}, [setSettings]);
+
+	const handleSubtitleOverlayTextColorCustomApply = useCallback((rawValue) => {
+		if (!applyCustomColor('subtitleOverlayTextColor', 'subtitleOverlayTextColorHex', rawValue)) return false;
+		closeSubtitleOverlayTextColorPopup();
+		return true;
+	}, [applyCustomColor, closeSubtitleOverlayTextColorPopup]);
+
+	const handleSubtitleOverlayBorderColorCustomApply = useCallback((rawValue) => {
+		if (!applyCustomColor('subtitleOverlayBorderColor', 'subtitleOverlayBorderColorHex', rawValue)) return false;
+		closeSubtitleOverlayBorderColorPopup();
+		return true;
+	}, [applyCustomColor, closeSubtitleOverlayBorderColorPopup]);
+
 	const handleSubtitleOverlayBorderStrengthSelect = useCallback((event) => {
 		const value = event.currentTarget.dataset.value;
 		if (!SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS.some((option) => option.value === value)) return;
@@ -343,16 +374,26 @@ export const useSettingsOptionHandlers = ({
 		[settings.subtitleOverlayWeight]
 	);
 	const subtitleOverlayTextColorLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS, settings.subtitleOverlayTextColor, 'White'),
-		[settings.subtitleOverlayTextColor]
+		() => getColorOptionLabel(
+			SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
+			settings.subtitleOverlayTextColor,
+			settings.subtitleOverlayTextColorHex,
+			'White'
+		),
+		[settings.subtitleOverlayTextColor, settings.subtitleOverlayTextColorHex]
 	);
 	const subtitleOverlayBorderStyleLabel = useMemo(
 		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS, settings.subtitleOverlayBorderStyle, 'Outline'),
 		[settings.subtitleOverlayBorderStyle]
 	);
 	const subtitleOverlayBorderColorLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS, settings.subtitleOverlayBorderColor, 'Black'),
-		[settings.subtitleOverlayBorderColor]
+		() => getColorOptionLabel(
+			SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
+			settings.subtitleOverlayBorderColor,
+			settings.subtitleOverlayBorderColorHex,
+			'Black'
+		),
+		[settings.subtitleOverlayBorderColor, settings.subtitleOverlayBorderColorHex]
 	);
 	const subtitleOverlayBorderStrengthLabel = useMemo(
 		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS, settings.subtitleOverlayBorderStrength, 'Medium'),
@@ -404,6 +445,8 @@ export const useSettingsOptionHandlers = ({
 		handleSubtitleOverlayTextColorSelect,
 		handleSubtitleOverlayBorderStyleSelect,
 		handleSubtitleOverlayBorderColorSelect,
+		handleSubtitleOverlayTextColorCustomApply,
+		handleSubtitleOverlayBorderColorCustomApply,
 		handleSubtitleOverlayBorderStrengthSelect,
 		handleSubtitleOverlayOutlineSizeDecrease,
 		handleSubtitleOverlayOutlineSizeIncrease,

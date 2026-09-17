@@ -29,8 +29,10 @@ export const DEFAULT_SETTINGS = {
 	subtitleOverlayBackground: 'none',
 	subtitleOverlayWeight: 'bold',
 	subtitleOverlayTextColor: 'white',
+    subtitleOverlayTextColorHex: '',
 	subtitleOverlayBorderStyle: 'outline',
 	subtitleOverlayBorderColor: 'black',
+    subtitleOverlayBorderColorHex: '',
 	subtitleOverlayBorderStrength: 'medium',
 	subtitleOverlayOutlineSize: 'medium',
 	subtitleOverlayOutlineSizePx: '2',
@@ -170,7 +172,12 @@ export const SUBTITLE_OVERLAY_WEIGHT_OPTIONS = [
 export const SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS = [
 	{value: 'white', label: 'White (Default)'},
 	{value: 'warmWhite', label: 'Warm White'},
+    {value: 'lightGray', label: 'Light Gray'},
 	{value: 'yellow', label: 'Yellow'},
+    {value: 'orange', label: 'Orange'},
+    {value: 'green', label: 'Green'},
+    {value: 'cyan', label: 'Cyan'},
+    {value: 'pink', label: 'Pink'},
 	{value: 'black', label: 'Black'}
 ];
 

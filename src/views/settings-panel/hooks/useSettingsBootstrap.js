@@ -28,14 +28,20 @@ import {
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
 import {
+	normalizeHexColor,
 	normalizeNumericSetting,
 	resolveSubtitleOffsetXPx,
-	resolveSubtitleOffsetYPx
+	resolveSubtitleOffsetYPx,
+	SUBTITLE_CUSTOM_COLOR
 } from '../../../utils/subtitleAppearance';
 
 const normalizeOptionValue = (value, options, fallback) => {
 	return options.some((option) => option.value === value) ? value : fallback;
 };
+
+const normalizeColorOptionValue = (value, options, fallback, customHex) => (
+	value === SUBTITLE_CUSTOM_COLOR && customHex ? value : normalizeOptionValue(value, options, fallback)
+);
 
 export const useSettingsBootstrap = ({
 	setSettings,
@@ -117,20 +123,24 @@ export const useSettingsBootstrap = ({
 				SUBTITLE_OVERLAY_WEIGHT_OPTIONS,
 				DEFAULT_SETTINGS.subtitleOverlayWeight
 			);
-			const subtitleOverlayTextColor = normalizeOptionValue(
+			const subtitleOverlayTextColorHex = normalizeHexColor(parsed.subtitleOverlayTextColorHex) || '';
+			const subtitleOverlayTextColor = normalizeColorOptionValue(
 				parsed.subtitleOverlayTextColor,
 				SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
-				DEFAULT_SETTINGS.subtitleOverlayTextColor
+				DEFAULT_SETTINGS.subtitleOverlayTextColor,
+				subtitleOverlayTextColorHex
 			);
 			const subtitleOverlayBorderStyle = normalizeOptionValue(
 				parsed.subtitleOverlayBorderStyle,
 				SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
 				DEFAULT_SETTINGS.subtitleOverlayBorderStyle
 			);
-			const subtitleOverlayBorderColor = normalizeOptionValue(
+			const subtitleOverlayBorderColorHex = normalizeHexColor(parsed.subtitleOverlayBorderColorHex) || '';
+			const subtitleOverlayBorderColor = normalizeColorOptionValue(
 				parsed.subtitleOverlayBorderColor,
 				SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
-				DEFAULT_SETTINGS.subtitleOverlayBorderColor
+				DEFAULT_SETTINGS.subtitleOverlayBorderColor,
+				subtitleOverlayBorderColorHex
 			);
 			const subtitleOverlayBorderStrength = normalizeOptionValue(
 				parsed.subtitleOverlayBorderStrength,
@@ -175,8 +185,10 @@ export const useSettingsBootstrap = ({
 				subtitleOverlayBackground,
 				subtitleOverlayWeight,
 				subtitleOverlayTextColor,
+				subtitleOverlayTextColorHex,
 				subtitleOverlayBorderStyle,
 				subtitleOverlayBorderColor,
+				subtitleOverlayBorderColorHex,
 				subtitleOverlayBorderStrength,
 				subtitleOverlayOutlineSize,
 				subtitleOverlayOutlineSizePx,

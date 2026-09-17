@@ -54,6 +54,27 @@ describe('subtitleOverlaySettings utilities', () => {
 		});
 	});
 
+	it('sets custom text and border colors only for valid custom hex values', () => {
+		const style = getSubtitleOverlayStyle({
+			subtitleOverlayTextColor: 'custom',
+			subtitleOverlayTextColorHex: '#80d0ff',
+			subtitleOverlayBorderColor: 'custom',
+			subtitleOverlayBorderColorHex: '123'
+		});
+		expect(style['--bf-player-subtitle-current-text-color']).toBe('#80d0ff');
+		expect(style['--bf-player-subtitle-current-border-color']).toBe('#112233');
+
+		const presetStyle = getSubtitleOverlayStyle({
+			subtitleOverlayTextColor: 'cyan',
+			subtitleOverlayTextColorHex: '#80d0ff',
+			subtitleOverlayBorderColor: 'custom',
+			subtitleOverlayBorderColorHex: 'nope'
+		});
+		expect(presetStyle).not.toHaveProperty('--bf-player-subtitle-current-text-color');
+		expect(presetStyle).not.toHaveProperty('--bf-player-subtitle-current-border-color');
+		expect(getSubtitleOverlayAttributes({subtitleOverlayTextColor: 'cyan'})['data-text-color']).toBe('cyan');
+	});
+
     it('builds clamped subtitle offset variables', () => {
         expect(getSubtitleOffsetStyle({
             subtitleOverlayOffsetYPx: '40',

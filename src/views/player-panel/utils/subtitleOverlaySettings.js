@@ -1,7 +1,9 @@
 import {
 	normalizeNumericSetting,
+	resolveCustomSubtitleColor,
 	resolveSubtitleOffsetXPx,
 	resolveSubtitleOffsetYPx,
+	SUBTITLE_CUSTOM_COLOR,
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE
 } from '../../../utils/subtitleAppearance';
@@ -10,9 +12,20 @@ import {getAssCoordinatePlane, getAssStageLengthPx, getAssStagePercent} from './
 const SUBTITLE_SIZE_VALUES = new Set(['small', 'medium', 'large']);
 const SUBTITLE_BACKGROUND_VALUES = new Set(['none', 'low', 'medium', 'high']);
 const SUBTITLE_WEIGHT_VALUES = new Set(['regular', 'bold', 'black']);
-const SUBTITLE_TEXT_COLOR_VALUES = new Set(['white', 'warmWhite', 'yellow', 'black']);
+const SUBTITLE_TEXT_COLOR_VALUES = new Set([
+    'white',
+    'warmWhite',
+    'lightGray',
+    'yellow',
+    'orange',
+    'green',
+    'cyan',
+    'pink',
+    'black',
+    SUBTITLE_CUSTOM_COLOR
+]);
 const SUBTITLE_BORDER_STYLE_VALUES = new Set(['none', 'shadow', 'outline', 'box']);
-const SUBTITLE_BORDER_COLOR_VALUES = new Set(['black', 'white', 'yellow', 'accent']);
+const SUBTITLE_BORDER_COLOR_VALUES = new Set(['black', 'white', 'yellow', 'accent', SUBTITLE_CUSTOM_COLOR]);
 const SUBTITLE_BORDER_STRENGTH_VALUES = new Set(['low', 'medium', 'high']);
 const SUBTITLE_OUTLINE_SIZE_VALUES = new Set(['thin', 'medium', 'thick', 'extra']);
 const SUBTITLE_SHADOW_DISTANCE_VALUES = new Set(['low', 'medium', 'high', 'extra']);
@@ -52,8 +65,18 @@ export const getSubtitleOffsetStyle = (settings = {}) => ({
 	'--bf-player-subtitle-offset-y': `${resolveSubtitleOffsetYPx(settings)}px`
 });
 
+const getSubtitleCustomColorStyle = (settings = {}) => {
+    const textColor = resolveCustomSubtitleColor(settings.subtitleOverlayTextColor, settings.subtitleOverlayTextColorHex);
+    const borderColor = resolveCustomSubtitleColor(settings.subtitleOverlayBorderColor, settings.subtitleOverlayBorderColorHex);
+    return {
+        ...(textColor ? {'--bf-player-subtitle-current-text-color': textColor} : {}),
+        ...(borderColor ? {'--bf-player-subtitle-current-border-color': borderColor} : {})
+    };
+};
+
 export const getSubtitleOverlayStyle = (settings = {}) => ({
 	...getSubtitleOffsetStyle(settings),
+    ...getSubtitleCustomColorStyle(settings),
 	'--bf-player-subtitle-current-font-size': `${normalizeNumericSetting(
 		settings.subtitleOverlayFontSizePx,
 		SUBTITLE_OVERLAY_FONT_SIZE_RANGE

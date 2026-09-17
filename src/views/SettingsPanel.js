@@ -325,6 +325,8 @@ const SettingsPanel = ({
 		handleSubtitleOverlayTextColorSelect,
 		handleSubtitleOverlayBorderStyleSelect,
 		handleSubtitleOverlayBorderColorSelect,
+		handleSubtitleOverlayTextColorCustomApply,
+		handleSubtitleOverlayBorderColorCustomApply,
 		handleSubtitleOverlayBorderStrengthSelect
 	} = optionHandlers;
 	const {
@@ -548,6 +550,8 @@ const SettingsPanel = ({
 					closeSubtitleOverlayBorderColorPopup={closeSubtitleOverlayBorderColorPopup}
 					subtitleOverlayBorderColorOptions={SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS}
 					handleSubtitleOverlayBorderColorSelect={handleSubtitleOverlayBorderColorSelect}
+					handleSubtitleOverlayTextColorCustomApply={handleSubtitleOverlayTextColorCustomApply}
+					handleSubtitleOverlayBorderColorCustomApply={handleSubtitleOverlayBorderColorCustomApply}
 					subtitleOverlayBorderStrengthPopupOpen={subtitleOverlayBorderStrengthPopupOpen}
 					closeSubtitleOverlayBorderStrengthPopup={closeSubtitleOverlayBorderStrengthPopup}
 					subtitleOverlayBorderStrengthOptions={SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS}

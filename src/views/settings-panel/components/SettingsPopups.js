@@ -4,6 +4,7 @@ import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../../../components/AppScroller';
 import Button from '../../../components/BreezyButton';
 import {usePopupInitialFocus} from '../../../hooks/usePopupInitialFocus';
+import SubtitleCustomColorField from './SubtitleCustomColorField';
 import {
 	getWipeCacheConfirmCopy,
 	isSubtitleBurnInCodecSelected,
@@ -80,6 +81,8 @@ const SettingsPopups = ({
 	closeSubtitleOverlayBorderColorPopup,
 	subtitleOverlayBorderColorOptions,
 	handleSubtitleOverlayBorderColorSelect,
+							handleSubtitleOverlayTextColorCustomApply,
+							handleSubtitleOverlayBorderColorCustomApply,
 	subtitleOverlayBorderStrengthPopupOpen,
 	closeSubtitleOverlayBorderStrengthPopup,
 	subtitleOverlayBorderStrengthOptions,
@@ -190,7 +193,8 @@ const SettingsPopups = ({
 		options,
 		settingKey,
 		onSelect,
-		fallback
+										   fallback,
+										   customColor
 	}) => (
 		<Popup
 			open={open}
@@ -212,6 +216,9 @@ const SettingsPopups = ({
 						</Button>
 					))}
 				</div>
+				{customColor && open ? (
+					<SubtitleCustomColorField initialHex={customColor.hex} onApply={customColor.onApply}/>
+				) : null}
 			</div>
 		</Popup>
 	);
@@ -301,7 +308,11 @@ const SettingsPopups = ({
 				options: subtitleOverlayTextColorOptions,
 				settingKey: 'subtitleOverlayTextColor',
 				onSelect: handleSubtitleOverlayTextColorSelect,
-				fallback: 'white'
+				fallback: 'white',
+				customColor: {
+					hex: settings.subtitleOverlayTextColorHex,
+					onApply: handleSubtitleOverlayTextColorCustomApply
+				}
 			})}
 
 			{renderSubtitleOptionPopup({
@@ -323,7 +334,11 @@ const SettingsPopups = ({
 				options: subtitleOverlayBorderColorOptions,
 				settingKey: 'subtitleOverlayBorderColor',
 				onSelect: handleSubtitleOverlayBorderColorSelect,
-				fallback: 'black'
+				fallback: 'black',
+				customColor: {
+					hex: settings.subtitleOverlayBorderColorHex,
+					onApply: handleSubtitleOverlayBorderColorCustomApply
+				}
 			})}
 
 			{renderSubtitleOptionPopup({

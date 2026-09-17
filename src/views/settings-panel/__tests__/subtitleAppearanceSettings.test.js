@@ -18,7 +18,8 @@ import {
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
-import {getSignedNumericSettingLabel} from '../../../utils/subtitleAppearance';
+import {getSignedNumericSettingLabel, normalizeHexColor} from '../../../utils/subtitleAppearance';
+import {getColorOptionLabel} from '../labels';
 
 describe('subtitle appearance settings', () => {
 	it('uses readable defaults for the lightweight subtitle renderer', () => {
@@ -58,7 +59,7 @@ describe('subtitle appearance settings', () => {
 			{value: 'black', label: 'Black'}
 		]);
 		expect(SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS.map((option) => option.value))
-			.toEqual(['white', 'warmWhite', 'yellow', 'black']);
+			.toEqual(['white', 'warmWhite', 'lightGray', 'yellow', 'orange', 'green', 'cyan', 'pink', 'black']);
 		expect(SUBTITLE_OVERLAY_BACKGROUND_OPTIONS.map((option) => option.value))
 			.toEqual(['none', 'low', 'medium', 'high']);
 		expect(SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS.map((option) => option.value))
@@ -103,5 +104,20 @@ describe('subtitle appearance settings', () => {
         expect(getSignedNumericSettingLabel('40', SUBTITLE_OVERLAY_OFFSET_Y_RANGE)).toBe('+40px');
         expect(getSignedNumericSettingLabel('-50', SUBTITLE_OVERLAY_OFFSET_Y_RANGE)).toBe('-50px');
         expect(getSignedNumericSettingLabel(undefined, SUBTITLE_OVERLAY_OFFSET_X_RANGE)).toBe('0px');
+	});
+
+	it('normalizes custom hex colors', () => {
+		expect(normalizeHexColor('#80D0FF')).toBe('#80d0ff');
+		expect(normalizeHexColor('80d0ff')).toBe('#80d0ff');
+		expect(normalizeHexColor(' #abc ')).toBe('#aabbcc');
+		expect(normalizeHexColor('#abcd')).toBeNull();
+		expect(normalizeHexColor('red')).toBeNull();
+		expect(normalizeHexColor('')).toBeNull();
+	});
+
+	it('labels custom colors with their hex value', () => {
+		expect(getColorOptionLabel(SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS, 'custom', '#80d0ff', 'White')).toBe('Custom (#80d0ff)');
+		expect(getColorOptionLabel(SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS, 'cyan', '#80d0ff', 'White')).toBe('Cyan');
+		expect(getColorOptionLabel(SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS, 'custom', '', 'White')).toBe('White');
 	});
 });

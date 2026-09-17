@@ -74,6 +74,24 @@ export const resolveSubtitleOffsetXPx = (settings = {}) => normalizeNumericSetti
 	SUBTITLE_OVERLAY_OFFSET_X_RANGE
 );
 
+export const SUBTITLE_CUSTOM_COLOR = 'custom';
+
+const HEX_COLOR_PATTERN = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+// Accepts "#abc", "abc", "#aabbcc" or "aabbcc" and returns "#aabbcc", or null when invalid.
+export const normalizeHexColor = (value) => {
+    const match = HEX_COLOR_PATTERN.exec(String(value || '').trim());
+    if (!match) return null;
+    const digits = match[1].length === 3
+        ? match[1].split('').map((digit) => digit + digit).join('')
+        : match[1];
+    return `#${digits.toLowerCase()}`;
+};
+
+export const resolveCustomSubtitleColor = (selectedColor, hexValue) => (
+    selectedColor === SUBTITLE_CUSTOM_COLOR ? normalizeHexColor(hexValue) : null
+);
+
 export const adjustNumericSetting = (value, range, direction) => {
 	const currentValue = Number(normalizeNumericSetting(value, range));
 	const step = direction === 'decrease' ? -range.step : range.step;

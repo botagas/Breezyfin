@@ -164,6 +164,11 @@ body,
 	--bf-theme-player-subtitle-color-white: #f8fbff;
 	--bf-theme-player-subtitle-color-warm-white: #fff4dc;
 	--bf-theme-player-subtitle-color-yellow: #ffe66d;
+    --bf-theme-player-subtitle-color-light-gray: #d3d9e2;
+    --bf-theme-player-subtitle-color-orange: #ffb96b;
+    --bf-theme-player-subtitle-color-green: #92f0a8;
+    --bf-theme-player-subtitle-color-cyan: #86e9ff;
+    --bf-theme-player-subtitle-color-pink: #ffa3d2;
 	--bf-theme-player-subtitle-color-black: #05070a;
 	--bf-theme-player-subtitle-border-color-black: rgba(0, 0, 0, 0.94);
 	--bf-theme-player-subtitle-border-color-white: rgba(248, 251, 255, 0.96);
