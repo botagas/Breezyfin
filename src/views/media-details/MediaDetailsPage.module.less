@@ -1,0 +1,21 @@
+.loadingOverlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 3;
+	pointer-events: none;
+}
+
+// Doubled selectors win over the transition shorthand of the shared reveal classes.
+.revealDelayTitle.revealDelayTitle {
+	transition-delay: 90ms;
+}
+
+.revealDelayContent.revealDelayContent {
+	transition-delay: 180ms;
+}

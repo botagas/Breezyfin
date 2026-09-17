@@ -6,7 +6,7 @@ import SearchPanel from '../../views/SearchPanel';
 import FavoritesPanel from '../../views/FavoritesPanel';
 import SettingsPanel from '../../views/SettingsPanel';
 import PlayerPanel from '../../views/PlayerPanel';
-import MediaDetailsPanel from '../../views/MediaDetailsPanel';
+import MediaDetailsPage from '../../views/media-details/MediaDetailsPage';
 import WatchlistPanel from '../../views/WatchlistPanel';
 import CalendarPanel from '../../views/CalendarPanel';
 import SyncPlayPanel from '../../views/SyncPlayPanel';
@@ -247,7 +247,7 @@ export const createPanelChildren = ({
 	];
 
 	panelChildren.push(
-		<MediaDetailsPanel
+        <MediaDetailsPage
 			key={`details-${item?.Id || 'none'}`}
 			isActive={currentView === 'details'}
 			item={item}
