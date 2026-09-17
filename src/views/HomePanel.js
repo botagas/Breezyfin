@@ -23,6 +23,7 @@ import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
 import {findVerticalScrollableAncestor, getVerticalVisibilityDelta} from '../utils/verticalFocusScroll';
 import {INTEGRATION_PREFERENCES_CHANGED_EVENT, readIntegrationPreferences} from '../utils/integrationPreferences';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {
 	getServerHomeRowsStatus,
 	getServerHomeRowStatus,
@@ -72,6 +73,30 @@ const pruneSeriesUnplayedCache = (cache, now = Date.now()) => {
 		.forEach(([seriesId]) => cache.delete(seriesId));
 };
 
+const DEFAULT_HOME_ROW_SETTINGS = Object.freeze({
+	recentlyAdded: true,
+	continueWatching: true,
+	nextUp: true,
+	latestMovies: true,
+	latestShows: true,
+	myRequests: true
+});
+
+const resolveHomeRowSettings = (settings, current = DEFAULT_HOME_ROW_SETTINGS) => {
+	if (!settings.homeRows) return current;
+	const next = Object.fromEntries(
+		Object.keys(DEFAULT_HOME_ROW_SETTINGS).map((key) => [key, settings.homeRows[key] !== false])
+	);
+	return Object.keys(next).every((key) => next[key] === current[key]) ? current : next;
+};
+
+const resolveHomeRowOrder = (settings, current = HOME_ROW_ORDER) => {
+	if (!Array.isArray(settings.homeRowOrder)) return current;
+	const normalized = settings.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
+	const next = [...normalized, ...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))];
+	return next.join('|') === current.join('|') ? current : next;
+};
+
 const resetUnsettledServerHomeRows = (rows) => (
 	(Array.isArray(rows) ? rows : []).map((row) => (
 		row.status === SERVER_HOME_ROW_STATUS.LOADING
@@ -114,16 +139,9 @@ const HomePanel = ({
 	const diagnosticsEnabled = useRuntimeDiagnosticsEnabled();
 	const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
 	diagnosticsEnabledRef.current = diagnosticsEnabled;
-	const [homeRowSettings, setHomeRowSettings] = useState({
-		recentlyAdded: true,
-		continueWatching: true,
-		nextUp: true,
-		latestMovies: true,
-		latestShows: true,
-		myRequests: true
-	});
-	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
-	const [showMediaBar, setShowMediaBar] = useState(true);
+	const [homeRowSettings, setHomeRowSettings] = useState(() => resolveHomeRowSettings(readBreezyfinSettings()));
+	const [homeRowOrder, setHomeRowOrder] = useState(() => resolveHomeRowOrder(readBreezyfinSettings()));
+	const [showMediaBar, setShowMediaBar] = useState(() => readBreezyfinSettings().showMediaBar !== false);
 	const [activatedRowCount, setActivatedRowCount] = useState(2);
 	const [serverHomeRenderCount, setServerHomeRenderCount] = useState(SERVER_HOME_INITIAL_RENDER_COUNT);
 	const {
@@ -371,24 +389,8 @@ const HomePanel = ({
 
 	const applyHomeSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		if (settings.homeRows) {
-			setHomeRowSettings({
-				recentlyAdded: settings.homeRows.recentlyAdded !== false,
-				continueWatching: settings.homeRows.continueWatching !== false,
-				nextUp: settings.homeRows.nextUp !== false,
-				latestMovies: settings.homeRows.latestMovies !== false,
-				latestShows: settings.homeRows.latestShows !== false,
-				myRequests: settings.homeRows.myRequests !== false
-			});
-		}
-		if (Array.isArray(settings.homeRowOrder)) {
-			const normalized = settings.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
-			const resolved = [
-				...normalized,
-				...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
-			];
-			setHomeRowOrder(resolved);
-		}
+		setHomeRowSettings((current) => resolveHomeRowSettings(settings, current));
+		setHomeRowOrder((current) => resolveHomeRowOrder(settings, current));
 		setShowMediaBar(settings.showMediaBar !== false);
 	}, []);
 
