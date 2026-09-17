@@ -370,8 +370,12 @@ const Toolbar = ({
 		if (onBack?.() === true) return;
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
-		onNavigate('home');
-	}, [closeDisclosure, onBack, onNavigate]);
+		// A real Back (like the remote's Back key) keeps panel caches; navigating to Home would force a reload.
+		if (activeSection === 'home') return;
+		if (typeof window !== 'undefined' && typeof window.history?.back === 'function') {
+			window.history.back();
+		}
+	}, [activeSection, closeDisclosure, onBack]);
 
 	const handleLibraryNavigate = useCallback((event) => {
 		const libraryId = event.currentTarget.dataset.libraryId;
