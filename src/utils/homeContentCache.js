@@ -16,6 +16,11 @@ export const writeHomeContentCache = (sessionKey, resetToken, content) => {
     cachedEntry = {sessionKey, resetToken, content, stale: false};
 };
 
+// Spotlight id of the row (or hero Play button) that was opened, restored when Home comes back with Back.
+export const rememberHomeFocus = (spotlightId) => {
+    if (cachedEntry) cachedEntry.focus = spotlightId || null;
+};
+
 export const markHomeContentCacheStale = () => {
     if (cachedEntry) cachedEntry.stale = true;
 };

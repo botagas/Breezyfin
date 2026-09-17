@@ -39,6 +39,7 @@ import {
 	clearHomeContentCache,
 	getHomeContentSessionKey,
 	readHomeContentCache,
+	rememberHomeFocus,
 	writeHomeContentCache
 } from '../utils/homeContentCache';
 
@@ -177,6 +178,14 @@ const HomePanel = ({
 		isActive,
 		onPanelBack: handlePanelBack
 	});
+	// After Back, the Panel focuses the card (or hero Play button) that was opened.
+	// The focus is used once, so a later Back from another panel keeps the Panel's default.
+	const [autoFocusSelector] = useState(() => (
+		cachedEntry?.focus ? `[data-spotlight-id="${window.CSS.escape(cachedEntry.focus)}"]` : undefined
+	));
+	useEffect(() => {
+		rememberHomeFocus(null);
+	}, []);
 	const {
 		captureScrollTo: captureHomeScrollRestore,
 		handleScroll: handleHomeScrollMemory,
@@ -568,6 +577,11 @@ const HomePanel = ({
 	}, [contentRefreshVersion, isActive, loadContent]);
 
 	const handleItemClick = useCallback((item) => {
+		// Rows are remembered instead of cards: the Panel can't look inside row containers, but the
+		// row restores its own last focused card.
+		const activeElement = document.activeElement;
+		const row = activeElement?.closest?.('[data-spotlight-id^="home-row-"]');
+		rememberHomeFocus(row ? row.dataset.spotlightId : activeElement?.dataset?.spotlightId);
 		if (item?.IsDiscoveryItem) {
 			activateDiscoveryItem(item);
 			return;
@@ -784,7 +798,11 @@ const HomePanel = ({
 	}
 
 	return (
-		<Panel {...rest} onKeyDownCapture={handleHomePanelKeyDownCapture}>
+		<Panel
+			{...rest}
+			autoFocus={autoFocusSelector ?? rest.autoFocus}
+			onKeyDownCapture={handleHomePanelKeyDownCapture}
+		>
 			{topToolbar}
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>

@@ -139,8 +139,10 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 	);
 });
 
+// preserveId keeps the row's last focused card while Home is unmounted (e.g. on a media page).
 const Container = createLastFocusedSpotlightContainer('div', {
-	restrict: 'self-only'
+	restrict: 'self-only',
+	preserveId: true
 });
 
 const MediaRow = ({
@@ -310,6 +312,7 @@ const MediaRow = ({
 			<Container
 				className={css.rowContent}
 				onFocus={handleFocus}
+				spotlightId={`home-row-${sectionKey || title}`}
 			>
 				<div className={`${css.cardContainer} ${isLegacyCompactLayout ? css.cardContainerCompactWebos6 : ''}`} ref={scrollerRef}>
 					{items.map((item, index) => (
