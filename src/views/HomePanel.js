@@ -574,18 +574,36 @@ const HomePanel = ({
 		};
 	}, [contentRefreshVersion, isActive, loadContent]);
 
+	// Pointer clicks can open a card that is only partly visible. Saving the position at which the
+	// card would be vertically centered below the toolbar (without scrolling) shows it fully after Back,
+	// so restoring its focus does not scroll the page again.
+	const rememberCenteredScrollTop = useCallback((card, row) => {
+		// Searching from the row skips the row's horizontal card scroller.
+		const scroller = findVerticalScrollableAncestor(row);
+		if (!scroller) return;
+		const scrollerRect = scroller.getBoundingClientRect();
+		const toolbarBottom = document.querySelector('[data-bf-navbar="true"]')?.getBoundingClientRect().bottom || 0;
+		const visibleCenter = (Math.max(scrollerRect.top, toolbarBottom) + scrollerRect.bottom) / 2;
+		const cardRect = card.getBoundingClientRect();
+		const cardCenter = (cardRect.top + cardRect.bottom) / 2;
+		const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+		const centeredTop = Math.min(maxTop, Math.max(0, scroller.scrollTop + cardCenter - visibleCenter));
+		handleHomeScrollMemory({scrollTop: centeredTop});
+	}, [handleHomeScrollMemory]);
+
 	const handleItemClick = useCallback((item) => {
 		// Rows are remembered instead of cards: the Panel can't look inside row containers, but the
 		// row restores its own last focused card.
 		const activeElement = document.activeElement;
 		const row = activeElement?.closest?.('[data-spotlight-id^="home-row-"]');
 		rememberHomeFocus(row ? row.dataset.spotlightId : activeElement?.dataset?.spotlightId);
+		if (row && Spotlight.getPointerMode()) rememberCenteredScrollTop(activeElement, row);
 		if (item?.IsDiscoveryItem) {
 			activateDiscoveryItem(item);
 			return;
 		}
 		onItemSelect(item);
-	}, [activateDiscoveryItem, onItemSelect]);
+	}, [activateDiscoveryItem, onItemSelect, rememberCenteredScrollTop]);
 
 	const handleViewMoreSection = useCallback((sectionKey) => {
 		const descriptor = serverHomeRows.find((row) => row.key === sectionKey)?.descriptor ||
