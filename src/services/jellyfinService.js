@@ -25,6 +25,7 @@ import {
 import {
 	getFavoriteMediaItems,
 	getItemDetails,
+	getItemFilterTags,
 	getItemMediaSegments,
 	getLatestMediaItems,
 	getLibraryChildItems,
@@ -394,6 +395,10 @@ class JellyfinService {
 
 	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0, options = {}) {
 		return getLibraryChildItems(this, parentId, itemTypes, limit, startIndex, options);
+	}
+
+	async getItemFilterTags(parentId, itemTypes) {
+		return getItemFilterTags(this, parentId, itemTypes);
 	}
 
 	async getItem(itemId) {

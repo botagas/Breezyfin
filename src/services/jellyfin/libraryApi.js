@@ -104,6 +104,9 @@ export const getLibraryChildItems = async (
 		if (typeof options?.searchTerm === 'string' && options.searchTerm.trim()) {
 			params.set('searchTerm', options.searchTerm.trim());
 		}
+		if (Array.isArray(options?.tags) && options.tags.length > 0) {
+			params.set('tags', options.tags.join('|'));
+		}
 		const url = `${service.serverUrl}/Users/${service.userId}/Items?${params.toString()}`;
 
 		return await service._fetchItems(url, {}, 'getLibraryItems');
@@ -111,6 +114,26 @@ export const getLibraryChildItems = async (
 		console.error('getLibraryItems error:', error);
 		return [];
 	}
+};
+
+// Throws instead of returning [] so callers can tell "no tags" apart from "tag list unavailable".
+export const getItemFilterTags = async (service, parentId, itemTypes) => {
+	const params = new URLSearchParams();
+	params.set('userId', service.userId);
+	const safeParentId = normalizeOptionalQueryValue(parentId);
+	if (safeParentId) params.set('parentId', safeParentId);
+	params.set('recursive', 'true');
+	const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
+	if (typeof types === 'string' && types.trim()) {
+		params.set('includeItemTypes', types.trim());
+	}
+	const data = await service._request(`/Items/Filters2?${params.toString()}`, {
+		context: 'getItemFilterTags'
+	});
+	if (!Array.isArray(data?.Tags)) {
+		throw new Error('getItemFilterTags returned no tag list');
+	}
+	return data.Tags.filter((tag) => typeof tag === 'string');
 };
 
 export const getItemDetails = async (service, itemId) => {

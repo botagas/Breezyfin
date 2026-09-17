@@ -309,11 +309,14 @@ const HomePanel = ({
 					serverHomeFallbackRef.current = true;
 				}
 			}
-			recently = await jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT);
+			const recentlyPromise = jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT);
 
-			if (!useServerHome) {
+			if (useServerHome) {
+				recently = await recentlyPromise;
+			} else {
 				const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-				[resume, next, movies, shows, myRequestsResult, watchlistResult] = await Promise.all([
+				[recently, resume, next, movies, shows, myRequestsResult, watchlistResult] = await Promise.all([
+					recentlyPromise,
 					jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT),
 					jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT),
 					jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT),

@@ -185,6 +185,69 @@ describe('requestsApi', () => {
 		);
 	});
 
+	it('loads requests through the server tag filter when the tag list is available', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue([
+			'1 - requester',
+			'2-Requester',
+			'3 - someone',
+			'4 - requester|other',
+			'drama'
+		]);
+		service.getLibraryItems.mockResolvedValueOnce([makeItem('match-1', ['1 - requester'])]);
+
+		await expect(getMyRequestItems(service, {
+			itemTypes: ['Movie', 'Series'],
+			limit: 2,
+			startIndex: 4,
+			username: 'requester'
+		})).resolves.toEqual({
+			items: [makeItem('match-1', ['1 - requester'])],
+			source: 'tags-filter',
+			scannedCount: 1,
+			nextStartIndex: 5,
+			hasMore: false,
+			diagnosticReason: 'plugin-capabilities-missing'
+		});
+		expect(service.getItemFilterTags).toHaveBeenCalledWith(null, ['Movie', 'Series']);
+		expect(service.getLibraryItems).toHaveBeenCalledTimes(1);
+		expect(service.getLibraryItems).toHaveBeenCalledWith(
+			null,
+			['Movie', 'Series'],
+			2,
+			4,
+			{tags: ['1 - requester', '2-Requester']}
+		);
+	});
+
+	it('skips the item request when no tag belongs to the user', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['3 - someone', 'drama']);
+
+		await expect(getMyRequestItems(service, {username: 'requester'})).resolves.toEqual(
+			expect.objectContaining({items: [], source: 'tags-filter', hasMore: false})
+		);
+		expect(service.getLibraryItems).not.toHaveBeenCalled();
+	});
+
+	it('scans the library when the tag list is unavailable', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockRejectedValue(new Error('no tag list'));
+		service.getLibraryItems.mockResolvedValue([]);
+
+		await expect(getMyRequestItems(service, {
+			itemTypes: ['Movie'],
+			limit: 10,
+			username: 'requester'
+		})).resolves.toEqual(
+			expect.objectContaining({source: 'tags-fallback'})
+		);
+		expect(service.getLibraryItems).toHaveBeenCalledWith(null, ['Movie'], 40, 0);
+	});
+
 	it('caches a missing My Requests endpoint for the authenticated session', async () => {
 		const service = createService();
 		service._request

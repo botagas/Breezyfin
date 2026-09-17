@@ -1,4 +1,4 @@
-import {itemMatchesUserRequestTag} from '../../utils/myRequests';
+import {buildUserRequestTagPattern, itemMatchesUserRequestTag} from '../../utils/myRequests';
 import {normalizeOptionalQueryValue} from './queryParams';
 
 const REQUESTS_PLUGIN_ENDPOINT = '/Breezyfin/MyRequests';
@@ -398,6 +398,36 @@ const getMyRequestsFromPlugin = async (service, {
 	}
 };
 
+// Lets Jellyfin do the tag matching: one request for the tag names, one for the matching items.
+// Throws when the tag list is unavailable so the caller can fall back to scanning.
+const collectTagFilteredPage = async (service, {
+	parentId,
+	itemTypes,
+	limit,
+	startIndex,
+	username,
+	pluginDiagnosticReason
+}) => {
+	const safeLimit = normalizePositiveInteger(limit, 60);
+	const safeStartIndex = normalizeStartIndex(startIndex);
+	const pattern = buildUserRequestTagPattern(username);
+	const allTags = await service.getItemFilterTags(parentId, itemTypes);
+	// Jellyfin separates tags with "|", so such a tag cannot be requested on its own.
+	const requestTags = allTags.filter((tag) => pattern.test(tag) && !tag.includes('|'));
+	const items = requestTags.length === 0
+		? []
+		: await service.getLibraryItems(parentId, itemTypes, safeLimit, safeStartIndex, {tags: requestTags});
+	const safeItems = Array.isArray(items) ? items : [];
+	return {
+		items: safeItems,
+		source: 'tags-filter',
+		scannedCount: safeItems.length,
+		nextStartIndex: safeStartIndex + safeItems.length,
+		hasMore: safeItems.length >= safeLimit,
+		diagnosticReason: pluginDiagnosticReason || 'tags-filter'
+	};
+};
+
 const collectTaggedFallbackPage = async (service, {
 	parentId,
 	itemTypes,
@@ -491,12 +521,20 @@ export const getMyRequestItems = async (service, {
 		return pluginResult.result;
 	}
 
-	return collectTaggedFallbackPage(service, {
+	const fallbackOptions = {
 		parentId: safeParentId,
 		itemTypes,
 		limit,
 		startIndex,
 		username,
 		pluginDiagnosticReason: pluginResult.diagnosticReason
-	});
+	};
+	if (String(username || '').trim()) {
+		try {
+			return await collectTagFilteredPage(service, fallbackOptions);
+		} catch {
+			// Tag list unavailable: scan the library instead.
+		}
+	}
+	return collectTaggedFallbackPage(service, fallbackOptions);
 };
