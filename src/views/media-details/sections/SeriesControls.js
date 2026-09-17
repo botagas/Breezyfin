@@ -29,6 +29,9 @@ const SeriesControls = ({
                 Episode {episode.IndexNumber}: {episode.Name}
             </Button>
         </div>
+        <Button size="small" icon="play" className={css.primaryButton} onClick={onPlay}>
+            {playLabel}
+        </Button>
         <div className={css.controlsActions}>
             <PlaybackControls
                 audioTracks={audioTracks}
@@ -40,9 +43,6 @@ const SeriesControls = ({
                 onOpenSubtitlePicker={onOpenSubtitlePicker}
             />
         </div>
-        <Button size="small" icon="play" className={css.primaryButton} onClick={onPlay}>
-            {playLabel}
-        </Button>
     </div>
 );
 

@@ -30,7 +30,7 @@ const focusNode = (node) => {
     } catch (error) {
         node.focus();
     }
-    return true;
+    return document.activeElement === node;
 };
 
 const stopEvent = (event) => {
@@ -149,9 +149,9 @@ export const useMediaDetailsNavigation = ({
     ), [introNode]);
 
     const focusIntroControls = useCallback(() => (
-        focusNode(introNode('audio')) ||
+        focusNode(introNode('play')) ||
         focusNode(introNode('subtitle')) ||
-        focusNode(introNode('play'))
+        focusNode(introNode('audio'))
     ), [introNode]);
 
     const focusIntroPrimary = useCallback(() => (
@@ -279,8 +279,8 @@ export const useMediaDetailsNavigation = ({
                 if (keyCode === KeyCodes.UP) return focusTopNav();
                 if (keyCode !== KeyCodes.DOWN) return false;
                 if (showSectionTwo()) return true;
-                if (name === 'audio') return focusNode(introNode('subtitle')) || focusNode(introNode('play'));
-                if (name === 'subtitle') return focusNode(introNode('play'));
+                if (name === 'play') return focusNode(introNode('subtitle')) || focusNode(introNode('audio'));
+                if (name === 'subtitle') return focusNode(introNode('audio'));
                 return true;
             case 'cast-toggle':
                 if (keyCode === KeyCodes.UP) return showIntro('topNav');
@@ -450,7 +450,8 @@ export const useMediaDetailsNavigation = ({
 
     const seedFocus = useCallback(() => {
         const container = containerRef.current;
-        if (!container || container.contains(document.activeElement)) return;
+        if (!container) return;
+        if (seededRef.current && container.contains(document.activeElement)) return;
         const restoresContent = hasSecondarySection && !seededRef.current && initialScrollTop > 0;
         seededRef.current = true;
         if (restoresContent && focusSectionTwo()) return;
