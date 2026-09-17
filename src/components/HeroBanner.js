@@ -12,7 +12,7 @@ import css from './HeroBanner.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
 
 const AUTO_ROTATE_INTERVAL_MS = 8000;
-const TRANSITION_DURATION_MS = 420;
+const TRANSITION_FALLBACK_MS = 2000;
 const HERO_PRELOAD_ADJACENT = 2;
 const HERO_PRELOAD_CACHE_LIMIT = 48;
 const heroBackdropPreloadCache = new Map();
@@ -141,15 +141,22 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		};
 	}, [isActive]);
 
+	const currentIndexRef = useRef(currentIndex);
+	useEffect(() => {
+		currentIndexRef.current = currentIndex;
+	}, [currentIndex]);
+
 	const changeIndex = useCallback((resolveNext) => {
 		if (itemCount === 0) return;
-		setCurrentIndex((prev) => {
-			const resolved = typeof resolveNext === 'function' ? resolveNext(prev) : resolveNext;
-			const next = ((resolved % itemCount) + itemCount) % itemCount;
-			if (next === prev) return prev;
-			setPreviousIndex(reducedMotionMode ? null : prev);
-			return next;
-		});
+		const prev = currentIndexRef.current;
+		const resolved = typeof resolveNext === 'function' ? resolveNext(prev) : resolveNext;
+		const next = ((resolved % itemCount) + itemCount) % itemCount;
+		if (next === prev) return;
+		currentIndexRef.current = next;
+		setCurrentIndex(next);
+		if (reducedMotionMode) return;
+		setPreviousIndex(prev);
+		setIsTransitioning(true);
 	}, [itemCount, reducedMotionMode]);
 
 	useEffect(() => {
@@ -180,15 +187,23 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		setPreviousIndex(null);
 	}, [reducedMotionMode]);
 
+	const finishTransition = useCallback(() => {
+		setIsTransitioning(false);
+		setPreviousIndex(null);
+	}, []);
+
+	// The CSS fade decides the duration: the transition ends when the incoming layer's animation ends.
+	const handleIncomingAnimationEnd = useCallback((event) => {
+		if (event.target !== event.currentTarget) return;
+		finishTransition();
+	}, [finishTransition]);
+
+	// Safety net in case no animationend arrives (e.g. the animation is disabled by CSS).
 	useEffect(() => {
-		if (reducedMotionMode || previousIndex === null || previousIndex === currentIndex) return undefined;
-		setIsTransitioning(true);
-		const timer = setTimeout(() => {
-			setIsTransitioning(false);
-			setPreviousIndex(null);
-		}, TRANSITION_DURATION_MS);
+		if (!isTransitioning) return undefined;
+		const timer = setTimeout(finishTransition, TRANSITION_FALLBACK_MS);
 		return () => clearTimeout(timer);
-	}, [currentIndex, previousIndex, reducedMotionMode]);
+	}, [currentIndex, finishTransition, isTransitioning]);
 
 	useEffect(() => {
 		setImageErrors({});
@@ -358,7 +373,10 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 						)}
 					</div>
 				)}
-				<div className={`${css.backdropLayer} ${isTransitioning ? css.backdropLayerIncoming : css.backdropLayerCurrent}`}>
+				<div
+					className={`${css.backdropLayer} ${isTransitioning ? css.backdropLayerIncoming : css.backdropLayerCurrent}`}
+					onAnimationEnd={isTransitioning ? handleIncomingAnimationEnd : undefined}
+				>
 					{!currentHasImageError ? (
 						<>
 							<img
