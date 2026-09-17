@@ -40,6 +40,7 @@ import {useSettingsOptionHandlers} from './settings-panel/hooks/useSettingsOptio
 import {useSettingsSystemHandlers} from './settings-panel/hooks/useSettingsSystemHandlers';
 import {useSettingsToggleHandlers} from './settings-panel/hooks/useSettingsToggleHandlers';
 import {useSettingsDisplayHandlers} from './settings-panel/hooks/useSettingsDisplayHandlers';
+import {DEFAULT_SETTINGS_TAB_KEY} from './settings-panel/utils/settingsViewModel';
 
 import css from './SettingsPanel.module.less';
 import {popupShellCss} from '../styles/popupStyles';
@@ -68,6 +69,8 @@ const SettingsPanel = ({
 	const [, bumpCapabilitySnapshotVersion] = useState(0);
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+	// Owned here so a tab switch re-renders the Scroller, which re-measures its scroll bounds.
+	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_SETTINGS_TAB_KEY);
 	const [integrationPreferences, setIntegrationPreferences] = useState(() => (
 		readIntegrationPreferences(jellyfinService)
 	));
@@ -400,6 +403,8 @@ const SettingsPanel = ({
 					onScrollStop={handleSettingsScrollMemoryStop}
 				>
 					<SettingsSections
+						activeTabKey={activeTabKey}
+						onActiveTabChange={setActiveTabKey}
 						loading={loading}
 						serverInfo={serverInfo}
 						serverUrl={jellyfinService.serverUrl}

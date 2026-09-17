@@ -99,9 +99,10 @@ const SettingsSections = ({
 	openLogsPopup,
 	openWipeCacheConfirm,
 	openWipeCacheKeepLoginConfirm,
-	isNonStableBuild = false
+                              isNonStableBuild = false,
+                              activeTabKey = DEFAULT_SETTINGS_TAB_KEY,
+                              onActiveTabChange
 }) => {
-	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_SETTINGS_TAB_KEY);
 	const [expandedCapabilityRows, setExpandedCapabilityRows] = useState({
 		videoCodecs: false,
 		audioCodecs: false
@@ -115,8 +116,8 @@ const SettingsSections = ({
 
 	const handleTabClick = useCallback((tabKey) => {
 		if (!tabKey || !isSettingsTabKey(tabKey)) return;
-		setActiveTabKey(tabKey);
-	}, []);
+        onActiveTabChange(tabKey);
+    }, [onActiveTabChange]);
 
 	const shouldRenderSection = useCallback(
 		(sectionKey) => activeSectionKeys.includes(sectionKey),
