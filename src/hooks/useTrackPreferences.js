@@ -1,15 +1,13 @@
-import {useRef, useCallback} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {
-	readTrackPreferences,
-	writeTrackPreferences,
 	createAudioPreference,
-	createSubtitlePreference
+	createSubtitlePreference,
+	normalizeLanguageCode,
+	readScopedTrackPreference,
+	writeScopedTrackPreference
 } from '../utils/trackPreferences';
-import {
-	getLanguageOrdinal,
-	getTrackTitle,
-	normalizeTrackToken
-} from '../utils/trackMatching';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
+import {getLanguageOrdinal, getTrackTitle, normalizeTrackToken} from '../utils/trackMatching';
 import {isSupportedAudioCodec} from '../utils/playbackSelection';
 
 const isInteger = (value) => Number.isInteger(value);
@@ -17,7 +15,17 @@ const isInteger = (value) => Number.isInteger(value);
 const matchesLanguage = (stream, language) =>
 	Boolean(stream?.Language) &&
 	Boolean(language) &&
-	String(stream.Language).toLowerCase() === String(language).toLowerCase();
+	normalizeLanguageCode(stream.Language) === normalizeLanguageCode(language);
+
+const SUBTITLES_OFF = 'none';
+
+const readGlobalTrackLanguages = () => {
+	const settings = readBreezyfinSettings();
+	return {
+		audio: settings.preferredAudioLanguage || 'eng',
+		subtitle: settings.preferredSubtitleLanguage || 'eng'
+	};
+};
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
@@ -122,27 +130,35 @@ const pickBestCompatibleAudioTrack = (audioStreams = []) => {
 	return best?.index ?? null;
 };
 
-export const useTrackPreferences = () => {
-	const preferencesRef = useRef(readTrackPreferences() || {});
+export const useTrackPreferences = (scopeId = null) => {
+	const scopeIdRef = useRef(scopeId);
+	const preferencesRef = useRef(readScopedTrackPreference(scopeId));
+
+	useEffect(() => {
+		if (scopeIdRef.current === scopeId) return;
+		scopeIdRef.current = scopeId;
+		preferencesRef.current = readScopedTrackPreference(scopeId);
+	}, [scopeId]);
 
 	const loadTrackPreferences = useCallback(() => {
-		preferencesRef.current = readTrackPreferences() || {};
+		preferencesRef.current = readScopedTrackPreference(scopeIdRef.current);
 		return preferencesRef.current;
 	}, []);
 
 	const saveTrackPreferences = useCallback((preferences) => {
 		const normalized = preferences && typeof preferences === 'object' ? preferences : {};
 		preferencesRef.current = normalized;
-		writeTrackPreferences(normalized);
+		writeScopedTrackPreference(scopeIdRef.current, normalized);
 		return normalized;
 	}, []);
 
 	const pickPreferredAudio = useCallback((audioStreams = [], providedAudio = null, defaultAudio = null) => {
 		if (!audioStreams.length) return null;
-		const preference = preferencesRef.current?.audio;
 		if (isInteger(providedAudio) && audioStreams.some((stream) => stream.Index === providedAudio)) {
 			return providedAudio;
 		}
+
+		const preference = preferencesRef.current?.audio;
 		const preferredAudioStream = findPreferredAudioStream(audioStreams, preference);
 		if (preferredAudioStream) return preferredAudioStream.Index;
 		if (preference?.language) {
@@ -151,6 +167,12 @@ export const useTrackPreferences = () => {
 			);
 			if (languageMatch) return languageMatch.Index;
 		}
+
+		const globalLanguage = readGlobalTrackLanguages().audio;
+		const globalLanguageStreams = audioStreams.filter((stream) => matchesLanguage(stream, globalLanguage));
+		const bestGlobalMatch = pickBestCompatibleAudioTrack(globalLanguageStreams);
+		if (isInteger(bestGlobalMatch)) return bestGlobalMatch;
+
 		if (isCompatibleAudioStream(defaultAudio)) {
 			return defaultAudio?.Index ?? null;
 		}
@@ -158,7 +180,7 @@ export const useTrackPreferences = () => {
 		if (isInteger(compatibleFallback)) {
 			return compatibleFallback;
 		}
-		return defaultAudio?.Index ?? audioStreams[0]?.Index ?? null;
+		return globalLanguageStreams[0]?.Index ?? defaultAudio?.Index ?? audioStreams[0]?.Index ?? null;
 	}, []);
 
 	const pickPreferredSubtitle = useCallback((subtitleStreams = [], providedSubtitle = null, defaultSubtitle = null) => {
@@ -197,6 +219,13 @@ export const useTrackPreferences = () => {
 				return preference.index;
 			}
 		}
+
+		const globalLanguage = readGlobalTrackLanguages().subtitle;
+		if (globalLanguage === SUBTITLES_OFF) return -1;
+		const globalMatch =
+			subtitleStreams.find((stream) => matchesLanguage(stream, globalLanguage) && !stream.IsForced) ||
+			subtitleStreams.find((stream) => matchesLanguage(stream, globalLanguage));
+		if (globalMatch) return globalMatch.Index;
 
 		if (defaultSubtitle?.IsForced) {
 			const sameLanguageNonForced = subtitleStreams.find(

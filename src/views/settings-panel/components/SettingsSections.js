@@ -6,18 +6,15 @@ import PanelTabNavigation from '../../../components/PanelTabNavigation';
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import {
 	DEFAULT_SETTINGS_TAB_KEY,
-	SETTINGS_TABS,
 	getAssSubtitleRendererControlState,
 	getBitmapSubtitleRendererControlState,
 	getSettingsSectionKeys,
 	getSubtitleBurnInFormatsControlState,
 	isSettingsTabKey,
-	isSmartSubtitleHandlingEnabled
+	isSmartSubtitleHandlingEnabled,
+	SETTINGS_TABS
 } from '../utils/settingsViewModel';
-import {
-	SettingsItem as Item,
-	SettingsSwitchItem as SwitchItem
-} from './SettingsStaticItems';
+import {SettingsItem as Item, SettingsSwitchItem as SwitchItem} from './SettingsStaticItems';
 import css from '../../SettingsPanel.module.less';
 
 const SETTINGS_PANEL_TABS = SETTINGS_TABS.map((tab) => ({id: tab.key, label: tab.label}));
@@ -317,6 +314,12 @@ const SettingsSections = ({
 			{shouldRenderSection('playback') ? (
 				<section className={css.section}>
 					<BodyText className={css.sectionTitle}>Playback</BodyText>
+					<Item
+						className={css.settingItem}
+						label="Preferred Audio Language"
+						slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
+						onClick={openAudioLangPopup}
+					/>
 					<SwitchItem
 						className={css.switchItem}
 						onToggle={settingToggleHandlers.autoPlayNext}
@@ -571,18 +574,6 @@ const SettingsSections = ({
 					>
 						Show Media Bar on Home
 					</SwitchItem>
-				</section>
-			) : null}
-
-			{shouldRenderSection('languages') ? (
-				<section className={css.section}>
-					<BodyText className={css.sectionTitle}>Audio Language Preferences</BodyText>
-					<Item
-						className={css.settingItem}
-						label="Preferred Audio Language"
-						slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
-						onClick={openAudioLangPopup}
-					/>
 				</section>
 			) : null}
 

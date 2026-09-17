@@ -3,6 +3,7 @@ import {useCallback, useEffect, useMemo, useReducer, useRef} from 'react';
 import jellyfinService from '../../services/jellyfinService';
 import {useTrackPreferences} from '../../hooks/useTrackPreferences';
 import {isPlayableMediaItem} from '../../utils/mediaItemUtils';
+import {getTrackPreferenceScopeId} from '../../utils/trackPreferences';
 import {updateItemsPlayedState} from '../media-details-panel/utils/mediaDetailsHelpers';
 import {
     fetchEpisodes,
@@ -57,7 +58,9 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
     const playbackRequestRef = useRef(0);
     const episodesRequestRef = useRef(0);
     const unmountedRef = useRef(false);
-    const {resolveDefaultTrackSelection, saveAudioSelection, saveSubtitleSelection} = useTrackPreferences();
+    const {resolveDefaultTrackSelection, saveAudioSelection, saveSubtitleSelection} = useTrackPreferences(
+        getTrackPreferenceScopeId(item)
+    );
 
     useEffect(() => {
         stateRef.current = state;
