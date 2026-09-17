@@ -6,16 +6,21 @@ import Marquee from '@enact/sandstone/Marquee';
 import jellyfinService from '../services/jellyfinService';
 import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
 
 import css from './HeroBanner.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
 
-const AUTO_ROTATE_INTERVAL_MS = 8000;
+const AUTO_ROTATE_INTERVAL_MS = 3000;
 const TRANSITION_DURATION_MS = 420;
 const HERO_PRELOAD_ADJACENT = 2;
 const HERO_PRELOAD_CACHE_LIMIT = 48;
 const heroBackdropPreloadCache = new Map();
 const joinClasses = (...classNames) => classNames.filter(Boolean).join(' ');
+
+const areHeroAnimationsDisabled = (settings = {}) => (
+	settings.disableAnimations !== false || settings.disableAllAnimations === true
+);
 
 const pruneHeroPreloadCache = () => {
 	if (heroBackdropPreloadCache.size <= HERO_PRELOAD_CACHE_LIMIT) return;
@@ -71,7 +76,9 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	const [isTransitioning, setIsTransitioning] = useState(false);
 	const [imageErrors, setImageErrors] = useState({});
 	const [loadedBackdropUrls, setLoadedBackdropUrls] = useState({});
-	const [performanceModeEnabled, setPerformanceModeEnabled] = useState(false);
+	const [performanceModeEnabled, setPerformanceModeEnabled] = useState(() => (
+		areHeroAnimationsDisabled(readBreezyfinSettings())
+	));
 	const heroVisibleRef = useRef(true);
 	const autoRotateTimerRef = useRef(null);
 	const syncAutoRotateRef = useRef(() => {
@@ -85,7 +92,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 
 	const applyMotionSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		setPerformanceModeEnabled(settings.disableAnimations === true || settings.disableAllAnimations === true);
+		setPerformanceModeEnabled(areHeroAnimationsDisabled(settings));
 	}, []);
 	useBreezyfinSettingsSync(applyMotionSettings, {enabled: isActive});
 
