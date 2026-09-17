@@ -1,16 +1,13 @@
 import {
 	normalizeNumericSetting,
+	resolveSubtitleOffsetXPx,
+	resolveSubtitleOffsetYPx,
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE
 } from '../../../utils/subtitleAppearance';
-import {
-	getAssCoordinatePlane,
-	getAssStageLengthPx,
-	getAssStagePercent
-} from './subtitleRendererAssStage';
+import {getAssCoordinatePlane, getAssStageLengthPx, getAssStagePercent} from './subtitleRendererAssStage';
 
 const SUBTITLE_SIZE_VALUES = new Set(['small', 'medium', 'large']);
-const SUBTITLE_POSITION_VALUES = new Set(['low', 'standard', 'raised']);
 const SUBTITLE_BACKGROUND_VALUES = new Set(['none', 'low', 'medium', 'high']);
 const SUBTITLE_WEIGHT_VALUES = new Set(['regular', 'bold', 'black']);
 const SUBTITLE_TEXT_COLOR_VALUES = new Set(['white', 'warmWhite', 'yellow', 'black']);
@@ -38,7 +35,6 @@ const normalizeSubtitleSetting = (value, allowedValues, fallback) => {
 
 export const getSubtitleOverlayAttributes = (settings = {}, controlsVisible = false) => ({
 	'data-size': normalizeSubtitleSetting(settings.subtitleOverlaySize, SUBTITLE_SIZE_VALUES, 'medium'),
-	'data-position': normalizeSubtitleSetting(settings.subtitleOverlayPosition, SUBTITLE_POSITION_VALUES, 'standard'),
 	'data-background': normalizeSubtitleSetting(settings.subtitleOverlayBackground, SUBTITLE_BACKGROUND_VALUES, 'none'),
 	'data-weight': normalizeSubtitleSetting(settings.subtitleOverlayWeight, SUBTITLE_WEIGHT_VALUES, 'bold'),
 	'data-text-color': normalizeSubtitleSetting(settings.subtitleOverlayTextColor, SUBTITLE_TEXT_COLOR_VALUES, 'white'),
@@ -51,7 +47,13 @@ export const getSubtitleOverlayAttributes = (settings = {}, controlsVisible = fa
 	'data-controls-visible': controlsVisible ? 'true' : 'false'
 });
 
+export const getSubtitleOffsetStyle = (settings = {}) => ({
+	'--bf-player-subtitle-offset-x': `${resolveSubtitleOffsetXPx(settings)}px`,
+	'--bf-player-subtitle-offset-y': `${resolveSubtitleOffsetYPx(settings)}px`
+});
+
 export const getSubtitleOverlayStyle = (settings = {}) => ({
+	...getSubtitleOffsetStyle(settings),
 	'--bf-player-subtitle-current-font-size': `${normalizeNumericSetting(
 		settings.subtitleOverlayFontSizePx,
 		SUBTITLE_OVERLAY_FONT_SIZE_RANGE

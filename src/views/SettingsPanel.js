@@ -25,7 +25,6 @@ import {
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
-	SUBTITLE_OVERLAY_POSITION_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
@@ -98,7 +97,8 @@ const SettingsPanel = ({
 		assSubtitleRendererPopupOpen,
 		bitmapSubtitleRendererPopupOpen,
 		subtitleOverlaySizePopupOpen,
-		subtitleOverlayPositionPopupOpen,
+        subtitleOverlayOffsetYPopupOpen,
+        subtitleOverlayOffsetXPopupOpen,
 		subtitleOverlayBackgroundPopupOpen,
 		subtitleOverlayWeightPopupOpen,
 		subtitleOverlayTextColorPopupOpen,
@@ -130,8 +130,10 @@ const SettingsPanel = ({
 		closeBitmapSubtitleRendererPopup,
 		openSubtitleOverlaySizePopup,
 		closeSubtitleOverlaySizePopup,
-		openSubtitleOverlayPositionPopup,
-		closeSubtitleOverlayPositionPopup,
+        openSubtitleOverlayOffsetYPopup,
+        closeSubtitleOverlayOffsetYPopup,
+        openSubtitleOverlayOffsetXPopup,
+        closeSubtitleOverlayOffsetXPopup,
 		openSubtitleOverlayBackgroundPopup,
 		closeSubtitleOverlayBackgroundPopup,
 		openSubtitleOverlayWeightPopup,
@@ -268,7 +270,6 @@ const SettingsPanel = ({
 		closeAssSubtitleRendererPopup,
 		closeBitmapSubtitleRendererPopup,
 		closeSubtitleOverlaySizePopup,
-		closeSubtitleOverlayPositionPopup,
 		closeSubtitleOverlayBackgroundPopup,
 		closeSubtitleOverlayWeightPopup,
 		closeSubtitleOverlayTextColorPopup,
@@ -311,7 +312,12 @@ const SettingsPanel = ({
 		handleSubtitleOverlayFontSizeDecrease,
 		handleSubtitleOverlayFontSizeIncrease,
 		handleSubtitleOverlayFontSizeReset,
-		handleSubtitleOverlayPositionSelect,
+        handleSubtitleOverlayOffsetYDecrease,
+        handleSubtitleOverlayOffsetYIncrease,
+        handleSubtitleOverlayOffsetYReset,
+        handleSubtitleOverlayOffsetXDecrease,
+        handleSubtitleOverlayOffsetXIncrease,
+        handleSubtitleOverlayOffsetXReset,
 		handleSubtitleOverlayBackgroundSelect,
 		handleSubtitleOverlayWeightSelect
 	} = optionHandlers;
@@ -335,7 +341,8 @@ const SettingsPanel = ({
 	} = optionHandlers;
 	const {
 		subtitleOverlayFontSizeLabel,
-		subtitleOverlayPositionLabel,
+        subtitleOverlayOffsetYLabel,
+        subtitleOverlayOffsetXLabel,
 		subtitleOverlayBackgroundLabel,
 		subtitleOverlayWeightLabel,
 		subtitleOverlayTextColorLabel,
@@ -421,7 +428,8 @@ const SettingsPanel = ({
 						bitmapSubtitleRendererLabel={bitmapSubtitleRendererLabel}
 						openBitmapSubtitleRendererPopup={openBitmapSubtitleRendererPopup}
 						subtitleOverlayFontSizeLabel={subtitleOverlayFontSizeLabel}
-						subtitleOverlayPositionLabel={subtitleOverlayPositionLabel}
+                        subtitleOverlayOffsetYLabel={subtitleOverlayOffsetYLabel}
+                        subtitleOverlayOffsetXLabel={subtitleOverlayOffsetXLabel}
 						subtitleOverlayBackgroundLabel={subtitleOverlayBackgroundLabel}
 						subtitleOverlayWeightLabel={subtitleOverlayWeightLabel}
 						subtitleOverlayTextColorLabel={subtitleOverlayTextColorLabel}
@@ -432,7 +440,8 @@ const SettingsPanel = ({
 						subtitleOverlayShadowDistanceLabel={subtitleOverlayShadowDistanceLabel}
 						subtitleOverlayShadowAngleLabel={subtitleOverlayShadowAngleLabel}
 						openSubtitleOverlaySizePopup={openSubtitleOverlaySizePopup}
-						openSubtitleOverlayPositionPopup={openSubtitleOverlayPositionPopup}
+                        openSubtitleOverlayOffsetYPopup={openSubtitleOverlayOffsetYPopup}
+                        openSubtitleOverlayOffsetXPopup={openSubtitleOverlayOffsetXPopup}
 						openSubtitleOverlayBackgroundPopup={openSubtitleOverlayBackgroundPopup}
 						openSubtitleOverlayWeightPopup={openSubtitleOverlayWeightPopup}
 						openSubtitleOverlayTextColorPopup={openSubtitleOverlayTextColorPopup}
@@ -507,10 +516,18 @@ const SettingsPanel = ({
 					handleSubtitleOverlayFontSizeDecrease={handleSubtitleOverlayFontSizeDecrease}
 					handleSubtitleOverlayFontSizeIncrease={handleSubtitleOverlayFontSizeIncrease}
 					handleSubtitleOverlayFontSizeReset={handleSubtitleOverlayFontSizeReset}
-					subtitleOverlayPositionPopupOpen={subtitleOverlayPositionPopupOpen}
-					closeSubtitleOverlayPositionPopup={closeSubtitleOverlayPositionPopup}
-					subtitleOverlayPositionOptions={SUBTITLE_OVERLAY_POSITION_OPTIONS}
-					handleSubtitleOverlayPositionSelect={handleSubtitleOverlayPositionSelect}
+                    subtitleOverlayOffsetYPopupOpen={subtitleOverlayOffsetYPopupOpen}
+                    closeSubtitleOverlayOffsetYPopup={closeSubtitleOverlayOffsetYPopup}
+                    subtitleOverlayOffsetYLabel={subtitleOverlayOffsetYLabel}
+                    handleSubtitleOverlayOffsetYDecrease={handleSubtitleOverlayOffsetYDecrease}
+                    handleSubtitleOverlayOffsetYIncrease={handleSubtitleOverlayOffsetYIncrease}
+                    handleSubtitleOverlayOffsetYReset={handleSubtitleOverlayOffsetYReset}
+                    subtitleOverlayOffsetXPopupOpen={subtitleOverlayOffsetXPopupOpen}
+                    closeSubtitleOverlayOffsetXPopup={closeSubtitleOverlayOffsetXPopup}
+                    subtitleOverlayOffsetXLabel={subtitleOverlayOffsetXLabel}
+                    handleSubtitleOverlayOffsetXDecrease={handleSubtitleOverlayOffsetXDecrease}
+                    handleSubtitleOverlayOffsetXIncrease={handleSubtitleOverlayOffsetXIncrease}
+                    handleSubtitleOverlayOffsetXReset={handleSubtitleOverlayOffsetXReset}
 					subtitleOverlayBackgroundPopupOpen={subtitleOverlayBackgroundPopupOpen}
 					closeSubtitleOverlayBackgroundPopup={closeSubtitleOverlayBackgroundPopup}
 					subtitleOverlayBackgroundOptions={SUBTITLE_OVERLAY_BACKGROUND_OPTIONS}

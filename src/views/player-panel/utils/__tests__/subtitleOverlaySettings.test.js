@@ -6,11 +6,12 @@ import {
 	getSubtitleCueTextStyle,
 	getSubtitleCueTransformLayerStyle,
 	getSubtitleDrawingSvgStyle,
+	getSubtitleOffsetStyle,
 	getSubtitleOverlayAttributes,
 	getSubtitleOverlayStyle,
 	getSubtitleTextStyle,
-	groupSubtitleCuesByPlacement,
 	groupSubtitleCuesByLayer,
+	groupSubtitleCuesByPlacement,
 	isClippedSubtitleCue,
 	isDrawingSubtitleCue
 } from '../subtitleOverlaySettings';
@@ -28,7 +29,6 @@ describe('subtitleOverlaySettings utilities', () => {
 			subtitleOverlayShadowAngle: 'upLeft'
 		}, true)).toEqual({
 			'data-size': 'medium',
-			'data-position': 'standard',
 			'data-background': 'none',
 			'data-weight': 'black',
 			'data-text-color': 'yellow',
@@ -47,10 +47,31 @@ describe('subtitleOverlaySettings utilities', () => {
 			subtitleOverlayFontSizePx: '48',
 			subtitleOverlayOutlineSizePx: '8'
 		})).toEqual({
+            '--bf-player-subtitle-offset-x': '0px',
+            '--bf-player-subtitle-offset-y': '0px',
 			'--bf-player-subtitle-current-font-size': '48px',
 			'--bf-player-subtitle-current-outline-size': '8px'
 		});
 	});
+
+    it('builds clamped subtitle offset variables', () => {
+        expect(getSubtitleOffsetStyle({
+            subtitleOverlayOffsetYPx: '40',
+            subtitleOverlayOffsetXPx: '-1000'
+        })).toEqual({
+            '--bf-player-subtitle-offset-x': '-300px',
+            '--bf-player-subtitle-offset-y': '40px'
+        });
+    });
+
+    it('maps the legacy low/raised positions to vertical offsets', () => {
+        expect(getSubtitleOffsetStyle({subtitleOverlayPosition: 'low'})['--bf-player-subtitle-offset-y']).toBe('-50px');
+        expect(getSubtitleOffsetStyle({subtitleOverlayPosition: 'raised'})['--bf-player-subtitle-offset-y']).toBe('80px');
+        expect(getSubtitleOffsetStyle({
+            subtitleOverlayPosition: 'raised',
+            subtitleOverlayOffsetYPx: '0'
+        })['--bf-player-subtitle-offset-y']).toBe('0px');
+    });
 
 	it('builds direct text styles for numeric subtitle appearance settings', () => {
 		expect(getSubtitleTextStyle({
@@ -283,6 +304,8 @@ describe('subtitleOverlaySettings utilities', () => {
 			subtitleOverlayFontSizePx: '200',
 			subtitleOverlayOutlineSizePx: '0'
 		})).toEqual({
+            '--bf-player-subtitle-offset-x': '0px',
+            '--bf-player-subtitle-offset-y': '0px',
 			'--bf-player-subtitle-current-font-size': '72px',
 			'--bf-player-subtitle-current-outline-size': '1px'
 		});

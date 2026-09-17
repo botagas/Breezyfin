@@ -6,18 +6,15 @@ import PanelTabNavigation from '../../../components/PanelTabNavigation';
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import {
 	DEFAULT_SETTINGS_TAB_KEY,
-	SETTINGS_TABS,
 	getAssSubtitleRendererControlState,
 	getBitmapSubtitleRendererControlState,
 	getSettingsSectionKeys,
 	getSubtitleBurnInFormatsControlState,
 	isSettingsTabKey,
-	isSmartSubtitleHandlingEnabled
+	isSmartSubtitleHandlingEnabled,
+	SETTINGS_TABS
 } from '../utils/settingsViewModel';
-import {
-	SettingsItem as Item,
-	SettingsSwitchItem as SwitchItem
-} from './SettingsStaticItems';
+import {SettingsItem as Item, SettingsSwitchItem as SwitchItem} from './SettingsStaticItems';
 import css from '../../SettingsPanel.module.less';
 
 const SETTINGS_PANEL_TABS = SETTINGS_TABS.map((tab) => ({id: tab.key, label: tab.label}));
@@ -53,7 +50,8 @@ const SettingsSections = ({
 	bitmapSubtitleRendererLabel,
 	openBitmapSubtitleRendererPopup,
 	subtitleOverlayFontSizeLabel,
-	subtitleOverlayPositionLabel,
+							  subtitleOverlayOffsetYLabel,
+							  subtitleOverlayOffsetXLabel,
 	subtitleOverlayBackgroundLabel,
 	subtitleOverlayWeightLabel,
 	subtitleOverlayTextColorLabel,
@@ -64,7 +62,8 @@ const SettingsSections = ({
 	subtitleOverlayShadowDistanceLabel,
 	subtitleOverlayShadowAngleLabel,
 	openSubtitleOverlaySizePopup,
-	openSubtitleOverlayPositionPopup,
+							  openSubtitleOverlayOffsetYPopup,
+							  openSubtitleOverlayOffsetXPopup,
 	openSubtitleOverlayBackgroundPopup,
 	openSubtitleOverlayWeightPopup,
 	openSubtitleOverlayTextColorPopup,
@@ -453,10 +452,23 @@ const SettingsSections = ({
 					/>
 					<Item
 						className={css.settingItem}
-						label="Breezyfin Subtitle Position"
-						slotAfter={subtitleOverlayPositionLabel}
-						onClick={openSubtitleOverlayPositionPopup}
+						label="Breezyfin Subtitle Vertical Offset"
+						slotAfter={subtitleOverlayOffsetYLabel}
+						onClick={openSubtitleOverlayOffsetYPopup}
 					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Horizontal Offset"
+						slotAfter={subtitleOverlayOffsetXLabel}
+						onClick={openSubtitleOverlayOffsetXPopup}
+					/>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.subtitleOverlayOffsetStyled}
+						selected={settings.subtitleOverlayOffsetStyled === true}
+					>
+						Apply Offsets to Styled Subtitles
+					</SwitchItem>
 					<Item
 						className={css.settingItem}
 						label="Breezyfin Subtitle Background"

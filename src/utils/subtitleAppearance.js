@@ -25,6 +25,26 @@ export const SUBTITLE_OVERLAY_OUTLINE_SIZE_LEGACY_PX = {
 	extra: '4'
 };
 
+export const SUBTITLE_OVERLAY_OFFSET_Y_RANGE = {
+	min: -200,
+	max: 400,
+	step: 10,
+	defaultValue: 0
+};
+
+export const SUBTITLE_OVERLAY_OFFSET_X_RANGE = {
+	min: -300,
+	max: 300,
+	step: 10,
+	defaultValue: 0
+};
+
+export const SUBTITLE_OVERLAY_POSITION_LEGACY_OFFSET_Y_PX = {
+	low: '-50',
+	standard: '0',
+	raised: '80'
+};
+
 export const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export const normalizeNumericSetting = (value, range) => {
@@ -38,6 +58,21 @@ export const normalizeNumericSetting = (value, range) => {
 export const getNumericSettingLabel = (value, range, unit = 'px') => {
 	return `${normalizeNumericSetting(value, range)}${unit}`;
 };
+
+export const getSignedNumericSettingLabel = (value, range, unit = 'px') => {
+	const normalized = normalizeNumericSetting(value, range);
+	return `${Number(normalized) > 0 ? '+' : ''}${normalized}${unit}`;
+};
+
+export const resolveSubtitleOffsetYPx = (settings = {}) => normalizeNumericSetting(
+	settings.subtitleOverlayOffsetYPx ?? SUBTITLE_OVERLAY_POSITION_LEGACY_OFFSET_Y_PX[settings.subtitleOverlayPosition],
+	SUBTITLE_OVERLAY_OFFSET_Y_RANGE
+);
+
+export const resolveSubtitleOffsetXPx = (settings = {}) => normalizeNumericSetting(
+	settings.subtitleOverlayOffsetXPx,
+	SUBTITLE_OVERLAY_OFFSET_X_RANGE
+);
 
 export const adjustNumericSetting = (value, range, direction) => {
 	const currentValue = Number(normalizeNumericSetting(value, range));

@@ -3,19 +3,22 @@ import {
 	ASS_SUBTITLE_RENDERER_STABLE_OPTIONS,
 	BITMAP_SUBTITLE_RENDERER_OPTIONS,
 	DEFAULT_SETTINGS,
+	getAssSubtitleRendererOptions,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
+	SUBTITLE_OVERLAY_OFFSET_X_RANGE,
+	SUBTITLE_OVERLAY_OFFSET_Y_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_OPTIONS,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE,
 	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
-	SUBTITLE_OVERLAY_WEIGHT_OPTIONS,
-	getAssSubtitleRendererOptions
+	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
+import {getSignedNumericSettingLabel} from '../../../utils/subtitleAppearance';
 
 describe('subtitle appearance settings', () => {
 	it('uses readable defaults for the lightweight subtitle renderer', () => {
@@ -33,6 +36,9 @@ describe('subtitle appearance settings', () => {
 		expect(DEFAULT_SETTINGS.subtitleOverlayOutlineSizePx).toBe('2');
 		expect(DEFAULT_SETTINGS.subtitleOverlayShadowDistance).toBe('medium');
 		expect(DEFAULT_SETTINGS.subtitleOverlayShadowAngle).toBe('down');
+        expect(DEFAULT_SETTINGS.subtitleOverlayOffsetYPx).toBe('0');
+        expect(DEFAULT_SETTINGS.subtitleOverlayOffsetXPx).toBe('0');
+        expect(DEFAULT_SETTINGS.subtitleOverlayOffsetStyled).toBe(false);
 	});
 
 	it('exposes stable option labels for subtitle appearance controls', () => {
@@ -79,5 +85,23 @@ describe('subtitle appearance settings', () => {
 			step: 1,
 			defaultValue: 2
 		});
+        expect(SUBTITLE_OVERLAY_OFFSET_Y_RANGE).toEqual({
+            min: -200,
+            max: 400,
+            step: 10,
+            defaultValue: 0
+        });
+        expect(SUBTITLE_OVERLAY_OFFSET_X_RANGE).toEqual({
+            min: -300,
+            max: 300,
+            step: 10,
+            defaultValue: 0
+        });
+    });
+
+    it('labels offsets with an explicit sign', () => {
+        expect(getSignedNumericSettingLabel('40', SUBTITLE_OVERLAY_OFFSET_Y_RANGE)).toBe('+40px');
+        expect(getSignedNumericSettingLabel('-50', SUBTITLE_OVERLAY_OFFSET_Y_RANGE)).toBe('-50px');
+        expect(getSignedNumericSettingLabel(undefined, SUBTITLE_OVERLAY_OFFSET_X_RANGE)).toBe('0px');
 	});
 });

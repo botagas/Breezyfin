@@ -17,10 +17,9 @@ import {
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
-	SUBTITLE_OVERLAY_OUTLINE_SIZE_OPTIONS,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_LEGACY_PX,
+	SUBTITLE_OVERLAY_OUTLINE_SIZE_OPTIONS,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE,
-	SUBTITLE_OVERLAY_POSITION_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
 	SUBTITLE_OVERLAY_SIZE_LEGACY_PX,
@@ -28,7 +27,11 @@ import {
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
-import {normalizeNumericSetting} from '../../../utils/subtitleAppearance';
+import {
+	normalizeNumericSetting,
+	resolveSubtitleOffsetXPx,
+	resolveSubtitleOffsetYPx
+} from '../../../utils/subtitleAppearance';
 
 const normalizeOptionValue = (value, options, fallback) => {
 	return options.some((option) => option.value === value) ? value : fallback;
@@ -102,11 +105,8 @@ export const useSettingsBootstrap = ({
 				parsed.subtitleOverlayFontSizePx || SUBTITLE_OVERLAY_SIZE_LEGACY_PX[subtitleOverlaySize],
 				SUBTITLE_OVERLAY_FONT_SIZE_RANGE
 			);
-			const subtitleOverlayPosition = normalizeOptionValue(
-				parsed.subtitleOverlayPosition,
-				SUBTITLE_OVERLAY_POSITION_OPTIONS,
-				DEFAULT_SETTINGS.subtitleOverlayPosition
-			);
+			const subtitleOverlayOffsetYPx = resolveSubtitleOffsetYPx(parsed);
+			const subtitleOverlayOffsetXPx = resolveSubtitleOffsetXPx(parsed);
 			const subtitleOverlayBackground = normalizeOptionValue(
 				parsed.subtitleOverlayBackground,
 				SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
@@ -170,7 +170,8 @@ export const useSettingsBootstrap = ({
 				subtitleBurnInTextCodecs,
 				subtitleOverlaySize,
 				subtitleOverlayFontSizePx,
-				subtitleOverlayPosition,
+				subtitleOverlayOffsetYPx,
+				subtitleOverlayOffsetXPx,
 				subtitleOverlayBackground,
 				subtitleOverlayWeight,
 				subtitleOverlayTextColor,
