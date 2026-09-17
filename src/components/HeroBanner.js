@@ -11,7 +11,7 @@ import {readBreezyfinSettings} from '../utils/settingsStorage';
 import css from './HeroBanner.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
 
-const AUTO_ROTATE_INTERVAL_MS = 3000;
+const AUTO_ROTATE_INTERVAL_MS = 8000;
 const TRANSITION_DURATION_MS = 420;
 const HERO_PRELOAD_ADJACENT = 2;
 const HERO_PRELOAD_CACHE_LIMIT = 48;
@@ -32,7 +32,7 @@ const pruneHeroPreloadCache = () => {
 	}
 };
 
-const preloadHeroBackdrop = (url) => {
+const preloadHeroImage = (url) => {
 	if (!url) return;
 	if (typeof window === 'undefined' || typeof window.Image !== 'function') return;
 
@@ -190,6 +190,12 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		))
 	), [backdropWidth, items]);
 
+	const logoUrlsByIndex = useMemo(() => (
+		(items || []).map((entry) => (
+			entry?.Id && entry.ImageTags?.Logo ? jellyfinService.getImageUrl(entry.Id, 'Logo', 600) : ''
+		))
+	), [items]);
+
 	useEffect(() => {
 		if (itemCount === 0) return;
 
@@ -200,9 +206,11 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		}
 
 		preloadIndexes.forEach((index) => {
-			preloadHeroBackdrop(backdropUrlsByIndex[index]);
+			// Logos are preloaded too, otherwise the title appears after the backdrop.
+			preloadHeroImage(backdropUrlsByIndex[index]);
+			preloadHeroImage(logoUrlsByIndex[index]);
 		});
-	}, [backdropUrlsByIndex, currentIndex, itemCount, preloadAdjacentCount]);
+	}, [backdropUrlsByIndex, currentIndex, itemCount, logoUrlsByIndex, preloadAdjacentCount]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
@@ -292,9 +300,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	const previousBackdropUrl = previousItem && previousIndex !== null
 		? (backdropUrlsByIndex[((previousIndex % itemCount) + itemCount) % itemCount] || '')
 		: '';
-	const logoUrl = currentItem.ImageTags?.Logo
-		? jellyfinService.getImageUrl(currentItem.Id, 'Logo', 600)
-		: null;
+	const logoUrl = logoUrlsByIndex[currentIndex % itemCount] || null;
 	const showLogo = Boolean(logoUrl);
 	const infoKey = reducedMotionMode ? 'hero-content-static' : `hero-content-${currentItem.Id}`;
 
@@ -373,7 +379,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 								src={logoUrl}
 								alt={currentItem.Name}
 								className={`${css.logo} ${css.logoTransition}`}
-								loading="lazy"
+								loading="eager"
 								decoding="async"
 								draggable={false}
 							/>
