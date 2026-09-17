@@ -51,8 +51,6 @@ const HOME_ROW_PREVIEW_LIMIT = 10;
 const SERVER_HOME_INITIAL_RENDER_COUNT = 8;
 const SERVER_HOME_RENDER_AHEAD = 6;
 const HOME_CONTENT_REVALIDATE_MS = 2 * 60 * 1000;
-const HOME_IMAGE_ROWS_BEHIND = 2;
-const HOME_IMAGE_ROWS_AHEAD = 3;
 const HOME_DESIGN_CURRENT = 'current';
 const HOME_DESIGN_CINEMATIC = 'cinematic';
 const HOME_DESIGN_VARIANT = process.env.REACT_APP_HOME_DESIGN_VARIANT === HOME_DESIGN_CURRENT
@@ -127,7 +125,6 @@ const HomePanel = ({
 	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
 	const [showMediaBar, setShowMediaBar] = useState(true);
 	const [activatedRowCount, setActivatedRowCount] = useState(2);
-	const [activeRowIndex, setActiveRowIndex] = useState(0);
 	const [serverHomeRenderCount, setServerHomeRenderCount] = useState(SERVER_HOME_INITIAL_RENDER_COUNT);
 	const {
 		activateItem: activateDiscoveryItem,
@@ -249,7 +246,6 @@ const HomePanel = ({
 		if (isInitialLoad) {
 			setLoading(true);
 			setActivatedRowCount(2);
-			setActiveRowIndex(0);
 			setServerHomeRenderCount(SERVER_HOME_INITIAL_RENDER_COUNT);
 		}
 		try {
@@ -609,7 +605,6 @@ const HomePanel = ({
 
 	const handleRowVisible = useCallback((rowIndex) => {
 		setActivatedRowCount((currentCount) => Math.max(currentCount, rowIndex + 2));
-		setActiveRowIndex(rowIndex);
 		if (serverHomeActive) {
 			setServerHomeRenderCount((currentCount) => Math.min(
 				serverHomeRows.length,
@@ -852,7 +847,6 @@ const HomePanel = ({
 								: undefined}
 							onItemClick={handleItemClick}
 							getImageCandidates={getMediaRowImageCandidates}
-							imagesActive
 							onRowVisible={handleRowVisible}
 							onRowFocus={handleRowFocus}
 							showEpisodeProgress={row.showEpisodeProgress}

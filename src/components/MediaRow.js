@@ -108,7 +108,9 @@ const MediaCard = memo(function MediaCard({
 					alt={item.Name}
 					width={640}
 					height={360}
-					loading="eager"
+					// Lazy loading only fetches cards near the viewport and never unloads them again,
+					// unlike a moving window of active rows, which made Magic Remote scrolling stutter.
+					loading="lazy"
 					deferred={imageDeferred}
 					placeholder={(
 						<div className={css.placeholder}>
