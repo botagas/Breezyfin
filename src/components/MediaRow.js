@@ -16,7 +16,17 @@ import css from './MediaRow.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred, onClick, showEpisodeProgress, onCardKeyDown, variant, ...rest}) {
+const MediaCard = memo(function MediaCard({
+	                                          item,
+	                                          imageCandidates,
+	                                          imageDeferred,
+	                                          onClick,
+	                                          showEpisodeProgress,
+	                                          reserveSubtitleLine,
+	                                          onCardKeyDown,
+	                                          variant,
+	                                          ...rest
+                                          }) {
 	const handleCardClick = useCallback(() => {
 		onClick(item);
 	}, [item, onClick]);
@@ -84,6 +94,7 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 	const showWatchedStatusBadge = showEpisodeProgress && cardUnwatchedCount !== null;
 	const isCompletedWatchBadge = showWatchedStatusBadge && cardUnwatchedCount === 0;
 	const remainingCount = getRemainingCount();
+	const subtitle = getSubtitle();
 	return (
 		<SpottableDiv
 			className={`${css.card} ${variant === 'cinematic' ? css.cardCinematic : ''}`}
@@ -129,9 +140,10 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 				<BodyText className={css.cardTitle}>
 					{getDisplayTitle()}
 				</BodyText>
-				{getSubtitle() && (
+				{/* Rows that can hold episodes keep the line even when empty, so all their cards match. */}
+				{(subtitle || reserveSubtitleLine) && (
 					<BodyText className={css.cardSubtitle} size="small">
-						{getSubtitle()}
+						{subtitle || ' '}
 					</BodyText>
 				)}
 			</div>
@@ -159,6 +171,7 @@ const MediaRow = ({
 	onRowVisible,
 	onRowFocus,
 	showEpisodeProgress = false,
+					  reserveSubtitleLine = false,
 	rowIndex = 0,
 	onCardKeyDown,
 	onMoreClick,
@@ -291,7 +304,7 @@ const MediaRow = ({
 	return (
 		<div
 			ref={rowRef}
-			className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''} ${variant === 'cinematic' ? css.rowCinematic : ''} ${variant === 'cinematic' && rowIndex === 0 ? css.rowCinematicFirst : ''}`}
+			className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''} ${variant === 'cinematic' ? css.rowCinematic : ''} ${variant === 'cinematic' && rowIndex === 0 ? css.rowCinematicFirst : ''} ${reserveSubtitleLine ? css.rowWithSubtitleLine : ''}`}
 			{...rest}
 		>
 			<div className={css.rowHeader}>
@@ -325,6 +338,7 @@ const MediaRow = ({
 							imageDeferred={!imagesActive}
 							onClick={onItemClick}
 							showEpisodeProgress={showEpisodeProgress}
+							reserveSubtitleLine={reserveSubtitleLine}
 							spotlightId={`${title}-${index}`}
 							data-row-index={rowIndex}
 							data-card-index={index}

@@ -704,8 +704,13 @@ const HomePanel = ({
 	const visibleRows = useMemo(() => {
 		const rowConfig = {
 			recentlyAdded: {title: 'Recently Added', items: recentlyAdded, showEpisodeProgress: false},
-			continueWatching: {title: 'Continue Watching', items: continueWatching, showEpisodeProgress: false},
-			nextUp: {title: 'Next Up', items: nextUp, showEpisodeProgress: false},
+			continueWatching: {
+				title: 'Continue Watching',
+				items: continueWatching,
+				showEpisodeProgress: false,
+				reserveSubtitleLine: true
+			},
+			nextUp: {title: 'Next Up', items: nextUp, showEpisodeProgress: false, reserveSubtitleLine: true},
 			latestMovies: {title: 'Latest Movies', items: latestMovies, showEpisodeProgress: false},
 			latestShows: {title: 'Latest TV Shows', items: latestShows, showEpisodeProgress: false},
 			myRequests: {title: 'My Requests', items: myRequests, showEpisodeProgress: true},
@@ -851,6 +856,7 @@ const HomePanel = ({
 							onRowVisible={handleRowVisible}
 							onRowFocus={handleRowFocus}
 							showEpisodeProgress={row.showEpisodeProgress}
+							reserveSubtitleLine={row.reserveSubtitleLine === true}
 							rowIndex={rowIndex}
 							onCardKeyDown={handleHomeCardKeyDown}
 							onMoreClick={handleViewMoreSection}

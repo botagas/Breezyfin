@@ -86,12 +86,20 @@
 	}
 }
 
+// Off-screen rows are laid out with these heights until rendered. They must match the real row
+// heights (measured in DevTools at a 32px root font size: 691px and 775px), otherwise restoring the
+// Home scroll position lands too high. Re-measure after changing card sizes or spacing.
 .rowCinematic {
 	position: relative;
 	z-index: 20;
 	margin-top: 0;
 	margin-bottom: 2.4rem;
 	content-visibility: auto;
+	contain-intrinsic-size: 0 21.59375rem;
+
+	&.rowWithSubtitleLine {
+		contain-intrinsic-size: 0 24.21875rem;
+	}
 }
 
 .rowCinematicFirst {
