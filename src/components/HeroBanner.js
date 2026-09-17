@@ -32,41 +32,51 @@ const pruneHeroPreloadCache = () => {
 	}
 };
 
+// The entry keeps the Image object while its item is near the current one: a referenced, decoded
+// image stays in memory, so switching to it does not wait for a disk read and decode.
 const preloadHeroImage = (url) => {
 	if (!url) return;
 	if (typeof window === 'undefined' || typeof window.Image !== 'function') return;
 
 	const now = Date.now();
 	const existing = heroBackdropPreloadCache.get(url);
-	if (existing?.status === 'loaded' || existing?.status === 'loading') {
+    if (existing?.image || existing?.status === 'error') {
 		existing.lastUsedAt = now;
 		return;
 	}
 
 	const image = new window.Image();
-	heroBackdropPreloadCache.set(url, {status: 'loading', lastUsedAt: now});
+    const entry = {
+        status: existing?.status === 'loaded' ? 'loaded' : 'loading',
+        lastUsedAt: now,
+        image
+    };
+    heroBackdropPreloadCache.set(url, entry);
 	pruneHeroPreloadCache();
 
-	image.decoding = 'async';
-	image.onload = () => {
-		const entry = heroBackdropPreloadCache.get(url);
-		if (entry) {
-			entry.status = 'loaded';
-			entry.lastUsedAt = Date.now();
-		}
+    const finish = (status) => {
+        entry.status = status;
+        entry.lastUsedAt = Date.now();
 		image.onload = null;
 		image.onerror = null;
 	};
+    image.decoding = 'async';
+    image.onload = () => {
+        const decoded = typeof image.decode === 'function' ? image.decode().catch(() => {
+        }) : Promise.resolve();
+        decoded.then(() => finish('loaded'));
+    };
 	image.onerror = () => {
-		const entry = heroBackdropPreloadCache.get(url);
-		if (entry) {
-			entry.status = 'error';
-			entry.lastUsedAt = Date.now();
-		}
-		image.onload = null;
-		image.onerror = null;
+        entry.image = null;
+        finish('error');
 	};
 	image.src = url;
+};
+
+const releaseHeroImagesExcept = (keepUrls) => {
+    heroBackdropPreloadCache.forEach((entry, url) => {
+        if (!keepUrls.has(url)) entry.image = null;
+    });
 };
 
 const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' }) => {
@@ -205,11 +215,16 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 			preloadIndexes.add(normalized);
 		}
 
-		preloadIndexes.forEach((index) => {
-			// Logos are preloaded too, otherwise the title appears after the backdrop.
-			preloadHeroImage(backdropUrlsByIndex[index]);
-			preloadHeroImage(logoUrlsByIndex[index]);
-		});
+        // Logos are preloaded too, otherwise the title appears after the backdrop.
+        const keepUrls = new Set();
+        preloadIndexes.forEach((index) => {
+            [backdropUrlsByIndex[index], logoUrlsByIndex[index]].forEach((url) => {
+                if (!url) return;
+                keepUrls.add(url);
+                preloadHeroImage(url);
+            });
+        });
+        releaseHeroImagesExcept(keepUrls);
 	}, [backdropUrlsByIndex, currentIndex, itemCount, logoUrlsByIndex, preloadAdjacentCount]);
 
 	useEffect(() => {
