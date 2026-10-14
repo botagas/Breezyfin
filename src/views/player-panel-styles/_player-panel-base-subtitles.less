@@ -214,6 +214,28 @@
 	bottom: calc(var(--bf-theme-player-subtitle-bottom-controls) + var(--bf-player-subtitle-offset-y, 0px));
 }
 
+.subtitleStyledLayer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.subtitleStyledLayer[data-offset-styled='true'] {
+	transform: translate(
+		var(--bf-player-subtitle-offset-x, 0px),
+		calc(0px - var(--bf-player-subtitle-offset-y, 0px))
+	);
+}
+
+.subtitleStyledLayer .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom);
+	transform: none;
+}
+
+.subtitleOverlay[data-controls-visible='true'] .subtitleStyledLayer .subtitleRegion[data-region='bottom'] {
+	bottom: var(--bf-theme-player-subtitle-bottom-controls);
+}
+
 .subtitleText {
 	max-width: var(--bf-theme-player-subtitle-max-width);
 	padding: var(--bf-theme-player-subtitle-padding-block) var(--bf-theme-player-subtitle-padding-inline);

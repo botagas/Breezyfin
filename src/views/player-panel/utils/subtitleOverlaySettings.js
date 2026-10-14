@@ -7,7 +7,7 @@ import {
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE
 } from '../../../utils/subtitleAppearance';
-import {getAssCoordinatePlane, getAssStageLengthPx, getAssStagePercent} from './subtitleRendererAssStage';
+import {getAssCoordinatePlane, getAssStageLengthPx, getAssStagePercent, isSourceAuthoredAssCue} from './subtitleRendererAssStage';
 
 const SUBTITLE_SIZE_VALUES = new Set(['small', 'medium', 'large']);
 const SUBTITLE_BACKGROUND_VALUES = new Set(['none', 'low', 'medium', 'high']);
@@ -407,6 +407,12 @@ export const getSubtitleClipLayerStyle = (cue = {}, stageGeometry = {}) => {
 		WebkitClipPath: inset
 	};
 };
+
+export const isStyledSubtitleCue = (cue = {}) => Boolean(
+	['ass', 'ssa'].includes(String(cue.format || '').toLowerCase()) ||
+	cue.hasAssOverrides || cue.sourceStyle || cue.activeSourceStyle ||
+	cue.sourceFontSize || cue.scriptGeometry || isSourceAuthoredAssCue(cue)
+);
 
 export const groupSubtitleCuesByPlacement = (cues = []) => cues.reduce((groups, cue) => {
 	if (isAbsoluteSubtitleCue(cue) || isClippedSubtitleCue(cue)) return groups;

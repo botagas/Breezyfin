@@ -1031,6 +1031,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/utils/subtitleRendererAssTransform.js`
   - Parses ASS `\t(...)` timing/acceleration payloads, strips transform target tags from baseline inline styling, and interpolates active numeric/color transform state for scale, rotation, skew, border, shadow, blur, spacing, and font size.
 - `src/views/player-panel/utils/subtitleOverlaySettings.js`
+  - `isStyledSubtitleCue` groups authored ASS cues in one opt-in offset layer. Ordinary
+    text keeps bottom-only offsets. Styled cues retain shared drawing and clip geometry.
   - `getSubtitleOverlayAttributes(settings, controlsVisible)` normalizes subtitle appearance settings into overlay `data-*` attributes.
   - `groupSubtitleCuesByPlacement(cues)` groups active cues into top/middle/bottom and left/center/right render buckets.
   - `getSubtitleAbsolutePositionStyle(cue)` preserves source-authored ASS anchors, including intentional off-screen placement, while the subtitle stage clips output to the visible video surface.

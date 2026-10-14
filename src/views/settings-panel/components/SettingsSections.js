@@ -468,7 +468,7 @@ const SettingsSections = ({
 						onToggle={settingToggleHandlers.subtitleOverlayOffsetStyled}
 						selected={settings.subtitleOverlayOffsetStyled === true}
 					>
-						Apply Offsets to Styled Subtitles
+						Apply Offsets to Entire Styled Layer
 					</SwitchItem>
 					<Item
 						className={css.settingItem}
