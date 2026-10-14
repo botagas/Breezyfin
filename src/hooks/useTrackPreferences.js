@@ -227,13 +227,8 @@ export const useTrackPreferences = (scopeId = null) => {
 			subtitleStreams.find((stream) => matchesLanguage(stream, globalLanguage));
 		if (globalMatch) return globalMatch.Index;
 
-		if (defaultSubtitle?.IsForced) {
-			const sameLanguageNonForced = subtitleStreams.find(
-				(stream) => !stream.IsForced && matchesLanguage(stream, defaultSubtitle.Language)
-			);
-			if (sameLanguageNonForced) return sameLanguageNonForced.Index;
-			const anyNonForced = subtitleStreams.find((stream) => !stream.IsForced);
-			if (anyNonForced) return anyNonForced.Index;
+		if (subtitleStreams.some((stream) => stream.Index === defaultSubtitle?.Index)) {
+			return defaultSubtitle.Index;
 		}
 
 		return -1;

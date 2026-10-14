@@ -81,6 +81,11 @@ register in the same change whenever an active workaround or its removal conditi
 
 Release packaging runs `prepare:release-notices` before either pack command and copies `LICENSE` plus `THIRD_PARTY_NOTICES.txt` into `dist/`. Production packages omit subtitle-engine declarations and source maps that are not needed at runtime; develop packages retain useful source maps. Run `npm run report:package-size` after a build to inspect application, iLib, subtitle-engine, font, and source-map footprint groups.
 
+Media Details request caching must use the current authenticated server, user, token,
+and session generation. The cache retains at most 80 entries for two minutes. User-data
+invalidation clears cached metadata, seasons, and episodes. An in-flight response must
+not repopulate a cache after its session or invalidation revision changes.
+
 ## Shared building blocks (prefer these first)
 
 - Back handling: `src/hooks/usePanelBackHandler.js`

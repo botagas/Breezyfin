@@ -149,9 +149,9 @@ export const useMediaDetailsNavigation = ({
     ), [introNode]);
 
     const focusIntroControls = useCallback(() => (
-        focusNode(introNode('play')) ||
+        focusNode(introNode('audio')) ||
         focusNode(introNode('subtitle')) ||
-        focusNode(introNode('audio'))
+        focusNode(introNode('play'))
     ), [introNode]);
 
     const focusIntroPrimary = useCallback(() => (

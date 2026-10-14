@@ -833,6 +833,9 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 
 ## Utility Helpers
 
+- Subtitle fallback order is a saved show/movie choice, the preferred language, then
+  the file default. Saved or global `None` keeps subtitles off.
+
 ### Poster card variants
 - File: `src/utils/posterMediaCardVariants.js`
 - Purpose: normalize `PosterMediaCard` semantic skins (`poster-grid` and `landscape-grid`) without coupling shared card markup to panel CSS-module maps.

@@ -17,15 +17,16 @@ const PlaybackControls = ({
                               onPlay
                           }) => (
     <>
-        {showPlay && (
+        {audioTracks.length > 0 && (
             <Button
                 size="small"
-                icon="play"
-                className={`${css.primaryButton} ${playClassName || ''}`}
-                onClick={onPlay}
-                data-md-nav={withNavigation ? 'play' : undefined}
+                icon="speaker"
+                onClick={onOpenAudioPicker}
+                className={`${css.compactSelectorButton} ${css.trackSelectorPrimary}`}
+                aria-label={`Audio track ${audioSummary}`}
+                data-md-nav={withNavigation ? 'audio' : undefined}
             >
-                {playLabel}
+                {audioSummary}
             </Button>
         )}
         {subtitleTracks.length > 1 && (
@@ -40,16 +41,15 @@ const PlaybackControls = ({
                 {subtitleSummary}
             </Button>
         )}
-        {audioTracks.length > 0 && (
+        {showPlay && (
             <Button
                 size="small"
-                icon="speaker"
-                onClick={onOpenAudioPicker}
-                className={`${css.compactSelectorButton} ${css.trackSelectorPrimary}`}
-                aria-label={`Audio track ${audioSummary}`}
-                data-md-nav={withNavigation ? 'audio' : undefined}
+                icon="play"
+                className={`${css.primaryButton} ${playClassName || ''}`}
+                onClick={onPlay}
+                data-md-nav={withNavigation ? 'play' : undefined}
             >
-                {audioSummary}
+                {playLabel}
             </Button>
         )}
     </>

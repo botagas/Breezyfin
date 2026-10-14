@@ -98,7 +98,14 @@ Run these before packaging a release candidate:
 
 ### Media Details validation
 
-- None.
+- Switch between saved users while opening the same series. Verify watched badges and
+  resume selection belong to the current user. After playback, reopen the series and
+  verify updated progress without waiting for the request-cache TTL.
+- Open Media Details with 5-way input and return from a picker. Verify initial and forced
+  focus uses `Audio -> Subtitle -> Play` and never selects Favorite or Watched as fallback.
+- Use a file whose default subtitle language differs from the preferred language. Verify
+  the file default is selected when no saved or preferred-language choice matches. Verify
+  saved and global `None` still turn subtitles off.
 
 ### TV performance validation
 
