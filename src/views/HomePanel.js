@@ -235,6 +235,7 @@ const HomePanel = ({
 			const seriesItems = await jellyfinService.getItemsUserData(missingSeriesIds);
 			const fetchedAt = Date.now();
 			seriesItems.forEach((series) => {
+				if (!series?.Id) return;
 				const count = Number(series?.UserData?.UnplayedItemCount);
 				cache.set(series.Id, {
 					count: Number.isFinite(count) ? count : 0,
