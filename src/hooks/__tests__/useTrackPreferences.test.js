@@ -22,6 +22,11 @@ describe('scoped subtitle preference fallback', () => {
 		expect(otherResult.current.resolveDefaultTrackSelection(streams).selectedSubtitleTrack).toBe(2);
 	});
 
+	it('leaves subtitles off when there is no usable file default', () => {
+		const {result} = renderHook(() => useTrackPreferences('movie-1'));
+		expect(result.current.resolveDefaultTrackSelection([{Type: 'Subtitle', Language: 'spa'}]).selectedSubtitleTrack).toBe(-1);
+	});
+
 	it('honors global None before a file default', () => {
 		localStorage.setItem('breezyfinSettings', JSON.stringify({preferredSubtitleLanguage: 'none'}));
 		const {result} = renderHook(() => useTrackPreferences('movie-1'));

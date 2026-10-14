@@ -227,8 +227,9 @@ export const useTrackPreferences = (scopeId = null) => {
 			subtitleStreams.find((stream) => matchesLanguage(stream, globalLanguage));
 		if (globalMatch) return globalMatch.Index;
 
-		if (subtitleStreams.some((stream) => stream.Index === defaultSubtitle?.Index)) {
-			return defaultSubtitle.Index;
+		const defaultSubtitleIndex = defaultSubtitle?.Index;
+		if (isInteger(defaultSubtitleIndex) && subtitleStreams.some((stream) => stream.Index === defaultSubtitleIndex)) {
+			return defaultSubtitleIndex;
 		}
 
 		return -1;
