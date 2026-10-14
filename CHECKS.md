@@ -83,11 +83,19 @@ Run these before packaging a release candidate:
   switching status appears immediately, negotiation continues after the deadline, and Back
   cancels the wait without a later transition.
 
+- Fail an audio replacement, then press Back while restoration is pending. Verify the
+  cancelled restoration does not publish a fatal playback error.
+- Supersede an audio replacement with playback recovery. Verify the stale replacement
+  does not restore an older source or stop the active recovery session.
+
 ### Navigation/focus validation
 
 - None.
 
 ### Login flow validation
+
+- Resume an expired saved account, then return from credentials with Back. Verify the
+  saved account no longer shows `Opening...`.
 
 - Return a non-JSON `400` or `401` response from the authentication endpoint. Verify the
   Login panel reports the HTTP failure instead of a JSON parser error.
