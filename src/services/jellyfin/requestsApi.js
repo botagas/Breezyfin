@@ -416,7 +416,7 @@ const collectTagFilteredPage = async (service, {
 	const requestTags = allTags.filter((tag) => pattern.test(tag) && !tag.includes('|'));
 	const items = requestTags.length === 0
 		? []
-		: await service.getLibraryItems(parentId, itemTypes, safeLimit, safeStartIndex, {tags: requestTags});
+		: await service.getLibraryItems(parentId, itemTypes, safeLimit, safeStartIndex, {tags: requestTags, throwOnError: true});
 	const safeItems = Array.isArray(items) ? items : [];
 	return {
 		items: safeItems,
@@ -532,8 +532,10 @@ export const getMyRequestItems = async (service, {
 	if (String(username || '').trim()) {
 		try {
 			return await collectTagFilteredPage(service, fallbackOptions);
-		} catch {
-			// Tag list unavailable: scan the library instead.
+		} catch (error) {
+			const status = getPluginErrorStatus(error);
+			if (status === 401 || status === 403 || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') throw error;
+			// Tag filtering unavailable: scan the library instead.
 		}
 	}
 	return collectTaggedFallbackPage(service, fallbackOptions);

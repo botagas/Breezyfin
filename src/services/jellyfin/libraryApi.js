@@ -111,6 +111,7 @@ export const getLibraryChildItems = async (
 
 		return await service._fetchItems(url, {}, 'getLibraryItems');
 	} catch (error) {
+		if (options?.throwOnError === true) throw error;
 		console.error('getLibraryItems error:', error);
 		return [];
 	}

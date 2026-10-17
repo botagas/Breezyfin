@@ -97,7 +97,9 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
-- None.
+- With plugin My Requests unavailable, fail the tag-filtered Items request while the
+  unfiltered request succeeds. Verify My Requests uses the bounded fallback scan.
+  Return a valid empty filtered response and verify no fallback scan starts.
 
 ### Media Details validation
 
