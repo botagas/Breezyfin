@@ -656,6 +656,9 @@ usePlayerInteractionReveal({
   `data-action` attributes:
   - intro/content section snap (wheel, focus, scroll stop) with a DOM-class pointer lock
   - pointer-mode click guards
+  - pointer entry reveals clipped sideways episode cards through the shared horizontal-scroll helper
+  - episode hover reads geometry only on card entry; nested actions, active scrolling, stationary-cursor entries,
+    Spotlight pauses, open pickers, and section transitions do not trigger additional reveals
   - initial focus seeding (`Audio -> Subtitle -> Play`, then episode selector, then Back)
 - Returns:
   - `firstSectionRef`, `contentSectionRef`

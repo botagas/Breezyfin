@@ -11,6 +11,8 @@ const SNAP_THRESHOLD_RATIO = 0.45;
 const FOCUS_SETTLE_TIMEOUT_MS = 420;
 const SECTION_SWITCH_LOCK_MS = 760;
 const HORIZONTAL_SCROLL_DELAY_MS = 45;
+const POINTER_SCROLL_IDLE_MS = 150;
+const POINTER_SCROLL_START_TIMEOUT_MS = 500;
 
 const INTRO_CONTROL_SELECTOR = '[data-md-nav="audio"], [data-md-nav="subtitle"], [data-md-nav="play"]';
 const INTRO_ACTION_SELECTOR = '[data-md-nav="intro-action"]';
@@ -82,6 +84,21 @@ export const useMediaDetailsNavigation = ({
     const introFocusRef = useRef({frame: null, timer: null});
     const horizontalScrollTimerRef = useRef(null);
     const seededRef = useRef(false);
+    const pointerScrollRef = useRef({active: false, timer: null, position: null});
+
+    const resetPointerScroll = useCallback(() => {
+        window.clearTimeout(pointerScrollRef.current.timer);
+        pointerScrollRef.current = {active: false, timer: null, position: null};
+    }, []);
+
+    const waitForPointerScroll = useCallback((delay) => {
+        window.clearTimeout(pointerScrollRef.current.timer);
+        pointerScrollRef.current.active = true;
+        pointerScrollRef.current.timer = window.setTimeout(() => {
+            pointerScrollRef.current.active = false;
+            pointerScrollRef.current.timer = null;
+        }, delay);
+    }, []);
 
     const getScrollElement = useCallback(() => findScrollElement(containerRef.current), [containerRef]);
 
@@ -391,6 +408,40 @@ export const useMediaDetailsNavigation = ({
         }
     }, [getContentTop, getScrollElement, hasSecondarySection, isActive, isIntroAligned, isLocked, pickerOpen, scrollToSection]);
 
+    const handleEpisodeHover = useCallback((event) => {
+        if (!isActive || pickerOpen || !isSidewaysEpisodeLayout || !Spotlight.getPointerMode() || Spotlight.isPaused() || isLocked()) return;
+        const card = event.target.closest?.('[data-md-nav="episode"]');
+        if (!card) {
+            pointerScrollRef.current.position = null;
+            return;
+        }
+        if (!containerRef.current?.contains(card) || (event.relatedTarget?.nodeType && card.contains(event.relatedTarget))) return;
+        const pending = pointerScrollRef.current;
+        if (pending.active) return;
+        // Scrolling can change the hovered card without moving the remote cursor.
+        if (pending.position?.x === event.clientX && pending.position?.y === event.clientY) return;
+        const horizontal = HORIZONTAL_SCROLL_OPTIONS.episode;
+        const scroller = card.closest(`.${horizontal.scroller}`);
+        if (!scroller) return;
+        const viewport = scroller.getBoundingClientRect();
+        const bounds = card.getBoundingClientRect();
+        if (bounds.left >= viewport.left && bounds.right <= viewport.right) return;
+        window.clearTimeout(horizontalScrollTimerRef.current);
+        if (scrollElementIntoHorizontalView(scroller, card, horizontal.options)) {
+            pending.position = {x: event.clientX, y: event.clientY};
+            waitForPointerScroll(POINTER_SCROLL_START_TIMEOUT_MS);
+        }
+    }, [containerRef, isActive, isLocked, isSidewaysEpisodeLayout, pickerOpen, waitForPointerScroll]);
+
+    const handleEpisodeScrollCapture = useCallback((event) => {
+        if (!isActive || pickerOpen || !isSidewaysEpisodeLayout || !Spotlight.getPointerMode()) return;
+        if (event.target.classList?.contains(css.episodeCardsSideways)) waitForPointerScroll(POINTER_SCROLL_IDLE_MS);
+    }, [isActive, isSidewaysEpisodeLayout, pickerOpen, waitForPointerScroll]);
+
+    const handlePointerLeave = useCallback(() => {
+        pointerScrollRef.current.position = null;
+    }, []);
+
     const handleWheelCapture = useCallback((event) => {
         if (!isActive || !hasSecondarySection || pickerOpen) return;
         if (isLocked()) {
@@ -466,11 +517,16 @@ export const useMediaDetailsNavigation = ({
         return () => window.cancelAnimationFrame(frame);
     }, [isActive, pickerOpen, ready, seedFocus]);
 
+    useEffect(() => {
+        resetPointerScroll();
+    }, [isActive, isSidewaysEpisodeLayout, pickerOpen, resetPointerScroll]);
+
     useEffect(() => () => {
+        resetPointerScroll();
         unlock();
         cancelIntroFocus();
         window.clearTimeout(horizontalScrollTimerRef.current);
-    }, [cancelIntroFocus, unlock]);
+    }, [cancelIntroFocus, resetPointerScroll, unlock]);
 
     return {
         firstSectionRef,
@@ -479,6 +535,9 @@ export const useMediaDetailsNavigation = ({
             onKeyDownCapture: handleKeyDownCapture,
             onKeyDown: handleKeyDown,
             onFocus: handleFocus,
+            onMouseOver: handleEpisodeHover,
+            onMouseLeave: handlePointerLeave,
+            onScrollCapture: handleEpisodeScrollCapture,
             onWheelCapture: handleWheelCapture,
             onMouseDownCapture: handlePointerCapture,
             onClickCapture: handlePointerCapture

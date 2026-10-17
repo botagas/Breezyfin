@@ -101,6 +101,11 @@ Run these before packaging a release candidate:
 
 ### Media Details validation
 
+- In the sideways episode layout, hover a clipped card at each row edge. Verify the row
+  reveals the card without selecting an episode or changing vertical scroll. Keep the
+  pointer stationary during the animation and verify scrolling stops. Move between card
+  actions and verify the row does not repeatedly scroll. Repeat with pointer and 5-way
+  input in both themes and all performance modes.
 - Switch between saved users while opening the same series. Verify watched badges and
   resume selection belong to the current user. After playback, reopen the series and
   verify updated progress without waiting for the request-cache TTL.
