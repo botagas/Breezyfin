@@ -20,7 +20,7 @@ abslink@1.2.2 — Apache-2.0
 agent-base@6.0.2 — MIT
 assjs@0.1.8 — MIT
 asynckit@0.4.0 — MIT
-axios@1.18.1 — MIT
+axios@1.20.0 — MIT
 call-bind-apply-helpers@1.0.2 — MIT
 classnames@2.5.1 — MIT
 combined-stream@1.0.8 — MIT
