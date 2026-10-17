@@ -4,6 +4,7 @@ import jellyfinService from '../../services/jellyfinService';
 import {useTrackPreferences} from '../../hooks/useTrackPreferences';
 import {isPlayableMediaItem} from '../../utils/mediaItemUtils';
 import {getTrackPreferenceScopeId} from '../../utils/trackPreferences';
+import {captureRuntimeSessionIdentity, isRuntimeSessionIdentityCurrent} from '../../utils/savedSessionIdentity';
 import {updateItemsPlayedState} from '../media-details-panel/utils/mediaDetailsHelpers';
 import {
     fetchEpisodes,
@@ -11,8 +12,7 @@ import {
     fetchPlaybackInfo,
     fetchSeasons,
     fetchSeriesItem,
-    invalidateEpisodes,
-    invalidateSeasons,
+    invalidateSeriesUserData,
     pickResumeEpisode
 } from './mediaDetailsRequests';
 
@@ -80,6 +80,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
 
     const itemId = item?.Id;
     const itemType = item?.Type;
+    const seriesId = itemType === 'Series' ? itemId : item?.SeriesId;
 
     useEffect(() => {
         unmountedRef.current = false;
@@ -194,27 +195,35 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
         if (!targetId) return;
         const isMainItem = targetId === itemId;
         const current = isMainItem ? stateRef.current.isFavorite : currentState === true;
+        const session = captureRuntimeSessionIdentity(jellyfinService);
         try {
             const nextState = await jellyfinService.toggleFavorite(targetId, current);
+            if (!isRuntimeSessionIdentityCurrent(session, jellyfinService)) return;
+            invalidateSeriesUserData(seriesId);
+            if (unmountedRef.current) return;
             if (isMainItem) {
                 dispatch({isFavorite: nextState});
             } else {
                 dispatch((latest) => ({episodes: patchUserData(latest.episodes, targetId, {IsFavorite: nextState})}));
-                invalidateEpisodes(itemId, stateRef.current.selectedSeasonId);
             }
             showToast(nextState ? 'Added to favorites' : 'Removed from favorites');
         } catch (error) {
+            if (unmountedRef.current || !isRuntimeSessionIdentityCurrent(session, jellyfinService)) return;
             console.error('Failed to toggle favorite:', error);
             showToast('Failed to update favorite');
         }
-    }, [itemId, showToast]);
+    }, [itemId, seriesId, showToast]);
 
     const toggleWatched = useCallback(async (targetId = itemId, currentState) => {
         if (!targetId) return;
         const isMainItem = targetId === itemId;
         const current = isMainItem ? stateRef.current.isWatched : currentState === true;
+        const session = captureRuntimeSessionIdentity(jellyfinService);
         try {
             const played = await jellyfinService.toggleWatched(targetId, current);
+            if (!isRuntimeSessionIdentityCurrent(session, jellyfinService)) return;
+            invalidateSeriesUserData(seriesId);
+            if (unmountedRef.current) return;
             const {selectedSeasonId} = stateRef.current;
             if (isMainItem) {
                 dispatch((latest) => ({
@@ -235,16 +244,13 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
                     episodes: updateItemsPlayedState(latest.episodes, targetId, played)
                 }));
             }
-            if (itemType === 'Series') {
-                invalidateSeasons(itemId);
-                stateRef.current.seasons.forEach((season) => invalidateEpisodes(itemId, season.Id));
-            }
             showToast(played ? 'Marked as watched' : 'Marked as unwatched');
         } catch (error) {
+            if (unmountedRef.current || !isRuntimeSessionIdentityCurrent(session, jellyfinService)) return;
             console.error('Error toggling watched status:', error);
             showToast('Failed to update watched status');
         }
-    }, [itemId, itemType, showToast]);
+    }, [itemId, itemType, seriesId, showToast]);
 
     const toggleWatchlist = useCallback(async () => {
         if (!itemId) return;

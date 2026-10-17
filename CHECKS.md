@@ -101,6 +101,9 @@ Run these before packaging a release candidate:
 
 ### Media Details validation
 
+- On a standalone episode page, change watched and favorite status, then open the
+  parent series immediately. Verify badges, season state, and resume selection refresh
+  without waiting for the cache TTL. Repeat when navigating away before the save ends.
 - In the sideways episode layout, hover a clipped card at each row edge. Verify the row
   reveals the card without selecting an episode or changing vertical scroll. Keep the
   pointer stationary during the animation and verify scrolling stops. Move between card

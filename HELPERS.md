@@ -1131,6 +1131,10 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - delegated key routing, section snap, pointer guards, and focus seeding.
 - `src/views/media-details/mediaDetailsRequests.js`
   - module-level request cache (2 min TTL) and resume-episode selection.
+  - `invalidateSeriesUserData(seriesId)` removes one series item, season lists, and
+    episode lists after a confirmed mutation. Other series remain cached.
+  - Watched/favorite mutations invalidate caches even after the page unmounts. Results
+    from an older authenticated session must not invalidate or update the current session.
 - `src/views/media-details/imageReveal.js`
   - DOM-based image load/fallback handlers.
 - `src/views/media-details/sections/`

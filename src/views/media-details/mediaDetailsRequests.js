@@ -68,6 +68,16 @@ export const invalidateSeasons = (seriesId) => {
 	cacheRevision += 1;
 };
 
+export const invalidateSeriesUserData = (seriesId) => {
+	if (!seriesId) return;
+	requestCache.delete(`series:${seriesId}`);
+	requestCache.delete(`seasons:${seriesId}`);
+	for (const key of requestCache.keys()) {
+		if (key.startsWith(`episodes:${seriesId}:`)) requestCache.delete(key);
+	}
+	cacheRevision += 1;
+};
+
 export const fetchPlaybackInfo = async (itemId) => {
     try {
         return (await jellyfinService.getPlaybackInfo(itemId)) || null;

@@ -1,6 +1,6 @@
 import jellyfinService from '../../../services/jellyfinService';
 import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../../../constants/integrationEvents';
-import {fetchEpisodes, fetchSeasons, invalidateEpisodes} from '../mediaDetailsRequests';
+import {fetchEpisodes, fetchSeasons, invalidateEpisodes, invalidateSeriesUserData} from '../mediaDetailsRequests';
 
 jest.mock('../../../services/jellyfinService', () => ({
 	__esModule: true,
@@ -60,11 +60,23 @@ describe('Media Details request cache ownership', () => {
 		expect(await fetchEpisodes('series-1', 'season-1')).toEqual([{Id: 'new-account-episode'}]);
 	});
 
-	it('does not repopulate invalidated watched state from an in-flight request', async () => {
+	it('invalidates all seasons of one series while preserving another series cache', async () => {
+		jellyfinService.getEpisodes.mockResolvedValue([{Id: 'old'}]);
+		await fetchEpisodes('series-1', 'season-1');
+		await fetchEpisodes('series-1', 'season-2');
+		await fetchEpisodes('series-2', 'season-3');
+		invalidateSeriesUserData('series-1');
+		jellyfinService.getEpisodes.mockResolvedValue([{Id: 'new'}]);
+		expect(await fetchEpisodes('series-1', 'season-1')).toEqual([{Id: 'new'}]);
+		expect(await fetchEpisodes('series-1', 'season-2')).toEqual([{Id: 'new'}]);
+		expect(await fetchEpisodes('series-2', 'season-3')).toEqual([{Id: 'old'}]);
+	});
+
+	it.each([invalidateEpisodes, invalidateSeriesUserData])('does not repopulate invalidated watched state from an in-flight request after %p', async (invalidate) => {
 		let resolveOld;
 		jellyfinService.getEpisodes.mockImplementationOnce(() => new Promise((resolve) => {resolveOld = resolve;}));
 		const oldRequest = fetchEpisodes('series-1', 'season-1');
-		invalidateEpisodes('series-1', 'season-1');
+		invalidate('series-1', 'season-1');
 		jellyfinService.getEpisodes.mockResolvedValue([{Id: 'episode-1', UserData: {Played: true}}]);
 		resolveOld([{Id: 'episode-1', UserData: {Played: false}}]);
 		expect(await oldRequest).toEqual([{Id: 'episode-1', UserData: {Played: true}}]);
