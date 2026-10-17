@@ -15,6 +15,9 @@ Run these before merging or publishing:
 1. `npm run lint`
 2. `npm run test -- --watch=false --runInBand`
 3. `npm run audit`
+4. `npm audit --omit=dev --audit-level=high`
+
+The repository audit and npm security audit are separate checks. Contributors must run both.
 
 ## Release-oriented checks
 

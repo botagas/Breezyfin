@@ -121,8 +121,9 @@ Production dependency security is a release gate; build-tool advisories remain a
 
 Evidence:
 
-- Axios `^1.18.1` is now an explicit runtime dependency and satisfies the Jellyfin SDK peer dependency. Its required `follow-redirects` and `form-data` chain is also resolved to non-vulnerable versions in the lockfile.
-- `npm audit --omit=dev --audit-level=high` currently passes with no production vulnerabilities.
+- Axios `^1.20.0` is now an explicit runtime dependency and satisfies the Jellyfin SDK peer dependency. Its required `follow-redirects` and `form-data` chain is also resolved to non-vulnerable versions in the lockfile.
+- Contributors must run `npm audit --omit=dev --audit-level=high` before publishing a PR.
+  `npm run audit` checks repository rules and does not query npm security advisories.
 - Findings from an unscoped `npm audit`, including current high-severity
   `brace-expansion`, `fast-uri`, and `js-yaml` reports, are confined to the nested Enact
   CLI build-tool chain and are not part of the packaged application.
