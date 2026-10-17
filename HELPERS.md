@@ -828,13 +828,12 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - `saveSubtitleSelection(trackIndex, subtitleStreams)`
   - `loadTrackPreferences()`
   - `saveTrackPreferences()`
+- Subtitle fallback order is a saved show/movie choice, the preferred language, then
+  the file default. Saved or global `None` keeps subtitles off.
 
 ---
 
 ## Utility Helpers
-
-- Subtitle fallback order is a saved show/movie choice, the preferred language, then
-  the file default. Saved or global `None` keeps subtitles off.
 
 ### Poster card variants
 - File: `src/utils/posterMediaCardVariants.js`
