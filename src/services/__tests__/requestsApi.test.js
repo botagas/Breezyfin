@@ -1,4 +1,5 @@
 import {getBreezyfinCapabilities, getMyRequestItems} from '../jellyfin/requestsApi';
+import {getLibraryChildItems} from '../jellyfin/libraryApi';
 
 let serviceCounter = 0;
 
@@ -217,8 +218,46 @@ describe('requestsApi', () => {
 			['Movie', 'Series'],
 			2,
 			4,
-			{tags: ['1 - requester', '2-Requester']}
+			{tags: ['1 - requester', '2-Requester'], throwOnError: true}
 		);
+	});
+
+	it.each([414, 500, 'network', 'timeout'])('falls back after a filtered library request fails: %s', async (failure) => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['1 - requester']);
+		const error = typeof failure === 'number' ? makeRequestError(failure) : new Error(failure);
+		if (failure === 'timeout') error.name = 'TimeoutError';
+		const match = makeItem('filtered-fallback-match', ['1 - requester']);
+		service._fetchItems = jest.fn().mockRejectedValueOnce(error).mockResolvedValueOnce([match]);
+		service.getLibraryItems.mockImplementation((...args) => getLibraryChildItems(service, ...args));
+		await expect(getMyRequestItems(service, {username: 'requester', limit: 2})).resolves.toMatchObject({
+			source: 'tags-fallback', items: [match], nextStartIndex: 1, hasMore: false
+		});
+		expect(service._fetchItems).toHaveBeenCalledTimes(2);
+		expect(new URL(service._fetchItems.mock.calls[0][0]).searchParams.has('tags')).toBe(true);
+		expect(new URL(service._fetchItems.mock.calls[1][0]).searchParams.has('tags')).toBe(false);
+	});
+
+	it('does not scan after a valid empty filtered library response', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['1 - requester']);
+		service._fetchItems = jest.fn().mockResolvedValue([]);
+		service.getLibraryItems.mockImplementation((...args) => getLibraryChildItems(service, ...args));
+		await expect(getMyRequestItems(service, {username: 'requester'})).resolves.toMatchObject({source: 'tags-filter', items: [], hasMore: false});
+		expect(service._fetchItems).toHaveBeenCalledTimes(1);
+	});
+
+	it.each([401, 403, 'AbortError', 'ERR_CANCELED'])('propagates filtered request authentication and cancellation errors: %s', async (failure) => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['1 - requester']);
+		const error = typeof failure === 'number' ? makeRequestError(failure) : Object.assign(new Error('cancelled'), failure === 'AbortError' ? {name: failure} : {code: failure});
+		service._fetchItems = jest.fn().mockRejectedValue(error);
+		service.getLibraryItems.mockImplementation((...args) => getLibraryChildItems(service, ...args));
+		await expect(getMyRequestItems(service, {username: 'requester'})).rejects.toBe(error);
+		expect(service._fetchItems).toHaveBeenCalledTimes(1);
 	});
 
 	it('skips the item request when no tag belongs to the user', async () => {

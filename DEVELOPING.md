@@ -520,6 +520,9 @@ Jellyfin service paths:
 - `src/services/jellyfin/subtitleApi.js` (subtitle event/raw text fetch helpers for client-side rendering)
 - `src/services/jellyfin/requestsApi.js` (session-cached plugin capability discovery,
   plugin-first My Requests paging, strict plugin error handling, and bounded tag fallback)
+  Library callers may set `options.throwOnError` to distinguish request failure from a
+  valid empty result. My Requests uses that mode for tag filtering and scans only after
+  recoverable failures. Authentication failures and explicit cancellation must propagate.
 - `src/services/jellyfin/pluginFeaturesApi.js` (shared capability-gated paging and
   authenticated plugin image URL construction; image paths must join against the
   normalized server base so reverse-proxy prefixes such as `/jellyfin` survive)
