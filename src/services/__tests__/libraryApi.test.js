@@ -37,6 +37,21 @@ describe('libraryApi', () => {
 		warnSpy.mockRestore();
 	});
 
+ it.each([
+  ['latest', (service, options) => getLatestMediaItems(service, ['Movie'], 10, 0, options)],
+  ['recent', (service, options) => getRecentlyAddedItems(service, 10, 0, options)],
+  ['next', (service, options) => getNextUpItems(service, 10, 0, options)],
+  ['resume', (service, options) => getResumeMediaItems(service, 10, 0, options)]
+ ])('distinguishes %s request failures from valid empty Home rows when requested', async (_name, load) => {
+  const service = createService();
+  const error = new Error('offline');
+  service._fetchItems.mockRejectedValue(error);
+  await expect(load(service, {throwOnError: true})).rejects.toBe(error);
+  await expect(load(service, {})).resolves.toEqual([]);
+  service._fetchItems.mockResolvedValue([]);
+  await expect(load(service, {throwOnError: true})).resolves.toEqual([]);
+ });
+
 	it('builds library item request with parent, paging, and type filters', async () => {
 		const service = createService();
 		service._fetchItems.mockResolvedValue([{Id: 'item-1'}]);

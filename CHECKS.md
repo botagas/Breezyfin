@@ -107,6 +107,12 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
+- Log out and sign in with the same account. Verify Home reloads the current rows.
+- Fail a built-in Home row request, then restore the connection and return to Home.
+  Verify Home retries the request and retains prior successful content during the failure.
+- Return with Back after the two-minute freshness period. Verify Home refreshes the rows.
+  Verify a successful empty response does not trigger repeated reloads.
+
 - With plugin My Requests unavailable, fail the tag-filtered Items request while the
   unfiltered request succeeds. Verify My Requests uses the bounded fallback scan.
   Return a valid empty filtered response and verify no fallback scan starts.

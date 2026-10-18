@@ -1,7 +1,7 @@
 import {JELLYFIN_TICKS_PER_SECOND} from '../../constants/time';
 import {normalizeOptionalQueryValue} from './queryParams';
 
-export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) => {
+export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0, options = {}) => {
 	try {
 		const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
@@ -11,12 +11,13 @@ export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 
 			'getLatestMedia'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error(`getLatestMedia ${includeItemTypes} error:`, error);
 		return [];
 	}
 };
 
-export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0) => {
+export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0, options = {}) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
@@ -25,12 +26,13 @@ export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0)
 			'getRecentlyAdded'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error('getRecentlyAdded error:', error);
 		return [];
 	}
 };
 
-export const getNextUpItems = async (service, limit = 24, startIndex = 0) => {
+export const getNextUpItems = async (service, limit = 24, startIndex = 0, options = {}) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
@@ -39,12 +41,13 @@ export const getNextUpItems = async (service, limit = 24, startIndex = 0) => {
 			'getNextUp'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error('Failed to get next up:', error);
 		return [];
 	}
 };
 
-export const getResumeMediaItems = async (service, limit = 10, startIndex = 0) => {
+export const getResumeMediaItems = async (service, limit = 10, startIndex = 0, options = {}) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
@@ -53,6 +56,7 @@ export const getResumeMediaItems = async (service, limit = 10, startIndex = 0) =
 			'getResumeItems'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error('getResumeItems error:', error);
 		return [];
 	}
