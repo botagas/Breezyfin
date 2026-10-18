@@ -438,6 +438,14 @@ const SettingsPopups = ({
 				<div ref={subtitleLangPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
 					<BodyText className={css.popupTitle}>Preferred Subtitle Language</BodyText>
 					<div className={css.popupOptions}>
+						<Button
+							data-language="none"
+							className={css.popupOption}
+							selected={settings.preferredSubtitleLanguage === 'none'}
+							onClick={handleSubtitleLanguageSelect}
+						>
+							None
+						</Button>
 						{languageOptions.map((option) => (
 							<Button
 								key={option.value}

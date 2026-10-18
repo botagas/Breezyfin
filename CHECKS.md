@@ -131,7 +131,35 @@ Run these before packaging a release candidate:
 
 ### Media Details validation
 
-- None.
+- Change Favorite, Watched, and Watchlist state outside the current card, then open
+  that card. Verify fresh details update all three buttons and the next action uses
+  the refreshed state. Repeat with a movie, episode, and series.
+- Delay details loading and complete a local item action. Verify the late details
+  response cannot revert that action and can still refresh the other flags.
+
+- Delay a season request and select an old episode with pointer and 5-way input.
+  Verify the new season owns the selected episode and audio/subtitle track metadata.
+- Switch seasons twice and let the earlier request finish last. Verify the latest
+  season remains selected.
+- Toggle watched or favorite state twice while episode or season lists load. Verify
+  the lists remain populated and the next visit retrieves current user data.
+
+- On a standalone episode page, change watched and favorite status, then open the
+  parent series immediately. Verify badges, season state, and resume selection refresh
+  without waiting for the cache TTL. Repeat when navigating away before the save ends.
+- In the sideways episode layout, hover a clipped card at each row edge. Verify the row
+  reveals the card without selecting an episode or changing vertical scroll. Keep the
+  pointer stationary during the animation and verify scrolling stops. Move between card
+  actions and verify the row does not repeatedly scroll. Repeat with pointer and 5-way
+  input in both themes and all performance modes.
+- Switch between saved users while opening the same series. Verify watched badges and
+  resume selection belong to the current user. After playback, reopen the series and
+  verify updated progress without waiting for the request-cache TTL.
+- Open Media Details with 5-way input and return from a picker. Verify initial and forced
+  focus uses `Audio -> Subtitle -> Play` and never selects Favorite or Watched as fallback.
+- Use a file whose default subtitle language differs from the preferred language. Verify
+  the file default is selected when no saved or preferred-language choice matches. Verify
+  saved and global `None` still turn subtitles off.
 
 ### TV performance validation
 

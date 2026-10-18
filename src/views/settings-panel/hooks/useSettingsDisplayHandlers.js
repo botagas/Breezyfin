@@ -27,7 +27,7 @@ export const useSettingsDisplayHandlers = ({
 	);
 
 	const getLanguageLabel = useCallback(
-		(value) => getOptionLabel(LANGUAGE_OPTIONS, value, value),
+		(value) => (value === 'none' ? 'None' : getOptionLabel(LANGUAGE_OPTIONS, value, value)),
 		[]
 	);
 
