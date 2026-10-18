@@ -16,6 +16,7 @@ import {
 	isAbsoluteSubtitleCue,
 	isClippedSubtitleCue,
 	isDrawingSubtitleCue,
+	isStyledSubtitleCue,
 	SUBTITLE_ALIGN_KEYS,
 	SUBTITLE_REGION_KEYS
 } from '../utils/subtitleOverlaySettings';
@@ -171,7 +172,8 @@ const SubtitleCue = ({
 
 	useLayoutEffect(() => {
 		const node = textRef.current;
-		const stageNode = stageRef.current;
+		// Child layout effects can run before the parent stage ref attaches.
+		const stageNode = stageRef.current || node?.closest('[data-subtitle-stage]');
 		if (!node || !stageNode || typeof window === 'undefined') return undefined;
 		const currentCue = cueRef.current;
 		const currentStageGeometry = stageGeometryRef.current;
@@ -194,10 +196,10 @@ const SubtitleCue = ({
 		const baseFontSize = cueTextStyle.fontSize || '';
 
 		const finalizeContainment = (fitScale) => {
-			if (disposed || !textRef.current || !stageRef.current) return;
+			if (disposed || !textRef.current) return;
 			const containment = getAssCueContainment({
 				cueRect: textRef.current.getBoundingClientRect(),
-				stageRect: stageRef.current.getBoundingClientRect(),
+				stageRect: stageNode.getBoundingClientRect(),
 				sourceAuthored: containmentPolicy.sourceAuthored
 			});
 			const transformParts = [];
@@ -219,10 +221,10 @@ const SubtitleCue = ({
 			node.style.transform = baseTransform;
 			node.style.fontSize = baseFontSize;
 			firstFrame = window.requestAnimationFrame(() => {
-				if (disposed || !textRef.current || !stageRef.current) return;
+				if (disposed || !textRef.current) return;
 				const containment = getAssCueContainment({
 					cueRect: textRef.current.getBoundingClientRect(),
-					stageRect: stageRef.current.getBoundingClientRect(),
+					stageRect: stageNode.getBoundingClientRect(),
 					sourceAuthored: containmentPolicy.sourceAuthored
 				});
 				if (containment.scale >= 0.999) {
@@ -390,6 +392,62 @@ const renderClippedCue = (cue, cueIndex, textStyle, stageGeometry, stageRef, dia
 	);
 };
 
+const renderSubtitleCues = (cues, textStyle, stageGeometry, stageRef, diagnosticsEnabled) => {
+	const clippedCues = cues.filter(isClippedSubtitleCue);
+	const absoluteCues = cues.filter((cue) => isAbsoluteSubtitleCue(cue) && !isClippedSubtitleCue(cue));
+	const cuesByPlacement = groupSubtitleCuesByPlacement(cues);
+	return (
+		<>
+			{clippedCues.map((cue, cueIndex) => renderClippedCue(
+				cue,
+				cueIndex,
+				textStyle,
+				stageGeometry,
+				stageRef,
+				diagnosticsEnabled
+			))}
+			{absoluteCues.map((cue, cueIndex) => renderAbsoluteCue(
+				cue,
+				cueIndex,
+				textStyle,
+				stageGeometry,
+				stageRef,
+				diagnosticsEnabled
+			))}
+			{SUBTITLE_REGION_KEYS.map((region) => (
+				SUBTITLE_ALIGN_KEYS.some((align) => cuesByPlacement[region][align].length > 0) ? (
+					<div className={css.subtitleRegion} data-region={region} key={region}>
+						{SUBTITLE_ALIGN_KEYS.map((align) => (
+							cuesByPlacement[region][align].length > 0 ? (
+								<div className={css.subtitleAlignGroup} data-align={align} key={`${region}-${align}`}>
+									{groupSubtitleCuesByLayer(cuesByPlacement[region][align]).map((layerGroup) => (
+										<div
+											className={css.subtitleCollisionLayer}
+											key={`${region}-${align}-layer-${layerGroup.layer}`}
+											style={{zIndex: layerGroup.layer}}
+										>
+											{layerGroup.cues.map((cue, cueIndex) => (
+												renderCue(
+													cue,
+													cueIndex,
+													textStyle,
+													stageGeometry,
+													stageRef,
+													diagnosticsEnabled
+												)
+											))}
+										</div>
+									))}
+								</div>
+							) : null
+						))}
+					</div>
+				) : null
+			))}
+		</>
+	);
+};
+
 const PlayerSubtitleOverlay = ({
 	controlsVisible = false,
 	cues = [],
@@ -400,6 +458,7 @@ const PlayerSubtitleOverlay = ({
 	visible = true
 }) => {
 	const stageRef = useRef(null);
+	const styledStageRef = useRef(null);
 	if (!visible || !Array.isArray(cues) || cues.length === 0) return null;
 	const overlayAttributes = getSubtitleOverlayAttributes(settings, controlsVisible);
 	const overlayStyle = getSubtitleOverlayStyle(settings);
@@ -407,9 +466,8 @@ const PlayerSubtitleOverlay = ({
 	const stageGeometry = getSubtitleVideoStageGeometry(
 		getSubtitleVideoMetrics({videoElement, mediaSource})
 	);
-	const clippedCues = cues.filter(isClippedSubtitleCue);
-	const absoluteCues = cues.filter((cue) => isAbsoluteSubtitleCue(cue) && !isClippedSubtitleCue(cue));
-	const cuesByPlacement = groupSubtitleCuesByPlacement(cues);
+	const styledCues = cues.filter(isStyledSubtitleCue);
+	const plainCues = cues.filter((cue) => !isStyledSubtitleCue(cue));
 	return (
 		<div
 			className={css.subtitleOverlay}
@@ -417,53 +475,13 @@ const PlayerSubtitleOverlay = ({
 			style={overlayStyle}
 			aria-hidden
 		>
-			<div className={css.subtitleStage} ref={stageRef} style={stageGeometry.style}>
-				{clippedCues.map((cue, cueIndex) => renderClippedCue(
-					cue,
-					cueIndex,
-					textStyle,
-					stageGeometry,
-					stageRef,
-					diagnosticsEnabled
-				))}
-				{absoluteCues.map((cue, cueIndex) => renderAbsoluteCue(
-					cue,
-					cueIndex,
-					textStyle,
-					stageGeometry,
-					stageRef,
-					diagnosticsEnabled
-				))}
-				{SUBTITLE_REGION_KEYS.map((region) => (
-					SUBTITLE_ALIGN_KEYS.some((align) => cuesByPlacement[region][align].length > 0) ? (
-						<div className={css.subtitleRegion} data-region={region} key={region}>
-							{SUBTITLE_ALIGN_KEYS.map((align) => (
-								cuesByPlacement[region][align].length > 0 ? (
-									<div className={css.subtitleAlignGroup} data-align={align} key={`${region}-${align}`}>
-										{groupSubtitleCuesByLayer(cuesByPlacement[region][align]).map((layerGroup) => (
-											<div
-												className={css.subtitleCollisionLayer}
-												key={`${region}-${align}-layer-${layerGroup.layer}`}
-												style={{zIndex: layerGroup.layer}}
-											>
-												{layerGroup.cues.map((cue, cueIndex) => (
-													renderCue(
-														cue,
-														cueIndex,
-														textStyle,
-														stageGeometry,
-														stageRef,
-														diagnosticsEnabled
-													)
-												))}
-											</div>
-										))}
-									</div>
-								) : null
-							))}
-						</div>
-					) : null
-				))}
+			<div className={css.subtitleStage} data-subtitle-stage="video" ref={stageRef} style={stageGeometry.style}>
+				{renderSubtitleCues(plainCues, textStyle, stageGeometry, stageRef, diagnosticsEnabled)}
+				{styledCues.length > 0 ? (
+					<div className={css.subtitleStyledLayer} data-subtitle-stage="styled" ref={styledStageRef} data-offset-styled={settings.subtitleOverlayOffsetStyled === true ? 'true' : 'false'}>
+						{renderSubtitleCues(styledCues, textStyle, stageGeometry, styledStageRef, diagnosticsEnabled)}
+					</div>
+				) : null}
 			</div>
 		</div>
 	);

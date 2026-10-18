@@ -538,6 +538,7 @@ usePlayerInteractionReveal({
   - restore metadata position before releasing startup and preserve the prior play state
   - save the selected preference only after the replacement becomes ready
   - restore the previous source in a fresh paused generation after post-swap failure
+  - end superseded loads without rollback and suppress terminal errors after cancellation
   - close the superseded Jellyfin session after successful readiness, and close an unused
     or failed replacement session before decision handoff, cancellation, or rollback
   - use the SyncPlay bridge's server-clock position and wait for Ready/Unpause authority
@@ -959,6 +960,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/utils/subtitleRendererAssTransform.js`
   - Parses ASS `\t(...)` timing/acceleration payloads, strips transform target tags from baseline inline styling, and interpolates active numeric/color transform state for scale, rotation, skew, border, shadow, blur, spacing, and font size.
 - `src/views/player-panel/utils/subtitleOverlaySettings.js`
+  - `isStyledSubtitleCue` groups authored ASS cues in one opt-in offset layer. Ordinary
+    text keeps bottom-only offsets. Styled cues retain shared drawing and clip geometry.
   - `getSubtitleOverlayAttributes(settings, controlsVisible)` normalizes subtitle appearance settings into overlay `data-*` attributes.
   - `groupSubtitleCuesByPlacement(cues)` groups active cues into top/middle/bottom and left/center/right render buckets.
   - `getSubtitleAbsolutePositionStyle(cue)` preserves source-authored ASS anchors, including intentional off-screen placement, while the subtitle stage clips output to the visible video surface.
@@ -1231,6 +1234,9 @@ Media Details season changes clear old episode and track selection state while l
 Old episode callbacks must not replace the pending season selection. The request cache
 retries invalidated data once. A second invalidation returns the same-session response
 without caching the response; the next reader must fetch again.
+The lightweight subtitle cue measurement resolves the attached owning stage from the
+cue ancestor when the parent ref has not attached during the child layout effect.
+The existing animation-frame measurement uses that stage for first-cue containment.
 
 - `src/utils/homeContentCache.js` stores Home content for Back navigation. Cache identity
   includes the runtime session generation. Writes preserve the successful fetch time.
