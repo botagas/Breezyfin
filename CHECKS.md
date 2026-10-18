@@ -105,7 +105,20 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
-- None.
+- Configure more than eight server Home rows. Scroll with the pointer or wheel while
+  the cursor stays between cards. Verify pending rows load and later rows appear.
+  Repeat with 5-way input. Verify rows do not reload repeatedly after entering the
+  viewport and native lazy artwork loading remains active.
+
+- Log out and sign in with the same account. Verify Home reloads the current rows.
+- Fail a built-in Home row request, then restore the connection and return to Home.
+  Verify Home retries the request and retains prior successful content during the failure.
+- Return with Back after the two-minute freshness period. Verify Home refreshes the rows.
+  Verify a successful empty response does not trigger repeated reloads.
+
+- With plugin My Requests unavailable, fail the tag-filtered Items request while the
+  unfiltered request succeeds. Verify My Requests uses the bounded fallback scan.
+  Return a valid empty filtered response and verify no fallback scan starts.
 
 ### Media Details validation
 

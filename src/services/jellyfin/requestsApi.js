@@ -1,4 +1,4 @@
-import {itemMatchesUserRequestTag} from '../../utils/myRequests';
+import {buildUserRequestTagPattern, itemMatchesUserRequestTag} from '../../utils/myRequests';
 import {normalizeOptionalQueryValue} from './queryParams';
 
 const REQUESTS_PLUGIN_ENDPOINT = '/Breezyfin/MyRequests';
@@ -398,13 +398,44 @@ const getMyRequestsFromPlugin = async (service, {
 	}
 };
 
-const collectTaggedFallbackPage = async (service, {
+// Lets Jellyfin do the tag matching: one request for the tag names, one for the matching items.
+// Throws when the tag list is unavailable so the caller can fall back to scanning.
+const collectTagFilteredPage = async (service, {
 	parentId,
 	itemTypes,
 	limit,
 	startIndex,
 	username,
 	pluginDiagnosticReason
+}) => {
+	const safeLimit = normalizePositiveInteger(limit, 60);
+	const safeStartIndex = normalizeStartIndex(startIndex);
+	const pattern = buildUserRequestTagPattern(username);
+	const allTags = await service.getItemFilterTags(parentId, itemTypes);
+	// Jellyfin separates tags with "|", so such a tag cannot be requested on its own.
+	const requestTags = allTags.filter((tag) => pattern.test(tag) && !tag.includes('|'));
+	const items = requestTags.length === 0
+		? []
+		: await service.getLibraryItems(parentId, itemTypes, safeLimit, safeStartIndex, {tags: requestTags, throwOnError: true});
+	const safeItems = Array.isArray(items) ? items : [];
+	return {
+		items: safeItems,
+		source: 'tags-filter',
+		scannedCount: safeItems.length,
+		nextStartIndex: safeStartIndex + safeItems.length,
+		hasMore: safeItems.length >= safeLimit,
+		diagnosticReason: pluginDiagnosticReason || 'tags-filter'
+	};
+};
+
+const collectTaggedFallbackPage = async (service, {
+	parentId,
+	itemTypes,
+	limit,
+	startIndex,
+	username,
+	pluginDiagnosticReason,
+	throwOnError = false
 }) => {
 	const safeLimit = normalizePositiveInteger(limit, 60);
 	const safeStartIndex = normalizeStartIndex(startIndex);
@@ -427,7 +458,7 @@ const collectTaggedFallbackPage = async (service, {
 	const collected = [];
 
 	while (collected.length < safeLimit && scanPages < FALLBACK_SCAN_PAGE_LIMIT && sourceHasMore) {
-		const rawItems = await service.getLibraryItems(parentId, itemTypes, rawLimit, cursor);
+		const rawItems = await service.getLibraryItems(parentId, itemTypes, rawLimit, cursor, ...(throwOnError ? [{throwOnError: true}] : []));
 		const safeRawItems = Array.isArray(rawItems) ? rawItems : [];
 		if (safeRawItems.length === 0) {
 			sourceHasMore = false;
@@ -478,7 +509,8 @@ export const getMyRequestItems = async (service, {
 	itemTypes,
 	limit = 60,
 	startIndex = 0,
-	username = ''
+	username = '',
+	throwOnError = false
 } = {}) => {
 	const safeParentId = normalizeOptionalQueryValue(parentId);
 	const pluginResult = await getMyRequestsFromPlugin(service, {
@@ -491,12 +523,23 @@ export const getMyRequestItems = async (service, {
 		return pluginResult.result;
 	}
 
-	return collectTaggedFallbackPage(service, {
+	const fallbackOptions = {
 		parentId: safeParentId,
 		itemTypes,
 		limit,
 		startIndex,
 		username,
-		pluginDiagnosticReason: pluginResult.diagnosticReason
-	});
+		pluginDiagnosticReason: pluginResult.diagnosticReason,
+		throwOnError
+	};
+	if (String(username || '').trim()) {
+		try {
+			return await collectTagFilteredPage(service, fallbackOptions);
+		} catch (error) {
+			const status = getPluginErrorStatus(error);
+			if (status === 401 || status === 403 || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') throw error;
+			// Tag filtering unavailable: scan the library instead.
+		}
+	}
+	return collectTaggedFallbackPage(service, fallbackOptions);
 };

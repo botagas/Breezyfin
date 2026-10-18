@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Panel, Header } from '../components/BreezyPanels';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
+import {Header, Panel} from '../components/BreezyPanels';
 import Toolbar from '../components/Toolbar';
 import MediaFilterControls from '../components/MediaFilterControls';
 import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
@@ -7,11 +7,11 @@ import PanelLandscapeVirtualGrid from '../components/PanelLandscapeVirtualGrid';
 import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
 import BodyText from '@enact/sandstone/BodyText';
-import { useMapById } from '../hooks/useMapById';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
+import {useMapById} from '../hooks/useMapById';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
 import {useMediaFilterState} from '../hooks/useMediaFilterState';
 import {useCollapsibleBrowseSearch} from '../hooks/useCollapsibleBrowseSearch';
-import { useLibraryPagination } from './library-panel/hooks/useLibraryPagination';
+import {useLibraryPagination} from './library-panel/hooks/useLibraryPagination';
 import {focusSpotlightTarget} from '../utils/gridFocus';
 import {MEDIA_FILTER_OPTIONS} from '../utils/mediaFilters';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
@@ -92,6 +92,11 @@ const LibraryPanel = ({
 		panelCacheSnapshotRef.current = mergedState;
 		onCacheState(cacheKey, mergedState);
 	}, [activeFilterIds, appliedSearchTerm, onCacheState]);
+	const handlePanelBack = useCallback(() => {
+		if (!filterPopupOpen) return false;
+		closeFilterPopup();
+		return true;
+	}, [closeFilterPopup, filterPopupOpen]);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -99,11 +104,7 @@ const LibraryPanel = ({
 		onExit,
 		registerBackHandler,
 		isActive,
-		onPanelBack: () => {
-			if (!filterPopupOpen) return false;
-			closeFilterPopup();
-			return true;
-		}
+		onPanelBack: handlePanelBack
 	});
 
 	const getItemTypesForLibrary = useCallback((collectionType) => {

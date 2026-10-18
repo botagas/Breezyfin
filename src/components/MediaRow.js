@@ -1,9 +1,10 @@
-import {memo, useRef, useCallback, useEffect} from 'react';
+import {memo, useCallback, useEffect, useRef} from 'react';
+import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
 import Icon from '@enact/sandstone/Icon';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
-import { createLastFocusedSpotlightContainer } from '../utils/spotlightContainerUtils';
+import {createLastFocusedSpotlightContainer} from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {getEpisodeLocator} from '../utils/mediaItemUtils';
@@ -15,7 +16,17 @@ import css from './MediaRow.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred, onClick, showEpisodeProgress, onCardKeyDown, variant, ...rest}) {
+const MediaCard = memo(function MediaCard({
+	                                          item,
+	                                          imageCandidates,
+	                                          imageDeferred,
+	                                          onClick,
+	                                          showEpisodeProgress,
+	                                          reserveSubtitleLine,
+	                                          onCardKeyDown,
+	                                          variant,
+	                                          ...rest
+                                          }) {
 	const handleCardClick = useCallback(() => {
 		onClick(item);
 	}, [item, onClick]);
@@ -83,6 +94,7 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 	const showWatchedStatusBadge = showEpisodeProgress && cardUnwatchedCount !== null;
 	const isCompletedWatchBadge = showWatchedStatusBadge && cardUnwatchedCount === 0;
 	const remainingCount = getRemainingCount();
+	const subtitle = getSubtitle();
 	return (
 		<SpottableDiv
 			className={`${css.card} ${variant === 'cinematic' ? css.cardCinematic : ''}`}
@@ -96,7 +108,9 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 					alt={item.Name}
 					width={640}
 					height={360}
-					loading="eager"
+					// Lazy loading only fetches cards near the viewport and never unloads them again,
+					// unlike a moving window of active rows, which made Magic Remote scrolling stutter.
+					loading="lazy"
 					deferred={imageDeferred}
 					placeholder={(
 						<div className={css.placeholder}>
@@ -128,9 +142,10 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 				<BodyText className={css.cardTitle}>
 					{getDisplayTitle()}
 				</BodyText>
-				{getSubtitle() && (
+				{/* Rows that can hold episodes keep the line even when empty, so all their cards match. */}
+				{(subtitle || reserveSubtitleLine) && (
 					<BodyText className={css.cardSubtitle} size="small">
-						{getSubtitle()}
+						{subtitle || ' '}
 					</BodyText>
 				)}
 			</div>
@@ -138,8 +153,10 @@ const MediaCard = memo(function MediaCard({item, imageCandidates, imageDeferred,
 	);
 });
 
+// preserveId keeps the row's last focused card while Home is unmounted (e.g. on a media page).
 const Container = createLastFocusedSpotlightContainer('div', {
-	restrict: 'self-only'
+	restrict: 'self-only',
+	preserveId: true
 });
 
 const MediaRow = ({
@@ -156,6 +173,7 @@ const MediaRow = ({
 	onRowVisible,
 	onRowFocus,
 	showEpisodeProgress = false,
+					  reserveSubtitleLine = false,
 	rowIndex = 0,
 	onCardKeyDown,
 	onMoreClick,
@@ -189,20 +207,27 @@ const MediaRow = ({
 	}, [items?.length, variant]);
 
 	useEffect(() => {
-		if (imagesActive || typeof onRowVisible !== 'function' || !rowRef.current) return undefined;
+		if (typeof onRowVisible !== 'function' || !rowRef.current) return undefined;
 		if (typeof window.IntersectionObserver !== 'function') return undefined;
+		let notified = false;
+		let disposed = false;
 		const observer = new window.IntersectionObserver((entries) => {
-			if (!entries.some((entry) => entry.isIntersecting)) return;
+			if (disposed || notified || !entries.some((entry) => entry.isIntersecting)) return;
+			notified = true;
 			onRowVisible(rowIndex);
 			observer.disconnect();
 		}, {rootMargin: '65% 0px'});
 		observer.observe(rowRef.current);
-		return () => observer.disconnect();
-	}, [imagesActive, onRowVisible, rowIndex]);
+		return () => {
+			disposed = true;
+			observer.disconnect();
+		};
+	}, [onRowVisible, rowIndex]);
 
 	const handleFocus = useCallback((e) => {
 		onRowVisible?.(rowIndex);
 		onRowFocus?.(rowIndex, rowRef.current);
+		if (Spotlight.getPointerMode()) return;
 		if (scrollerRef.current && scrollerRef.current.contains(e.target)) {
 			const scroller = scrollerRef.current;
 			const element = e.target.closest('.' + css.card);
@@ -287,7 +312,7 @@ const MediaRow = ({
 	return (
 		<div
 			ref={rowRef}
-			className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''} ${variant === 'cinematic' ? css.rowCinematic : ''} ${variant === 'cinematic' && rowIndex === 0 ? css.rowCinematicFirst : ''}`}
+			className={`${css.row} ${isLegacyCompactLayout ? css.rowCompactWebos6 : ''} ${variant === 'cinematic' ? css.rowCinematic : ''} ${variant === 'cinematic' && rowIndex === 0 ? css.rowCinematicFirst : ''} ${reserveSubtitleLine ? css.rowWithSubtitleLine : ''}`}
 			{...rest}
 		>
 			<div className={css.rowHeader}>
@@ -308,6 +333,7 @@ const MediaRow = ({
 			<Container
 				className={css.rowContent}
 				onFocus={handleFocus}
+				spotlightId={`home-row-${sectionKey || title}`}
 			>
 				<div className={`${css.cardContainer} ${isLegacyCompactLayout ? css.cardContainerCompactWebos6 : ''}`} ref={scrollerRef}>
 					{items.map((item, index) => (
@@ -320,6 +346,7 @@ const MediaRow = ({
 							imageDeferred={!imagesActive}
 							onClick={onItemClick}
 							showEpisodeProgress={showEpisodeProgress}
+							reserveSubtitleLine={reserveSubtitleLine}
 							spotlightId={`${title}-${index}`}
 							data-row-index={rowIndex}
 							data-card-index={index}

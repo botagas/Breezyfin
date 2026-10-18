@@ -1,28 +1,25 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Panel, Header } from '../components/BreezyPanels';
+import {useCallback, useMemo, useState} from 'react';
+import {Header, Panel} from '../components/BreezyPanels';
 import Scroller from '../components/AppScroller';
 import jellyfinService from '../services/jellyfinService';
 import SettingsToolbar from '../components/SettingsToolbar';
-import { useMapById } from '../hooks/useMapById';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToastMessage } from '../hooks/useToastMessage';
-import { PANEL_TOAST_CONFIG } from '../constants/toast';
-import {
-	getRuntimePlatformCapabilities,
-	setRuntimeCapabilityProbeRefreshDays
-} from '../utils/platformCapabilities';
+import {useMapById} from '../hooks/useMapById';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
+import {usePanelScrollState} from '../hooks/usePanelScrollState';
+import {useToastMessage} from '../hooks/useToastMessage';
+import {PANEL_TOAST_CONFIG} from '../constants/toast';
+import {getRuntimePlatformCapabilities, setRuntimeCapabilityProbeRefreshDays} from '../utils/platformCapabilities';
 import {isNonStableBuild} from '../utils/featureFlags';
 import BreezyToast from '../components/BreezyToast';
 import {
-	BITRATE_OPTIONS,
 	BITMAP_SUBTITLE_RENDERER_OPTIONS,
+	BITRATE_OPTIONS,
 	CAPABILITY_PROBE_REFRESH_OPTIONS,
 	DEFAULT_SETTINGS,
+	getAssSubtitleRendererOptions,
 	LANGUAGE_OPTIONS,
 	NAVBAR_THEME_OPTIONS,
 	SCREENSAVER_TIMEOUT_OPTIONS,
-	getAssSubtitleRendererOptions,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
@@ -34,22 +31,16 @@ import {
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from './settings-panel/constants';
-import {
-	getCapabilityProbeRefreshLabel,
-	getHomeRowLabel,
-	getPlayNextPromptModeLabel
-} from './settings-panel/labels';
-import {
-	createCapabilityProbeRefreshNormalizer
-} from './settings-panel/capabilityFormatting';
-import { useRuntimeCapabilityLabels } from './settings-panel/hooks/useRuntimeCapabilityLabels';
-import { useSettingsBootstrap } from './settings-panel/hooks/useSettingsBootstrap';
-import { useSettingsDisclosures } from './settings-panel/hooks/useSettingsDisclosures';
-import { useSettingsHomeRows } from './settings-panel/hooks/useSettingsHomeRows';
-import { useSettingsOptionHandlers } from './settings-panel/hooks/useSettingsOptionHandlers';
-import { useSettingsSystemHandlers } from './settings-panel/hooks/useSettingsSystemHandlers';
-import { useSettingsToggleHandlers } from './settings-panel/hooks/useSettingsToggleHandlers';
-import { useSettingsDisplayHandlers } from './settings-panel/hooks/useSettingsDisplayHandlers';
+import {getCapabilityProbeRefreshLabel, getHomeRowLabel, getPlayNextPromptModeLabel} from './settings-panel/labels';
+import {createCapabilityProbeRefreshNormalizer} from './settings-panel/capabilityFormatting';
+import {useRuntimeCapabilityLabels} from './settings-panel/hooks/useRuntimeCapabilityLabels';
+import {useSettingsBootstrap} from './settings-panel/hooks/useSettingsBootstrap';
+import {useSettingsDisclosures} from './settings-panel/hooks/useSettingsDisclosures';
+import {useSettingsHomeRows} from './settings-panel/hooks/useSettingsHomeRows';
+import {useSettingsOptionHandlers} from './settings-panel/hooks/useSettingsOptionHandlers';
+import {useSettingsSystemHandlers} from './settings-panel/hooks/useSettingsSystemHandlers';
+import {useSettingsToggleHandlers} from './settings-panel/hooks/useSettingsToggleHandlers';
+import {useSettingsDisplayHandlers} from './settings-panel/hooks/useSettingsDisplayHandlers';
 
 import css from './SettingsPanel.module.less';
 import {popupShellCss} from '../styles/popupStyles';
@@ -203,6 +194,7 @@ const SettingsPanel = ({
 	} = useRuntimeCapabilityLabels(runtimeCapabilities);
 	const {
 		captureScrollTo: captureSettingsScrollRestore,
+		handleScroll: handleSettingsScrollMemory,
 		handleScrollStop: handleSettingsScrollMemoryStop
 	} = usePanelScrollState({
 		cachedState,
@@ -395,6 +387,7 @@ const SettingsPanel = ({
 				<Scroller
 					className={css.settingsContainer}
 					cbScrollTo={captureSettingsScrollRestore}
+					onScroll={handleSettingsScrollMemory}
 					onScrollStop={handleSettingsScrollMemoryStop}
 				>
 					<SettingsSections

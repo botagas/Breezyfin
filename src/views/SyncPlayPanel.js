@@ -28,7 +28,11 @@ const SyncPlayPanel = ({
 	const [error, setError] = useState('');
 	const [backdropItem, setBackdropItem] = useState(null);
 	const requestGenerationRef = useRef(0);
-	const {captureScrollTo, handleScrollStop} = usePanelScrollState({cachedState, isActive, onCacheState});
+	const {captureScrollTo, handleScroll, handleScrollStop} = usePanelScrollState({
+		cachedState,
+		isActive,
+		onCacheState
+	});
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, isActive
 	});
@@ -149,6 +153,7 @@ const SyncPlayPanel = ({
 			backdropItem={backdropItem}
 			loading={loading}
 			captureScrollTo={captureScrollTo}
+			onScroll={handleScroll}
 			onScrollStop={handleScrollStop}
 		>
 			<section className={css.section}>

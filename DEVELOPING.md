@@ -398,6 +398,19 @@ Preferred panel scroll cache wiring:
 - `src/hooks/usePanelScrollState.js`
 - `usePanelScrollState()` for normalized `scrollTop` state, `Scroller` restore/save wiring, and optional cache persistence.
 
+Panel cache snapshots:
+
+- `src/hooks/usePanelCacheOnUnmount.js`
+- `usePanelCacheOnUnmount()` persists a panel snapshot once on unmount. Do not call `onCacheState` from an effect on
+  every state change; each call re-renders `App`.
+
+nMagic Remote wheel scrolling:
+
+- `src/hooks/useWheelScrollSpotlightPause.js`
+- `useWheelScrollSpotlightPause()` pauses Spotlight pointer focus while a scroll runs and resumes it 400 ms after the
+  scroll stops. `AppScroller` and `MediaVirtualGrid` already use it. Skip scroll-on-focus corrections for pointer focus
+  with `Spotlight.getPointerMode()`.
+
 Low-level scroll primitives (use only when panel behavior is custom):
 - `src/hooks/useScrollerScrollMemory.js`
 - `useScrollerScrollMemory()` for `Scroller` restore/save wiring.
@@ -507,6 +520,9 @@ Jellyfin service paths:
 - `src/services/jellyfin/subtitleApi.js` (subtitle event/raw text fetch helpers for client-side rendering)
 - `src/services/jellyfin/requestsApi.js` (session-cached plugin capability discovery,
   plugin-first My Requests paging, strict plugin error handling, and bounded tag fallback)
+  Library callers may set `options.throwOnError` to distinguish request failure from a
+  valid empty result. My Requests uses that mode for tag filtering and scans only after
+  recoverable failures. Authentication failures and explicit cancellation must propagate.
 - `src/services/jellyfin/pluginFeaturesApi.js` (shared capability-gated paging and
   authenticated plugin image URL construction; image paths must join against the
   normalized server base so reverse-proxy prefixes such as `/jellyfin` survive)
@@ -561,3 +577,9 @@ Status badge convention:
 
 - Keep comments minimal; prefer clear naming/structure so code explains itself.
 - Add comments only where behavior, constraints, or tradeoffs need to be addressed.
+
+Home row callers may pass `throwOnError: true` through the library and My Requests
+service options when the caller must distinguish a failed fetch from a valid empty
+result. Existing callers retain their default array fallback. Home must not cache a
+failed refresh as successful content. Home cache restoration must preserve the original
+fetch time and must not cross authenticated session generations.

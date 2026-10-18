@@ -21,6 +21,7 @@ export const createPanelChildren = ({
 	selection,
 	notices,
 	cacheState,
+										resetTokens = {},
 	actions,
 	cacheActions,
 	backHandlers,
@@ -117,6 +118,7 @@ export const createPanelChildren = ({
 			onExit={handleExit}
 			cachedState={homePanelState}
 			onCacheState={handleHomePanelStateChange}
+			resetToken={resetTokens.home}
 			registerBackHandler={registerHomeBackHandler}
 			noCloseButton
 		/>,
@@ -160,6 +162,7 @@ export const createPanelChildren = ({
 			onExit={handleExit}
 			cachedState={searchPanelState}
 			onCacheState={handleSearchPanelStateChange}
+			resetToken={resetTokens.search}
 			registerBackHandler={registerSearchBackHandler}
 			noCloseButton
 		/>,
@@ -173,6 +176,7 @@ export const createPanelChildren = ({
 			onExit={handleExit}
 			cachedState={favoritesPanelState}
 			onCacheState={handleFavoritesPanelStateChange}
+			resetToken={resetTokens.favorites}
 			registerBackHandler={registerFavoritesBackHandler}
 			noCloseButton
 		/>,

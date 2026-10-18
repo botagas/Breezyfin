@@ -44,7 +44,7 @@ export const useMediaDetailsFocusOrchestrator = ({
 	}, [css.seasonWatchedButton]);
 
 	const scrollCastIntoView = useCallback((element) => {
-		if (!element || !castScrollerRef.current) return;
+		if (!element || !castScrollerRef.current || Spotlight.getPointerMode()) return;
 		const scroller = castScrollerRef.current;
 		if (castFocusScrollTimeoutRef.current) {
 			window.clearTimeout(castFocusScrollTimeoutRef.current);
@@ -56,7 +56,7 @@ export const useMediaDetailsFocusOrchestrator = ({
 	}, [castFocusScrollTimeoutRef, castScrollerRef]);
 
 	const scrollSeasonIntoView = useCallback((element) => {
-		if (!element || !seasonScrollerRef.current) return;
+		if (!element || !seasonScrollerRef.current || Spotlight.getPointerMode()) return;
 		const scroller = seasonScrollerRef.current;
 		if (seasonFocusScrollTimeoutRef.current) {
 			window.clearTimeout(seasonFocusScrollTimeoutRef.current);

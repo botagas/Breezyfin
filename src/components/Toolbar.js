@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react';
-import { Spottable } from '@enact/spotlight/Spottable';
+import {memo, useCallback, useEffect, useId, useMemo, useRef, useState} from 'react';
+import Spotlight from '@enact/spotlight';
+import {Spottable} from '@enact/spotlight/Spottable';
 import Popup from '@enact/sandstone/Popup';
 import jellyfinService from '../services/jellyfinService';
 import {KeyCodes} from '../utils/keyCodes';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { useDismissOnOutsideInteraction } from '../hooks/useDismissOnOutsideInteraction';
-import { useDisclosureMap } from '../hooks/useDisclosureMap';
-import { useMapById } from '../hooks/useMapById';
-import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
+import {usePanelBackHandler} from '../hooks/usePanelBackHandler';
+import {useDismissOnOutsideInteraction} from '../hooks/useDismissOnOutsideInteraction';
+import {useDisclosureMap} from '../hooks/useDisclosureMap';
+import {useMapById} from '../hooks/useMapById';
+import {usePopupInitialFocus} from '../hooks/usePopupInitialFocus';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 import {buildUserPrimaryImageUrl, normalizeImageTag} from '../utils/imageUrls';
@@ -20,10 +21,8 @@ import ToolbarClassicLayout from './toolbar/ToolbarClassicLayout';
 import css from './Toolbar.module.less';
 import {useRuntimeSuspended} from '../hooks/useRuntimeSuspension';
 import {popupShellCss} from '../styles/popupStyles';
-import {
-	INTEGRATION_PREFERENCES_CHANGED_EVENT,
-	readIntegrationPreferences
-} from '../utils/integrationPreferences';
+import {INTEGRATION_PREFERENCES_CHANGED_EVENT, readIntegrationPreferences} from '../utils/integrationPreferences';
+import {readToolbarData, writeToolbarData} from './toolbar/toolbarDataCache';
 
 const SpottableDiv = Spottable('div');
 const TOOLBAR_THEME_CLASSIC = 'classic';
@@ -31,6 +30,17 @@ const TOOLBAR_THEME_ELEGANT = 'elegant';
 const TOOLBAR_DISCLOSURE_KEYS = {
 	USER_MENU: 'userMenu',
 	LIBRARIES_POPUP: 'librariesPopup'
+};
+const DEFAULT_PLUGIN_FEATURES = {
+	calendar: false,
+	syncPlay: false,
+	watchParty: false,
+	hideNativeSyncButton: false
+};
+const PLUGIN_FEATURE_KEYS = Object.keys(DEFAULT_PLUGIN_FEATURES);
+const mergePluginFeatures = (current, patch) => {
+	const next = {...current, ...patch};
+	return PLUGIN_FEATURE_KEYS.every((key) => next[key] === current[key]) ? current : next;
 };
 const INITIAL_TOOLBAR_DISCLOSURES = {
 	[TOOLBAR_DISCLOSURE_KEYS.USER_MENU]: false,
@@ -51,18 +61,15 @@ const Toolbar = ({
 	isActive = false
 }) => {
 	const runtimeSuspended = useRuntimeSuspended();
-	const [libraries, setLibraries] = useState([]);
-	const [currentTime, setCurrentTime] = useState(new Date());
-	const [userName, setUserName] = useState('User');
-	const [userAvatarUrl, setUserAvatarUrl] = useState('');
-	const [pluginFeatures, setPluginFeatures] = useState({
-		calendar: false,
-		syncPlay: false,
-		watchParty: false,
-		hideNativeSyncButton: false
-	});
-	const [watchlistEnabled, setWatchlistEnabled] = useState(() => readIntegrationPreferences(jellyfinService).watchlistEnabled);
 	const serviceSessionKey = `${jellyfinService.serverUrl || ''}|${jellyfinService.userId || ''}|${jellyfinService.accessToken || ''}`;
+	const [libraries, setLibraries] = useState(() => readToolbarData(serviceSessionKey)?.libraries || []);
+	const [currentTime, setCurrentTime] = useState(() => new Date());
+	const [userName, setUserName] = useState(() => readToolbarData(serviceSessionKey)?.userName || 'User');
+	const [userAvatarUrl, setUserAvatarUrl] = useState(() => readToolbarData(serviceSessionKey)?.userAvatarUrl || '');
+	const [pluginFeatures, setPluginFeatures] = useState(() => (
+		readToolbarData(serviceSessionKey)?.pluginFeatures || DEFAULT_PLUGIN_FEATURES
+	));
+	const [watchlistEnabled, setWatchlistEnabled] = useState(() => readIntegrationPreferences(jellyfinService).watchlistEnabled);
 	const {disclosures, openDisclosure, closeDisclosure, setDisclosure} = useDisclosureMap(INITIAL_TOOLBAR_DISCLOSURES);
 	const showUserMenu = disclosures[TOOLBAR_DISCLOSURE_KEYS.USER_MENU] === true;
 	const showLibrariesPopup = disclosures[TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP] === true;
@@ -111,8 +118,11 @@ const Toolbar = ({
 	}, []);
 	useBreezyfinSettingsSync(applyToolbarThemeFromSettings);
 
-	const loadLibraries = useCallback(async () => {
+	const loadLibraries = useCallback(async (sessionKey) => {
 		const libs = await jellyfinService.getLibraryViews();
+		if (Array.isArray(libs) && libs.length > 0) {
+			writeToolbarData(sessionKey, {libraries: libs});
+		}
 		setLibraries(libs);
 	}, []);
 
@@ -126,29 +136,43 @@ const Toolbar = ({
 		});
 	}, []);
 
-	const loadUserInfo = useCallback(async () => {
+	const loadUserInfo = useCallback(async (sessionKey) => {
 		const user = await jellyfinService.getCurrentUser();
+		const avatarUrl = buildUserAvatarUrl(user);
+		if (user) {
+			writeToolbarData(sessionKey, {
+				userLoaded: true,
+				userAvatarUrl: avatarUrl,
+				...(user.Name ? {userName: user.Name} : {})
+			});
+		}
 		if (user && user.Name) {
 			setUserName(user.Name);
 		}
-		setPluginFeatures((current) => ({
-			...current,
+		setPluginFeatures((current) => mergePluginFeatures(current, {
 			syncPlay: !current.hideNativeSyncButton && Boolean(user) && user?.Policy?.SyncPlayAccess !== 'None'
 		}));
-		setUserAvatarUrl(buildUserAvatarUrl(user));
+		setUserAvatarUrl(avatarUrl);
 	}, [buildUserAvatarUrl]);
 
 	useEffect(() => {
 		if (!isActive) return;
-		loadLibraries();
-		loadUserInfo();
+		const cachedData = readToolbarData(serviceSessionKey);
+		if (!cachedData?.libraries) loadLibraries(serviceSessionKey);
+		if (!cachedData?.userLoaded) loadUserInfo(serviceSessionKey);
 	}, [isActive, loadLibraries, loadUserInfo, serviceSessionKey]);
+
+	useEffect(() => {
+		writeToolbarData(serviceSessionKey, {pluginFeatures});
+	}, [pluginFeatures, serviceSessionKey]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
 		let cancelled = false;
 		let retryTimer = null;
-		setPluginFeatures((current) => ({...current, calendar: false}));
+		if (!readToolbarData(serviceSessionKey)?.calendarLoaded) {
+			setPluginFeatures((current) => mergePluginFeatures(current, {calendar: false}));
+		}
 		const loadCapabilities = () => {
 			jellyfinService.getBreezyfinCapabilities().then((capabilities) => {
 				if (cancelled) return;
@@ -158,8 +182,8 @@ const Toolbar = ({
 					}
 					return;
 				}
-				setPluginFeatures((current) => ({
-					...current,
+				writeToolbarData(serviceSessionKey, {calendarLoaded: true});
+				setPluginFeatures((current) => mergePluginFeatures(current, {
 					calendar: capabilities.features?.['calendar.v1'] === true
 				}));
 			}).catch(() => null);
@@ -185,15 +209,14 @@ const Toolbar = ({
 		let cancelled = false;
 		jellyfinService.detectJellyWatchParty().then((availability) => {
 			if (cancelled) return;
-			setPluginFeatures((current) => ({
-				...current,
+			setPluginFeatures((current) => mergePluginFeatures(current, {
 				watchParty: availability.available === true,
 				hideNativeSyncButton: availability.hideNativeSyncButton === true,
 				syncPlay: availability.hideNativeSyncButton === true ? false : current.syncPlay
 			}));
 		}).catch(() => {
 			if (!cancelled) {
-				setPluginFeatures((current) => ({...current, watchParty: false}));
+				setPluginFeatures((current) => mergePluginFeatures(current, {watchParty: false}));
 			}
 		});
 		return () => {
@@ -236,7 +259,7 @@ const Toolbar = ({
 	}, [currentTime]);
 
 	const handleCenterFocus = useCallback((event) => {
-		if (!centerRef.current || !centerRef.current.contains(event.target)) return;
+		if (!centerRef.current || !centerRef.current.contains(event.target) || Spotlight.getPointerMode()) return;
 		const target = event.target.closest(`.${css.iconButton}, .${css.toolbarButton}`);
 		if (!target) return;
 
@@ -296,8 +319,9 @@ const Toolbar = ({
 
 	const handleUserAvatarError = useCallback((event) => {
 		if (applyImageFormatFallbackFromEvent(event)) return;
+		writeToolbarData(serviceSessionKey, {userAvatarUrl: ''});
 		setUserAvatarUrl('');
-	}, []);
+	}, [serviceSessionKey]);
 
 	const handleNavigateHome = useCallback(() => {
 		onNavigate('home');
@@ -346,8 +370,12 @@ const Toolbar = ({
 		if (onBack?.() === true) return;
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.USER_MENU);
 		closeDisclosure(TOOLBAR_DISCLOSURE_KEYS.LIBRARIES_POPUP);
-		onNavigate('home');
-	}, [closeDisclosure, onBack, onNavigate]);
+		// A real Back (like the remote's Back key) keeps panel caches; navigating to Home would force a reload.
+		if (activeSection === 'home') return;
+		if (typeof window !== 'undefined' && typeof window.history?.back === 'function') {
+			window.history.back();
+		}
+	}, [activeSection, closeDisclosure, onBack]);
 
 	const handleLibraryNavigate = useCallback((event) => {
 		const libraryId = event.currentTarget.dataset.libraryId;
@@ -661,4 +689,4 @@ const Toolbar = ({
 	);
 };
 
-export default Toolbar;
+export default memo(Toolbar);

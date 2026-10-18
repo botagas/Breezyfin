@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {clearHomeContentCache} from '../utils/homeContentCache';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import Spotlight from '@enact/spotlight';
-import { Panels } from '../components/BreezyPanels';
+import {Panels} from '../components/BreezyPanels';
 
 import PerformanceOverlay from '../components/PerformanceOverlay';
 import FocusDebugOverlay from '../components/FocusDebugOverlay';
@@ -9,8 +10,8 @@ import DebugErrorMenu from '../components/DebugErrorMenu';
 import ScreensaverOverlay from '../components/ScreensaverOverlay';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { useInputMode } from '../hooks/useInputMode';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
+import {useInputMode} from '../hooks/useInputMode';
 import {RuntimeDiagnosticsProvider} from '../hooks/useRuntimeDiagnostics';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
@@ -19,15 +20,15 @@ import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
 import {normalizeScreensaverTimeoutMinutes} from '../utils/screensaver';
 import {isNonStableBuild} from '../utils/featureFlags';
 import {
-	CRASH_RECOVERY_ACTIONS,
+	clearCrashPlaybackContext,
 	consumeCrashRecoveryAction,
+	CRASH_RECOVERY_ACTIONS,
 	peekCrashRecoveryAction,
 	readCrashNavigationSnapshot,
-	saveCrashNavigationSnapshot,
-	clearCrashPlaybackContext
+	saveCrashNavigationSnapshot
 } from '../utils/crashRecovery';
 import AppCrashBoundary from './AppCrashBoundary';
-import {normalizePanelStatePayload, upsertKeyedPanelState, clearKeyedPanelState} from './utils/panelStateCache';
+import {clearKeyedPanelState, normalizePanelStatePayload, upsertKeyedPanelState} from './utils/panelStateCache';
 import {getPanelIndexForView} from './utils/panelIndex';
 import {createPanelChildren} from './utils/createPanelChildren';
 import {buildRuntimeDataAttributes} from './utils/runtimeDataAttributes';
@@ -51,6 +52,11 @@ const DETAIL_RETURN_VIEWS = new Set([
 	'home', 'homeSection', 'library', 'search', 'favorites', 'settings', 'watchlist', 'calendar', 'syncPlay', 'watchParty'
 ]);
 const SHOW_NON_STABLE_DEBUG_OPTIONS = isNonStableBuild();
+
+// Panels persist their cache when they unmount. On logout, user switch, or session expiry
+// the service session is cleared before the panel unmounts, so dropping writes without a
+// session keeps the previous user's data out of the next session's panel caches.
+const hasActiveServiceSession = () => Boolean(jellyfinService.accessToken);
 
 const resolveInitialVisualSettings = () => {
 	const settings = readBreezyfinSettings();
@@ -82,6 +88,9 @@ const App = (props) => {
 	const [libraryPanelStateById, setLibraryPanelStateById] = useState({});
 	const [searchPanelState, setSearchPanelState] = useState(null);
 	const [favoritesPanelState, setFavoritesPanelState] = useState(null);
+	const [homeResetToken, setHomeResetToken] = useState(0);
+	const [searchResetToken, setSearchResetToken] = useState(0);
+	const [favoritesResetToken, setFavoritesResetToken] = useState(0);
 	const [settingsPanelState, setSettingsPanelState] = useState(null);
 	const [detailsPanelStateByItemId, setDetailsPanelStateByItemId] = useState({});
 	const [detailsReturnView, setDetailsReturnView] = useState('home');
@@ -107,6 +116,7 @@ const App = (props) => {
 		setHomeSectionPanelStateById({});
 		setLibraryPanelStateById({});
 		setFavoritesPanelState(null);
+		setFavoritesResetToken((token) => token + 1);
 		setDetailsPanelStateByItemId({});
 	}, []);
 	const {
@@ -182,6 +192,7 @@ const App = (props) => {
 		setPlayerControlsVisible
 	});
 	const resetSessionState = useCallback(() => {
+		clearHomeContentCache();
 		setSessionActive(false);
 		setSelectedItem(null);
 		setSelectedLibrary(null);
@@ -733,6 +744,7 @@ const App = (props) => {
 		switch (section) {
 			case 'home':
 				setHomePanelState(null);
+				setHomeResetToken((token) => token + 1);
 				break;
 			case 'homeSection':
 				if (nextHomeSectionId) {
@@ -750,9 +762,11 @@ const App = (props) => {
 				break;
 			case 'search':
 				setSearchPanelState(null);
+				setSearchResetToken((token) => token + 1);
 				break;
 			case 'favorites':
 				setFavoritesPanelState(null);
+				setFavoritesResetToken((token) => token + 1);
 				break;
 			case 'settings':
 				setSettingsPanelState(null);
@@ -807,37 +821,41 @@ const App = (props) => {
 	}, []);
 
 	const handleSearchPanelStateChange = useCallback((nextState) => {
+		if (!hasActiveServiceSession()) return;
 		setSearchPanelState(normalizePanelStatePayload(nextState));
 	}, []);
 
 	const handleHomePanelStateChange = useCallback((nextState) => {
+		if (!hasActiveServiceSession()) return;
 		setHomePanelState(normalizePanelStatePayload(nextState));
 	}, []);
 
 	const handleHomeSectionPanelStateChange = useCallback((sectionId, nextState) => {
-		if (!sectionId) return;
+		if (!sectionId || !hasActiveServiceSession()) return;
 		setHomeSectionPanelStateById((previousState) => (
 			upsertKeyedPanelState(previousState, sectionId, nextState)
 		));
 	}, []);
 
 	const handleLibraryPanelStateChange = useCallback((libraryId, nextState) => {
-		if (!libraryId) return;
+		if (!libraryId || !hasActiveServiceSession()) return;
 		setLibraryPanelStateById((previousState) => (
 			upsertKeyedPanelState(previousState, libraryId, nextState)
 		));
 	}, []);
 
 	const handleFavoritesPanelStateChange = useCallback((nextState) => {
+		if (!hasActiveServiceSession()) return;
 		setFavoritesPanelState(normalizePanelStatePayload(nextState));
 	}, []);
 
 	const handleSettingsPanelStateChange = useCallback((nextState) => {
+		if (!hasActiveServiceSession()) return;
 		setSettingsPanelState(normalizePanelStatePayload(nextState));
 	}, []);
 
 	const handleDetailsPanelStateChange = useCallback((itemId, nextState) => {
-		if (!itemId) return;
+		if (!itemId || !hasActiveServiceSession()) return;
 		setDetailsPanelStateByItemId((previousState) => (
 			upsertKeyedPanelState(previousState, itemId, nextState)
 		));
@@ -921,6 +939,11 @@ const App = (props) => {
 			settings: settingsPanelState,
 			...integrationPanelState,
 			detailsByItemId: detailsPanelStateByItemId
+		},
+		resetTokens: {
+			home: homeResetToken,
+			search: searchResetToken,
+			favorites: favoritesResetToken
 		},
 		actions: {
 			login: handleLogin,
