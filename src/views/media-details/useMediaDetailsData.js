@@ -21,6 +21,12 @@ const mergeState = (state, update) => ({
     ...(typeof update === 'function' ? update(state) : update)
 });
 
+const getUserDataFlags = (item) => ({
+    isFavorite: Boolean(item?.UserData?.IsFavorite),
+    isWatched: Boolean(item?.UserData?.Played),
+    isWatchlisted: item?.UserData?.Likes === true
+});
+
 const createInitialState = (item) => ({
     loading: true,
     details: null,
@@ -33,9 +39,7 @@ const createInitialState = (item) => ({
     episodes: [],
     selectedEpisodeId: null,
     episodeNavList: [],
-    isFavorite: Boolean(item?.UserData?.IsFavorite),
-    isWatched: Boolean(item?.UserData?.Played),
-    isWatchlisted: item?.UserData?.Likes === true
+    ...getUserDataFlags(item)
 });
 
 const loadSafely = (promise, fallback, label) => promise.catch((error) => {
@@ -59,6 +63,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
     const episodesRequestRef = useRef(0);
     const pendingSeasonRef = useRef(null);
     const unmountedRef = useRef(false);
+    const updatedUserDataRef = useRef(new Set());
     const {resolveDefaultTrackSelection, saveAudioSelection, saveSubtitleSelection} = useTrackPreferences(
         getTrackPreferenceScopeId(item)
     );
@@ -90,6 +95,11 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
         const episodesToken = ++episodesRequestRef.current;
         const isCurrent = () => !unmountedRef.current && token === playbackRequestRef.current;
         const detailsPromise = fetchItemDetails(itemId);
+        const loadedUserDataPatch = (details) => (
+            details?.UserData ? Object.fromEntries(
+                Object.entries(getUserDataFlags(details)).filter(([key]) => !updatedUserDataRef.current.has(key))
+            ) : {}
+        );
 
         const loadSeries = async () => {
             const initialSeasonId = item.__initialSeasonId || null;
@@ -112,6 +122,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
             dispatch({
                 loading: false,
                 details,
+                ...loadedUserDataPatch(details),
                 seasons,
                 selectedSeasonId: season?.Id || null,
                 episodes,
@@ -131,6 +142,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
             dispatch({
                 loading: false,
                 details,
+                ...loadedUserDataPatch(details),
                 episodeNavList,
                 ...playbackPatch(playbackInfo, itemId)
             });
@@ -206,6 +218,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
             invalidateSeriesUserData(seriesId);
             if (unmountedRef.current) return;
             if (isMainItem) {
+                updatedUserDataRef.current.add('isFavorite');
                 dispatch({isFavorite: nextState});
             } else {
                 dispatch((latest) => ({episodes: patchUserData(latest.episodes, targetId, {IsFavorite: nextState})}));
@@ -230,6 +243,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
             if (unmountedRef.current) return;
             const {selectedSeasonId} = stateRef.current;
             if (isMainItem) {
+                updatedUserDataRef.current.add('isWatched');
                 dispatch((latest) => ({
                     isWatched: played,
                     ...(itemType === 'Series' ? {
@@ -259,15 +273,19 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
     const toggleWatchlist = useCallback(async () => {
         if (!itemId) return;
         const current = stateRef.current.isWatchlisted;
+        const session = captureRuntimeSessionIdentity(jellyfinService);
         try {
             if (current) {
                 await jellyfinService.removeFromLikesWatchlist(itemId);
             } else {
                 await jellyfinService.addToLikesWatchlist(itemId);
             }
+            if (unmountedRef.current || !isRuntimeSessionIdentityCurrent(session, jellyfinService)) return;
+            updatedUserDataRef.current.add('isWatchlisted');
             dispatch({isWatchlisted: !current});
             showToast(current ? 'Removed from watchlist' : 'Added to watchlist');
         } catch (error) {
+            if (unmountedRef.current || !isRuntimeSessionIdentityCurrent(session, jellyfinService)) return;
             console.error('Failed to update watchlist:', error);
             showToast('Failed to update watchlist');
         }

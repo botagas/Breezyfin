@@ -6,7 +6,8 @@ import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../../../constants/integrat
 
 jest.mock('../../../services/jellyfinService', () => ({__esModule: true, default: {
 	getItem: jest.fn(), getPlaybackInfo: jest.fn(), getEpisodes: jest.fn(), getSeasons: jest.fn(),
-	toggleWatched: jest.fn(), toggleFavorite: jest.fn()
+	toggleWatched: jest.fn(), toggleFavorite: jest.fn(),
+	addToLikesWatchlist: jest.fn(), removeFromLikesWatchlist: jest.fn()
 }}));
 jest.mock('../../../hooks/useTrackPreferences', () => ({useTrackPreferences: () => ({
 	resolveDefaultTrackSelection: () => ({selectedAudioTrack: null, selectedSubtitleTrack: -1})
@@ -119,5 +120,89 @@ describe('Media Details mutation cache ownership', () => {
   await act(async () => {finishOld([{Id: 'stale-episode'}]); await oldRequest;});
   expect(result.current.state).toMatchObject({selectedSeasonId: 'season-3', selectedEpisodeId: 'latest-episode', playbackItemId: 'latest-episode'});
  });
+
+	it.each(['Movie', 'Episode', 'Series'].flatMap((type) => [[type, true], [type, false]]))(
+		'replaces stale %s card flags with freshly loaded UserData=%s', async (type, fresh) => {
+			const stale = !fresh;
+			const card = {Id: 'review-item', Type: type, UserData: {IsFavorite: stale, Played: stale, Likes: stale}};
+			jellyfinService.getItem.mockResolvedValue({...card, UserData: {IsFavorite: fresh, Played: fresh, Likes: fresh}});
+			const {result} = renderHook(() => useMediaDetailsData({item: card, showToast: jest.fn()}));
+			await waitFor(() => expect(result.current.state.loading).toBe(false));
+			expect(result.current.state).toMatchObject({isFavorite: fresh, isWatched: fresh, isWatchlisted: fresh});
+		}
+	);
+
+	it('uses refreshed flags as the baseline for subsequent item actions', async () => {
+		const card = {Id: 'movie-1', Type: 'Movie'};
+		jellyfinService.getItem.mockResolvedValue({...card, UserData: {IsFavorite: true, Played: true, Likes: true}});
+		jellyfinService.toggleFavorite.mockResolvedValue(false);
+		jellyfinService.toggleWatched.mockResolvedValue(false);
+		const {result} = renderHook(() => useMediaDetailsData({item: card, showToast: jest.fn()}));
+		await waitFor(() => expect(result.current.state.loading).toBe(false));
+		await act(async () => result.current.toggleFavorite());
+		await act(async () => result.current.toggleWatched());
+		await act(async () => result.current.toggleWatchlist());
+		expect(jellyfinService.toggleFavorite).toHaveBeenCalledWith(card.Id, true);
+		expect(jellyfinService.toggleWatched).toHaveBeenCalledWith(card.Id, true);
+		expect(jellyfinService.removeFromLikesWatchlist).toHaveBeenCalledWith(card.Id);
+		expect(jellyfinService.addToLikesWatchlist).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['toggleFavorite', 'isFavorite', 'toggleFavorite', 'IsFavorite'],
+		['toggleWatched', 'isWatched', 'toggleWatched', 'Played'],
+		['toggleWatchlist', 'isWatchlisted', 'addToLikesWatchlist', 'Likes']
+	])('preserves a completed %s while late details refresh the other flags', async (action, flag, method, field) => {
+		const card = {Id: 'movie-1', Type: 'Movie'};
+		let finishDetails;
+		jellyfinService.getItem.mockImplementationOnce(() => new Promise((resolve) => {finishDetails = resolve;}));
+		jellyfinService[method].mockResolvedValue(true);
+		const {result} = renderHook(() => useMediaDetailsData({item: card, showToast: jest.fn()}));
+		await act(async () => result.current[action]());
+		expect(result.current.state[flag]).toBe(true);
+		const userData = {IsFavorite: true, Played: true, Likes: true, [field]: false};
+		await act(async () => finishDetails({...card, UserData: userData}));
+		await waitFor(() => expect(result.current.state.loading).toBe(false));
+		expect(result.current.state).toMatchObject({isFavorite: true, isWatched: true, isWatchlisted: true});
+	});
+
+	it.each([null, {Id: 'movie-1'}])('retains card flags when loaded details have no UserData: %j', async (details) => {
+		const card = {Id: 'movie-1', Type: 'Movie', UserData: {IsFavorite: true, Played: true, Likes: true}};
+		jellyfinService.getItem.mockResolvedValue(details);
+		const {result} = renderHook(() => useMediaDetailsData({item: card, showToast: jest.fn()}));
+		await waitFor(() => expect(result.current.state.loading).toBe(false));
+		expect(result.current.state).toMatchObject({isFavorite: true, isWatched: true, isWatchlisted: true});
+	});
+
+	it.each([
+		['toggleFavorite', 'toggleFavorite'],
+		['toggleWatched', 'toggleWatched'],
+		['toggleWatchlist', 'addToLikesWatchlist']
+	])('still applies fresh flags when an earlier %s failed', async (action, method) => {
+		const card = {Id: 'movie-1', Type: 'Movie'};
+		let finishDetails;
+		jellyfinService.getItem.mockImplementationOnce(() => new Promise((resolve) => {finishDetails = resolve;}));
+		jellyfinService[method].mockRejectedValue(new Error('save failed'));
+		const {result} = renderHook(() => useMediaDetailsData({item: card, showToast: jest.fn()}));
+		await act(async () => result.current[action]());
+		await act(async () => finishDetails({...card, UserData: {IsFavorite: true, Played: true, Likes: true}}));
+		await waitFor(() => expect(result.current.state.loading).toBe(false));
+		expect(result.current.state).toMatchObject({isFavorite: true, isWatched: true, isWatchlisted: true});
+	});
+
+	it.each(['unmount', 'session'])('ignores a watchlist completion after %s', async (reason) => {
+		const card = {Id: 'movie-1', Type: 'Movie'};
+		const showToast = jest.fn();
+		const {result, unmount} = renderHook(() => useMediaDetailsData({item: card, showToast}));
+		await waitFor(() => expect(result.current.state.loading).toBe(false));
+		let finishSave;
+		jellyfinService.addToLikesWatchlist.mockImplementationOnce(() => new Promise((resolve) => {finishSave = resolve;}));
+		const saving = result.current.toggleWatchlist();
+		if (reason === 'unmount') unmount();
+		else jellyfinService.sessionGeneration += 1;
+		await act(async () => {finishSave(); await saving;});
+		expect(showToast).not.toHaveBeenCalled();
+		expect(result.current.state.isWatchlisted).toBe(false);
+	});
 
 });

@@ -639,6 +639,10 @@ usePlayerInteractionReveal({
 ### `useMediaDetailsData`
 
 - File: `src/views/media-details/useMediaDetailsData.js`
+- Loaded item and series details refresh Favorite, Watched, and Watchlist flags. A
+  successful local action protects its flag from an older pending details response.
+  Missing details or UserData retain the card fallback. Watchlist completions must
+  still belong to the mounted panel and authenticated session.
 - Purpose: load and hold all Media Details data in one reducer so each response commits in a single render:
   - item metadata, playback info, seasons, episodes, and the episode navigation list load in parallel
   - resume-episode selection, stale-response guards, and default track resolution

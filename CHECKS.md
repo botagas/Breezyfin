@@ -109,6 +109,12 @@ Run these before packaging a release candidate:
 
 ### Media Details validation
 
+- Change Favorite, Watched, and Watchlist state outside the current card, then open
+  that card. Verify fresh details update all three buttons and the next action uses
+  the refreshed state. Repeat with a movie, episode, and series.
+- Delay details loading and complete a local item action. Verify the late details
+  response cannot revert that action and can still refresh the other flags.
+
 - Delay a season request and select an old episode with pointer and 5-way input.
   Verify the new season owns the selected episode and audio/subtitle track metadata.
 - Switch seasons twice and let the earlier request finish last. Verify the latest
