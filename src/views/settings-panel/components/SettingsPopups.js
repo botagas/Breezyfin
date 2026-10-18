@@ -4,6 +4,7 @@ import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../../../components/AppScroller';
 import Button from '../../../components/BreezyButton';
 import {usePopupInitialFocus} from '../../../hooks/usePopupInitialFocus';
+import SubtitleCustomColorField from './SubtitleCustomColorField';
 import {
 	getWipeCacheConfirmCopy,
 	isSubtitleBurnInCodecSelected,
@@ -48,10 +49,18 @@ const SettingsPopups = ({
 	handleSubtitleOverlayFontSizeDecrease,
 	handleSubtitleOverlayFontSizeIncrease,
 	handleSubtitleOverlayFontSizeReset,
-	subtitleOverlayPositionPopupOpen,
-	closeSubtitleOverlayPositionPopup,
-	subtitleOverlayPositionOptions,
-	handleSubtitleOverlayPositionSelect,
+							subtitleOverlayOffsetYPopupOpen,
+							closeSubtitleOverlayOffsetYPopup,
+							subtitleOverlayOffsetYLabel,
+							handleSubtitleOverlayOffsetYDecrease,
+							handleSubtitleOverlayOffsetYIncrease,
+							handleSubtitleOverlayOffsetYReset,
+							subtitleOverlayOffsetXPopupOpen,
+							closeSubtitleOverlayOffsetXPopup,
+							subtitleOverlayOffsetXLabel,
+							handleSubtitleOverlayOffsetXDecrease,
+							handleSubtitleOverlayOffsetXIncrease,
+							handleSubtitleOverlayOffsetXReset,
 	subtitleOverlayBackgroundPopupOpen,
 	closeSubtitleOverlayBackgroundPopup,
 	subtitleOverlayBackgroundOptions,
@@ -72,6 +81,8 @@ const SettingsPopups = ({
 	closeSubtitleOverlayBorderColorPopup,
 	subtitleOverlayBorderColorOptions,
 	handleSubtitleOverlayBorderColorSelect,
+							handleSubtitleOverlayTextColorCustomApply,
+							handleSubtitleOverlayBorderColorCustomApply,
 	subtitleOverlayBorderStrengthPopupOpen,
 	closeSubtitleOverlayBorderStrengthPopup,
 	subtitleOverlayBorderStrengthOptions,
@@ -130,7 +141,8 @@ const SettingsPopups = ({
 	const assSubtitleRendererPopupContentRef = useRef(null);
 	const bitmapSubtitleRendererPopupContentRef = useRef(null);
 	const subtitleOverlaySizePopupContentRef = useRef(null);
-	const subtitleOverlayPositionPopupContentRef = useRef(null);
+	const subtitleOverlayOffsetYPopupContentRef = useRef(null);
+	const subtitleOverlayOffsetXPopupContentRef = useRef(null);
 	const subtitleOverlayBackgroundPopupContentRef = useRef(null);
 	const subtitleOverlayWeightPopupContentRef = useRef(null);
 	const subtitleOverlayTextColorPopupContentRef = useRef(null);
@@ -155,7 +167,8 @@ const SettingsPopups = ({
 	usePopupInitialFocus(assSubtitleRendererPopupOpen, assSubtitleRendererPopupContentRef);
 	usePopupInitialFocus(bitmapSubtitleRendererPopupOpen, bitmapSubtitleRendererPopupContentRef);
 	usePopupInitialFocus(subtitleOverlaySizePopupOpen, subtitleOverlaySizePopupContentRef);
-	usePopupInitialFocus(subtitleOverlayPositionPopupOpen, subtitleOverlayPositionPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayOffsetYPopupOpen, subtitleOverlayOffsetYPopupContentRef);
+	usePopupInitialFocus(subtitleOverlayOffsetXPopupOpen, subtitleOverlayOffsetXPopupContentRef);
 	usePopupInitialFocus(subtitleOverlayBackgroundPopupOpen, subtitleOverlayBackgroundPopupContentRef);
 	usePopupInitialFocus(subtitleOverlayWeightPopupOpen, subtitleOverlayWeightPopupContentRef);
 	usePopupInitialFocus(subtitleOverlayTextColorPopupOpen, subtitleOverlayTextColorPopupContentRef);
@@ -180,7 +193,8 @@ const SettingsPopups = ({
 		options,
 		settingKey,
 		onSelect,
-		fallback
+										   fallback,
+										   customColor
 	}) => (
 		<Popup
 			open={open}
@@ -202,6 +216,9 @@ const SettingsPopups = ({
 						</Button>
 					))}
 				</div>
+				{customColor && open ? (
+					<SubtitleCustomColorField initialHex={customColor.hex} onApply={customColor.onApply}/>
+				) : null}
 			</div>
 		</Popup>
 	);
@@ -291,7 +308,11 @@ const SettingsPopups = ({
 				options: subtitleOverlayTextColorOptions,
 				settingKey: 'subtitleOverlayTextColor',
 				onSelect: handleSubtitleOverlayTextColorSelect,
-				fallback: 'white'
+				fallback: 'white',
+				customColor: {
+					hex: settings.subtitleOverlayTextColorHex,
+					onApply: handleSubtitleOverlayTextColorCustomApply
+				}
 			})}
 
 			{renderSubtitleOptionPopup({
@@ -313,7 +334,11 @@ const SettingsPopups = ({
 				options: subtitleOverlayBorderColorOptions,
 				settingKey: 'subtitleOverlayBorderColor',
 				onSelect: handleSubtitleOverlayBorderColorSelect,
-				fallback: 'black'
+				fallback: 'black',
+				customColor: {
+					hex: settings.subtitleOverlayBorderColorHex,
+					onApply: handleSubtitleOverlayBorderColorCustomApply
+				}
 			})}
 
 			{renderSubtitleOptionPopup({
@@ -515,28 +540,29 @@ const SettingsPopups = ({
 				onReset: handleSubtitleOverlayFontSizeReset
 			})}
 
-			<Popup
-				open={subtitleOverlayPositionPopupOpen}
-				onClose={closeSubtitleOverlayPositionPopup}
-				css={popupShellCss}
-			>
-				<div ref={subtitleOverlayPositionPopupContentRef} className={`${popupStyles.popupSurface} ${css.popupContent}`}>
-					<BodyText className={css.popupTitle}>Breezyfin Subtitle Position</BodyText>
-					<div className={css.popupOptions}>
-						{subtitleOverlayPositionOptions.map((option) => (
-							<Button
-								key={option.value}
-								data-value={option.value}
-								className={css.popupOption}
-								selected={(settings.subtitleOverlayPosition || 'standard') === option.value}
-								onClick={handleSubtitleOverlayPositionSelect}
-							>
-								{option.label}
-							</Button>
-						))}
-					</div>
-				</div>
-			</Popup>
+			{renderSubtitleNumericPopup({
+				open: subtitleOverlayOffsetYPopupOpen,
+				onClose: closeSubtitleOverlayOffsetYPopup,
+				contentRef: subtitleOverlayOffsetYPopupContentRef,
+				title: 'Breezyfin Subtitle Vertical Offset',
+				message: 'Moves bottom subtitles up (+) or down (-) from the standard position.',
+				valueLabel: subtitleOverlayOffsetYLabel,
+				onDecrease: handleSubtitleOverlayOffsetYDecrease,
+				onIncrease: handleSubtitleOverlayOffsetYIncrease,
+				onReset: handleSubtitleOverlayOffsetYReset
+			})}
+
+			{renderSubtitleNumericPopup({
+				open: subtitleOverlayOffsetXPopupOpen,
+				onClose: closeSubtitleOverlayOffsetXPopup,
+				contentRef: subtitleOverlayOffsetXPopupContentRef,
+				title: 'Breezyfin Subtitle Horizontal Offset',
+				message: 'Moves bottom subtitles right (+) or left (-) from the center.',
+				valueLabel: subtitleOverlayOffsetXLabel,
+				onDecrease: handleSubtitleOverlayOffsetXDecrease,
+				onIncrease: handleSubtitleOverlayOffsetXIncrease,
+				onReset: handleSubtitleOverlayOffsetXReset
+			})}
 
 			<Popup
 				open={subtitleOverlayBackgroundPopupOpen}

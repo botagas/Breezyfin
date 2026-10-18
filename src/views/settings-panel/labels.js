@@ -1,9 +1,16 @@
 import {HOME_ROW_LABELS} from './constants';
+import {SUBTITLE_CUSTOM_COLOR} from '../../utils/subtitleAppearance';
 
 export const getOptionLabel = (options, value, fallback) => {
 	const option = options.find((entry) => entry.value === value);
 	return option ? option.label : fallback;
 };
+
+export const getColorOptionLabel = (options, value, customHex, fallback) => (
+	value === SUBTITLE_CUSTOM_COLOR && customHex
+		? `Custom (${customHex})`
+		: getOptionLabel(options, value, fallback)
+);
 
 export const getHomeRowLabel = (rowKey) => {
 	return HOME_ROW_LABELS[rowKey] || rowKey;

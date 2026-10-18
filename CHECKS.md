@@ -71,6 +71,10 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
+- Start lightweight styled subtitles and let a subtitle gap pass. Verify the first
+  dialogue cue after each gap remains fitted inside its stage. Repeat with whole-layer
+  offsets enabled. Verify authored clipped signs and drawings retain their geometry.
+
 - After initial native-audio fallback has been used, select Retry for the same item. Verify
   the fallback is available once again and remains limited across automatic replacement
   generations.
@@ -86,6 +90,11 @@ Run these before packaging a release candidate:
   switching status appears immediately, negotiation continues after the deadline, and Back
   cancels the wait without a later transition.
 
+- Set subtitle X/Y offsets, then toggle `Apply Offsets to Entire Styled Layer`. Compare
+  lightweight ASS, an external ASS renderer, and PGS. Verify authored signs and dialogue
+  move together only when enabled. Verify clips remain aligned and offsets are not doubled.
+  Ordinary top and middle captions must retain their positions. Repeat with Player
+  controls shown and hidden in Classic and Elegant themes on supported webOS versions.
 - Fail an audio replacement, then press Back while restoration is pending. Verify the
   cancelled restoration does not publish a fatal playback error.
 - Supersede an audio replacement with playback recovery. Verify the stale replacement
