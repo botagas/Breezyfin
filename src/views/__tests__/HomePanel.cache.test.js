@@ -1,31 +1,17 @@
 /* eslint-disable react/prop-types */
+import '../../testUtils/homePanelTestSetup';
+import {readIntegrationPreferences} from '../../utils/integrationPreferences';
 import {act, render, screen, waitFor} from '@testing-library/react';
 import HomePanel from '../HomePanel';
 import jellyfinService from '../../services/jellyfinService';
 import {clearHomeContentCache, getHomeContentSessionKey, readHomeContentCache, writeHomeContentCache} from '../../utils/homeContentCache';
 import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../../constants/integrationEvents';
 
-jest.mock('../../services/jellyfinService', () => ({__esModule: true, default: {
- serverUrl: 'https://media.test', userId: 'user', sessionGeneration: 1, username: 'user',
- getRecentlyAdded: jest.fn(), getResumeItems: jest.fn(), getNextUp: jest.fn(), getLatestMedia: jest.fn(), getMyRequests: jest.fn(), getLikesWatchlist: jest.fn()
-}}));
-jest.mock('../../components/BreezyPanels', () => ({Panel: ({children}) => <div>{children}</div>}));
-jest.mock('../../components/AppScroller', () => ({children}) => <div>{children}</div>);
 jest.mock('../../components/MediaRow', () => ({items = []}) => <div>{items.map(item => <span key={item.Id}>{item.Name}</span>)}</div>);
-jest.mock('../../components/HeroBanner', () => () => null);
-jest.mock('../../components/Toolbar', () => () => null);
-jest.mock('../../components/BreezyLoadingOverlay', () => () => null);
-jest.mock('../../components/MediaPanelBackdrop', () => () => null);
-jest.mock('../../components/ProviderItemPopup', () => () => null);
-jest.mock('../../hooks/useBreezyfinSettingsSync', () => ({useBreezyfinSettingsSync: jest.fn()}));
-jest.mock('../../hooks/usePanelToolbarActions', () => ({usePanelToolbarActions: () => ({})}));
-jest.mock('../../hooks/usePanelScrollState', () => ({usePanelScrollState: () => ({})}));
-jest.mock('../../hooks/useRuntimeDiagnostics', () => ({useRuntimeDiagnosticsEnabled: () => false}));
-jest.mock('../../hooks/usePluginMediaItemPopup', () => ({usePluginMediaItemPopup: () => ({})}));
-jest.mock('../../utils/integrationPreferences', () => ({INTEGRATION_PREFERENCES_CHANGED_EVENT: 'test-preferences', readIntegrationPreferences: () => ({homeSource: 'builtin', watchlistEnabled: true})}));
 
 beforeEach(() => {
  clearHomeContentCache(); jest.clearAllMocks();
+ readIntegrationPreferences.mockReturnValue({homeSource: 'builtin', watchlistEnabled: true});
  jest.spyOn(console, 'error').mockImplementation(() => {});
  for (const method of ['getRecentlyAdded', 'getResumeItems', 'getNextUp', 'getLatestMedia']) jellyfinService[method].mockResolvedValue([]);
  jellyfinService.getMyRequests.mockResolvedValue({items: []});
