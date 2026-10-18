@@ -1329,3 +1329,7 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   1. close local disclosure(s)
   2. run toolbar back handler
   3. fallback to app-level navigation.
+
+The lightweight subtitle cue measurement resolves the attached owning stage from the
+cue ancestor when the parent ref has not attached during the child layout effect.
+The existing animation-frame measurement uses that stage for first-cue containment.

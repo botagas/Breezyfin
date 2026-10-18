@@ -71,6 +71,10 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
+- Start lightweight styled subtitles and let a subtitle gap pass. Verify the first
+  dialogue cue after each gap remains fitted inside its stage. Repeat with whole-layer
+  offsets enabled. Verify authored clipped signs and drawings retain their geometry.
+
 - After initial native-audio fallback has been used, select Retry for the same item. Verify
   the fallback is available once again and remains limited across automatic replacement
   generations.

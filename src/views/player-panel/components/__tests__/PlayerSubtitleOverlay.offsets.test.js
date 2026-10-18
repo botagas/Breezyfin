@@ -1,4 +1,4 @@
-import {render, screen} from '@testing-library/react';
+import {act, render, screen} from '@testing-library/react';
 import PlayerSubtitleOverlay from '../PlayerSubtitleOverlay';
 import PlayerMediaSurface from '../PlayerMediaSurface';
 import {normalizeSubtitleText, findActiveSubtitleCues} from '../../utils/subtitleRenderer';
@@ -49,4 +49,29 @@ describe('styled subtitle offset ownership', () => {
 		expect(external.style.getPropertyValue('--bf-player-subtitle-offset-y')).toBe('80px');
 		expect(lightweight.closest('.subtitleOverlay').style.getPropertyValue('--bf-player-subtitle-offset-y')).toBe('80px');
 	});
+ it.each(['initial', 'empty', 'plain'])('measures the first styled cue after %s content', (previous) => {
+  const frames = [];
+  const frame = jest.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {frames.push(callback); return frames.length;});
+  const cancel = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+  const rect = jest.spyOn(window.Element.prototype, 'getBoundingClientRect').mockReturnValue({left: 0, top: 0, right: 1920, bottom: 1080, width: 1920, height: 1080});
+  const styled = getCues().filter(cue => cue.lines?.[0] === 'Styled dialogue');
+  const props = {videoElement: metrics, diagnosticsEnabled: true};
+  const initial = previous === 'initial' ? styled : (previous === 'empty' ? [] : [{lines: ['Plain caption']}]);
+  const view = render(<PlayerSubtitleOverlay {...props} cues={initial} />);
+  if (previous !== 'initial') {
+   frames.length = 0;
+   view.rerender(<PlayerSubtitleOverlay {...props} cues={styled} />);
+  }
+  expect(frames.length).toBeGreaterThan(0);
+  act(() => {
+   while (frames.length) frames.shift()();
+  });
+  expect(rect).toHaveBeenCalled();
+  const stage = screen.getByText('Styled dialogue').closest('[data-subtitle-stage]');
+  expect(stage.dataset.subtitleStage).toBe('styled');
+  expect(screen.getByText('Styled dialogue').closest('[data-ass-fit-scale]')).toBeTruthy();
+  view.unmount();
+  frame.mockRestore(); cancel.mockRestore(); rect.mockRestore();
+ });
+
 });

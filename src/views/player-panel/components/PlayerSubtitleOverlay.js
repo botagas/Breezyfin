@@ -172,7 +172,8 @@ const SubtitleCue = ({
 
 	useLayoutEffect(() => {
 		const node = textRef.current;
-		const stageNode = stageRef.current;
+		// Child layout effects can run before the parent stage ref attaches.
+		const stageNode = stageRef.current || node?.closest('[data-subtitle-stage]');
 		if (!node || !stageNode || typeof window === 'undefined') return undefined;
 		const currentCue = cueRef.current;
 		const currentStageGeometry = stageGeometryRef.current;
@@ -195,10 +196,10 @@ const SubtitleCue = ({
 		const baseFontSize = cueTextStyle.fontSize || '';
 
 		const finalizeContainment = (fitScale) => {
-			if (disposed || !textRef.current || !stageRef.current) return;
+			if (disposed || !textRef.current) return;
 			const containment = getAssCueContainment({
 				cueRect: textRef.current.getBoundingClientRect(),
-				stageRect: stageRef.current.getBoundingClientRect(),
+				stageRect: stageNode.getBoundingClientRect(),
 				sourceAuthored: containmentPolicy.sourceAuthored
 			});
 			const transformParts = [];
@@ -220,10 +221,10 @@ const SubtitleCue = ({
 			node.style.transform = baseTransform;
 			node.style.fontSize = baseFontSize;
 			firstFrame = window.requestAnimationFrame(() => {
-				if (disposed || !textRef.current || !stageRef.current) return;
+				if (disposed || !textRef.current) return;
 				const containment = getAssCueContainment({
 					cueRect: textRef.current.getBoundingClientRect(),
-					stageRect: stageRef.current.getBoundingClientRect(),
+					stageRect: stageNode.getBoundingClientRect(),
 					sourceAuthored: containmentPolicy.sourceAuthored
 				});
 				if (containment.scale >= 0.999) {
@@ -474,10 +475,10 @@ const PlayerSubtitleOverlay = ({
 			style={overlayStyle}
 			aria-hidden
 		>
-			<div className={css.subtitleStage} ref={stageRef} style={stageGeometry.style}>
+			<div className={css.subtitleStage} data-subtitle-stage="video" ref={stageRef} style={stageGeometry.style}>
 				{renderSubtitleCues(plainCues, textStyle, stageGeometry, stageRef, diagnosticsEnabled)}
 				{styledCues.length > 0 ? (
-					<div className={css.subtitleStyledLayer} ref={styledStageRef} data-offset-styled={settings.subtitleOverlayOffsetStyled === true ? 'true' : 'false'}>
+					<div className={css.subtitleStyledLayer} data-subtitle-stage="styled" ref={styledStageRef} data-offset-styled={settings.subtitleOverlayOffsetStyled === true ? 'true' : 'false'}>
 						{renderSubtitleCues(styledCues, textStyle, stageGeometry, styledStageRef, diagnosticsEnabled)}
 					</div>
 				) : null}
