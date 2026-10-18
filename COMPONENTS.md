@@ -2,6 +2,10 @@
 
 This guide covers shared UI components in `src/components/`.
 
+`src/components/HomePlaybackNotice.js` presents Home launch progress, account mismatch and
+failure states. It reuses the shared popup shell, action buttons and initial-focus hook.
+Account navigation starts after the popup finishes hiding.
+
 ## Component expectations
 
 - Keep components reusable and panel-agnostic unless the component is explicitly panel-local.

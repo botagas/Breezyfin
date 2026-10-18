@@ -8,6 +8,7 @@ import PerformanceOverlay from '../components/PerformanceOverlay';
 import FocusDebugOverlay from '../components/FocusDebugOverlay';
 import DebugErrorMenu from '../components/DebugErrorMenu';
 import ScreensaverOverlay from '../components/ScreensaverOverlay';
+import HomePlaybackNotice from '../components/HomePlaybackNotice';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
@@ -37,14 +38,12 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import {useAppScreensaver} from './hooks/useAppScreensaver';
 import {useIntegrationPanelCache} from './hooks/useIntegrationPanelCache';
 import {useAppSyncPlayNavigation} from './hooks/useAppSyncPlayNavigation';
+import {useHomePlaybackLaunch} from './hooks/useHomePlaybackLaunch';
+import {useAppSessionRestore} from './hooks/useAppSessionRestore';
 import {SyncPlayProvider} from '../contexts/SyncPlayContext';
 import SyncPlayGlobalOverlays from '../components/SyncPlayGlobalOverlays';
 import {emitAppDebugEvent, isEditableTarget} from './utils/appInput';
-import {
-	captureRuntimeSessionIdentity,
-	isRuntimeSessionIdentityCurrent,
-	resolveExpiredSavedSessionKey
-} from '../utils/savedSessionIdentity';
+import {resolveExpiredSavedSessionKey} from '../utils/savedSessionIdentity';
 
 import css from './App.module.less';
 
@@ -135,6 +134,7 @@ const App = (props) => {
 		spotlight: Spotlight
 	});
 	const handleBackRef = useRef(null);
+	const homeLaunchRef = useRef(null);
 	const crashRecoveryPendingRef = useRef(Boolean(peekCrashRecoveryAction()));
 	const {
 		refs: {
@@ -417,41 +417,10 @@ const App = (props) => {
 		}
 	}, []);
 
-	useEffect(() => {
-		let cancelled = false;
-		const restoreSession = async () => {
-			try {
-				if (peekCrashRecoveryAction() === CRASH_RECOVERY_ACTIONS.HOME) {
-					consumeCrashRecoveryAction();
-					crashRecoveryPendingRef.current = false;
-					resetSessionState();
-					setCurrentView('login');
-					setLoginNotice('Crash recovery paused automatic sign-in. Choose an account or open diagnostics.');
-					setLoginNoticeNonce((value) => value + 1);
-					return;
-				}
-				const restored = jellyfinService.restoreSession();
-				if (!restored) return;
-				const restoredSessionIdentity = captureRuntimeSessionIdentity(jellyfinService);
-				if (!restoredSessionIdentity) return;
-				const user = await jellyfinService.getCurrentUser();
-				if (cancelled || !isRuntimeSessionIdentityCurrent(restoredSessionIdentity, jellyfinService)) return;
-				if (user) {
-					setSessionActive(true);
-					setCurrentView('home');
-					applyPendingCrashRecovery();
-					return;
-				}
-				handleSessionExpired();
-			} finally {
-				if (!cancelled) setSessionRestorePending(false);
-			}
-		};
-		restoreSession();
-		return () => {
-			cancelled = true;
-		};
-	}, [applyPendingCrashRecovery, handleSessionExpired, resetSessionState]);
+	const discardPendingCrashRecovery = useAppSessionRestore({
+		crashRecoveryPendingRef, resetSessionState, applyPendingCrashRecovery, handleSessionExpired,
+		setSessionActive, setCurrentView, setLoginNotice, setLoginNoticeNonce, setSessionRestorePending
+	});
 
 	useEffect(() => {
 		const onSessionExpired = (event) => {
@@ -502,6 +471,10 @@ const App = (props) => {
 	}, [runtimeDataAttributes]);
 
 	const handleBack = useCallback(() => {
+		if (homeLaunchRef.current?.pending || homeLaunchRef.current?.notice) {
+			homeLaunchRef.current.cancel();
+			return true;
+		}
 		if (screensaverActive) {
 			dismissScreensaver();
 			return true;
@@ -617,12 +590,14 @@ const App = (props) => {
 	}, []);
 
 	const handleLogin = useCallback(() => {
+		discardPendingCrashRecovery();
+		setSessionRestorePending(false);
 		clearPanelHistory();
 		setLoginNotice('');
 		setLoginReauthenticationKey(null);
 		setSessionActive(true);
 		setCurrentView('home');
-	}, [clearPanelHistory]);
+	}, [clearPanelHistory, discardPendingCrashRecovery]);
 
 	const handleLogout = useCallback(() => {
 		jellyfinService.logout();
@@ -647,6 +622,28 @@ const App = (props) => {
 		setLoginReauthenticationKey(null);
 		setCurrentView('login');
 	}, [resetSessionState]);
+
+	const prepareHomePlayback = useCallback((item) => {
+		clearPanelHistory();
+		setDetailsReturnView('home');
+		setPreviousItem(null);
+		setSelectedItem(item);
+		setPlaybackOptions(null);
+		setCurrentView('details');
+	}, [clearPanelHistory]);
+	const homeLaunch = useHomePlaybackLaunch({
+		authenticated: sessionActive,
+		restoring: sessionRestorePending,
+		currentView,
+		selectedItem,
+		crashRecoveryPending: crashRecoveryPendingRef.current,
+		onPrepare: prepareHomePlayback,
+		onPlay: handlePlay,
+		onChooseAccount: handleSwitchUser,
+		onWake: dismissScreensaver,
+		onRevealPlayer: () => setPlayerControlsVisible(true)
+	});
+	homeLaunchRef.current = homeLaunch;
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
 		if (diagnosticsEnabled) {
@@ -1023,6 +1020,7 @@ const App = (props) => {
 					suspended={screensaverActive}
 				/>
 				<SyncPlayGlobalOverlays />
+				<HomePlaybackNotice notice={homeLaunch.notice} onCancel={homeLaunch.cancel} onChooseAccount={homeLaunch.chooseAccount} onShown={homeLaunch.noticeShown} onHidden={homeLaunch.noticeHidden} />
 				<ScreensaverOverlay active={screensaverActive} />
 			</div>
 			</SyncPlayProvider>

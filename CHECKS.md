@@ -102,7 +102,25 @@ Run these before packaging a release candidate:
 
 ### Navigation/focus validation
 
-- None.
+- Launch a Home card with the client closed, browsing and already playing. Confirm a matching
+  item is not restarted. Confirm Player Back returns to Details, then Breezyfin Home.
+- Compare Home and in-app playback for resume, multiple audio languages, subtitles Off,
+  forced/preferred subtitles, source versions and HDR/DV or subtitle consent.
+- Use mismatched server/user sessions and expired credentials. Confirm Choose account closes
+  the popup before sign-in; matching sign-in continues playback. Cancel and Back must abandon it.
+- Delay server/item requests, then cancel, hide the app, change account or launch a newer card.
+  Confirm stale results cannot open Player. Repeat with an existing SyncPlay group and preserve
+  its normal queue-replacement decision.
+- Verify launch requests contain no credentials or media URLs. Test malformed parameters,
+  duplicate request IDs, unavailable items and ordinary app-icon launches.
+- Receive a Home relaunch while Breezyfin is already hidden. Confirm preparation waits for
+  foreground. Hide during server/item lookup and return; no loading notice may remain stuck.
+- Open a Home item, then use Settings cache wipe with and without keeping login. Confirm the
+  reload cannot replay the old Home request or reopen its account notice. A new Home card
+  activation must still work.
+- Recover from a crash with missing or expired saved credentials. Complete manual sign-in,
+  then activate a fresh Home card. The old crash action must not block playback or restore
+  another account's navigation. Repeat with an unavailable user lookup and Return Home recovery.
 
 ### Login flow validation
 

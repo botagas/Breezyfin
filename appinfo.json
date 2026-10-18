@@ -5,6 +5,7 @@
     "type": "web",
     "main": "index.html",
     "title": "Breezyfin",
+    "breezyfinLaunchVersion": 1,
     "icon": "icon.png",
     "requiredPermissions": [
         "time.query",
