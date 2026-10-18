@@ -109,6 +109,9 @@ Run these before packaging a release candidate:
 - Open a Home item, then use Settings cache wipe with and without keeping login. Confirm the
   reload cannot replay the old Home request or reopen its account notice. A new Home card
   activation must still work.
+- Recover from a crash with missing or expired saved credentials. Complete manual sign-in,
+  then activate a fresh Home card. The old crash action must not block playback or restore
+  another account's navigation. Repeat with an unavailable user lookup and Return Home recovery.
 
 ### Login flow validation
 

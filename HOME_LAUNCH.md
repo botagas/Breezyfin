@@ -31,6 +31,10 @@ storage before reloading. Retained platform parameters cannot replay an accepted
 after an ordinary reload or a Settings cache wipe. Storage failures retain in-memory
 deduplication without preventing new launches. Ordinary launches do not start playback.
 Pending requests do not survive a page reload, application restart or crash recovery.
+Crash recovery takes precedence only during its active startup attempt. Missing, invalid
+or expired saved sessions must release that attempt and discard the stale crash action.
+An explicit login also discards stale recovery before opening the user's Home panel, so
+later Home playback requests can proceed without restoring another account's snapshot.
 
 Missing or mismatched authentication opens an account notice. Choose account closes the
 notice before opening the existing account-selection flow. Cancel or Back abandons the

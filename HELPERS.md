@@ -9,6 +9,10 @@ and bounded session-scoped receipt deduplication, and `src/App/hooks/useHomePlay
 pending account selection and cancellation. The hook reuses saved-session identity guards
 and the existing playback entry point. It does not negotiate media or store credentials.
 
+`src/App/hooks/useAppSessionRestore.js` owns the initial saved-session lookup and recovery
+completion. It preserves session identity and unmount guards. Failed restoration clears
+the stale crash action and recovery latch; explicit login uses the same discard operation.
+
 | Need | Preferred Helper |
 |---|---|
 | Save/restore non-virtual panel scroll + cache scrollTop | `usePanelScrollState` |
