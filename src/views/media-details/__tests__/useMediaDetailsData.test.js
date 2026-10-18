@@ -16,11 +16,11 @@ const item = {Id: 'episode-1', Type: 'Episode', SeriesId: 'series-1', SeasonId: 
 const episode = (updated) => ({...item, UserData: {Played: updated, IsFavorite: updated}});
 const mountEpisode = async () => {
 	const showToast = jest.fn();
-	const hook = renderHook(() => useMediaDetailsData({item, showToast}));
-	await waitFor(() => expect(hook.result.current.state.loading).toBe(false));
+	const utils = renderHook(() => useMediaDetailsData({item, showToast}));
+	await waitFor(() => expect(utils.result.current.state.loading).toBe(false));
 	await fetchSeasons('series-1');
 	await fetchSeriesItem('series-1');
-	return {...hook, showToast};
+	return {...utils, showToast};
 };
 const updateServerData = () => {
 	jellyfinService.getEpisodes.mockResolvedValue([episode(true)]);
@@ -87,4 +87,37 @@ describe('Media Details mutation cache ownership', () => {
 		expect(jellyfinService.getEpisodes).toHaveBeenCalledTimes(2);
 		expect(showToast).not.toHaveBeenCalled();
 	});
+ it('ignores old-season selections while switching and keeps playback metadata aligned', async () => {
+  jellyfinService.getEpisodes.mockResolvedValue([{Id: 'old-1'}, {Id: 'old-2'}]);
+  jellyfinService.getPlaybackInfo.mockImplementation(async id => ({MediaSources: [{Id: id}]}));
+  const {result} = renderHook(() => useMediaDetailsData({item: {Id: 'series-1', Type: 'Series'}, showToast: jest.fn()}));
+  await waitFor(() => expect(result.current.state.loading).toBe(false));
+  let finishSeason;
+  jellyfinService.getEpisodes.mockImplementationOnce(() => new Promise(resolve => {finishSeason = resolve;}));
+  let switching;
+  act(() => {switching = result.current.selectSeason('season-2');});
+  expect(result.current.state.episodes).toEqual([]);
+  expect(result.current.state.playbackInfo).toBeNull();
+  await act(async () => result.current.selectEpisode('old-2'));
+  expect(jellyfinService.getPlaybackInfo).not.toHaveBeenCalledWith('old-2');
+  await act(async () => {finishSeason([{Id: 'new-1'}, {Id: 'new-2'}]); await switching;});
+  expect(result.current.state).toMatchObject({selectedEpisodeId: 'new-1', playbackItemId: 'new-1'});
+  await act(async () => result.current.selectEpisode('new-2'));
+  expect(result.current.state).toMatchObject({selectedEpisodeId: 'new-2', playbackItemId: 'new-2'});
+ });
+
+ it('keeps the latest season when an earlier season finishes after it', async () => {
+  jellyfinService.getPlaybackInfo.mockImplementation(async id => ({MediaSources: [{Id: id}]}));
+  const {result} = renderHook(() => useMediaDetailsData({item: {Id: 'series-1', Type: 'Series'}, showToast: jest.fn()}));
+  await waitFor(() => expect(result.current.state.loading).toBe(false));
+  let finishOld;
+  jellyfinService.getEpisodes.mockImplementationOnce(() => new Promise(resolve => {finishOld = resolve;}))
+   .mockResolvedValueOnce([{Id: 'latest-episode'}]);
+  let oldRequest;
+  act(() => {oldRequest = result.current.selectSeason('season-2');});
+  await act(async () => result.current.selectSeason('season-3'));
+  await act(async () => {finishOld([{Id: 'stale-episode'}]); await oldRequest;});
+  expect(result.current.state).toMatchObject({selectedSeasonId: 'season-3', selectedEpisodeId: 'latest-episode', playbackItemId: 'latest-episode'});
+ });
+
 });

@@ -103,6 +103,13 @@ Run these before packaging a release candidate:
 
 ### Media Details validation
 
+- Delay a season request and select an old episode with pointer and 5-way input.
+  Verify the new season owns the selected episode and audio/subtitle track metadata.
+- Switch seasons twice and let the earlier request finish last. Verify the latest
+  season remains selected.
+- Toggle watched or favorite state twice while episode or season lists load. Verify
+  the lists remain populated and the next visit retrieves current user data.
+
 - On a standalone episode page, change watched and favorite status, then open the
   parent series immediately. Verify badges, season state, and resume selection refresh
   without waiting for the cache TTL. Repeat when navigating away before the save ends.

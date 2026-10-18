@@ -82,4 +82,26 @@ describe('Media Details request cache ownership', () => {
 		expect(await oldRequest).toEqual([{Id: 'episode-1', UserData: {Played: true}}]);
 		expect(await fetchEpisodes('series-1', 'season-1')).toEqual([{Id: 'episode-1', UserData: {Played: true}}]);
 	});
+ it.each([
+  ['episodes', () => fetchEpisodes('series-1', 'season-1'), 'getEpisodes'],
+  ['seasons', () => fetchSeasons('series-1'), 'getSeasons']
+ ])('retains usable %s after repeated invalidation without caching a stale retry', async (_name, load, method) => {
+  let finishFirst, finishRetry;
+  jellyfinService[method].mockImplementationOnce(() => new Promise(resolve => {finishFirst = resolve;}))
+   .mockImplementationOnce(() => new Promise(resolve => {finishRetry = resolve;}));
+  const request = load();
+  invalidateSeriesUserData('series-1');
+  finishFirst([{Id: 'old'}]);
+  // Allow the original request and its retry to enter the service mock.
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  expect(finishRetry).toBeDefined();
+  invalidateSeriesUserData('series-1');
+  finishRetry([{Id: 'usable'}]);
+  expect(await request).toEqual([{Id: 'usable'}]);
+  expect(jellyfinService[method]).toHaveBeenCalledTimes(2);
+  jellyfinService[method].mockResolvedValue([{Id: 'fresh'}]);
+  expect(await load()).toEqual([{Id: 'fresh'}]);
+  expect(jellyfinService[method]).toHaveBeenCalledTimes(3);
+ });
+
 });

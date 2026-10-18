@@ -30,7 +30,9 @@ const cached = async (key, load, {skipEmpty = false, retryInvalidated = true} = 
 	const value = await load();
 	if (!isRuntimeSessionIdentityCurrent(session, jellyfinService)) return null;
 	if (revision !== cacheRevision) {
-		return retryInvalidated ? cached(key, load, {skipEmpty, retryInvalidated: false}) : null;
+		// Keep retries bounded. A second invalidation leaves usable data uncached so the
+		// next reader revalidates instead of rendering a fabricated empty result.
+		return retryInvalidated ? cached(key, load, {skipEmpty, retryInvalidated: false}) : value;
 	}
 	const isEmpty = value == null || (Array.isArray(value) && value.length === 0);
 	if (!(skipEmpty && isEmpty) && value != null) {

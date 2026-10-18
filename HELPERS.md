@@ -1222,3 +1222,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   1. close local disclosure(s)
   2. run toolbar back handler
   3. fallback to app-level navigation.
+
+Media Details season changes clear old episode and track selection state while loading.
+Old episode callbacks must not replace the pending season selection. The request cache
+retries invalidated data once. A second invalidation returns the same-session response
+without caching the response; the next reader must fetch again.

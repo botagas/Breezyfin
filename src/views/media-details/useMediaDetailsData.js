@@ -57,6 +57,7 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
     const stateRef = useRef(state);
     const playbackRequestRef = useRef(0);
     const episodesRequestRef = useRef(0);
+    const pendingSeasonRef = useRef(null);
     const unmountedRef = useRef(false);
     const {resolveDefaultTrackSelection, saveAudioSelection, saveSubtitleSelection} = useTrackPreferences(
         getTrackPreferenceScopeId(item)
@@ -154,7 +155,8 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
     }, [itemId]);
 
     const selectEpisode = useCallback(async (episodeId) => {
-        if (!episodeId || episodeId === stateRef.current.selectedEpisodeId) return;
+        if (pendingSeasonRef.current !== null || !episodeId || episodeId === stateRef.current.selectedEpisodeId ||
+            !stateRef.current.episodes.some((episode) => episode.Id === episodeId)) return;
         dispatch({selectedEpisodeId: episodeId});
         const token = ++playbackRequestRef.current;
         const playbackInfo = await fetchPlaybackInfo(episodeId);
@@ -164,11 +166,13 @@ export const useMediaDetailsData = ({item, onItemSelect, showToast}) => {
 
     const selectSeason = useCallback(async (seasonId) => {
         if (!itemId || !seasonId || seasonId === stateRef.current.selectedSeasonId) return;
-        dispatch({selectedSeasonId: seasonId});
         const episodesToken = ++episodesRequestRef.current;
+        pendingSeasonRef.current = episodesToken;
+        dispatch({selectedSeasonId: seasonId, episodes: [], selectedEpisodeId: null, ...playbackPatch(null, null)});
         const playbackToken = ++playbackRequestRef.current;
         const episodes = await loadSafely(fetchEpisodes(itemId, seasonId), [], 'episodes');
         if (unmountedRef.current || episodesToken !== episodesRequestRef.current) return;
+        pendingSeasonRef.current = null;
         const resumeEpisode = pickResumeEpisode(episodes);
         dispatch({episodes, selectedEpisodeId: resumeEpisode?.Id || null});
         if (!resumeEpisode) {
