@@ -1,7 +1,8 @@
-import { Jellyfin } from '@jellyfin/sdk';
+import {Jellyfin} from '@jellyfin/sdk';
 import {getAppVersion, loadAppVersion} from '../utils/appInfo';
 import {getDeviceId} from '../utils/deviceIdentity';
 import {applyPreferredImageFormatToParams} from '../utils/imageFormat';
+import {markHomeContentCacheStale} from '../utils/homeContentCache';
 import {SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE} from '../constants/session';
 import {
 	applySessionFromStore,
@@ -24,7 +25,9 @@ import {
 import {
 	getFavoriteMediaItems,
 	getItemDetails,
+	getItemFilterTags,
 	getItemMediaSegments,
+	getItemsUserData,
 	getLatestMediaItems,
 	getLibraryChildItems,
 	getLibraryViewItems,
@@ -61,11 +64,7 @@ import {getBreezyfinCapabilities, getMyRequestItems} from './jellyfin/requestsAp
 import {getHomeSectionDescriptors, getHomeSectionItems} from './jellyfin/homeSectionsApi';
 import {getDiscoveryDetails, getDiscoveryFeed} from './jellyfin/discoveryApi';
 import {getCalendarEvents} from './jellyfin/calendarApi';
-import {
-	addItemToLikesWatchlist,
-	getLikesWatchlist,
-	removeItemFromLikesWatchlist
-} from './jellyfin/watchlistApi';
+import {addItemToLikesWatchlist, getLikesWatchlist, removeItemFromLikesWatchlist} from './jellyfin/watchlistApi';
 import {
 	getWatchlistMovieHistory,
 	getWatchlistSeriesInsights,
@@ -77,8 +76,8 @@ import * as watchPartyApi from './jellyfin/watchPartyApi';
 import {
 	buildSubtitleStreamUrl,
 	getBitmapSubtitleDeliveryCandidates,
-	getSubtitleTrackEvents,
 	getSubtitleTrackBinary,
+	getSubtitleTrackEvents,
 	getSubtitleTrackText
 } from './jellyfin/subtitleApi';
 import {createJellyfinRequestError} from './jellyfin/requestErrors';
@@ -371,20 +370,20 @@ class JellyfinService {
 		);
 	}
 
-	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) {
-		return getLatestMediaItems(this, includeItemTypes, limit, startIndex);
+	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0, options = {}) {
+		return getLatestMediaItems(this, includeItemTypes, limit, startIndex, options);
 	}
 
-	async getRecentlyAdded(limit = 20, startIndex = 0) {
-		return getRecentlyAddedItems(this, limit, startIndex);
+	async getRecentlyAdded(limit = 20, startIndex = 0, options = {}) {
+		return getRecentlyAddedItems(this, limit, startIndex, options);
 	}
 
-	async getNextUp(limit = 24, startIndex = 0) {
-		return getNextUpItems(this, limit, startIndex);
+	async getNextUp(limit = 24, startIndex = 0, options = {}) {
+		return getNextUpItems(this, limit, startIndex, options);
 	}
 
-	async getResumeItems(limit = 10, startIndex = 0) {
-		return getResumeMediaItems(this, limit, startIndex);
+	async getResumeItems(limit = 10, startIndex = 0, options = {}) {
+		return getResumeMediaItems(this, limit, startIndex, options);
 	}
 
 	async getCurrentUser() {
@@ -397,6 +396,14 @@ class JellyfinService {
 
 	async getLibraryItems(parentId, itemTypes, limit = 100, startIndex = 0, options = {}) {
 		return getLibraryChildItems(this, parentId, itemTypes, limit, startIndex, options);
+	}
+
+	async getItemsUserData(itemIds) {
+		return getItemsUserData(this, itemIds);
+	}
+
+	async getItemFilterTags(parentId, itemTypes) {
+		return getItemFilterTags(this, parentId, itemTypes);
 	}
 
 	async getItem(itemId) {
@@ -439,7 +446,9 @@ class JellyfinService {
 		return reportPlaybackProgressState(this, itemId, positionTicks, isPaused, session);
 	}
 
+	// Playback and watched-state changes alter Continue Watching / Next Up on Home.
 	async reportPlaybackStopped(itemId, positionTicks, session = {}) {
+		markHomeContentCacheStale();
 		return reportPlaybackStoppedState(this, itemId, positionTicks, session);
 	}
 
@@ -451,13 +460,14 @@ class JellyfinService {
 		return searchLibraryItemsPage(this, searchTerm, itemTypes, limit, startIndex);
 	}
 
-	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '') {
+	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '', options = {}) {
 		return getMyRequestItems(this, {
 			parentId,
 			itemTypes,
 			limit,
 			startIndex,
-			username
+			username,
+			throwOnError: options.throwOnError === true
 		});
 	}
 
@@ -591,14 +601,17 @@ class JellyfinService {
 	}
 
 	async markWatched(itemId) {
+		markHomeContentCacheStale();
 		return markItemWatched(this, itemId);
 	}
 
 	async markUnwatched(itemId) {
+		markHomeContentCacheStale();
 		return markItemUnwatched(this, itemId);
 	}
 
 	async toggleWatched(itemId, isWatched) {
+		markHomeContentCacheStale();
 		return toggleItemWatched(this, itemId, isWatched);
 	}
 

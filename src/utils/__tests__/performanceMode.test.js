@@ -7,7 +7,8 @@ import {
 
 describe('performance mode profiles', () => {
 	it('normalizes animation settings with Performance+ taking precedence', () => {
-		expect(getPerformanceMode({})).toBe(PERFORMANCE_MODES.NORMAL);
+		expect(getPerformanceMode({})).toBe(PERFORMANCE_MODES.PERFORMANCE);
+		expect(getPerformanceMode({disableAnimations: false})).toBe(PERFORMANCE_MODES.NORMAL);
 		expect(getPerformanceMode({disableAnimations: true})).toBe(PERFORMANCE_MODES.PERFORMANCE);
 		expect(getPerformanceMode({
 			disableAnimations: true,

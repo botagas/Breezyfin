@@ -208,7 +208,7 @@ const WatchlistPanel = ({
 		onCacheEntries: cacheInsightEntries
 	});
 	const insightItemsById = useMapById(insightEntry.items);
-	const {captureScrollTo, handleScrollStop} = usePanelScrollState({
+	const {captureScrollTo, handleScroll, handleScrollStop} = usePanelScrollState({
 		cachedState,
 		isActive,
 		onCacheState: cachePanelState
@@ -401,6 +401,7 @@ const WatchlistPanel = ({
 			loading={nestedView && loading}
 			errorMessage={error}
 			captureScrollTo={captureScrollTo}
+			onScroll={handleScroll}
 			onScrollStop={handleScrollStop}
 			scrollable={
 				!nestedView &&

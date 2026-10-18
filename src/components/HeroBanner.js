@@ -1,21 +1,26 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Button from './BreezyButton';
 import BodyText from '@enact/sandstone/BodyText';
 import Heading from '@enact/sandstone/Heading';
 import Marquee from '@enact/sandstone/Marquee';
 import jellyfinService from '../services/jellyfinService';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
 
 import css from './HeroBanner.module.less';
 import imageLoadCss from './ImageLoadReveal.module.less';
 
 const AUTO_ROTATE_INTERVAL_MS = 8000;
-const TRANSITION_DURATION_MS = 420;
+const TRANSITION_FALLBACK_MS = 2000;
 const HERO_PRELOAD_ADJACENT = 2;
 const HERO_PRELOAD_CACHE_LIMIT = 48;
 const heroBackdropPreloadCache = new Map();
 const joinClasses = (...classNames) => classNames.filter(Boolean).join(' ');
+
+const areHeroAnimationsDisabled = (settings = {}) => (
+	settings.disableAnimations !== false || settings.disableAllAnimations === true
+);
 
 const pruneHeroPreloadCache = () => {
 	if (heroBackdropPreloadCache.size <= HERO_PRELOAD_CACHE_LIMIT) return;
@@ -27,41 +32,51 @@ const pruneHeroPreloadCache = () => {
 	}
 };
 
-const preloadHeroBackdrop = (url) => {
+// The entry keeps the Image object while its item is near the current one: a referenced, decoded
+// image stays in memory, so switching to it does not wait for a disk read and decode.
+const preloadHeroImage = (url) => {
 	if (!url) return;
 	if (typeof window === 'undefined' || typeof window.Image !== 'function') return;
 
 	const now = Date.now();
 	const existing = heroBackdropPreloadCache.get(url);
-	if (existing?.status === 'loaded' || existing?.status === 'loading') {
+    if (existing?.image || existing?.status === 'error') {
 		existing.lastUsedAt = now;
 		return;
 	}
 
 	const image = new window.Image();
-	heroBackdropPreloadCache.set(url, {status: 'loading', lastUsedAt: now});
+    const entry = {
+        status: existing?.status === 'loaded' ? 'loaded' : 'loading',
+        lastUsedAt: now,
+        image
+    };
+    heroBackdropPreloadCache.set(url, entry);
 	pruneHeroPreloadCache();
 
-	image.decoding = 'async';
-	image.onload = () => {
-		const entry = heroBackdropPreloadCache.get(url);
-		if (entry) {
-			entry.status = 'loaded';
-			entry.lastUsedAt = Date.now();
-		}
+    const finish = (status) => {
+        entry.status = status;
+        entry.lastUsedAt = Date.now();
 		image.onload = null;
 		image.onerror = null;
 	};
+    image.decoding = 'async';
+    image.onload = () => {
+        const decoded = typeof image.decode === 'function' ? image.decode().catch(() => {
+        }) : Promise.resolve();
+        decoded.then(() => finish('loaded'));
+    };
 	image.onerror = () => {
-		const entry = heroBackdropPreloadCache.get(url);
-		if (entry) {
-			entry.status = 'error';
-			entry.lastUsedAt = Date.now();
-		}
-		image.onload = null;
-		image.onerror = null;
+        entry.image = null;
+        finish('error');
 	};
 	image.src = url;
+};
+
+const releaseHeroImagesExcept = (keepUrls) => {
+    heroBackdropPreloadCache.forEach((entry, url) => {
+        if (!keepUrls.has(url)) entry.image = null;
+    });
 };
 
 const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' }) => {
@@ -71,18 +86,23 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	const [isTransitioning, setIsTransitioning] = useState(false);
 	const [imageErrors, setImageErrors] = useState({});
 	const [loadedBackdropUrls, setLoadedBackdropUrls] = useState({});
-	const [performanceModeEnabled, setPerformanceModeEnabled] = useState(false);
-	const [heroVisible, setHeroVisible] = useState(true);
+	const [performanceModeEnabled, setPerformanceModeEnabled] = useState(() => (
+		areHeroAnimationsDisabled(readBreezyfinSettings())
+	));
+	const heroVisibleRef = useRef(true);
+	const autoRotateTimerRef = useRef(null);
+	const syncAutoRotateRef = useRef(() => {
+	});
 	const heroRootRef = useRef(null);
 	const reducedMotionMode = performanceModeEnabled;
 	const useCinematicLayout = variant === 'cinematic';
 	const backdropWidth = reducedMotionMode ? 1280 : 1920;
 	const preloadAdjacentCount = reducedMotionMode ? 1 : HERO_PRELOAD_ADJACENT;
-	const shouldAutoRotate = itemCount > 1 && heroVisible;
+	const canAutoRotate = isActive && itemCount > 1;
 
 	const applyMotionSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		setPerformanceModeEnabled(settings.disableAnimations === true || settings.disableAllAnimations === true);
+		setPerformanceModeEnabled(areHeroAnimationsDisabled(settings));
 	}, []);
 	useBreezyfinSettingsSync(applyMotionSettings, {enabled: isActive});
 
@@ -97,18 +117,21 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		const node = heroRootRef.current;
 		if (!node) return undefined;
 		if (typeof window === 'undefined' || typeof window.IntersectionObserver !== 'function') {
-			setHeroVisible(true);
+			heroVisibleRef.current = true;
+			syncAutoRotateRef.current();
 			return undefined;
 		}
 
+		// Visibility only drives the auto-rotate timer, so it is tracked in a ref to avoid re-renders.
 		const observer = new window.IntersectionObserver(
 			(entries) => {
 				const entry = entries[0];
 				if (!entry) return;
-				setHeroVisible(entry.isIntersecting && entry.intersectionRatio >= 0.18);
+				heroVisibleRef.current = entry.isIntersecting && entry.intersectionRatio >= 0.18;
+				syncAutoRotateRef.current();
 			},
 			{
-				threshold: [0, 0.12, 0.18, 0.28, 0.5]
+				threshold: [0, 0.18]
 			}
 		);
 
@@ -118,27 +141,45 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		};
 	}, [isActive]);
 
+	const currentIndexRef = useRef(currentIndex);
+	useEffect(() => {
+		currentIndexRef.current = currentIndex;
+	}, [currentIndex]);
+
 	const changeIndex = useCallback((resolveNext) => {
 		if (itemCount === 0) return;
-		setCurrentIndex((prev) => {
-			const resolved = typeof resolveNext === 'function' ? resolveNext(prev) : resolveNext;
-			const next = ((resolved % itemCount) + itemCount) % itemCount;
-			if (next === prev) return prev;
-			setPreviousIndex(reducedMotionMode ? null : prev);
-			return next;
-		});
+		const prev = currentIndexRef.current;
+		const resolved = typeof resolveNext === 'function' ? resolveNext(prev) : resolveNext;
+		const next = ((resolved % itemCount) + itemCount) % itemCount;
+		if (next === prev) return;
+		currentIndexRef.current = next;
+		setCurrentIndex(next);
+		if (reducedMotionMode) return;
+		setPreviousIndex(prev);
+		setIsTransitioning(true);
 	}, [itemCount, reducedMotionMode]);
 
 	useEffect(() => {
-		if (!isActive) return undefined;
-		if (!shouldAutoRotate) return undefined;
-
-		const interval = setInterval(() => {
-			changeIndex((prev) => prev + 1);
-		}, AUTO_ROTATE_INTERVAL_MS);
-
-		return () => clearInterval(interval);
-	}, [changeIndex, isActive, shouldAutoRotate]);
+		const syncAutoRotate = () => {
+			const shouldRun = canAutoRotate && heroVisibleRef.current;
+			if (shouldRun && autoRotateTimerRef.current === null) {
+				autoRotateTimerRef.current = setInterval(() => {
+					changeIndex((prev) => prev + 1);
+				}, AUTO_ROTATE_INTERVAL_MS);
+			} else if (!shouldRun && autoRotateTimerRef.current !== null) {
+				clearInterval(autoRotateTimerRef.current);
+				autoRotateTimerRef.current = null;
+			}
+		};
+		syncAutoRotateRef.current = syncAutoRotate;
+		syncAutoRotate();
+		return () => {
+			clearInterval(autoRotateTimerRef.current);
+			autoRotateTimerRef.current = null;
+			syncAutoRotateRef.current = () => {
+			};
+		};
+	}, [canAutoRotate, changeIndex]);
 
 	useEffect(() => {
 		if (!reducedMotionMode) return;
@@ -146,15 +187,23 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		setPreviousIndex(null);
 	}, [reducedMotionMode]);
 
+	const finishTransition = useCallback(() => {
+		setIsTransitioning(false);
+		setPreviousIndex(null);
+	}, []);
+
+	// The CSS fade decides the duration: the transition ends when the incoming layer's animation ends.
+	const handleIncomingAnimationEnd = useCallback((event) => {
+		if (event.target !== event.currentTarget) return;
+		finishTransition();
+	}, [finishTransition]);
+
+	// Safety net in case no animationend arrives (e.g. the animation is disabled by CSS).
 	useEffect(() => {
-		if (reducedMotionMode || previousIndex === null || previousIndex === currentIndex) return undefined;
-		setIsTransitioning(true);
-		const timer = setTimeout(() => {
-			setIsTransitioning(false);
-			setPreviousIndex(null);
-		}, TRANSITION_DURATION_MS);
+		if (!isTransitioning) return undefined;
+		const timer = setTimeout(finishTransition, TRANSITION_FALLBACK_MS);
 		return () => clearTimeout(timer);
-	}, [currentIndex, previousIndex, reducedMotionMode]);
+	}, [currentIndex, finishTransition, isTransitioning]);
 
 	useEffect(() => {
 		setImageErrors({});
@@ -166,6 +215,12 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 		))
 	), [backdropWidth, items]);
 
+	const logoUrlsByIndex = useMemo(() => (
+		(items || []).map((entry) => (
+			entry?.Id && entry.ImageTags?.Logo ? jellyfinService.getImageUrl(entry.Id, 'Logo', 600) : ''
+		))
+	), [items]);
+
 	useEffect(() => {
 		if (itemCount === 0) return;
 
@@ -175,10 +230,17 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 			preloadIndexes.add(normalized);
 		}
 
-		preloadIndexes.forEach((index) => {
-			preloadHeroBackdrop(backdropUrlsByIndex[index]);
-		});
-	}, [backdropUrlsByIndex, currentIndex, itemCount, preloadAdjacentCount]);
+        // Logos are preloaded too, otherwise the title appears after the backdrop.
+        const keepUrls = new Set();
+        preloadIndexes.forEach((index) => {
+            [backdropUrlsByIndex[index], logoUrlsByIndex[index]].forEach((url) => {
+                if (!url) return;
+                keepUrls.add(url);
+                preloadHeroImage(url);
+            });
+        });
+        releaseHeroImagesExcept(keepUrls);
+	}, [backdropUrlsByIndex, currentIndex, itemCount, logoUrlsByIndex, preloadAdjacentCount]);
 
 	useEffect(() => {
 		if (!isActive) return undefined;
@@ -268,9 +330,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	const previousBackdropUrl = previousItem && previousIndex !== null
 		? (backdropUrlsByIndex[((previousIndex % itemCount) + itemCount) % itemCount] || '')
 		: '';
-	const logoUrl = currentItem.ImageTags?.Logo
-		? jellyfinService.getImageUrl(currentItem.Id, 'Logo', 600)
-		: null;
+	const logoUrl = logoUrlsByIndex[currentIndex % itemCount] || null;
 	const showLogo = Boolean(logoUrl);
 	const infoKey = reducedMotionMode ? 'hero-content-static' : `hero-content-${currentItem.Id}`;
 
@@ -313,7 +373,10 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 						)}
 					</div>
 				)}
-				<div className={`${css.backdropLayer} ${isTransitioning ? css.backdropLayerIncoming : css.backdropLayerCurrent}`}>
+				<div
+					className={`${css.backdropLayer} ${isTransitioning ? css.backdropLayerIncoming : css.backdropLayerCurrent}`}
+					onAnimationEnd={isTransitioning ? handleIncomingAnimationEnd : undefined}
+				>
 					{!currentHasImageError ? (
 						<>
 							<img
@@ -349,7 +412,7 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 								src={logoUrl}
 								alt={currentItem.Name}
 								className={`${css.logo} ${css.logoTransition}`}
-								loading="lazy"
+								loading="eager"
 								decoding="async"
 								draggable={false}
 							/>
@@ -440,4 +503,4 @@ const HeroBanner = ({ items, onPlayClick, isActive = false, variant = 'current' 
 	);
 };
 
-export default HeroBanner;
+export default memo(HeroBanner);

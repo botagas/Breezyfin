@@ -13,6 +13,9 @@
 	right: 0;
 	bottom: 0;
 	opacity: 0;
+	// Each layer stacks as a whole, so the incoming layer paints above the outgoing image
+	// (whose z-index would otherwise lift it over the incoming layer).
+	isolation: isolate;
 
 	img {
 		width: 100%;
@@ -40,9 +43,10 @@
 	animation: heroBackdropIn 420ms ease-out forwards !important;
 }
 
+// The outgoing backdrop stays fully visible underneath while the incoming one fades in on top;
+// fading both at once let the background show through halfway.
 .backdropLayerOutgoing {
 	opacity: 1;
-	animation: heroBackdropOut 420ms ease-out forwards !important;
 }
 
 .backdropFallback {
