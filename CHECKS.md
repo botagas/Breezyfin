@@ -97,6 +97,11 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
+- Configure more than eight server Home rows. Scroll with the pointer or wheel while
+  the cursor stays between cards. Verify pending rows load and later rows appear.
+  Repeat with 5-way input. Verify rows do not reload repeatedly after entering the
+  viewport and native lazy artwork loading remains active.
+
 - Log out and sign in with the same account. Verify Home reloads the current rows.
 - Fail a built-in Home row request, then restore the connection and return to Home.
   Verify Home retries the request and retains prior successful content during the failure.
