@@ -582,3 +582,9 @@ Status badge convention:
 
 - Keep comments minimal; prefer clear naming/structure so code explains itself.
 - Add comments only where behavior, constraints, or tradeoffs need to be addressed.
+
+Home row callers may pass `throwOnError: true` through the library and My Requests
+service options when the caller must distinguish a failed fetch from a valid empty
+result. Existing callers retain their default array fallback. Home must not cache a
+failed refresh as successful content. Home cache restoration must preserve the original
+fetch time and must not cross authenticated session generations.

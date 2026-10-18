@@ -370,20 +370,20 @@ class JellyfinService {
 		);
 	}
 
-	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) {
-		return getLatestMediaItems(this, includeItemTypes, limit, startIndex);
+	async getLatestMedia(includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0, options = {}) {
+		return getLatestMediaItems(this, includeItemTypes, limit, startIndex, options);
 	}
 
-	async getRecentlyAdded(limit = 20, startIndex = 0) {
-		return getRecentlyAddedItems(this, limit, startIndex);
+	async getRecentlyAdded(limit = 20, startIndex = 0, options = {}) {
+		return getRecentlyAddedItems(this, limit, startIndex, options);
 	}
 
-	async getNextUp(limit = 24, startIndex = 0) {
-		return getNextUpItems(this, limit, startIndex);
+	async getNextUp(limit = 24, startIndex = 0, options = {}) {
+		return getNextUpItems(this, limit, startIndex, options);
 	}
 
-	async getResumeItems(limit = 10, startIndex = 0) {
-		return getResumeMediaItems(this, limit, startIndex);
+	async getResumeItems(limit = 10, startIndex = 0, options = {}) {
+		return getResumeMediaItems(this, limit, startIndex, options);
 	}
 
 	async getCurrentUser() {
@@ -460,13 +460,14 @@ class JellyfinService {
 		return searchLibraryItemsPage(this, searchTerm, itemTypes, limit, startIndex);
 	}
 
-	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '') {
+	async getMyRequests(parentId, itemTypes = null, limit = 60, startIndex = 0, username = '', options = {}) {
 		return getMyRequestItems(this, {
 			parentId,
 			itemTypes,
 			limit,
 			startIndex,
-			username
+			username,
+			throwOnError: options.throwOnError === true
 		});
 	}
 

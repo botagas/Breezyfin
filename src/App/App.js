@@ -1,3 +1,4 @@
+import {clearHomeContentCache} from '../utils/homeContentCache';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import Spotlight from '@enact/spotlight';
@@ -191,6 +192,7 @@ const App = (props) => {
 		setPlayerControlsVisible
 	});
 	const resetSessionState = useCallback(() => {
+		clearHomeContentCache();
 		setSessionActive(false);
 		setSelectedItem(null);
 		setSelectedLibrary(null);

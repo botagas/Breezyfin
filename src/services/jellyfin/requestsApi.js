@@ -434,7 +434,8 @@ const collectTaggedFallbackPage = async (service, {
 	limit,
 	startIndex,
 	username,
-	pluginDiagnosticReason
+	pluginDiagnosticReason,
+	throwOnError = false
 }) => {
 	const safeLimit = normalizePositiveInteger(limit, 60);
 	const safeStartIndex = normalizeStartIndex(startIndex);
@@ -457,7 +458,7 @@ const collectTaggedFallbackPage = async (service, {
 	const collected = [];
 
 	while (collected.length < safeLimit && scanPages < FALLBACK_SCAN_PAGE_LIMIT && sourceHasMore) {
-		const rawItems = await service.getLibraryItems(parentId, itemTypes, rawLimit, cursor);
+		const rawItems = await service.getLibraryItems(parentId, itemTypes, rawLimit, cursor, ...(throwOnError ? [{throwOnError: true}] : []));
 		const safeRawItems = Array.isArray(rawItems) ? rawItems : [];
 		if (safeRawItems.length === 0) {
 			sourceHasMore = false;
@@ -508,7 +509,8 @@ export const getMyRequestItems = async (service, {
 	itemTypes,
 	limit = 60,
 	startIndex = 0,
-	username = ''
+	username = '',
+	throwOnError = false
 } = {}) => {
 	const safeParentId = normalizeOptionalQueryValue(parentId);
 	const pluginResult = await getMyRequestsFromPlugin(service, {
@@ -527,7 +529,8 @@ export const getMyRequestItems = async (service, {
 		limit,
 		startIndex,
 		username,
-		pluginDiagnosticReason: pluginResult.diagnosticReason
+		pluginDiagnosticReason: pluginResult.diagnosticReason,
+		throwOnError
 	};
 	if (String(username || '').trim()) {
 		try {

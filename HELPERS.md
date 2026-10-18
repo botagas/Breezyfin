@@ -1227,3 +1227,7 @@ Media Details season changes clear old episode and track selection state while l
 Old episode callbacks must not replace the pending season selection. The request cache
 retries invalidated data once. A second invalidation returns the same-session response
 without caching the response; the next reader must fetch again.
+
+- `src/utils/homeContentCache.js` stores Home content for Back navigation. Cache identity
+  includes the runtime session generation. Writes preserve the successful fetch time.
+  Session teardown clears the cache. Failed refreshes retain stale content for retry.
