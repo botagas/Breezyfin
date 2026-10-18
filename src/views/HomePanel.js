@@ -41,7 +41,8 @@ import {
 	getHomeContentSessionKey,
 	readHomeContentCache,
 	rememberHomeFocus,
-	writeHomeContentCache
+	writeHomeContentCache,
+	markHomeContentCacheStale
 } from '../utils/homeContentCache';
 
 import css from './HomePanel.module.less';
@@ -160,10 +161,9 @@ const HomePanel = ({
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
 	const contentLoadedRef = useRef(Boolean(cachedContent));
-	// Content restored with Back counts as freshly loaded unless it was marked stale, which triggers
-	// a background refresh without the loading overlay. Only the Home tab forces a full reload.
+	// Back restores content immediately, but preserves its age for background revalidation.
 	const cachedContentIsFresh = Boolean(cachedEntry && !cachedEntry.stale);
-	const contentLoadedAtRef = useRef(cachedContentIsFresh ? Date.now() : 0);
+	const contentLoadedAtRef = useRef(cachedContentIsFresh ? cachedEntry.loadedAt : 0);
 	const contentLoadSucceededRef = useRef(cachedContentIsFresh);
 	const lastResetTokenRef = useRef(resetToken);
 	const contentLoadedVersionRef = useRef(0);
@@ -260,6 +260,7 @@ const HomePanel = ({
 		contentLoadRequestIdRef.current += 1;
 		const loadRequestId = contentLoadRequestIdRef.current;
 		const loadInvalidationVersion = contentInvalidationVersionRef.current;
+		contentLoadSucceededRef.current = false;
 		const isInitialLoad = !contentLoadedRef.current;
 		serverHomeLoadBatchIdRef.current += 1;
 		if (isInitialLoad) {
@@ -332,56 +333,69 @@ const HomePanel = ({
 					serverHomeFallbackRef.current = true;
 				}
 			}
-			const recentlyPromise = jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT);
+			const userName = useServerHome ? '' : (jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '');
+			const requestOptions = {throwOnError: true};
+			let rowLoadFailed = false;
+			const loadRow = (request) => request.catch((error) => {
+				rowLoadFailed = true;
+				console.error('Failed to load Home row:', error);
+				return null;
+			});
+			const recentlyPromise = loadRow(jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT, 0, requestOptions));
 
 			if (useServerHome) {
 				recently = await recentlyPromise;
 			} else {
-				const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
 				[recently, resume, next, movies, shows, myRequestsResult, watchlistResult] = await Promise.all([
 					recentlyPromise,
-					jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getMyRequests(
+					loadRow(jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getMyRequests(
 						null,
 						['Movie', 'Series'],
 						HOME_ROW_PREVIEW_LIMIT,
 						0,
-						userName
-					).catch(() => ({items: []})),
+						userName,
+						requestOptions
+					)),
 					preferences.watchlistEnabled
-						? jellyfinService.getLikesWatchlist(HOME_ROW_PREVIEW_LIMIT).catch(() => ({items: []}))
+						? loadRow(jellyfinService.getLikesWatchlist(HOME_ROW_PREVIEW_LIMIT))
 						: Promise.resolve({items: []})
 				]);
 			}
 
-			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
+			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume || [], next || []]);
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
-			const heroContent = recently.filter(item =>
+			const heroContent = (recently || []).filter(item =>
 				(item.Type === 'Movie' || item.Type === 'Series') &&
 				item.BackdropImageTags && item.BackdropImageTags.length > 0
 			).slice(0, 5);
 
-			setHeroItems(heroContent);
-			setRecentlyAdded(recently || []);
-			setContinueWatching(enhancedResume || []);
-			setNextUp(enhancedNext || []);
-			setLatestMovies(movies || []);
-			setLatestShows(shows || []);
-			setMyRequests((myRequestsResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
-			setWatchlist((watchlistResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			if (recently !== null) {
+				setHeroItems(heroContent);
+				setRecentlyAdded(recently || []);
+			}
+			if (resume !== null) setContinueWatching(enhancedResume || []);
+			if (next !== null) setNextUp(enhancedNext || []);
+			if (movies !== null) setLatestMovies(movies || []);
+			if (shows !== null) setLatestShows(shows || []);
+			if (myRequestsResult !== null) setMyRequests((myRequestsResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			if (watchlistResult !== null) setWatchlist((watchlistResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
 			if (!useServerHome) setServerHomeRows(resolvedServerRows);
 			setServerHomeActive(useServerHome);
-			contentLoadSucceededRef.current = true;
+			contentLoadSucceededRef.current = !rowLoadFailed;
+			if (rowLoadFailed) markHomeContentCacheStale();
 		} catch (error) {
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
+			contentLoadSucceededRef.current = false;
+			markHomeContentCacheStale();
 			console.error('Failed to load content:', error);
 		} finally {
 			if (loadRequestId === contentLoadRequestIdRef.current) {
 				contentLoadedRef.current = true;
-				contentLoadedAtRef.current = Date.now();
+				contentLoadedAtRef.current = contentLoadSucceededRef.current ? Date.now() : 0;
 				contentLoadedVersionRef.current = loadInvalidationVersion;
 				setLoading(false);
 			}
@@ -531,6 +545,9 @@ const HomePanel = ({
 			watchlist,
 			serverHomeRows,
 			serverHomeActive
+		}, {
+			loadedAt: contentLoadedAtRef.current,
+			stale: contentLoadedVersionRef.current < contentInvalidationVersionRef.current
 		});
 	}, [
 		contentSessionKey,

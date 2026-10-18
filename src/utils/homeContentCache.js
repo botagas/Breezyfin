@@ -6,14 +6,15 @@ import {INTEGRATION_PREFERENCES_CHANGED_EVENT} from './integrationPreferences';
 // A stale entry is still shown, but Home refreshes it in the background.
 let cachedEntry = null;
 
-export const getHomeContentSessionKey = (service) => `${service?.serverUrl || ''}|${service?.userId || ''}`;
+export const getHomeContentSessionKey = (service) => `${service?.serverUrl || ''}|${service?.userId || ''}|${service?.sessionGeneration || 0}`;
 
 export const readHomeContentCache = (sessionKey, resetToken) => (
     cachedEntry?.sessionKey === sessionKey && cachedEntry.resetToken === resetToken ? cachedEntry : null
 );
 
-export const writeHomeContentCache = (sessionKey, resetToken, content) => {
-    cachedEntry = {sessionKey, resetToken, content, stale: false};
+export const writeHomeContentCache = (sessionKey, resetToken, content, {loadedAt = Date.now(), stale = false} = {}) => {
+    const focus = readHomeContentCache(sessionKey, resetToken)?.focus;
+    cachedEntry = {sessionKey, resetToken, content, loadedAt, stale, focus};
 };
 
 // Spotlight id of the row (or hero Play button) that was opened, restored when Home comes back with Back.

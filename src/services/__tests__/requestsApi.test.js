@@ -48,6 +48,18 @@ describe('requestsApi', () => {
 		jest.clearAllMocks();
 	});
 
+ it('propagates a failed bounded scan when Home requests error-aware results', async () => {
+  const service = createService();
+  service._request.mockRejectedValue(makeRequestError(404));
+  const error = new Error('offline');
+  service.getLibraryItems.mockImplementation((_parent, _types, _limit, _start, options) => {
+   if (options?.throwOnError) return Promise.reject(error);
+   return Promise.resolve([]);
+  });
+  await expect(getMyRequestItems(service, {username: 'review-user', throwOnError: true})).rejects.toBe(error);
+  expect(service.getLibraryItems).toHaveBeenLastCalledWith(null, undefined, 240, 0, {throwOnError: true});
+ });
+
 	it('discovers capabilities once per service session and returns plugin paging metadata', async () => {
 		const service = createService();
 		const firstItems = [
