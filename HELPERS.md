@@ -4,6 +4,11 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 
 ## How To Choose
 
+Home launch handling uses `src/App/utils/homeLaunch.js` for validated early parameter capture
+and deduplication, and `src/App/hooks/useHomePlaybackLaunch.js` for authenticated admission,
+pending account selection and cancellation. The hook reuses saved-session identity guards
+and the existing playback entry point. It does not negotiate media or store credentials.
+
 | Need | Preferred Helper |
 |---|---|
 | Save/restore non-virtual panel scroll + cache scrollTop | `usePanelScrollState` |

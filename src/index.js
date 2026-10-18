@@ -7,10 +7,12 @@ import './global.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import {initAppLogger} from './utils/appLogger';
+import {installHomeLaunchListener} from './App/utils/homeLaunch';
 
 const appElement = (<App />);
 
 if (typeof window !== 'undefined') {
+	installHomeLaunchListener(window, document);
 	initAppLogger();
 	if (ENACT_PACK_ISOMORPHIC) {
 		hydrateRoot(document.getElementById('root'), appElement);

@@ -31,13 +31,15 @@ export const useAppSyncPlayNavigation = ({
 		selectedItemId: selectedItem?.Id,
 		onOpenRemoteItem: openRemoteItem
 	});
-	const handlePlay = useCallback(async (item, options = null) => {
+	const handlePlay = useCallback(async (item, options = null, admission = null) => {
+		if (admission && !admission.isCurrent()) return;
 		try {
 			if (await coordinator.requestPlay(item, options)) return;
 		} catch (error) {
 			console.warn('Could not start SyncPlay group playback:', error);
 			return;
 		}
+		if (admission && !admission.isCurrent()) return;
 		if (currentView !== 'player') pushPanelHistory();
 		setSelectedItem(item);
 		setPlaybackOptions(options);

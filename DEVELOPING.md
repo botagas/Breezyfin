@@ -4,6 +4,11 @@ This document is the detailed developer guide for architecture patterns, shared 
 
 ## Core principles
 
+External Home playback follows [HOME_LAUNCH.md](HOME_LAUNCH.md). The early launch inbox
+initializes before React mounts. App-local launch coordination stages Details before using
+the normal playback entry point. Keep request parsing and asynchronous ownership outside
+the App orchestrator. Playback preparation must use the active authenticated session.
+
 - Reuse existing shared hooks/components before introducing new abstractions.
 - Keep panel logic modular with panel-local `components/`, `hooks/`, and `utils/` folders.
 - Keep styling token-driven and theme-consistent.

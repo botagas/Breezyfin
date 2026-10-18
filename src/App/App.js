@@ -7,6 +7,7 @@ import PerformanceOverlay from '../components/PerformanceOverlay';
 import FocusDebugOverlay from '../components/FocusDebugOverlay';
 import DebugErrorMenu from '../components/DebugErrorMenu';
 import ScreensaverOverlay from '../components/ScreensaverOverlay';
+import HomePlaybackNotice from '../components/HomePlaybackNotice';
 import jellyfinService from '../services/jellyfinService';
 import {isBackKey} from '../utils/keyCodes';
 import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
@@ -36,6 +37,7 @@ import {usePanelBackHandlerRegistry} from './hooks/usePanelBackHandlerRegistry';
 import {useAppScreensaver} from './hooks/useAppScreensaver';
 import {useIntegrationPanelCache} from './hooks/useIntegrationPanelCache';
 import {useAppSyncPlayNavigation} from './hooks/useAppSyncPlayNavigation';
+import {useHomePlaybackLaunch} from './hooks/useHomePlaybackLaunch';
 import {SyncPlayProvider} from '../contexts/SyncPlayContext';
 import SyncPlayGlobalOverlays from '../components/SyncPlayGlobalOverlays';
 import {emitAppDebugEvent, isEditableTarget} from './utils/appInput';
@@ -125,6 +127,7 @@ const App = (props) => {
 		spotlight: Spotlight
 	});
 	const handleBackRef = useRef(null);
+	const homeLaunchRef = useRef(null);
 	const crashRecoveryPendingRef = useRef(Boolean(peekCrashRecoveryAction()));
 	const {
 		refs: {
@@ -491,6 +494,10 @@ const App = (props) => {
 	}, [runtimeDataAttributes]);
 
 	const handleBack = useCallback(() => {
+		if (homeLaunchRef.current?.pending || homeLaunchRef.current?.notice) {
+			homeLaunchRef.current.cancel();
+			return true;
+		}
 		if (screensaverActive) {
 			dismissScreensaver();
 			return true;
@@ -636,6 +643,28 @@ const App = (props) => {
 		setLoginReauthenticationKey(null);
 		setCurrentView('login');
 	}, [resetSessionState]);
+
+	const prepareHomePlayback = useCallback((item) => {
+		clearPanelHistory();
+		setDetailsReturnView('home');
+		setPreviousItem(null);
+		setSelectedItem(item);
+		setPlaybackOptions(null);
+		setCurrentView('details');
+	}, [clearPanelHistory]);
+	const homeLaunch = useHomePlaybackLaunch({
+		authenticated: sessionActive,
+		restoring: sessionRestorePending,
+		currentView,
+		selectedItem,
+		crashRecoveryPending: crashRecoveryPendingRef.current,
+		onPrepare: prepareHomePlayback,
+		onPlay: handlePlay,
+		onChooseAccount: handleSwitchUser,
+		onWake: dismissScreensaver,
+		onRevealPlayer: () => setPlayerControlsVisible(true)
+	});
+	homeLaunchRef.current = homeLaunch;
 
 	const handleItemSelect = useCallback((item, fromItem = null) => {
 		if (diagnosticsEnabled) {
@@ -1000,6 +1029,7 @@ const App = (props) => {
 					suspended={screensaverActive}
 				/>
 				<SyncPlayGlobalOverlays />
+				<HomePlaybackNotice notice={homeLaunch.notice} onCancel={homeLaunch.cancel} onChooseAccount={homeLaunch.chooseAccount} onShown={homeLaunch.noticeShown} onHidden={homeLaunch.noticeHidden} />
 				<ScreensaverOverlay active={screensaverActive} />
 			</div>
 			</SyncPlayProvider>
