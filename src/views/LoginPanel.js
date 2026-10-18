@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Panel } from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import Heading from '@enact/sandstone/Heading';
@@ -52,7 +52,11 @@ const LoginPanel = ({
 	const [step, setStep] = useState('saved'); // 'saved' | 'server' | 'serverSelect' | 'login' | 'quickConnect'
 	const [savedServers, setSavedServers] = useState([]);
 	const [resumingKey, setResumingKey] = useState(null);
+	const resumeAttemptRef = useRef(0);
 	const [reauthenticatingKey, setReauthenticatingKey] = useState(null);
+	useEffect(() => () => {
+		resumeAttemptRef.current += 1;
+	}, []);
 	const savedServerKeySelector = useCallback((entry) => getSavedSessionKey(entry), []);
 	const savedServersByKey = useMapById(savedServers, savedServerKeySelector);
 	const savedServerChoices = useMemo(() => {
@@ -279,6 +283,7 @@ const LoginPanel = ({
 
 	const handleResume = useCallback(async (entry) => {
 		if (!entry) return;
+		const resumeAttempt = ++resumeAttemptRef.current;
 		const key = `${entry.serverId}:${entry.userId}`;
 		clearLoginMessages();
 		cancelQuickConnect();
@@ -294,12 +299,13 @@ const LoginPanel = ({
 				throw new Error('Saved session could not be activated');
 			}
 			const user = await jellyfinService.getCurrentUser();
-			if (!isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService)) return;
+			if (resumeAttempt !== resumeAttemptRef.current || !isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService)) return;
 			if (!user) {
 				throw new Error('Session is no longer valid');
 			}
 			onLogin();
 		} catch (err) {
+			if (resumeAttempt !== resumeAttemptRef.current) return;
 			if (
 				resumedSessionIdentity &&
 				!isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService)
@@ -312,13 +318,15 @@ const LoginPanel = ({
 				reauthenticationKey: key
 			});
 		} finally {
-			const resumedSessionIsCurrent = !resumedSessionIdentity ||
-				isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService);
-			if (resumedSessionIsCurrent) {
-				setLoading(false);
+			if (resumeAttempt === resumeAttemptRef.current) {
 				setResumingKey(null);
-				setStatus('');
-				refreshSavedServers();
+				const resumedSessionIsCurrent = !resumedSessionIdentity ||
+					isRuntimeSessionIdentityCurrent(resumedSessionIdentity, jellyfinService);
+				if (resumedSessionIsCurrent) {
+					setLoading(false);
+					setStatus('');
+					refreshSavedServers();
+				}
 			}
 		}
 	}, [cancelQuickConnect, clearLoginMessages, connectToSavedServer, onLogin, refreshSavedServers]);

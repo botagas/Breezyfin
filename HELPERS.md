@@ -549,6 +549,7 @@ usePlayerInteractionReveal({
   - restore metadata position before releasing startup and preserve the prior play state
   - save the selected preference only after the replacement becomes ready
   - restore the previous source in a fresh paused generation after post-swap failure
+  - end superseded loads without rollback and suppress terminal errors after cancellation
   - close the superseded Jellyfin session after successful readiness, and close an unused
     or failed replacement session before decision handoff, cancellation, or rollback
   - use the SyncPlay bridge's server-clock position and wait for Ready/Unpause authority
