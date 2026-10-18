@@ -207,16 +207,22 @@ const MediaRow = ({
 	}, [items?.length, variant]);
 
 	useEffect(() => {
-		if (imagesActive || typeof onRowVisible !== 'function' || !rowRef.current) return undefined;
+		if (typeof onRowVisible !== 'function' || !rowRef.current) return undefined;
 		if (typeof window.IntersectionObserver !== 'function') return undefined;
+		let notified = false;
+		let disposed = false;
 		const observer = new window.IntersectionObserver((entries) => {
-			if (!entries.some((entry) => entry.isIntersecting)) return;
+			if (disposed || notified || !entries.some((entry) => entry.isIntersecting)) return;
+			notified = true;
 			onRowVisible(rowIndex);
 			observer.disconnect();
 		}, {rootMargin: '65% 0px'});
 		observer.observe(rowRef.current);
-		return () => observer.disconnect();
-	}, [imagesActive, onRowVisible, rowIndex]);
+		return () => {
+			disposed = true;
+			observer.disconnect();
+		};
+	}, [onRowVisible, rowIndex]);
 
 	const handleFocus = useCallback((e) => {
 		onRowVisible?.(rowIndex);
