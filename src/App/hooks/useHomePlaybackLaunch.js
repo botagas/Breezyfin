@@ -12,7 +12,9 @@ export const useHomePlaybackLaunch = ({
 	const [notice, setNotice] = useState(null);
 	const [prepared, setPrepared] = useState(null);
 	const [noticeHiddenRevision, setNoticeHiddenRevision] = useState(0);
+	const [visibilityRevision, setVisibilityRevision] = useState(0);
 	const noticeVisible = useRef(false);
+	const waitingForForeground = useRef(false);
 	const generation = useRef(0);
 	const choosingAccount = useRef(null);
 	const admittedSession = useRef(null);
@@ -29,6 +31,7 @@ export const useHomePlaybackLaunch = ({
 		setPrepared(null);
 		setNotice(null);
 		choosingAccount.current = null;
+		waitingForForeground.current = false;
 		inbox.clear();
 	}, [inbox]);
 	const chooseAccount = useCallback((options = {}) => {
@@ -39,8 +42,9 @@ export const useHomePlaybackLaunch = ({
 	}, []);
 	useEffect(() => {
 		if (!request) { setNotice(error ? {message: error} : null); return undefined; }
-		latest.current.onWake?.();
 		if (crashRecoveryPending) { cancel(); return undefined; }
+		if (document.hidden) { waitingForForeground.current = true; setNotice(null); return undefined; }
+		latest.current.onWake?.();
 		if (restoring) return undefined;
 		if (admittedSession.current?.request === request && admittedSession.current.key !== sessionKey && choosingAccount.current !== request) {
 			cancel();
@@ -54,16 +58,23 @@ export const useHomePlaybackLaunch = ({
 		choosingAccount.current = null;
 		const token = ++generation.current;
 		const identity = captureRuntimeSessionIdentity(jellyfinService);
-		const current = () => generation.current === token && latest.current.request === request &&
+		const ownsRequest = () => generation.current === token && inbox.getSnapshot().request === request;
+		const current = () => ownsRequest() &&
 			!document.hidden && isRuntimeSessionIdentityCurrent(identity, jellyfinService);
+		const admitCompletion = () => {
+			if (!ownsRequest()) return false;
+			if (current()) return true;
+			cancel();
+			return false;
+		};
 		setNotice({message: 'Opening the Home item…', loading: true});
 		(async () => {
 			if (identity?.userId.replace(/-/g, '').toLowerCase() !== request.userId) {
-				if (current()) setNotice({message: `Choose the same account as Home on ${request.serverUrl}.`, account: true});
+				if (admitCompletion()) setNotice({message: `Choose the same account as Home on ${request.serverUrl}.`, account: true});
 				return;
 			}
 			const server = await jellyfinService.getPublicServerInfo();
-			if (!current()) return;
+			if (!admitCompletion()) return;
 			if (!server?.Id) throw new Error('The server could not be verified. Check the connection and try the Home card again.');
 			if (server.Id.replace(/-/g, '').toLowerCase() !== request.serverId) {
 				setNotice({message: `Choose the same server and account as Home: ${request.serverUrl}.`, account: true});
@@ -75,18 +86,18 @@ export const useHomePlaybackLaunch = ({
 				return;
 			}
 			const item = await jellyfinService.getItem(request.itemId);
-			if (!current()) return;
+			if (!admitCompletion()) return;
 			if (!item || !['Movie', 'Episode'].includes(item.Type) || item.Id !== request.itemId) {
 				throw new Error('This Home item is unavailable to the selected account. Refresh Home and try again.');
 			}
 			setNotice(null);
 			latest.current.onPrepare(item);
-			setPrepared({item, current, request});
+			setPrepared({item, current, admitCompletion, request});
 		})().catch(() => {
-			if (current()) setNotice({message: 'The Home item could not be opened. Check access and the server connection, then try again.'});
+			if (admitCompletion()) setNotice({message: 'The Home item could not be opened. Check access and the server connection, then try again.'});
 		});
 		return () => { generation.current += 1; };
-	}, [request, error, authenticated, restoring, crashRecoveryPending, sessionKey, inbox, cancel]);
+	}, [request, error, authenticated, restoring, crashRecoveryPending, sessionKey, visibilityRevision, inbox, cancel]);
 	useEffect(() => {
 		if (prepared && prepared.request !== request) { setPrepared(null); return; }
 		if (!prepared || currentView !== 'details' || selectedItem?.Id !== prepared.item.Id) return;
@@ -94,15 +105,22 @@ export const useHomePlaybackLaunch = ({
 		if (!prepared.current()) { cancel(); return; }
 		setPrepared(null);
 		Promise.resolve(latest.current.onPlay(prepared.item, null, {isCurrent: prepared.current})).then(() => {
-			if (prepared.current()) { setNotice(null); inbox.clear(); }
+			if (prepared.admitCompletion()) { setNotice(null); inbox.clear(); }
 		}).catch(() => {
-			if (prepared.current()) setNotice({message: 'Playback could not start. Try the Home card again.'});
+			if (prepared.admitCompletion()) setNotice({message: 'Playback could not start. Try the Home card again.'});
 		});
 	}, [prepared, request, currentView, selectedItem, noticeHiddenRevision, inbox, cancel]);
 	useEffect(() => {
-		const hide = () => { if (document.hidden && latest.current.request) cancel(); };
-		document.addEventListener('visibilitychange', hide);
-		return () => document.removeEventListener('visibilitychange', hide);
-	}, [cancel]);
+		const visibilityChanged = () => {
+			if (document.hidden) {
+				if (inbox.getSnapshot().request) cancel();
+			} else if (waitingForForeground.current) {
+				waitingForForeground.current = false;
+				setVisibilityRevision((value) => value + 1);
+			}
+		};
+		document.addEventListener('visibilitychange', visibilityChanged);
+		return () => document.removeEventListener('visibilitychange', visibilityChanged);
+	}, [cancel, inbox]);
 	return {notice, pending: Boolean(request), cancel, chooseAccount, noticeShown, noticeHidden};
 };

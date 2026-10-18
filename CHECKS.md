@@ -104,6 +104,11 @@ Run these before packaging a release candidate:
   its normal queue-replacement decision.
 - Verify launch requests contain no credentials or media URLs. Test malformed parameters,
   duplicate request IDs, unavailable items and ordinary app-icon launches.
+- Receive a Home relaunch while Breezyfin is already hidden. Confirm preparation waits for
+  foreground. Hide during server/item lookup and return; no loading notice may remain stuck.
+- Open a Home item, then use Settings cache wipe with and without keeping login. Confirm the
+  reload cannot replay the old Home request or reopen its account notice. A new Home card
+  activation must still work.
 
 ### Login flow validation
 

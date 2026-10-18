@@ -85,6 +85,63 @@ describe('Home playback admission', () => {
 		expect(options.onPrepare).not.toHaveBeenCalled();
 		expect(options.onPlay).not.toHaveBeenCalled();
 	});
+	it.each(['server', 'item'])('clears a pending %s lookup when it observes hidden state before the visibility event', async (stage) => {
+		const pending = deferred();
+		if (stage === 'server') jellyfinService.getPublicServerInfo.mockReturnValue(pending.promise);
+		else jellyfinService.getItem.mockReturnValue(pending.promise);
+		inbox.receive(request());
+		const view = renderHook(() => useHomePlaybackLaunch(options));
+		await waitFor(() => expect(stage === 'server' ? jellyfinService.getPublicServerInfo : jellyfinService.getItem).toHaveBeenCalled());
+		expect(view.result.current.notice?.loading).toBe(true);
+		Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+		await act(async () => { pending.resolve(stage === 'server' ? {Id: serverId} : item); await pending.promise; });
+		expect(view.result.current.notice).toBeNull();
+		expect(inbox.getSnapshot().request).toBeNull();
+		act(() => {
+			Object.defineProperty(document, 'hidden', {configurable: true, value: false});
+			document.dispatchEvent(new Event('visibilitychange'));
+		});
+		expect(view.result.current.notice).toBeNull();
+		expect(options.onPrepare).not.toHaveBeenCalled();
+	});
+	it('waits for foreground when a relaunch arrives while already hidden', async () => {
+		Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+		const view = renderHook(() => useHomePlaybackLaunch(options));
+		act(() => inbox.receive(request()));
+		expect(view.result.current.notice).toBeNull();
+		expect(jellyfinService.getPublicServerInfo).not.toHaveBeenCalled();
+		act(() => {
+			Object.defineProperty(document, 'hidden', {configurable: true, value: false});
+			document.dispatchEvent(new Event('visibilitychange'));
+		});
+		await waitFor(() => expect(options.onPrepare).toHaveBeenCalledWith(item));
+	});
+	it('does not let an old hidden completion cancel a newer queued relaunch', async () => {
+		const pending = deferred(); jellyfinService.getItem.mockReturnValueOnce(pending.promise);
+		inbox.receive(request()); renderHook(() => useHomePlaybackLaunch(options));
+		await waitFor(() => expect(jellyfinService.getItem).toHaveBeenCalledTimes(1));
+		Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+		act(() => inbox.receive(request('newer')));
+		await act(async () => { pending.resolve(item); await pending.promise; });
+		expect(inbox.getSnapshot().request?.requestId).toBe('newer');
+		act(() => {
+			Object.defineProperty(document, 'hidden', {configurable: true, value: false});
+			document.dispatchEvent(new Event('visibilitychange'));
+		});
+		await waitFor(() => expect(options.onPrepare).toHaveBeenCalledWith(item));
+	});
+	it('clears ownership when playback admission finishes hidden before a visibility event', async () => {
+		const pending = deferred(); options.onPlay.mockReturnValue(pending.promise);
+		inbox.receive(request());
+		const view = renderHook((props) => useHomePlaybackLaunch(props), {initialProps: options});
+		await waitFor(() => expect(options.onPrepare).toHaveBeenCalledWith(item));
+		view.rerender({...options, currentView: 'details', selectedItem: item});
+		await waitFor(() => expect(options.onPlay).toHaveBeenCalled());
+		Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+		await act(async () => { pending.resolve(); await pending.promise; });
+		expect(inbox.getSnapshot().request).toBeNull();
+		expect(view.result.current.notice).toBeNull();
+	});
 	it('keeps the newest request when lookups complete out of order', async () => {
 		const old = deferred(); jellyfinService.getItem.mockReturnValueOnce(old.promise);
 		inbox.receive(request()); renderHook(() => useHomePlaybackLaunch(options));

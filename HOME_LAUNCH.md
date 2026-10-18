@@ -24,8 +24,13 @@ automatic connection, account switch or credential transfer.
 
 The early inbox captures initial platform parameters before React mounts and accepts
 `webOSLaunch` and `webOSRelaunch` events. It keeps only the latest request and remembers
-the most recent 128 request IDs in memory. Ordinary launches do not start playback.
-Requests do not survive an application restart or crash recovery.
+the most recent 128 request IDs in memory and session storage. Only opaque request IDs
+are stored; request bodies, account IDs and credentials are not stored in the receipt ledger.
+The listener writes the receipts again before page unload because Settings clears session
+storage before reloading. Retained platform parameters cannot replay an accepted request
+after an ordinary reload or a Settings cache wipe. Storage failures retain in-memory
+deduplication without preventing new launches. Ordinary launches do not start playback.
+Pending requests do not survive a page reload, application restart or crash recovery.
 
 Missing or mismatched authentication opens an account notice. Choose account closes the
 notice before opening the existing account-selection flow. Cancel or Back abandons the
@@ -40,6 +45,9 @@ An already-playing matching item only reveals the player controls.
 Cancellation, a newer request, session replacement, hiding during preparation and unmount
 invalidate asynchronous preparation. After the existing playback coordinator accepts the
 request, normal Player and SyncPlay lifecycle behavior owns playback.
+An initial request received while already hidden waits for foreground before preparation.
+A completion that observes hidden state cancels only its own pending request and loading
+notice, even if the visibility event has not arrived. It cannot clear a newer request.
 Leaving Player retains layered Back handling and returns to the item Details page, then
 Breezyfin Home. The TV Home button remains a platform action.
 
