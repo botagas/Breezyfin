@@ -1,4 +1,5 @@
 import {getBreezyfinCapabilities, getMyRequestItems} from '../jellyfin/requestsApi';
+import {getLibraryChildItems} from '../jellyfin/libraryApi';
 
 let serviceCounter = 0;
 
@@ -46,6 +47,18 @@ describe('requestsApi', () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
+
+ it('propagates a failed bounded scan when Home requests error-aware results', async () => {
+  const service = createService();
+  service._request.mockRejectedValue(makeRequestError(404));
+  const error = new Error('offline');
+  service.getLibraryItems.mockImplementation((_parent, _types, _limit, _start, options) => {
+   if (options?.throwOnError) return Promise.reject(error);
+   return Promise.resolve([]);
+  });
+  await expect(getMyRequestItems(service, {username: 'review-user', throwOnError: true})).rejects.toBe(error);
+  expect(service.getLibraryItems).toHaveBeenLastCalledWith(null, undefined, 240, 0, {throwOnError: true});
+ });
 
 	it('discovers capabilities once per service session and returns plugin paging metadata', async () => {
 		const service = createService();
@@ -183,6 +196,107 @@ describe('requestsApi', () => {
 			8,
 			8
 		);
+	});
+
+	it('loads requests through the server tag filter when the tag list is available', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue([
+			'1 - requester',
+			'2-Requester',
+			'3 - someone',
+			'4 - requester|other',
+			'drama'
+		]);
+		service.getLibraryItems.mockResolvedValueOnce([makeItem('match-1', ['1 - requester'])]);
+
+		await expect(getMyRequestItems(service, {
+			itemTypes: ['Movie', 'Series'],
+			limit: 2,
+			startIndex: 4,
+			username: 'requester'
+		})).resolves.toEqual({
+			items: [makeItem('match-1', ['1 - requester'])],
+			source: 'tags-filter',
+			scannedCount: 1,
+			nextStartIndex: 5,
+			hasMore: false,
+			diagnosticReason: 'plugin-capabilities-missing'
+		});
+		expect(service.getItemFilterTags).toHaveBeenCalledWith(null, ['Movie', 'Series']);
+		expect(service.getLibraryItems).toHaveBeenCalledTimes(1);
+		expect(service.getLibraryItems).toHaveBeenCalledWith(
+			null,
+			['Movie', 'Series'],
+			2,
+			4,
+			{tags: ['1 - requester', '2-Requester'], throwOnError: true}
+		);
+	});
+
+	it.each([414, 500, 'network', 'timeout'])('falls back after a filtered library request fails: %s', async (failure) => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['1 - requester']);
+		const error = typeof failure === 'number' ? makeRequestError(failure) : new Error(failure);
+		if (failure === 'timeout') error.name = 'TimeoutError';
+		const match = makeItem('filtered-fallback-match', ['1 - requester']);
+		service._fetchItems = jest.fn().mockRejectedValueOnce(error).mockResolvedValueOnce([match]);
+		service.getLibraryItems.mockImplementation((...args) => getLibraryChildItems(service, ...args));
+		await expect(getMyRequestItems(service, {username: 'requester', limit: 2})).resolves.toMatchObject({
+			source: 'tags-fallback', items: [match], nextStartIndex: 1, hasMore: false
+		});
+		expect(service._fetchItems).toHaveBeenCalledTimes(2);
+		expect(new URL(service._fetchItems.mock.calls[0][0]).searchParams.has('tags')).toBe(true);
+		expect(new URL(service._fetchItems.mock.calls[1][0]).searchParams.has('tags')).toBe(false);
+	});
+
+	it('does not scan after a valid empty filtered library response', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['1 - requester']);
+		service._fetchItems = jest.fn().mockResolvedValue([]);
+		service.getLibraryItems.mockImplementation((...args) => getLibraryChildItems(service, ...args));
+		await expect(getMyRequestItems(service, {username: 'requester'})).resolves.toMatchObject({source: 'tags-filter', items: [], hasMore: false});
+		expect(service._fetchItems).toHaveBeenCalledTimes(1);
+	});
+
+	it.each([401, 403, 'AbortError', 'ERR_CANCELED'])('propagates filtered request authentication and cancellation errors: %s', async (failure) => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['1 - requester']);
+		const error = typeof failure === 'number' ? makeRequestError(failure) : Object.assign(new Error('cancelled'), failure === 'AbortError' ? {name: failure} : {code: failure});
+		service._fetchItems = jest.fn().mockRejectedValue(error);
+		service.getLibraryItems.mockImplementation((...args) => getLibraryChildItems(service, ...args));
+		await expect(getMyRequestItems(service, {username: 'requester'})).rejects.toBe(error);
+		expect(service._fetchItems).toHaveBeenCalledTimes(1);
+	});
+
+	it('skips the item request when no tag belongs to the user', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockResolvedValue(['3 - someone', 'drama']);
+
+		await expect(getMyRequestItems(service, {username: 'requester'})).resolves.toEqual(
+			expect.objectContaining({items: [], source: 'tags-filter', hasMore: false})
+		);
+		expect(service.getLibraryItems).not.toHaveBeenCalled();
+	});
+
+	it('scans the library when the tag list is unavailable', async () => {
+		const service = createService();
+		service._request.mockRejectedValueOnce(makeRequestError(404));
+		service.getItemFilterTags = jest.fn().mockRejectedValue(new Error('no tag list'));
+		service.getLibraryItems.mockResolvedValue([]);
+
+		await expect(getMyRequestItems(service, {
+			itemTypes: ['Movie'],
+			limit: 10,
+			username: 'requester'
+		})).resolves.toEqual(
+			expect.objectContaining({source: 'tags-fallback'})
+		);
+		expect(service.getLibraryItems).toHaveBeenCalledWith(null, ['Movie'], 40, 0);
 	});
 
 	it('caches a missing My Requests endpoint for the authenticated session', async () => {

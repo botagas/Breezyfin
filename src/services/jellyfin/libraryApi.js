@@ -1,7 +1,7 @@
 import {JELLYFIN_TICKS_PER_SECOND} from '../../constants/time';
 import {normalizeOptionalQueryValue} from './queryParams';
 
-export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0) => {
+export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 'Series'], limit = 16, startIndex = 0, options = {}) => {
 	try {
 		const types = Array.isArray(includeItemTypes) ? includeItemTypes.join(',') : includeItemTypes;
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
@@ -11,12 +11,13 @@ export const getLatestMediaItems = async (service, includeItemTypes = ['Movie', 
 			'getLatestMedia'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error(`getLatestMedia ${includeItemTypes} error:`, error);
 		return [];
 	}
 };
 
-export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0) => {
+export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0, options = {}) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
@@ -25,12 +26,13 @@ export const getRecentlyAddedItems = async (service, limit = 20, startIndex = 0)
 			'getRecentlyAdded'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error('getRecentlyAdded error:', error);
 		return [];
 	}
 };
 
-export const getNextUpItems = async (service, limit = 24, startIndex = 0) => {
+export const getNextUpItems = async (service, limit = 24, startIndex = 0, options = {}) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
@@ -39,12 +41,13 @@ export const getNextUpItems = async (service, limit = 24, startIndex = 0) => {
 			'getNextUp'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error('Failed to get next up:', error);
 		return [];
 	}
 };
 
-export const getResumeMediaItems = async (service, limit = 10, startIndex = 0) => {
+export const getResumeMediaItems = async (service, limit = 10, startIndex = 0, options = {}) => {
 	try {
 		const safeStartIndex = Math.max(0, Number(startIndex) || 0);
 		return await service._fetchItems(
@@ -53,6 +56,7 @@ export const getResumeMediaItems = async (service, limit = 10, startIndex = 0) =
 			'getResumeItems'
 		);
 	} catch (error) {
+		if (options.throwOnError === true) throw error;
 		console.error('getResumeItems error:', error);
 		return [];
 	}
@@ -104,13 +108,61 @@ export const getLibraryChildItems = async (
 		if (typeof options?.searchTerm === 'string' && options.searchTerm.trim()) {
 			params.set('searchTerm', options.searchTerm.trim());
 		}
+		if (Array.isArray(options?.tags) && options.tags.length > 0) {
+			params.set('tags', options.tags.join('|'));
+		}
 		const url = `${service.serverUrl}/Users/${service.userId}/Items?${params.toString()}`;
 
 		return await service._fetchItems(url, {}, 'getLibraryItems');
 	} catch (error) {
+		if (options?.throwOnError === true) throw error;
 		console.error('getLibraryItems error:', error);
 		return [];
 	}
+};
+
+// Each id adds ~33 characters to the URL; chunks keep requests well below common 8 KB request-line limits.
+const ITEMS_USER_DATA_CHUNK_SIZE = 50;
+
+export const getItemsUserData = async (service, itemIds) => {
+	const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).filter(Boolean))];
+	const chunks = [];
+	for (let index = 0; index < ids.length; index += ITEMS_USER_DATA_CHUNK_SIZE) {
+		chunks.push(ids.slice(index, index + ITEMS_USER_DATA_CHUNK_SIZE));
+	}
+	const results = await Promise.all(chunks.map(async (chunk) => {
+		try {
+			return await service._fetchItems(
+				`/Users/${service.userId}/Items?ids=${chunk.map(encodeURIComponent).join(',')}&enableImages=false`,
+				{},
+				'getItemsUserData'
+			);
+		} catch (error) {
+			console.error('getItemsUserData error:', error);
+			return [];
+		}
+	}));
+	return results.flat();
+};
+
+// Throws instead of returning [] so callers can tell "no tags" apart from "tag list unavailable".
+export const getItemFilterTags = async (service, parentId, itemTypes) => {
+	const params = new URLSearchParams();
+	params.set('userId', service.userId);
+	const safeParentId = normalizeOptionalQueryValue(parentId);
+	if (safeParentId) params.set('parentId', safeParentId);
+	params.set('recursive', 'true');
+	const types = Array.isArray(itemTypes) ? itemTypes.join(',') : itemTypes;
+	if (typeof types === 'string' && types.trim()) {
+		params.set('includeItemTypes', types.trim());
+	}
+	const data = await service._request(`/Items/Filters2?${params.toString()}`, {
+		context: 'getItemFilterTags'
+	});
+	if (!Array.isArray(data?.Tags)) {
+		throw new Error('getItemFilterTags returned no tag list');
+	}
+	return data.Tags.filter((tag) => typeof tag === 'string');
 };
 
 export const getItemDetails = async (service, itemId) => {

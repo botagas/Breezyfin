@@ -30,7 +30,7 @@ export const useProviderPanelShell = ({
 		cacheSnapshotRef.current = merged;
 		onCacheState(merged);
 	}, [onCacheState]);
-	const {captureScrollTo, handleScrollStop} = usePanelScrollState({
+	const {captureScrollTo, handleScroll, handleScrollStop} = usePanelScrollState({
 		cachedState,
 		isActive,
 		onCacheState: cachePanelState
@@ -72,6 +72,7 @@ export const useProviderPanelShell = ({
 		openExternalItem,
 		requestIdRef,
 		captureScrollTo,
+		handleScroll,
 		handleScrollStop,
 		toolbarActions,
 		closeExternalItem,

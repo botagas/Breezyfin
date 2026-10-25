@@ -15,6 +15,14 @@ Run these before merging or publishing:
 1. `npm run lint`
 2. `npm run test -- --watch=false --runInBand`
 3. `npm run audit`
+4. `npm audit --omit=dev --audit-level=high`
+
+The repository audit and npm security audit are separate checks. Contributors must run both.
+
+After updating dependencies, repeat `npm ci` before the production security audit.
+Confirm `audit:runtime-deps` rejects unclassified extraneous Enact CLI entries.
+Those entries must be pruned by lockfile regeneration or remain development-only;
+do not exclude an application dependency to suppress a security finding.
 
 ## Release-oriented checks
 
@@ -68,6 +76,14 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
+- Start DirectPlay with an explicit non-default audio track that the runtime does
+  not expose. Confirm the delayed fallback uses the current media source and position.
+  Replace playback before discovery times out and confirm the old source cannot restart.
+
+- Start lightweight styled subtitles and let a subtitle gap pass. Verify the first
+  dialogue cue after each gap remains fitted inside its stage. Repeat with whole-layer
+  offsets enabled. Verify authored clipped signs and drawings retain their geometry.
+
 - After initial native-audio fallback has been used, select Retry for the same item. Verify
   the fallback is available once again and remains limited across automatic replacement
   generations.
@@ -83,22 +99,94 @@ Run these before packaging a release candidate:
   switching status appears immediately, negotiation continues after the deadline, and Back
   cancels the wait without a later transition.
 
+- Set subtitle X/Y offsets, then toggle `Apply Offsets to Entire Styled Layer`. Compare
+  lightweight ASS, an external ASS renderer, and PGS. Verify authored signs and dialogue
+  move together only when enabled. Verify clips remain aligned and offsets are not doubled.
+  Ordinary top and middle captions must retain their positions. Repeat with Player
+  controls shown and hidden in Classic and Elegant themes on supported webOS versions.
+- Fail an audio replacement, then press Back while restoration is pending. Verify the
+  cancelled restoration does not publish a fatal playback error.
+- Supersede an audio replacement with playback recovery. Verify the stale replacement
+  does not restore an older source or stop the active recovery session.
+
 ### Navigation/focus validation
 
-- None.
+- Launch a Home card with the client closed, browsing and already playing. Confirm a matching
+  item is not restarted. Confirm Player Back returns to Details, then Breezyfin Home.
+- Compare Home and in-app playback for resume, multiple audio languages, subtitles Off,
+  forced/preferred subtitles, source versions and HDR/DV or subtitle consent.
+- Use mismatched server/user sessions and expired credentials. Confirm Choose account closes
+  the popup before sign-in; matching sign-in continues playback. Cancel and Back must abandon it.
+- Delay server/item requests, then cancel, hide the app, change account or launch a newer card.
+  Confirm stale results cannot open Player. Repeat with an existing SyncPlay group and preserve
+  its normal queue-replacement decision.
+- Verify launch requests contain no credentials or media URLs. Test malformed parameters,
+  duplicate request IDs, unavailable items and ordinary app-icon launches.
+- Receive a Home relaunch while Breezyfin is already hidden. Confirm preparation waits for
+  foreground. Hide during server/item lookup and return; no loading notice may remain stuck.
+- Open a Home item, then use Settings cache wipe with and without keeping login. Confirm the
+  reload cannot replay the old Home request or reopen its account notice. A new Home card
+  activation must still work.
+- Recover from a crash with missing or expired saved credentials. Complete manual sign-in,
+  then activate a fresh Home card. The old crash action must not block playback or restore
+  another account's navigation. Repeat with an unavailable user lookup and Return Home recovery.
 
 ### Login flow validation
+
+- Resume an expired saved account, then return from credentials with Back. Verify the
+  saved account no longer shows `Opening...`.
 
 - Return a non-JSON `400` or `401` response from the authentication endpoint. Verify the
   Login panel reports the HTTP failure instead of a JSON parser error.
 
 ### Browse and Home regression validation
 
-- None.
+- Configure more than eight server Home rows. Scroll with the pointer or wheel while
+  the cursor stays between cards. Verify pending rows load and later rows appear.
+  Repeat with 5-way input. Verify rows do not reload repeatedly after entering the
+  viewport and native lazy artwork loading remains active.
+
+- Log out and sign in with the same account. Verify Home reloads the current rows.
+- Fail a built-in Home row request, then restore the connection and return to Home.
+  Verify Home retries the request and retains prior successful content during the failure.
+- Return with Back after the two-minute freshness period. Verify Home refreshes the rows.
+  Verify a successful empty response does not trigger repeated reloads.
+
+- With plugin My Requests unavailable, fail the tag-filtered Items request while the
+  unfiltered request succeeds. Verify My Requests uses the bounded fallback scan.
+  Return a valid empty filtered response and verify no fallback scan starts.
 
 ### Media Details validation
 
-- None.
+- Change Favorite, Watched, and Watchlist state outside the current card, then open
+  that card. Verify fresh details update all three buttons and the next action uses
+  the refreshed state. Repeat with a movie, episode, and series.
+- Delay details loading and complete a local item action. Verify the late details
+  response cannot revert that action and can still refresh the other flags.
+
+- Delay a season request and select an old episode with pointer and 5-way input.
+  Verify the new season owns the selected episode and audio/subtitle track metadata.
+- Switch seasons twice and let the earlier request finish last. Verify the latest
+  season remains selected.
+- Toggle watched or favorite state twice while episode or season lists load. Verify
+  the lists remain populated and the next visit retrieves current user data.
+
+- On a standalone episode page, change watched and favorite status, then open the
+  parent series immediately. Verify badges, season state, and resume selection refresh
+  without waiting for the cache TTL. Repeat when navigating away before the save ends.
+- In the sideways episode layout, hover a clipped card at each row edge. Verify the row
+  reveals the card without selecting an episode or changing vertical scroll. Keep the
+  pointer stationary during the animation and verify scrolling stops. Move between card
+  actions and verify the row does not repeatedly scroll. Repeat with pointer and 5-way
+  input in both themes and all performance modes.
+- Switch between saved users while opening the same series. Verify watched badges and
+  resume selection belong to the current user. After playback, reopen the series and
+  verify updated progress without waiting for the request-cache TTL.
+- Open Media Details with 5-way input and return from a picker. Verify initial and forced
+  focus uses `Audio -> Subtitle -> Play` and never selects Favorite or Watched as fallback.
+- Use a file whose default subtitle language differs from the preferred language. Verify
+  the file default is selected when no saved or preferred-language choice matches. Verify
+  saved and global `None` still turn subtitles off.
 
 ### TV performance validation
 

@@ -5,16 +5,11 @@ import ri from '@enact/ui/resolution';
 
 import {SCROLLER_OVERSCROLL_EFFECT_OFF} from '../constants/scroller';
 import {usePerformanceMode} from '../hooks/usePerformanceMode';
+import {useWheelScrollSpotlightPause} from '../hooks/useWheelScrollSpotlightPause';
 import {useRuntimeDiagnosticsEnabled} from '../hooks/useRuntimeDiagnostics';
 import {getVirtualGridOverhang} from '../utils/performanceMode';
-import {
-	resolveGridFocusRestoreTarget,
-	updateGridFocusRestoreCycle
-} from '../utils/gridScrollRestore';
-import {
-	registerMediaGridProfile,
-	unregisterMediaGridProfile
-} from '../utils/mediaPerformanceMetrics';
+import {resolveGridFocusRestoreTarget, updateGridFocusRestoreCycle} from '../utils/gridScrollRestore';
+import {registerMediaGridProfile, unregisterMediaGridProfile} from '../utils/mediaPerformanceMetrics';
 import css from './MediaVirtualGrid.module.less';
 
 export const MEDIA_VIRTUAL_GRID_VARIANTS = Object.freeze({
@@ -96,9 +91,12 @@ const MediaVirtualGrid = ({
 		scrollToRef.current = scrollTo;
 		cbScrollTo?.(scrollTo);
 	}, [cbScrollTo]);
-	const handleScrollStop = useCallback(({moreInfo} = {}) => {
+	const handleLoadMoreOnScrollStop = useCallback(({moreInfo} = {}) => {
 		requestLoadMore(moreInfo?.lastVisibleIndex);
 	}, [requestLoadMore]);
+	const {handleScrollStart, handleScrollStop} = useWheelScrollSpotlightPause({
+		onScrollStop: handleLoadMoreOnScrollStop
+	});
 
 	useEffect(() => {
 		if (!diagnosticsEnabled) return undefined;
@@ -150,6 +148,7 @@ const MediaVirtualGrid = ({
 				spacing={metrics.spacing}
 				childProps={childProps}
 				cbScrollTo={captureScrollTo}
+				onScrollStart={handleScrollStart}
 				onScrollStop={handleScrollStop}
 				overhang={resolvedOverhang}
 				overscrollEffectOn={overscrollEffectOn}

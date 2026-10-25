@@ -4,6 +4,8 @@ import {BITMAP_SUBTITLE_RENDERERS} from '../../utils/bitmapSubtitleRenderers';
 
 export {
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
+	SUBTITLE_OVERLAY_OFFSET_X_RANGE,
+	SUBTITLE_OVERLAY_OFFSET_Y_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_LEGACY_PX,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE,
 	SUBTITLE_OVERLAY_SIZE_LEGACY_PX
@@ -21,12 +23,16 @@ export const DEFAULT_SETTINGS = {
 	subtitleBurnInTextCodecs: ['ass', 'ssa'],
 	subtitleOverlaySize: 'medium',
 	subtitleOverlayFontSizePx: '36',
-	subtitleOverlayPosition: 'standard',
+	subtitleOverlayOffsetYPx: '0',
+	subtitleOverlayOffsetXPx: '0',
+	subtitleOverlayOffsetStyled: false,
 	subtitleOverlayBackground: 'none',
 	subtitleOverlayWeight: 'bold',
 	subtitleOverlayTextColor: 'white',
+    subtitleOverlayTextColorHex: '',
 	subtitleOverlayBorderStyle: 'outline',
 	subtitleOverlayBorderColor: 'black',
+    subtitleOverlayBorderColorHex: '',
 	subtitleOverlayBorderStrength: 'medium',
 	subtitleOverlayOutlineSize: 'medium',
 	subtitleOverlayOutlineSizePx: '2',
@@ -150,12 +156,6 @@ export const SUBTITLE_OVERLAY_SIZE_OPTIONS = [
 	{value: 'large', label: 'Large'}
 ];
 
-export const SUBTITLE_OVERLAY_POSITION_OPTIONS = [
-	{value: 'low', label: 'Low'},
-	{value: 'standard', label: 'Standard (Default)'},
-	{value: 'raised', label: 'Raised'}
-];
-
 export const SUBTITLE_OVERLAY_BACKGROUND_OPTIONS = [
 	{value: 'none', label: 'None (Default)'},
 	{value: 'low', label: 'Low'},
@@ -172,7 +172,12 @@ export const SUBTITLE_OVERLAY_WEIGHT_OPTIONS = [
 export const SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS = [
 	{value: 'white', label: 'White (Default)'},
 	{value: 'warmWhite', label: 'Warm White'},
+    {value: 'lightGray', label: 'Light Gray'},
 	{value: 'yellow', label: 'Yellow'},
+    {value: 'orange', label: 'Orange'},
+    {value: 'green', label: 'Green'},
+    {value: 'cyan', label: 'Cyan'},
+    {value: 'pink', label: 'Pink'},
 	{value: 'black', label: 'Black'}
 ];
 
@@ -227,7 +232,8 @@ export const SETTINGS_DISCLOSURE_KEYS = {
 	BITMAP_SUBTITLE_RENDERER: 'bitmapSubtitleRendererPopup',
 	SUBTITLE_BURN_IN_TEXT_CODECS: 'subtitleBurnInTextCodecsPopup',
 	SUBTITLE_OVERLAY_SIZE: 'subtitleOverlaySizePopup',
-	SUBTITLE_OVERLAY_POSITION: 'subtitleOverlayPositionPopup',
+	SUBTITLE_OVERLAY_OFFSET_Y: 'subtitleOverlayOffsetYPopup',
+	SUBTITLE_OVERLAY_OFFSET_X: 'subtitleOverlayOffsetXPopup',
 	SUBTITLE_OVERLAY_BACKGROUND: 'subtitleOverlayBackgroundPopup',
 	SUBTITLE_OVERLAY_WEIGHT: 'subtitleOverlayWeightPopup',
 	SUBTITLE_OVERLAY_TEXT_COLOR: 'subtitleOverlayTextColorPopup',
@@ -254,7 +260,8 @@ export const SETTINGS_DISCLOSURE_KEY_LIST = [
 	SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE,
-	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_Y,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_X,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR,
@@ -281,7 +288,8 @@ export const INITIAL_SETTINGS_DISCLOSURES = {
 	[SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE]: false,
-	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_Y]: false,
+	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_X]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT]: false,
 	[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR]: false,
@@ -316,7 +324,8 @@ export const DISCLOSURE_BACK_PRIORITY = [
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND,
-	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_Y,
+	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_X,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE,
 	SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS,
 	SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER,

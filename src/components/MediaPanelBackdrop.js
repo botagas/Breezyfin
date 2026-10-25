@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {memo, useCallback, useEffect, useMemo, useState} from 'react';
 import {applyImageFormatFallbackFromEvent} from '../utils/imageFormat';
 import {getMediaPanelBackdropUrls, uniqueImageCandidates} from '../utils/mediaItemUtils';
 import {buildExternalImageVariantUrl} from '../utils/externalImageUrls';
@@ -53,4 +53,4 @@ const MediaPanelBackdrop = ({item = null, imageUrl = '', className = ''}) => {
 	);
 };
 
-export default MediaPanelBackdrop;
+export default memo(MediaPanelBackdrop);

@@ -4,6 +4,15 @@ This file documents shared hooks/helpers used across Breezyfin so panel code sta
 
 ## How To Choose
 
+Home launch handling uses `src/App/utils/homeLaunch.js` for validated early parameter capture
+and bounded session-scoped receipt deduplication, and `src/App/hooks/useHomePlaybackLaunch.js` for authenticated admission,
+pending account selection and cancellation. The hook reuses saved-session identity guards
+and the existing playback entry point. It does not negotiate media or store credentials.
+
+`src/App/hooks/useAppSessionRestore.js` owns the initial saved-session lookup and recovery
+completion. It preserves session identity and unmount guards. Failed restoration clears
+the stale crash action and recovery latch; explicit login uses the same discard operation.
+
 | Need | Preferred Helper |
 |---|---|
 | Save/restore non-virtual panel scroll + cache scrollTop | `usePanelScrollState` |
@@ -163,6 +172,44 @@ const {
   onCacheState
 });
 ```
+
+### `usePanelCacheOnUnmount`
+
+- File: `src/hooks/usePanelCacheOnUnmount.js`
+- Purpose: persist a panel cache snapshot through `onCacheState` once when the panel unmounts. Writing the snapshot on
+  every change updates `App` state and re-renders the whole app.
+- Signature:
+
+```js
+usePanelCacheOnUnmount(onCacheState, getSnapshot)
+```
+
+- `getSnapshot` should be a `useCallback` that builds the snapshot from current state and refs.
+- Keep explicit `onCacheState` calls where navigation happens before unmount, e.g. item clicks.
+- Panel resets requested by `App` use a `resetToken` prop instead of clearing `cachedState` while mounted.
+- Example:
+
+```js
+const getCacheSnapshot = useCallback(() => ({favorites, loaded: !loading}), [favorites, loading]);
+usePanelCacheOnUnmount(onCacheState, getCacheSnapshot);
+```
+
+### `useWheelScrollSpotlightPause`
+
+- File: `src/hooks/useWheelScrollSpotlightPause.js`
+- Purpose: pause Spotlight while a scroll runs in pointer mode, so items passing under the Magic Remote cursor do not
+  take focus on every frame. Spotlight resumes `WHEEL_SCROLL_RESUME_DELAY_MS` (400 ms) after the scroll stops, which
+  bridges the gaps between wheel bursts.
+- Signature:
+
+```js
+const {handleScrollStart, handleScrollStop} = useWheelScrollSpotlightPause({onScrollStart, onScrollStop});
+```
+
+- Already applied by `AppScroller` and `MediaVirtualGrid`; pass their `onScrollStart` / `onScrollStop` props as usual.
+- Arrow-key scrolling is unaffected because the pause is only taken in pointer mode.
+- Scroll-on-focus corrections (e.g. horizontal row scrolling) should skip pointer focus via
+  `Spotlight.getPointerMode()`.
 
 ### `useLibraryPagination`
 - File: `src/views/library-panel/hooks/useLibraryPagination.js`
@@ -484,6 +531,8 @@ usePlayerInteractionReveal({
 - File: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
 - Purpose:
   - register and invalidate generation-bound source tokens
+  - invoke the latest initial-audio fallback callback after discovery delays while
+    rejecting replaced source tokens
   - combine source-engine, generation-matched client-subtitle, and SyncPlay readiness
   - request native playback after assignment without waiting for `canplay`
   - request HLS.js playback only after the first current-generation fragment is buffered
@@ -509,6 +558,7 @@ usePlayerInteractionReveal({
   - restore metadata position before releasing startup and preserve the prior play state
   - save the selected preference only after the replacement becomes ready
   - restore the previous source in a fresh paused generation after post-swap failure
+  - end superseded loads without rollback and suppress terminal errors after cancellation
   - close the superseded Jellyfin session after successful readiness, and close an unused
     or failed replacement session before decision handoff, cancellation, or rollback
   - use the SyncPlay bridge's server-clock position and wait for Ready/Unpause authority
@@ -607,101 +657,38 @@ usePlayerInteractionReveal({
   - `handleVideoPause()`
   - `clearError()`
 
-### `useMediaDetailsFocusDebug`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
-- Purpose: encapsulate opt-in focus/scroll debug tracing (`bfFocusDebug`) and attach focus/scroll debug listeners.
+### `useMediaDetailsData`
+
+- File: `src/views/media-details/useMediaDetailsData.js`
+- Loaded item and series details refresh Favorite, Watched, and Watchlist flags. A
+  successful local action protects its flag from an older pending details response.
+  Missing details or UserData retain the card fallback. Watchlist completions must
+  still belong to the mounted panel and authenticated session.
+- Purpose: load and hold all Media Details data in one reducer so each response commits in a single render:
+  - item metadata, playback info, seasons, episodes, and the episode navigation list load in parallel
+  - resume-episode selection, stale-response guards, and default track resolution
+  - favorite/watched/watchlist mutations patch local state instead of refetching
 - Returns:
-  - `detailsDebugEnabled`
-  - `describeNode(node)`
-  - `logDetailsDebug(message, payload?)`
+  - `state`, `selectedEpisode`
+  - `selectEpisode(id)`, `selectSeason(id)`, `selectTrack(type, key)`
+  - `toggleFavorite(id?, current?)`, `toggleWatched(id?, current?)`, `toggleWatchlist()`
+  - `openSeriesFromEpisode()`
 
-### `useMediaDetailsFocusOrchestrator`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
-- Purpose: centralize Media Details focus routing/orchestration:
-  - pointer-to-focus sync and guard behavior
-  - initial focus seeding for series/non-series with playback-first order (`Audio -> Subtitle -> Play`)
-  - focus target helper methods used by interaction handlers
-  - cast/season focus scrolling behavior
-- Returns key methods:
-  - `scrollCastIntoView()`, `scrollSeasonIntoView()`
-  - `focusTopHeaderAction()`, `focusEpisodeSelector()`
-  - `focusEpisodeCardByIndex()`, `focusEpisodeInfoButtonByIndex()`, `focusEpisodeFavoriteButtonByIndex()`, `focusEpisodeWatchedButtonByIndex()`
-  - `focusSeasonCardByIndex()`, `focusSeasonWatchedButton()`, `focusBelowSeasons()`
-  - `focusNonSeriesAudioSelector()`, `focusNonSeriesSubtitleSelector()`, `focusNonSeriesPrimaryPlay()`
-  - `handleDetailsPointerDownCapture()`, `handleDetailsPointerClickCapture()`
-- Focus policy note:
-  - prefer playback controls for first-section targeting (`Audio -> Subtitle -> Play`), then fall back as needed.
-  - do not use header favorite/watched actions as automatic first-focus targets.
+### `useMediaDetailsNavigation`
 
-### `useMediaDetailsSectionNavigation`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
-- Purpose: centralize intro/content section navigation behavior for Media Details:
-  - section snap thresholds and wheel capture
-  - focus-driven section switching
-  - smooth-scroll-preserving focus handoff when returning from section two to section one
-  - intro top-nav `DOWN` routing and section primary focus targets
-  - scroller stop snap behavior
-- Returns key methods:
-  - `hasSecondarySection`
-  - `focusSectionOnePrimary()`
-  - `focusAndShowFirstSection()`
-  - `focusAndShowSecondSection()`
-  - `focusIntroTopNavigation()`
-  - `handleIntroActionKeyDown(event)`
-  - `handleIntroTopNavKeyDown(event)`
-  - `handleSectionWheelCapture(event)`
-  - `handleDetailsScrollerScrollStop(event)`
-
-### `useMediaDetailsItemActions`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
-- Purpose: centralize favorite/watched mutation flows and related local refresh behavior for item/episode/season contexts.
+- File: `src/views/media-details/useMediaDetailsNavigation.js`
+- Purpose: one delegated key handler for all Media Details controls, driven by `data-md-nav`, `data-index`, and
+  `data-action` attributes:
+  - intro/content section snap (wheel, focus, scroll stop) with a DOM-class pointer lock
+  - pointer-mode click guards
+  - pointer entry reveals clipped sideways episode cards through the shared horizontal-scroll helper
+  - episode hover reads geometry only on card entry; nested actions, active scrolling, stationary-cursor entries,
+    Spotlight pauses, open pickers, and section transitions do not trigger additional reveals
+  - initial focus seeding (`Audio -> Subtitle -> Play`, then episode selector, then Back)
 - Returns:
-  - `handleToggleFavorite()`
-  - `handleToggleFavoriteById(itemId?, currentFavoriteState?)`
-  - `handleToggleWatched(itemId?, currentWatchedState?)`
-
-### `useMediaDetailsPickerHandlers`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
-- Purpose: centralize audio/subtitle picker selection and episode picker selection behavior.
-- Returns:
-  - `handleTrackSelect(event)`
-  - `handleEpisodePopupSelect(event)`
-
-### `useMediaDetailsDomHelpers`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsDomHelpers.js`
-- Purpose: centralize Media Details DOM-level helper callbacks used by focus/debug/navigation orchestration:
-  - scroll element resolution
-  - scroll snapshot generation
-  - safe focus without scroll jumps
-- Returns:
-  - `getDetailsScrollElement()`
-  - `getScrollSnapshot()`
-  - `focusNodeWithoutScroll(node)`
-
-### `useMediaDetailsOverviewState`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
-- Purpose: centralize Media Details overview/presentation derivation:
-  - overview overflow measurement effect
-  - series/non-series primary play label derivation (`Play`/`Continue`/`Next Up`)
-- Returns:
-  - `hasOverviewOverflow`
-  - `seriesPlayLabel`
-  - `overviewPlayLabel`
-
-### `useMediaDetailsPanelSync`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
-- Purpose: centralize Media Details panel-level synchronization effects:
-  - reset cast/overview expansion when item changes
-  - cleanup pending cast/season/episode focus-scroll timers on unmount
-  - subscribe/apply settings (`navbarTheme`, `showSeasonImages`, `useSidewaysEpisodeList`)
-
-### `useMediaDetailsItemBootstrap`
-- File: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
-- Purpose: centralize per-item bootstrap effect for Media Details:
-  - bump request guards on item change
-  - reload playback/season data
-  - reset non-series/series selection state
-  - initialize favorite/watched state from `item.UserData`
+  - `firstSectionRef`, `contentSectionRef`
+  - `containerHandlers`
+  - `handleScrollStop(event)`
 
 ### `useInputMode`
 - File: `src/hooks/useInputMode.js`
@@ -869,6 +856,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - `saveSubtitleSelection(trackIndex, subtitleStreams)`
   - `loadTrackPreferences()`
   - `saveTrackPreferences()`
+- Subtitle fallback order is a saved show/movie choice, the preferred language, then
+  the file default. Saved or global `None` keeps subtitles off.
 
 ---
 
@@ -991,6 +980,8 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
 - `src/views/player-panel/utils/subtitleRendererAssTransform.js`
   - Parses ASS `\t(...)` timing/acceleration payloads, strips transform target tags from baseline inline styling, and interpolates active numeric/color transform state for scale, rotation, skew, border, shadow, blur, spacing, and font size.
 - `src/views/player-panel/utils/subtitleOverlaySettings.js`
+  - `isStyledSubtitleCue` groups authored ASS cues in one opt-in offset layer. Ordinary
+    text keeps bottom-only offsets. Styled cues retain shared drawing and clip geometry.
   - `getSubtitleOverlayAttributes(settings, controlsVisible)` normalizes subtitle appearance settings into overlay `data-*` attributes.
   - `groupSubtitleCuesByPlacement(cues)` groups active cues into top/middle/bottom and left/center/right render buckets.
   - `getSubtitleAbsolutePositionStyle(cue)` preserves source-authored ASS anchors, including intentional off-screen placement, while the subtitle stage clips output to the visible video surface.
@@ -1157,63 +1148,34 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   - maps isolated room events to host/guest player control, readiness, reconnect,
     clock-offset, drift-correction, and chat behavior.
 
-### Media details panel local hooks
-- `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
-  - centralizes optional focus/scroll debug tracing lifecycle.
-- `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
-  - centralizes pointer/5-way focus routing and initial focus seeding.
-- `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
-  - centralizes section snap + first/second section focus switch behavior (including deferred first-section focus after smooth scroll).
-- `src/views/media-details-panel/hooks/useMediaDetailsKeyboardShortcuts.js`
-  - centralizes details panel BACK/PLAY key handling and pointer-mode guard behavior.
+### Media details page modules
+
+- `src/views/media-details/MediaDetailsPage.js`
+  - panel shell: reveal gating, playback/back keys, pickers, and section wiring.
+- `src/views/media-details/useMediaDetailsData.js`
+  - reducer-backed data loading, selection, and item mutations.
+- `src/views/media-details/useMediaDetailsNavigation.js`
+  - delegated key routing, section snap, pointer guards, and focus seeding.
+- `src/views/media-details/mediaDetailsRequests.js`
+  - module-level request cache (2 min TTL) and resume-episode selection.
+  - `invalidateSeriesUserData(seriesId)` removes one series item, season lists, and
+    episode lists after a confirmed mutation. Other series remain cached.
+  - Watched/favorite mutations invalidate caches even after the page unmounts. Results
+    from an older authenticated session must not invalidate or update the current session.
+- `src/views/media-details/imageReveal.js`
+  - DOM-based image load/fallback handlers.
+- `src/views/media-details/sections/`
+  - memoized `IntroSection`, `CastSection`, `SeasonsSection`, `SeriesControls`, `EpisodesSection`, `PlaybackControls`.
 - `src/views/media-details-panel/hooks/useMediaDetailsTrackOptions.js`
   - centralizes audio/subtitle option lists and summary labels.
 - `src/views/media-details-panel/hooks/useMediaCredits.js`
   - merges/normalizes cast + creator credits from item/season/episode metadata.
-- `src/views/media-details-panel/hooks/useMediaDetailsDataLoader.js`
-  - centralizes media details cache-backed data loading and series/episode selection orchestration.
-- `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
-  - centralizes favorite/watched mutation flows and related refresh behavior.
-- `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
-  - centralizes audio/subtitle and episode picker selection handlers.
-- `src/views/media-details-panel/hooks/useMediaDetailsPrimaryActions.js`
-  - centralizes primary play/back and overview/cast/episode-series action handlers.
-- `src/views/media-details-panel/hooks/useMediaDetailsDisclosures.js`
-  - centralizes Media Details popup disclosure state and open/close handlers.
-- `src/views/media-details-panel/hooks/useMediaDetailsImages.js`
-  - centralizes Media Details image state, image URL builders, and fallback/error handlers.
-- `src/views/media-details-panel/hooks/useMediaDetailsInteractionHandlers.js`
-  - centralizes cast/season/episode focus-navigation + key interaction handlers.
-- `src/views/media-details-panel/hooks/useMediaDetailsDomHelpers.js`
-  - centralizes DOM scroll-element/snapshot helpers and focus-without-scroll helper callbacks.
-- `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
-  - centralizes overview overflow state and primary play-label derivation.
-- `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
-  - centralizes panel sync effects (item reset, timeout cleanup, settings sync).
-- `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
-  - centralizes per-item bootstrap effect for request guards + reload + initial favorite/watched state.
-
-### Media details panel local components
 - `src/views/media-details-panel/components/MediaDetailsToast.js`
   - shared details toast rendering shell.
 - `src/views/media-details-panel/components/MediaTrackPickerPopup.js`
   - shared audio/subtitle picker popup structure.
 - `src/views/media-details-panel/components/MediaEpisodePickerPopup.js`
   - shared episode picker popup structure.
-- `src/views/media-details-panel/components/MediaTrackSelectorButton.js`
-  - shared compact audio/subtitle selector button shell.
-- `src/views/media-details-panel/components/MediaTrackSelectorRow.js`
-  - shared compact audio/subtitle selector pair layout.
-- `src/views/media-details-panel/components/MediaDetailsIntroSection.js`
-  - details heading/breadcrumb + intro metadata/overview/action controls shell.
-- `src/views/media-details-panel/components/MediaCastSection.js`
-  - cast toggle + cast card row section.
-- `src/views/media-details-panel/components/MediaSeasonsSection.js`
-  - season cards section with watched toggle and poster fallbacks.
-- `src/views/media-details-panel/components/MediaSeriesStickyControls.js`
-  - sticky episode selector + track selectors + primary play controls.
-- `src/views/media-details-panel/components/MediaEpisodesSection.js`
-  - episodes grid/sideways layout rendering with favorite/watched status badges and action buttons.
 
 ### Settings and track storage helpers
 - `src/utils/settingsStorage.js`
@@ -1287,3 +1249,15 @@ useToastMessage({ durationMs = 2000, fadeOutMs = 0, stack = false, maxVisible = 
   1. close local disclosure(s)
   2. run toolbar back handler
   3. fallback to app-level navigation.
+
+Media Details season changes clear old episode and track selection state while loading.
+Old episode callbacks must not replace the pending season selection. The request cache
+retries invalidated data once. A second invalidation returns the same-session response
+without caching the response; the next reader must fetch again.
+The lightweight subtitle cue measurement resolves the attached owning stage from the
+cue ancestor when the parent ref has not attached during the child layout effect.
+The existing animation-frame measurement uses that stage for first-cue containment.
+
+- `src/utils/homeContentCache.js` stores Home content for Back navigation. Cache identity
+  includes the runtime session generation. Writes preserve the successful fetch time.
+  Session teardown clears the cache. Failed refreshes retain stale content for retry.

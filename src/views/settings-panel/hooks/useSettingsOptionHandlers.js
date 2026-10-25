@@ -12,18 +12,22 @@ import {
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
 	SUBTITLE_OVERLAY_FONT_SIZE_RANGE,
-	SUBTITLE_OVERLAY_POSITION_OPTIONS,
+	SUBTITLE_OVERLAY_OFFSET_X_RANGE,
+	SUBTITLE_OVERLAY_OFFSET_Y_RANGE,
 	SUBTITLE_OVERLAY_OUTLINE_SIZE_RANGE,
 	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from '../constants';
-import {getOptionLabel, getSubtitleBurnInTextCodecsLabel} from '../labels';
+import {getColorOptionLabel, getOptionLabel, getSubtitleBurnInTextCodecsLabel} from '../labels';
 import {
 	adjustNumericSetting,
 	getNumericSettingLabel,
-	normalizeNumericSetting
+	getSignedNumericSettingLabel,
+	normalizeHexColor,
+	normalizeNumericSetting,
+	SUBTITLE_CUSTOM_COLOR
 } from '../../../utils/subtitleAppearance';
 
 export const useSettingsOptionHandlers = ({
@@ -37,7 +41,6 @@ export const useSettingsOptionHandlers = ({
 	closeSubtitleLangPopup,
 	closeAssSubtitleRendererPopup,
 	closeBitmapSubtitleRendererPopup,
-	closeSubtitleOverlayPositionPopup,
 	closeSubtitleOverlayBackgroundPopup,
 	closeSubtitleOverlayWeightPopup,
 	closeSubtitleOverlayTextColorPopup,
@@ -205,12 +208,29 @@ export const useSettingsOptionHandlers = ({
 		handleNumericSettingReset('subtitleOverlayFontSizePx', SUBTITLE_OVERLAY_FONT_SIZE_RANGE);
 	}, [handleNumericSettingReset]);
 
-	const handleSubtitleOverlayPositionSelect = useCallback((event) => {
-		const value = event.currentTarget.dataset.value;
-		if (!SUBTITLE_OVERLAY_POSITION_OPTIONS.some((option) => option.value === value)) return;
-		handleSettingChange('subtitleOverlayPosition', value);
-		closeSubtitleOverlayPositionPopup();
-	}, [closeSubtitleOverlayPositionPopup, handleSettingChange]);
+	const handleSubtitleOverlayOffsetYDecrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayOffsetYPx', SUBTITLE_OVERLAY_OFFSET_Y_RANGE, 'decrease');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayOffsetYIncrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayOffsetYPx', SUBTITLE_OVERLAY_OFFSET_Y_RANGE, 'increase');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayOffsetYReset = useCallback(() => {
+		handleNumericSettingReset('subtitleOverlayOffsetYPx', SUBTITLE_OVERLAY_OFFSET_Y_RANGE);
+	}, [handleNumericSettingReset]);
+
+	const handleSubtitleOverlayOffsetXDecrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayOffsetXPx', SUBTITLE_OVERLAY_OFFSET_X_RANGE, 'decrease');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayOffsetXIncrease = useCallback(() => {
+		handleNumericSettingChange('subtitleOverlayOffsetXPx', SUBTITLE_OVERLAY_OFFSET_X_RANGE, 'increase');
+	}, [handleNumericSettingChange]);
+
+	const handleSubtitleOverlayOffsetXReset = useCallback(() => {
+		handleNumericSettingReset('subtitleOverlayOffsetXPx', SUBTITLE_OVERLAY_OFFSET_X_RANGE);
+	}, [handleNumericSettingReset]);
 
 	const handleSubtitleOverlayBackgroundSelect = useCallback((event) => {
 		const value = event.currentTarget.dataset.value;
@@ -246,6 +266,35 @@ export const useSettingsOptionHandlers = ({
 		handleSettingChange('subtitleOverlayBorderColor', value);
 		closeSubtitleOverlayBorderColorPopup();
 	}, [closeSubtitleOverlayBorderColorPopup, handleSettingChange]);
+
+	const applyCustomColor = useCallback((settingKey, hexKey, rawValue) => {
+		const hex = normalizeHexColor(rawValue);
+		if (!hex) return false;
+		setSettings((prevSettings) => {
+			const updated = {
+				...prevSettings,
+				[settingKey]: SUBTITLE_CUSTOM_COLOR,
+				[hexKey]: hex
+			};
+			if (!writeBreezyfinSettings(updated)) {
+				console.error(`Failed to save ${settingKey} setting`);
+			}
+			return updated;
+		});
+		return true;
+	}, [setSettings]);
+
+	const handleSubtitleOverlayTextColorCustomApply = useCallback((rawValue) => {
+		if (!applyCustomColor('subtitleOverlayTextColor', 'subtitleOverlayTextColorHex', rawValue)) return false;
+		closeSubtitleOverlayTextColorPopup();
+		return true;
+	}, [applyCustomColor, closeSubtitleOverlayTextColorPopup]);
+
+	const handleSubtitleOverlayBorderColorCustomApply = useCallback((rawValue) => {
+		if (!applyCustomColor('subtitleOverlayBorderColor', 'subtitleOverlayBorderColorHex', rawValue)) return false;
+		closeSubtitleOverlayBorderColorPopup();
+		return true;
+	}, [applyCustomColor, closeSubtitleOverlayBorderColorPopup]);
 
 	const handleSubtitleOverlayBorderStrengthSelect = useCallback((event) => {
 		const value = event.currentTarget.dataset.value;
@@ -308,9 +357,13 @@ export const useSettingsOptionHandlers = ({
 		() => getNumericSettingLabel(settings.subtitleOverlayFontSizePx, SUBTITLE_OVERLAY_FONT_SIZE_RANGE),
 		[settings.subtitleOverlayFontSizePx]
 	);
-	const subtitleOverlayPositionLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_POSITION_OPTIONS, settings.subtitleOverlayPosition, 'Standard'),
-		[settings.subtitleOverlayPosition]
+	const subtitleOverlayOffsetYLabel = useMemo(
+		() => getSignedNumericSettingLabel(settings.subtitleOverlayOffsetYPx, SUBTITLE_OVERLAY_OFFSET_Y_RANGE),
+		[settings.subtitleOverlayOffsetYPx]
+	);
+	const subtitleOverlayOffsetXLabel = useMemo(
+		() => getSignedNumericSettingLabel(settings.subtitleOverlayOffsetXPx, SUBTITLE_OVERLAY_OFFSET_X_RANGE),
+		[settings.subtitleOverlayOffsetXPx]
 	);
 	const subtitleOverlayBackgroundLabel = useMemo(
 		() => getOptionLabel(SUBTITLE_OVERLAY_BACKGROUND_OPTIONS, settings.subtitleOverlayBackground, 'None'),
@@ -321,16 +374,26 @@ export const useSettingsOptionHandlers = ({
 		[settings.subtitleOverlayWeight]
 	);
 	const subtitleOverlayTextColorLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS, settings.subtitleOverlayTextColor, 'White'),
-		[settings.subtitleOverlayTextColor]
+		() => getColorOptionLabel(
+			SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
+			settings.subtitleOverlayTextColor,
+			settings.subtitleOverlayTextColorHex,
+			'White'
+		),
+		[settings.subtitleOverlayTextColor, settings.subtitleOverlayTextColorHex]
 	);
 	const subtitleOverlayBorderStyleLabel = useMemo(
 		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS, settings.subtitleOverlayBorderStyle, 'Outline'),
 		[settings.subtitleOverlayBorderStyle]
 	);
 	const subtitleOverlayBorderColorLabel = useMemo(
-		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS, settings.subtitleOverlayBorderColor, 'Black'),
-		[settings.subtitleOverlayBorderColor]
+		() => getColorOptionLabel(
+			SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
+			settings.subtitleOverlayBorderColor,
+			settings.subtitleOverlayBorderColorHex,
+			'Black'
+		),
+		[settings.subtitleOverlayBorderColor, settings.subtitleOverlayBorderColorHex]
 	);
 	const subtitleOverlayBorderStrengthLabel = useMemo(
 		() => getOptionLabel(SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS, settings.subtitleOverlayBorderStrength, 'Medium'),
@@ -371,12 +434,19 @@ export const useSettingsOptionHandlers = ({
 		handleSubtitleOverlayFontSizeDecrease,
 		handleSubtitleOverlayFontSizeIncrease,
 		handleSubtitleOverlayFontSizeReset,
-		handleSubtitleOverlayPositionSelect,
+		handleSubtitleOverlayOffsetYDecrease,
+		handleSubtitleOverlayOffsetYIncrease,
+		handleSubtitleOverlayOffsetYReset,
+		handleSubtitleOverlayOffsetXDecrease,
+		handleSubtitleOverlayOffsetXIncrease,
+		handleSubtitleOverlayOffsetXReset,
 		handleSubtitleOverlayBackgroundSelect,
 		handleSubtitleOverlayWeightSelect,
 		handleSubtitleOverlayTextColorSelect,
 		handleSubtitleOverlayBorderStyleSelect,
 		handleSubtitleOverlayBorderColorSelect,
+		handleSubtitleOverlayTextColorCustomApply,
+		handleSubtitleOverlayBorderColorCustomApply,
 		handleSubtitleOverlayBorderStrengthSelect,
 		handleSubtitleOverlayOutlineSizeDecrease,
 		handleSubtitleOverlayOutlineSizeIncrease,
@@ -389,7 +459,8 @@ export const useSettingsOptionHandlers = ({
 		assSubtitleRendererLabel,
 		bitmapSubtitleRendererLabel,
 		subtitleOverlayFontSizeLabel,
-		subtitleOverlayPositionLabel,
+		subtitleOverlayOffsetYLabel,
+		subtitleOverlayOffsetXLabel,
 		subtitleOverlayBackgroundLabel,
 		subtitleOverlayWeightLabel,
 		subtitleOverlayTextColorLabel,

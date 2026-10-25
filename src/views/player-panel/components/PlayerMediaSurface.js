@@ -3,6 +3,7 @@ import {applyImageFormatFallbackFromEvent} from '../../../utils/imageFormat';
 import PlayerLoadingOverlay from './PlayerLoadingOverlay';
 import PlayerSeekFeedback from './PlayerSeekFeedback';
 import PlayerSubtitleOverlay from './PlayerSubtitleOverlay';
+import {getSubtitleOffsetStyle} from '../utils/subtitleOverlaySettings';
 
 import css from '../../PlayerPanel.module.less';
 
@@ -36,6 +37,8 @@ const PlayerMediaSurface = ({
 	useEffect(() => {
 		setBackdropIndex(0);
 	}, [backdropKey, item?.Id]);
+    const offsetStyledSubtitles = playbackSettings?.subtitleOverlayOffsetStyled === true;
+    const styledSubtitleOffsetStyle = offsetStyledSubtitles ? getSubtitleOffsetStyle(playbackSettings) : undefined;
 	const backdropUrl = backdropUrls[backdropIndex] || '';
 	const hasBackdrop = Boolean(backdropUrl);
 	const handleBackdropError = useCallback((event) => {
@@ -82,6 +85,8 @@ const PlayerMediaSurface = ({
 				ref={externalSubtitleLayerRef}
 				className={css.externalSubtitleLayer}
 				data-controls-visible={!loading && !error && showControls ? 'true' : 'false'}
+                data-offset-styled={offsetStyledSubtitles ? 'true' : 'false'}
+                style={styledSubtitleOffsetStyle}
 				aria-hidden
 			/>
 			<PlayerSubtitleOverlay

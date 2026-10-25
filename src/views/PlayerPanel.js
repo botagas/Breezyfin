@@ -1,31 +1,32 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Panel } from '../components/BreezyPanels';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {Panel} from '../components/BreezyPanels';
 import jellyfinService from '../services/jellyfinService';
 import {
-	getPlayerTrackLabel,
 	getPlayerBackdropCandidates,
+	getPlayerTrackLabel,
 	getSkipSegmentLabel
 } from './player-panel/utils/playerPanelHelpers';
-import { usePanelBackHandler } from '../hooks/usePanelBackHandler';
-import { usePlayerKeyboardShortcuts } from './player-panel/hooks/usePlayerKeyboardShortcuts';
-import { usePlayerLifecycleEffects } from './player-panel/hooks/usePlayerLifecycleEffects';
-import { useTrackPreferences } from '../hooks/useTrackPreferences';
-import { useToastMessage } from '../hooks/useToastMessage';
-import { PLAYER_PANEL_TOAST_CONFIG } from '../constants/toast';
-import { usePlayerRecoveryHandlers } from './player-panel/hooks/usePlayerRecoveryHandlers';
-import { usePlayerVideoLoader } from './player-panel/hooks/usePlayerVideoLoader';
-import { usePlayerSkipOverlayState } from './player-panel/hooks/usePlayerSkipOverlayState';
-import { usePlayerSeekAndTrackSwitching } from './player-panel/hooks/usePlayerSeekAndTrackSwitching';
-import { usePlayerPlaybackCommands } from './player-panel/hooks/usePlayerPlaybackCommands';
-import { usePlayerDisclosures } from './player-panel/hooks/usePlayerDisclosures';
-import { usePlayerEpisodeProgress } from './player-panel/hooks/usePlayerEpisodeProgress';
-import { usePlayerEpisodeAndSurfaceHandlers } from './player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers';
-import { usePlayerCoreControls } from './player-panel/hooks/usePlayerCoreControls';
-import { usePlayerBackNavigation } from './player-panel/hooks/usePlayerBackNavigation';
-import { usePlayerMediaEventHandlers } from './player-panel/hooks/usePlayerMediaEventHandlers';
-import { usePlayerVisibilitySync } from './player-panel/hooks/usePlayerVisibilitySync';
-import { usePlayerPlaybackContext } from './player-panel/hooks/usePlayerPlaybackContext';
-import { usePlayerTrackPopupHandlers } from './player-panel/hooks/usePlayerTrackPopupHandlers';
+import {usePanelBackHandler} from '../hooks/usePanelBackHandler';
+import {usePlayerKeyboardShortcuts} from './player-panel/hooks/usePlayerKeyboardShortcuts';
+import {usePlayerLifecycleEffects} from './player-panel/hooks/usePlayerLifecycleEffects';
+import {useTrackPreferences} from '../hooks/useTrackPreferences';
+import {getTrackPreferenceScopeId} from '../utils/trackPreferences';
+import {useToastMessage} from '../hooks/useToastMessage';
+import {PLAYER_PANEL_TOAST_CONFIG} from '../constants/toast';
+import {usePlayerRecoveryHandlers} from './player-panel/hooks/usePlayerRecoveryHandlers';
+import {usePlayerVideoLoader} from './player-panel/hooks/usePlayerVideoLoader';
+import {usePlayerSkipOverlayState} from './player-panel/hooks/usePlayerSkipOverlayState';
+import {usePlayerSeekAndTrackSwitching} from './player-panel/hooks/usePlayerSeekAndTrackSwitching';
+import {usePlayerPlaybackCommands} from './player-panel/hooks/usePlayerPlaybackCommands';
+import {usePlayerDisclosures} from './player-panel/hooks/usePlayerDisclosures';
+import {usePlayerEpisodeProgress} from './player-panel/hooks/usePlayerEpisodeProgress';
+import {usePlayerEpisodeAndSurfaceHandlers} from './player-panel/hooks/usePlayerEpisodeAndSurfaceHandlers';
+import {usePlayerCoreControls} from './player-panel/hooks/usePlayerCoreControls';
+import {usePlayerBackNavigation} from './player-panel/hooks/usePlayerBackNavigation';
+import {usePlayerMediaEventHandlers} from './player-panel/hooks/usePlayerMediaEventHandlers';
+import {usePlayerVisibilitySync} from './player-panel/hooks/usePlayerVisibilitySync';
+import {usePlayerPlaybackContext} from './player-panel/hooks/usePlayerPlaybackContext';
+import {usePlayerTrackPopupHandlers} from './player-panel/hooks/usePlayerTrackPopupHandlers';
 import {usePlayerSubtitleRenderer} from './player-panel/hooks/usePlayerSubtitleRenderer';
 import {usePlayerStartupCoordinator} from './player-panel/hooks/usePlayerStartupCoordinator';
 import {usePlayerSourcePipeline} from './player-panel/hooks/usePlayerSourcePipeline';
@@ -36,18 +37,12 @@ import {usePlayerPlaybackDecision} from './player-panel/hooks/usePlayerPlaybackD
 import {usePlayerPausedScreensaver} from './player-panel/hooks/usePlayerPausedScreensaver';
 import {usePlayerRuntimeDiagnostics} from './player-panel/hooks/usePlayerRuntimeDiagnostics';
 import {usePlayerGroupSessions} from './player-panel/hooks/usePlayerGroupSessions';
-import {
-	buildPlaybackOverride,
-	resolveVideoSeekSeconds
-} from './player-panel/utils/playbackOverride';
+import {buildPlaybackOverride, resolveVideoSeekSeconds} from './player-panel/utils/playbackOverride';
 import {createSyncPlayStartupBridge} from './player-panel/utils/syncPlayStartupBridge';
 import {createPlaybackRuntimeContext} from './player-panel/utils/playbackRuntimeContext';
 import {resolveDefaultAudioStreamIndex} from './player-panel/utils/playerVideoLoaderHelpers';
 import {createPlaybackGenerationAllocator} from './player-panel/utils/playbackGeneration';
-import {
-	createPlaybackRecoveryLedger,
-	PLAYBACK_RECOVERY_KEYS
-} from './player-panel/utils/playbackRecoveryLedger';
+import {createPlaybackRecoveryLedger, PLAYBACK_RECOVERY_KEYS} from './player-panel/utils/playbackRecoveryLedger';
 import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
 import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {normalizeScreensaverTimeoutMinutes} from '../utils/screensaver';
@@ -151,7 +146,7 @@ const PlayerPanel = ({
 		pickPreferredSubtitle,
 		saveAudioSelection,
 		saveSubtitleSelection
-	} = useTrackPreferences();
+	} = useTrackPreferences(getTrackPreferenceScopeId(item));
 
 	const [loading, setLoading] = useState(true);
 	const [loadingStatusMessage, setLoadingStatusMessage] = useState('Loading...');

@@ -29,6 +29,7 @@ affected media or feature, the TV model, and relevant sanitized logs.
 ## Current capabilities
 
 - Multi-server, multi-user saved sessions with quick account switching
+- Direct playback from Breezyfin Home with matching server/account validation; see [Home launch contract](HOME_LAUNCH.md).
 - Automatic session restoration and credential recovery for expired saved accounts
 - Password and Jellyfin Quick Connect sign-in after a server connection is established
 - TV-first navigation tuned for LG Magic Remote (5-way and pointer flows)

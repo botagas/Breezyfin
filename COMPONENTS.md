@@ -2,6 +2,10 @@
 
 This guide covers shared UI components in `src/components/`.
 
+`src/components/HomePlaybackNotice.js` presents Home launch progress, account mismatch and
+failure states. It reuses the shared popup shell, action buttons and initial-focus hook.
+Account navigation starts after the popup finishes hiding.
+
 ## Component expectations
 
 - Keep components reusable and panel-agnostic unless the component is explicitly panel-local.
@@ -117,8 +121,11 @@ This guide covers shared UI components in `src/components/`.
 - `MediaRow` renders `pending`, `loading`, and retryable `error` states for descriptor-first
   server Home rows through the shared loading surface. Home removes rows that resolve
   empty.
-- Home activates artwork by row. It loads the first viewport immediately. It activates
-  later rows through row visibility or focus, not through per-image observers.
+- `MediaRow` observes row visibility independently of `imagesActive`. A row near the
+  viewport notifies `onRowVisible` once, then disconnects its observer. Unmount cleanup
+  ignores queued notifications. Focus remains an activation fallback when the runtime
+  does not provide `IntersectionObserver`. Home uses row visibility to load pending
+  server rows and expand its render window. Artwork retains native lazy loading.
 - Settings rows use `src/views/settings-panel/components/SettingsStaticItems.js`. These
   panel-local Sandstone compositions omit the marquee controller and content-measurement
   path. They retain Enact touch, Spotlight, skin, switch, and accessibility behavior.

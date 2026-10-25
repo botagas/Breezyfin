@@ -4,6 +4,14 @@ This document is the detailed developer guide for architecture patterns, shared 
 
 ## Core principles
 
+External Home playback follows [HOME_LAUNCH.md](HOME_LAUNCH.md). The early launch inbox
+initializes before React mounts. App-local launch coordination stages Details before using
+the normal playback entry point. Keep request parsing and asynchronous ownership outside
+the App orchestrator. Playback preparation must use the active authenticated session.
+App-local session restoration owns the recovery attempt lifetime. Once the active attempt
+finishes, a failed restore must not leave Home launches disabled. Explicit login discards
+stale crash navigation instead of applying a snapshot from a previous account.
+
 - Reuse existing shared hooks/components before introducing new abstractions.
 - Keep panel logic modular with panel-local `components/`, `hooks/`, and `utils/` folders.
 - Keep styling token-driven and theme-consistent.
@@ -80,6 +88,18 @@ mixed scroll ownership, or legacy compatibility styles, check `WORKAROUNDS.md`. 
 register in the same change whenever an active workaround or its removal condition changes.
 
 Release packaging runs `prepare:release-notices` before either pack command and copies `LICENSE` plus `THIRD_PARTY_NOTICES.txt` into `dist/`. Production packages omit subtitle-engine declarations and source maps that are not needed at runtime; develop packages retain useful source maps. Run `npm run report:package-size` after a build to inspect application, iLib, subtitle-engine, font, and source-map footprint groups.
+
+Media Details request caching must use the current authenticated server, user, token,
+and session generation. The cache retains at most 80 entries for two minutes. User-data
+invalidation clears cached metadata, seasons, and episodes. An in-flight response must
+not repopulate a cache after its session or invalidation revision changes.
+
+Enact CLI's bundled development tools must not enter the production audit through
+stale extraneous lockfile entries. After a dependency refresh, run
+`npm run audit:runtime-deps`, a clean `npm ci`, and
+`npm audit --omit=dev --audit-level=high`. The runtime audit accepts pruned entries
+or explicit development-only metadata and rejects unclassified bundled tooling.
+See WA-010 in `WORKAROUNDS.md` before changing that guard.
 
 ## Shared building blocks (prefer these first)
 
@@ -366,18 +386,13 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 - Toolbar DOWN routing: use Toolbar's explicit `onNavigateDown` contract for panel entry; picker/menu scopes take priority over panel-level navigation and must not be inferred from broad `toolbar-*` prefixes.
 - Toolbar Back routing: `usePanelToolbarActions` exposes the same layered Back callback to both App/remote handling and the visible Toolbar action. Nested panel state must get first refusal before Toolbar disclosures and the Home/history fallback.
 - Cross-item playback: carry `audioTrackIntent` and `subtitleTrackIntent`, then remap both against the new media source before compatibility probes. Raw stream indices are item-local and must not cross episode boundaries.
-- Media details focus debug tracing: `src/views/media-details-panel/hooks/useMediaDetailsFocusDebug.js`
-- Media details focus orchestration: `src/views/media-details-panel/hooks/useMediaDetailsFocusOrchestrator.js`
-- Media details section snap/focus navigation orchestration: `src/views/media-details-panel/hooks/useMediaDetailsSectionNavigation.js`
-- Media details watched/favorite actions: `src/views/media-details-panel/hooks/useMediaDetailsItemActions.js`
-- Media details picker handlers: `src/views/media-details-panel/hooks/useMediaDetailsPickerHandlers.js`
-- Media details interaction handlers: `src/views/media-details-panel/hooks/useMediaDetailsInteractionHandlers.js`
-- Media details data loader: `src/views/media-details-panel/hooks/useMediaDetailsDataLoader.js`
-- Media details DOM scroll/focus helper callbacks: `src/views/media-details-panel/hooks/useMediaDetailsDomHelpers.js`
-- Media details overview overflow + play-label derivation: `src/views/media-details-panel/hooks/useMediaDetailsOverviewState.js`
-- Media details panel sync effects: `src/views/media-details-panel/hooks/useMediaDetailsPanelSync.js`
-- Media details per-item bootstrap effect: `src/views/media-details-panel/hooks/useMediaDetailsItemBootstrap.js`
-- Media details staged loading reveal orchestration: `src/views/media-details-panel/hooks/useMediaDetailsStagedReveal.js`
+- Media details page: `src/views/media-details/MediaDetailsPage.js` (sections in `src/views/media-details/sections/`)
+- Media details data loading, selection, and watched/favorite/watchlist mutations:
+  `src/views/media-details/useMediaDetailsData.js`
+- Media details request cache shared across detail pages: `src/views/media-details/mediaDetailsRequests.js`
+- Media details key routing (`data-md-nav` attributes), section snap, pointer guards, and focus seeding:
+  `src/views/media-details/useMediaDetailsNavigation.js`
+- Media details image reveal (DOM class based, no re-render per image): `src/views/media-details/imageReveal.js`
 - Settings sync listeners: `src/hooks/useBreezyfinSettingsSync.js`
 - Settings runtime capability label derivation: `src/views/settings-panel/hooks/useRuntimeCapabilityLabels.js`
 - Settings bootstrap loader/effects: `src/views/settings-panel/hooks/useSettingsBootstrap.js`
@@ -397,6 +412,19 @@ Release packaging runs `prepare:release-notices` before either pack command and 
 Preferred panel scroll cache wiring:
 - `src/hooks/usePanelScrollState.js`
 - `usePanelScrollState()` for normalized `scrollTop` state, `Scroller` restore/save wiring, and optional cache persistence.
+
+Panel cache snapshots:
+
+- `src/hooks/usePanelCacheOnUnmount.js`
+- `usePanelCacheOnUnmount()` persists a panel snapshot once on unmount. Do not call `onCacheState` from an effect on
+  every state change; each call re-renders `App`.
+
+nMagic Remote wheel scrolling:
+
+- `src/hooks/useWheelScrollSpotlightPause.js`
+- `useWheelScrollSpotlightPause()` pauses Spotlight pointer focus while a scroll runs and resumes it 400 ms after the
+  scroll stops. `AppScroller` and `MediaVirtualGrid` already use it. Skip scroll-on-focus corrections for pointer focus
+  with `Spotlight.getPointerMode()`.
 
 Low-level scroll primitives (use only when panel behavior is custom):
 - `src/hooks/useScrollerScrollMemory.js`
@@ -466,6 +494,9 @@ Player panel decomposition paths:
 - `src/views/player-panel/utils/`
 
 Media details decomposition paths:
+
+- `src/views/media-details/`
+- `src/views/media-details/sections/`
 - `src/views/media-details-panel/components/`
 - `src/views/media-details-panel/hooks/`
 - `src/views/media-details-panel/utils/`
@@ -480,10 +511,12 @@ App shell decomposition paths:
 - `src/App/utils/` (`panelStateCache`, `panelIndex`, `createPanelChildren`, `runtimeDataAttributes`)
 
 Media details section components:
-- `MediaCastSection`
-- `MediaSeasonsSection`
-- `MediaSeriesStickyControls`
-- `MediaEpisodesSection`
+
+- `IntroSection`
+- `CastSection`
+- `SeasonsSection`
+- `SeriesControls`
+- `EpisodesSection`
 
 ## Service decomposition conventions
 
@@ -507,6 +540,9 @@ Jellyfin service paths:
 - `src/services/jellyfin/subtitleApi.js` (subtitle event/raw text fetch helpers for client-side rendering)
 - `src/services/jellyfin/requestsApi.js` (session-cached plugin capability discovery,
   plugin-first My Requests paging, strict plugin error handling, and bounded tag fallback)
+  Library callers may set `options.throwOnError` to distinguish request failure from a
+  valid empty result. My Requests uses that mode for tag filtering and scans only after
+  recoverable failures. Authentication failures and explicit cancellation must propagate.
 - `src/services/jellyfin/pluginFeaturesApi.js` (shared capability-gated paging and
   authenticated plugin image URL construction; image paths must join against the
   normalized server base so reverse-proxy prefixes such as `/jellyfin` survive)
@@ -561,3 +597,9 @@ Status badge convention:
 
 - Keep comments minimal; prefer clear naming/structure so code explains itself.
 - Add comments only where behavior, constraints, or tradeoffs need to be addressed.
+
+Home row callers may pass `throwOnError: true` through the library and My Requests
+service options when the caller must distinguish a failed fetch from a valid empty
+result. Existing callers retain their default array fallback. Home must not cache a
+failed refresh as successful content. Home cache restoration must preserve the original
+fetch time and must not cross authenticated session generations.
