@@ -127,10 +127,17 @@ Evidence:
 - Findings from an unscoped `npm audit`, including current high-severity
   `brace-expansion`, `fast-uri`, and `js-yaml` reports, are confined to the nested Enact
   CLI build-tool chain and are not part of the packaged application.
-- Enact CLI's tarball contains undeclared nested `@enact/dev-utils` tooling. The lockfile
-  marks those extraneous entries as development-only so `--omit=dev` reflects their real
-  ancestor; preserve that metadata when refreshing the lockfile. Range-scoped overrides
-  keep normal dependency paths on patched releases without changing Enact generations.
+- Enact CLI's tarball contains undeclared nested `@enact/dev-utils` tooling. Stale
+  extraneous entries without development-only metadata can incorrectly enter npm's
+  production audit. Regenerating the lockfile prunes those redundant entries without
+  changing the pinned CLI. `audit:runtime-deps` rejects their return. Correctly classified
+  development-only entries are also valid. See WA-010 in `WORKAROUNDS.md`.
+- The current lockfile updates runtime `follow-redirects` to 1.16.1. Its production
+  audit passes after a clean install; CLI-only advisories remain a separate review input.
+- The 2026-10-25 unscoped audit reports 39 development-tool findings: six low,
+  ten moderate, 21 high and two critical. None of their affected package paths are
+  in the 69-package production graph. Keep those findings visible during the separate
+  build-tool compatibility review; do not run forced toolchain upgrades for this release.
 - Running `npm audit fix` blindly is too risky for this app because Enact/webOS packaging, Sandstone behavior, and production minification have all been regression-sensitive.
 
 Recommended adoption path:

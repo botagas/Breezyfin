@@ -63,7 +63,9 @@ export const usePlayerStartupCoordinator = ({
 	const syncPlayReadyRequestedRef = useRef(false);
 	const subtitleDeadlineRef = useRef({key: '', timer: null});
 	const subtitleTimeoutCallbackRef = useRef(onSubtitleTimeout);
+	const initialAudioFallbackCallbackRef = useRef(onInitialAudioSelectionFallback);
 	subtitleTimeoutCallbackRef.current = onSubtitleTimeout;
+	initialAudioFallbackCallbackRef.current = onInitialAudioSelectionFallback;
 	const setStatus = useCallback((phase, sourceToken = sourceTokenRef.current) => {
 		dispatchLifecycle({
 			type: 'PHASE_UPDATED',
@@ -294,7 +296,7 @@ export const usePlayerStartupCoordinator = ({
 					setSourceVersion((current) => current + 1);
 					return;
 				}
-				Promise.resolve(onInitialAudioSelectionFallback?.({
+				Promise.resolve(initialAudioFallbackCallbackRef.current?.({
 					sourceToken,
 					reason,
 					audioStreamIndex: selectedTrackIndex,
@@ -341,7 +343,6 @@ export const usePlayerStartupCoordinator = ({
 		exitInProgressRef,
 		isTokenCurrent,
 		onAudioTransitionFailed,
-		onInitialAudioSelectionFallback,
 		playbackStartedRef,
 		setStatus
 	]);

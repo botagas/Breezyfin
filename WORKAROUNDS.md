@@ -299,3 +299,31 @@ Verify HLS.js commits only after the matching event. Verify SyncPlay waits for s
 authority. Delay the video mount and confirm that it commits once. Press Back and confirm
 that no delayed attachment occurs. Each superseded or failed Jellyfin PlaySession must
 receive at most one stop report.
+
+## WA-010: Bundled Enact CLI audit classification
+
+**Status:** Active for pinned Enact CLI 7.3.3.
+
+**Constraint:** The CLI tarball contains undeclared nested development tools. npm can
+record those packages as extraneous without inheriting the CLI's development-only
+classification. A later advisory can then fail the production audit for tooling
+that is not in the application dependency graph.
+
+**Implementation:**
+
+- Regenerate the lockfile through npm to prune redundant extraneous tooling records.
+  Correct development-only metadata is also valid; package versions must not be
+  changed merely to reclassify their scope.
+- `scripts/package-audit/runtimePackageGraph.cjs` checks the CLI's development-only
+  declaration and rejects unclassified extraneous entries beneath its package path.
+- `audit:runtime-deps` runs that check before evaluating production runtime versions.
+- Regression tests keep a real production dependency in the runtime graph while
+  rejecting the bundled-tool metadata that caused the Zod audit failure.
+
+**Removal condition:** Remove only when the selected CLI's package no longer exposes
+this metadata problem and clean installs plus both security audit scopes confirm
+correct classification. Keep application security findings blocking.
+
+**Validation:** Run the package-graph tests, `npm ci`, `npm run audit:runtime-deps`,
+`npm audit --omit=dev --audit-level=high`, lint, workspace tests and release builds.
+Review remaining unscoped build-tool advisories separately using `QUALITY.md`.

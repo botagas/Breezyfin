@@ -94,6 +94,13 @@ and session generation. The cache retains at most 80 entries for two minutes. Us
 invalidation clears cached metadata, seasons, and episodes. An in-flight response must
 not repopulate a cache after its session or invalidation revision changes.
 
+Enact CLI's bundled development tools must not enter the production audit through
+stale extraneous lockfile entries. After a dependency refresh, run
+`npm run audit:runtime-deps`, a clean `npm ci`, and
+`npm audit --omit=dev --audit-level=high`. The runtime audit accepts pruned entries
+or explicit development-only metadata and rejects unclassified bundled tooling.
+See WA-010 in `WORKAROUNDS.md` before changing that guard.
+
 ## Shared building blocks (prefer these first)
 
 - Back handling: `src/hooks/usePanelBackHandler.js`

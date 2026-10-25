@@ -19,6 +19,11 @@ Run these before merging or publishing:
 
 The repository audit and npm security audit are separate checks. Contributors must run both.
 
+After updating dependencies, repeat `npm ci` before the production security audit.
+Confirm `audit:runtime-deps` rejects unclassified extraneous Enact CLI entries.
+Those entries must be pruned by lockfile regeneration or remain development-only;
+do not exclude an application dependency to suppress a security finding.
+
 ## Release-oriented checks
 
 Run these before packaging a release candidate:
@@ -70,6 +75,10 @@ Run these before packaging a release candidate:
 - None.
 
 ### Playback/path validation
+
+- Start DirectPlay with an explicit non-default audio track that the runtime does
+  not expose. Confirm the delayed fallback uses the current media source and position.
+  Replace playback before discovery times out and confirm the old source cannot restart.
 
 - Start lightweight styled subtitles and let a subtitle gap pass. Verify the first
   dialogue cue after each gap remains fitted inside its stage. Repeat with whole-layer

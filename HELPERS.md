@@ -531,6 +531,8 @@ usePlayerInteractionReveal({
 - File: `src/views/player-panel/hooks/usePlayerStartupCoordinator.js`
 - Purpose:
   - register and invalidate generation-bound source tokens
+  - invoke the latest initial-audio fallback callback after discovery delays while
+    rejecting replaced source tokens
   - combine source-engine, generation-matched client-subtitle, and SyncPlay readiness
   - request native playback after assignment without waiting for `canplay`
   - request HLS.js playback only after the first current-generation fragment is buffered
