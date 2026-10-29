@@ -232,6 +232,11 @@ describe('usePlayerSourcePipeline', () => {
 		act(() => {
 			jest.advanceTimersByTime(3500);
 		});
+		expect(Hls).not.toHaveBeenCalled();
+
+		act(() => {
+			jest.advanceTimersByTime(6500);
+		});
 		const hlsToken = view.props.nativeSourceTokenRef.current;
 		expect(Hls).toHaveBeenCalledTimes(1);
 		expect(hlsToken.engine).toBe('hls.js');
@@ -252,7 +257,7 @@ describe('usePlayerSourcePipeline', () => {
 		});
 		view.video.readyState = 2;
 		act(() => {
-			jest.advanceTimersByTime(3500);
+			jest.advanceTimersByTime(10000);
 		});
 
 		expect(Hls).toHaveBeenCalledTimes(1);
@@ -280,7 +285,7 @@ describe('usePlayerSourcePipeline', () => {
 		expect(Hls).not.toHaveBeenCalled();
 
 		act(() => {
-			jest.advanceTimersByTime(3500);
+			jest.advanceTimersByTime(10000);
 		});
 		expect(Hls).toHaveBeenCalledTimes(1);
 		expect(view.props.nativeSourceTokenRef.current.engine).toBe('hls.js');
