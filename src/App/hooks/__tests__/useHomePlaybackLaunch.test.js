@@ -196,10 +196,8 @@ describe('Home playback admission', () => {
 		const view = renderHook(() => useHomePlaybackLaunch(options));
 		await waitFor(() => expect(jellyfinService.getItem).toHaveBeenCalledTimes(1));
 		if (reason === 'cancel') act(() => view.result.current.cancel());
-		else {
-			act(() => inbox.receive(request('newer')));
-			await waitFor(() => expect(options.onPrepare).toHaveBeenCalledTimes(1));
-		}
+		else act(() => inbox.receive(request('newer')));
+		await waitFor(() => expect(options.onPrepare).toHaveBeenCalledTimes(reason === 'newer' ? 1 : 0));
 		await act(async () => { old.reject(new Error('Late upstream failure')); await old.promise.catch(() => undefined); });
 		expect(view.result.current.notice).toBeNull();
 		expect(inbox.getSnapshot().request?.requestId || null).toBe(reason === 'cancel' ? null : 'newer');

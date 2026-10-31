@@ -55,7 +55,11 @@ This guide covers top-level panels and panel-local modules in `src/views/`.
     support. Login owns layered Back navigation and cancels Quick Connect before leaving
     its waiting step.
 - `src/views/player-panel/`
-- `src/views/media-details-panel/`
+- `src/views/media-details/` owns the current Media Details page, presentational
+  `sections/`, data loading, request caching, and delegated navigation.
+  `src/views/media-details/MediaDetailsPage.js` provides the panel entry point.
+- `src/views/media-details-panel/` retains shared pickers, the toast wrapper, track and
+  credit hooks, and pure metadata helpers used by the current page.
 - `src/views/settings-panel/` (`components/`, `hooks/`, `constants.js`, `labels.js`, panel-local formatting helpers)
 
 ## Conventions
