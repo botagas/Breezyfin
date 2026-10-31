@@ -141,6 +141,12 @@ Run these before packaging a release candidate:
 
 ### Browse and Home regression validation
 
+- On Home, Watchlist, and Calendar rows with overflow, hover clipped cards at both edges.
+  Verify each card becomes visible without opening the item or changing vertical scroll.
+  Keep the pointer stationary and verify scrolling stops. Leave and re-enter the row, then
+  verify another reveal works. Repeat after wheel scrolling and with 5-way LEFT/RIGHT input
+  in Classic and Elegant themes, all performance modes, and a legacy webOS runtime.
+
 - Configure more than eight server Home rows. Scroll with the pointer or wheel while
   the cursor stays between cards. Verify pending rows load and later rows appear.
   Repeat with 5-way input. Verify rows do not reload repeatedly after entering the

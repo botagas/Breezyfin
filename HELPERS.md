@@ -211,6 +211,18 @@ const {handleScrollStart, handleScrollStop} = useWheelScrollSpotlightPause({onSc
 - Scroll-on-focus corrections (e.g. horizontal row scrolling) should skip pointer focus via
   `Spotlight.getPointerMode()`.
 
+### `useHorizontalPointerReveal`
+
+- File: `src/hooks/useHorizontalPointerReveal.js`
+- Purpose: reveal clipped horizontal cards on pointer entry without changing focus or selection.
+- Callers supply `rootRef`, `resolveTarget(node)` returning `{card, scroller, options}`, and optional
+  `enabled`, `isBlocked()`, and `onBeforeReveal()` guards. The resolver must identify the scroller
+  for scroll events even when no card matches.
+- Apply the returned `onMouseOver`, `onMouseLeave`, and `onScrollCapture` handlers to the row or its container.
+- The hook ignores nested card transitions, active scrolling, stationary-cursor entries, and paused Spotlight.
+  The hook clears pending timers when disabled or unmounted.
+- `MediaRow` uses the hook for Home, Watchlist, and Calendar. Media Details uses the same hook for sideways episodes.
+
 ### `useLibraryPagination`
 - File: `src/views/library-panel/hooks/useLibraryPagination.js`
 - Purpose: panel-local pagination flow for Library:
@@ -681,7 +693,7 @@ usePlayerInteractionReveal({
   `data-action` attributes:
   - intro/content section snap (wheel, focus, scroll stop) with a DOM-class pointer lock
   - pointer-mode click guards
-  - pointer entry reveals clipped sideways episode cards through the shared horizontal-scroll helper
+  - pointer entry reveals clipped sideways episode cards through `useHorizontalPointerReveal`
   - episode hover reads geometry only on card entry; nested actions, active scrolling, stationary-cursor entries,
     Spotlight pauses, open pickers, and section transitions do not trigger additional reveals
   - initial focus seeding (`Audio -> Subtitle -> Play`, then episode selector, then Back)

@@ -116,6 +116,8 @@ Account navigation starts after the popup finishes hiding.
 - Keep the grid mounted during filter or search reloads. Pass no items, disable its
   Spotlight container, and put loading or empty feedback above it. Sandstone can then
   finish pending scroller callbacks safely.
+- `MediaRow` uses `useHorizontalPointerReveal` to reveal clipped cards on pointer entry.
+  The hook must preserve focus and selection and suppress scroll feedback under a stationary cursor.
 - `MediaRow` may expose an optional icon-only section action through `onMoreClick` and
   `sectionKey`. Keep the action generic. The owning panel must route its destination.
 - `MediaRow` renders `pending`, `loading`, and retryable `error` states for descriptor-first

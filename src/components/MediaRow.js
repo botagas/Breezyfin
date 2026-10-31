@@ -4,6 +4,7 @@ import Spottable from '@enact/spotlight/Spottable';
 import BodyText from '@enact/sandstone/BodyText';
 import Icon from '@enact/sandstone/Icon';
 import {scrollElementIntoHorizontalView} from '../utils/horizontalScroll';
+import {useHorizontalPointerReveal} from '../hooks/useHorizontalPointerReveal';
 import {createLastFocusedSpotlightContainer} from '../utils/spotlightContainerUtils';
 import {KeyCodes} from '../utils/keyCodes';
 import {getRuntimePlatformCapabilities} from '../utils/platformCapabilities';
@@ -159,6 +160,13 @@ const Container = createLastFocusedSpotlightContainer('div', {
 	preserveId: true
 });
 
+const resolvePointerTarget = (target) => {
+	const scroller = target.closest?.(`.${css.cardContainer}`);
+	if (!scroller) return null;
+	const card = target.closest(`.${css.card}`);
+	return {card, scroller, options: {minBuffer: 60, edgeRatio: 0.10, padding: 20}};
+};
+
 const MediaRow = ({
 	title,
 	items,
@@ -190,6 +198,15 @@ const MediaRow = ({
 	const rowRef = useRef(null);
 	const focusAnimationFrameRef = useRef(0);
 	const horizontalMetricsRef = useRef(null);
+	const cancelFocusScroll = useCallback(() => {
+		window.cancelAnimationFrame(focusAnimationFrameRef.current);
+	}, []);
+	const pointerHandlers = useHorizontalPointerReveal({
+		rootRef: rowRef,
+		resolveTarget: resolvePointerTarget,
+		enabled: !loading && (!status || status === 'ready'),
+		onBeforeReveal: cancelFocusScroll
+	});
 
 	useEffect(() => {
 		return () => {
@@ -335,7 +352,7 @@ const MediaRow = ({
 				onFocus={handleFocus}
 				spotlightId={`home-row-${sectionKey || title}`}
 			>
-				<div className={`${css.cardContainer} ${isLegacyCompactLayout ? css.cardContainerCompactWebos6 : ''}`} ref={scrollerRef}>
+				<div className={`${css.cardContainer} ${isLegacyCompactLayout ? css.cardContainerCompactWebos6 : ''}`} ref={scrollerRef} {...pointerHandlers}>
 					{items.map((item, index) => (
 						<MediaCard
 							key={buildMediaListItemKey(`home-row-${sectionKey || title}`, item, index)}
