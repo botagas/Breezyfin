@@ -75,7 +75,10 @@ export const useHomePlaybackLaunch = ({
 			}
 			const server = await jellyfinService.getPublicServerInfo();
 			if (!admitCompletion()) return;
-			if (!server?.Id) throw new Error('The server could not be verified. Check the connection and try the Home card again.');
+			if (!server?.Id) {
+				setNotice({message: 'The server could not be verified. Check the connection and try the Home card again.'});
+				return;
+			}
 			if (server.Id.replace(/-/g, '').toLowerCase() !== request.serverId) {
 				setNotice({message: `Choose the same server and account as Home: ${request.serverUrl}.`, account: true});
 				return;
@@ -88,7 +91,8 @@ export const useHomePlaybackLaunch = ({
 			const item = await jellyfinService.getItem(request.itemId);
 			if (!admitCompletion()) return;
 			if (!item || !['Movie', 'Episode'].includes(item.Type) || item.Id !== request.itemId) {
-				throw new Error('This Home item is unavailable to the selected account. Refresh Home and try again.');
+				setNotice({message: 'This Home item is unavailable to the selected account. Refresh Home and try again.'});
+				return;
 			}
 			setNotice(null);
 			latest.current.onPrepare(item);

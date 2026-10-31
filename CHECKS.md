@@ -122,6 +122,10 @@ Run these before packaging a release candidate:
   its normal queue-replacement decision.
 - Verify launch requests contain no credentials or media URLs. Test malformed parameters,
   duplicate request IDs, unavailable items and ordinary app-icon launches.
+- Return missing server identity or an unavailable item for a Home launch. Verify the
+  notice identifies the validation failure. Reject a lookup and verify the notice uses
+  generic guidance without raw exception text. Cancel or launch a newer card before the
+  old lookup fails. Verify the old failure cannot replace the current notice.
 - Receive a Home relaunch while Breezyfin is already hidden. Confirm preparation waits for
   foreground. Hide during server/item lookup and return; no loading notice may remain stuck.
 - Open a Home item, then use Settings cache wipe with and without keeping login. Confirm the

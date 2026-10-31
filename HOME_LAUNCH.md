@@ -55,5 +55,9 @@ notice, even if the visibility event has not arrived. It cannot clear a newer re
 Leaving Player retains layered Back handling and returns to the item Details page, then
 Breezyfin Home. The TV Home button remains a platform action.
 
+Missing server identity and unavailable items produce specific app-authored notices.
+Unexpected lookup failures produce a generic notice without raw exception text.
+Cancelled or superseded requests must not publish a late failure notice.
+
 Errors do not launch another client or account. The Home launcher owns its separate
 Jellyfin Native option and must preserve that client's existing launch behavior.

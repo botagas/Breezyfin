@@ -11,7 +11,7 @@ const request = (id = 'first', requestedItemId = itemId) => ({breezyfinHome: {
 	version: 1, action: 'play', requestId: id, itemId: requestedItemId, serverId, userId, serverUrl: 'https://jellyfin.example.test'
 }});
 const item = {Id: itemId, Type: 'Episode', UserData: {PlaybackPositionTicks: 123000000}};
-const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r; }); return {promise, resolve}; };
+const deferred = () => { let resolve, reject; const promise = new Promise((r, j) => { resolve = r; reject = j; }); return {promise, resolve, reject}; };
 
 describe('Home playback admission', () => {
 	let inbox, options;
@@ -162,10 +162,47 @@ describe('Home playback admission', () => {
 		await waitFor(() => expect(inbox.getSnapshot().request).toBeNull());
 		expect(options.onPlay).not.toHaveBeenCalled();
 	});
-	it('shows an unavailable-item failure without trying another client or item', async () => {
-		jellyfinService.getItem.mockResolvedValue(null); inbox.receive(request());
+	it.each([null, {...item, Type: 'Series'}, {...item, Id: 'f'.repeat(32)}])('explains why an invalid Home item cannot open: %j', async (invalidItem) => {
+		jellyfinService.getItem.mockResolvedValue(invalidItem); inbox.receive(request());
 		const view = renderHook(() => useHomePlaybackLaunch(options));
-		await waitFor(() => expect(view.result.current.notice?.message).toContain('could not be opened'));
+		await waitFor(() => expect(view.result.current.notice).toEqual({
+			message: 'This Home item is unavailable to the selected account. Refresh Home and try again.'
+		}));
+		expect(options.onPrepare).not.toHaveBeenCalled();
+		expect(options.onPlay).not.toHaveBeenCalled();
+	});
+	it.each([null, {}])('explains when server identity is unavailable: %j', async (server) => {
+		jellyfinService.getPublicServerInfo.mockResolvedValue(server); inbox.receive(request());
+		const view = renderHook(() => useHomePlaybackLaunch(options));
+		await waitFor(() => expect(view.result.current.notice).toEqual({
+			message: 'The server could not be verified. Check the connection and try the Home card again.'
+		}));
+		expect(jellyfinService.getItem).not.toHaveBeenCalled();
+		expect(options.onPrepare).not.toHaveBeenCalled();
+	});
+	it.each(['server', 'item'])('keeps unexpected %s failures behind the generic notice', async (stage) => {
+		const lookup = stage === 'server' ? jellyfinService.getPublicServerInfo : jellyfinService.getItem;
+		lookup.mockRejectedValue(new Error('Unexpected upstream response')); inbox.receive(request());
+		const view = renderHook(() => useHomePlaybackLaunch(options));
+		await waitFor(() => expect(view.result.current.notice).toEqual({
+			message: 'The Home item could not be opened. Check access and the server connection, then try again.'
+		}));
+		expect(options.onPrepare).not.toHaveBeenCalled();
+		expect(options.onPlay).not.toHaveBeenCalled();
+	});
+	it.each(['cancel', 'newer'])('ignores a late lookup rejection after %s', async (reason) => {
+		const old = deferred(); jellyfinService.getItem.mockReturnValueOnce(old.promise);
+		inbox.receive(request());
+		const view = renderHook(() => useHomePlaybackLaunch(options));
+		await waitFor(() => expect(jellyfinService.getItem).toHaveBeenCalledTimes(1));
+		if (reason === 'cancel') act(() => view.result.current.cancel());
+		else {
+			act(() => inbox.receive(request('newer')));
+			await waitFor(() => expect(options.onPrepare).toHaveBeenCalledTimes(1));
+		}
+		await act(async () => { old.reject(new Error('Late upstream failure')); await old.promise.catch(() => undefined); });
+		expect(view.result.current.notice).toBeNull();
+		expect(inbox.getSnapshot().request?.requestId || null).toBe(reason === 'cancel' ? null : 'newer');
 		expect(options.onPlay).not.toHaveBeenCalled();
 	});
 });

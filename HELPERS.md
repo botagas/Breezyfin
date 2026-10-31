@@ -8,6 +8,8 @@ Home launch handling uses `src/App/utils/homeLaunch.js` for validated early para
 and bounded session-scoped receipt deduplication, and `src/App/hooks/useHomePlaybackLaunch.js` for authenticated admission,
 pending account selection and cancellation. The hook reuses saved-session identity guards
 and the existing playback entry point. It does not negotiate media or store credentials.
+The hook shows specific app-authored validation notices and keeps unexpected lookup
+exceptions behind a generic notice. Session and request guards apply to both paths.
 
 `src/App/hooks/useAppSessionRestore.js` owns the initial saved-session lookup and recovery
 completion. It preserves session identity and unmount guards. Failed restoration clears
