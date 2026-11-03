@@ -1,6 +1,6 @@
 {
 	"name": "breezyfin",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Jellyfin client for LG webOS TVs, built with Enact Sandstone.",
 	"author": "",
 	"main": "src/index.js",
@@ -49,7 +49,10 @@
 		"test-watch": "enact test --watch",
 		"audit:duplicates": "node scripts/duplicate-audit/find-duplicates.cjs",
 		"audit:jscpd": "jscpd --config .jscpd.json --no-tips --exit-code 1 src scripts",
-		"report:package-size": "node scripts/report-package-size.cjs"
+		"report:package-size": "node scripts/report-package-size.cjs",
+		"pack-dev": "REACT_APP_ENABLE_PERSISTENT_LOGS=1 REACT_APP_RELEASE_CHANNEL=develop npm run pack-p",
+		"package:ipk": "rm -rf build && cp appinfo.json icon.png dist/ && npx -p @webos-tools/cli ares-config --profile tv && npx -p @webos-tools/cli ares-package dist --outdir build",
+		"deploy:tv": "npm run pack-dev && npm run package:ipk && npx -p @webos-tools/cli ares-install --device tv build/*.ipk && npx -p @webos-tools/cli ares-launch --device tv com.breezyfin.app"
 	},
 	"license": "GPL-3.0-only",
 	"private": true,
@@ -63,7 +66,9 @@
 	},
 	"enact": {
 		"alias": {
-			"react-is": "react-is-18"
+			"react-is": "react-is-18",
+			"strip-ansi": "strip-ansi-6",
+			"ansi-regex": "ansi-regex-5"
 		},
 		"theme": "sandstone",
 		"publicUrl": "."
@@ -77,7 +82,7 @@
 		"@enact/webos": "4.9.8",
 		"@jellyfin/sdk": "^0.13.0",
 		"assjs": "^0.1.8",
-		"axios": "^1.18.1",
+		"axios": "^1.20.0",
 		"hls.js": "^1.6.15",
 		"ilib": "14.21.1",
 		"jassub": "2.5.6",
@@ -95,10 +100,12 @@
 		"@testing-library/dom": "10.4.1",
 		"@testing-library/react": "16.3.2",
 		"@testing-library/user-event": "14.6.1",
+		"ansi-regex-5": "npm:ansi-regex@5.0.1",
 		"baseline-browser-mapping": "^2.10.0",
 		"jscpd": "^5.0.11",
 		"postcss-less": "^6.0.0",
 		"react-is-18": "npm:react-is@18.3.1",
+		"strip-ansi-6": "npm:strip-ansi@6.0.1",
 		"stylelint": "^17.13.0"
 	},
 	"overrides": {

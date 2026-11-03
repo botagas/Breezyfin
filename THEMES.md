@@ -181,6 +181,15 @@ Relevant settings:
 
 Default theme is Elegant unless settings explicitly switch to Classic.
 
+Subtitle appearance offsets use shared CSS variables in the Player overlay. Ordinary
+text offsets apply only to the bottom region. Top and middle text retain their positions.
+`Apply Offsets to Entire Styled Layer` is opt-in. The switch translates the complete
+styled layer, including authored signs, drawings, and clips. Lightweight ASS and external
+ASS/PGS renderers must use the same saved offsets. Styled bottom regions must not apply
+the offsets a second time. Burned-in server subtitles cannot use client overlay offsets.
+Custom text and outline colors accept normalized three-digit or six-digit hex input.
+Source-authored ASS colors retain their per-cue overrides.
+
 ## 8) Adding new theme features
 
 Use this sequence:

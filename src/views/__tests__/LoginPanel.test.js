@@ -61,17 +61,21 @@ jest.mock('../login-panel/components/LoginSavedAccountsStep', () => function Tes
 	const entry = props.savedServers[0];
 	return entry ? (
 		<button data-resume-key={`${entry.serverId}:${entry.userId}`} onClick={props.onResumeClick}>
-			Saved account
+			{props.resumingKey === `${entry.serverId}:${entry.userId}` ? 'Opening...' : 'Saved account'}
 		</button>
 	) : null;
 });
 jest.mock('../login-panel/components/LoginCredentialsStep', () => function TestCredentials(props) {
-	return <div data-testid="credentials">{props.username}</div>;
+	return <><div data-testid="credentials">{props.username}</div><button onClick={props.onBack}>Back</button></>;
 });
 
 describe('LoginPanel saved-session recovery', () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
+		jellyfinService.serverUrl = 'http://media.local';
+		jellyfinService.userId = 'user-1';
+		jellyfinService.accessToken = 'expired-token';
+		jellyfinService.sessionGeneration = 4;
 		jellyfinService.getSavedServers.mockReturnValue([{
 			serverId: 'server-1',
 			userId: 'user-1',
@@ -97,6 +101,43 @@ describe('LoginPanel saved-session recovery', () => {
 		await waitFor(() => expect(screen.getByTestId('credentials').textContent).toBe('Alice'));
 		expect(jellyfinService.setActiveServer).toHaveBeenCalledWith('server-1', 'user-1');
 		expect(jellyfinService.connect).toHaveBeenCalledWith('http://media.local');
+	});
+
+	it('clears the saved-account opening state after expired-token reconnect', async () => {
+		jellyfinService.connect.mockImplementation(async () => {
+			jellyfinService.accessToken = null;
+			jellyfinService.userId = null;
+			jellyfinService.sessionGeneration += 1;
+			return {ServerName: 'Media'};
+		});
+		render(<LoginPanel isActive onLogin={jest.fn()} />);
+		fireEvent.click(await screen.findByText('Saved account'));
+		await screen.findByTestId('credentials');
+		fireEvent.click(screen.getByText('Back'));
+		expect(await screen.findByText('Saved account')).toBeTruthy();
+		expect(screen.queryByText('Opening...')).toBeNull();
+	});
+
+	it('does not let an older resume attempt clear or reconnect a newer attempt', async () => {
+		let resolveFirst;
+		let resolveSecond;
+		jellyfinService.getCurrentUser
+			.mockImplementationOnce(() => new Promise((resolve) => {resolveFirst = resolve;}))
+			.mockImplementationOnce(() => new Promise((resolve) => {resolveSecond = resolve;}));
+		const onLogin = jest.fn();
+		render(<LoginPanel isActive onLogin={onLogin} />);
+		fireEvent.click(await screen.findByText('Saved account'));
+		fireEvent.click(await screen.findByText('Opening...'));
+		await act(async () => {
+			resolveFirst(null);
+		});
+		expect(jellyfinService.connect).not.toHaveBeenCalled();
+		expect(screen.getByText('Opening...')).toBeTruthy();
+		await act(async () => {
+			resolveSecond({Id: 'user-1'});
+		});
+		expect(onLogin).toHaveBeenCalledTimes(1);
+		expect(screen.queryByText('Opening...')).toBeNull();
 	});
 
 	it('does not reconnect an old saved session after Quick Connect replaces it', async () => {

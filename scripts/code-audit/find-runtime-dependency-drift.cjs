@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const {getRuntimePackageEntries} = require('../package-audit/runtimePackageGraph.cjs');
+const {getRuntimePackageEntries, getCliBundledMetadataFailures} = require('../package-audit/runtimePackageGraph.cjs');
 
 const ROOT = process.cwd();
 const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
@@ -19,7 +19,7 @@ const EXPECTED_RUNTIME = Object.freeze({
 	'react-dom': '18.3.1'
 });
 
-const failures = [];
+const failures = getCliBundledMetadataFailures(packageJson, packageLock);
 const EXPECTED_BUILD_REACT_IS = '18.3.1';
 const runtimeEntries = getRuntimePackageEntries(packageLock);
 for (const [name, expectedVersion] of Object.entries(EXPECTED_RUNTIME)) {

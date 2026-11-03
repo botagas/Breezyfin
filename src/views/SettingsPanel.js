@@ -1,55 +1,46 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Panel, Header } from '../components/BreezyPanels';
+import {useCallback, useMemo, useState} from 'react';
+import {Header, Panel} from '../components/BreezyPanels';
 import Scroller from '../components/AppScroller';
 import jellyfinService from '../services/jellyfinService';
 import SettingsToolbar from '../components/SettingsToolbar';
-import { useMapById } from '../hooks/useMapById';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
-import { useToastMessage } from '../hooks/useToastMessage';
-import { PANEL_TOAST_CONFIG } from '../constants/toast';
-import {
-	getRuntimePlatformCapabilities,
-	setRuntimeCapabilityProbeRefreshDays
-} from '../utils/platformCapabilities';
+import {useMapById} from '../hooks/useMapById';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
+import {usePanelScrollState} from '../hooks/usePanelScrollState';
+import {useToastMessage} from '../hooks/useToastMessage';
+import {PANEL_TOAST_CONFIG} from '../constants/toast';
+import {getRuntimePlatformCapabilities, setRuntimeCapabilityProbeRefreshDays} from '../utils/platformCapabilities';
 import {isNonStableBuild} from '../utils/featureFlags';
 import BreezyToast from '../components/BreezyToast';
 import {
-	BITRATE_OPTIONS,
 	BITMAP_SUBTITLE_RENDERER_OPTIONS,
+	BITRATE_OPTIONS,
 	CAPABILITY_PROBE_REFRESH_OPTIONS,
 	DEFAULT_SETTINGS,
+	getAssSubtitleRendererOptions,
 	LANGUAGE_OPTIONS,
 	NAVBAR_THEME_OPTIONS,
 	SCREENSAVER_TIMEOUT_OPTIONS,
-	getAssSubtitleRendererOptions,
 	SUBTITLE_BURN_IN_TEXT_CODEC_OPTIONS,
 	SUBTITLE_OVERLAY_BACKGROUND_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS,
 	SUBTITLE_OVERLAY_BORDER_STYLE_OPTIONS,
-	SUBTITLE_OVERLAY_POSITION_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_ANGLE_OPTIONS,
 	SUBTITLE_OVERLAY_SHADOW_DISTANCE_OPTIONS,
 	SUBTITLE_OVERLAY_TEXT_COLOR_OPTIONS,
 	SUBTITLE_OVERLAY_WEIGHT_OPTIONS
 } from './settings-panel/constants';
-import {
-	getCapabilityProbeRefreshLabel,
-	getHomeRowLabel,
-	getPlayNextPromptModeLabel
-} from './settings-panel/labels';
-import {
-	createCapabilityProbeRefreshNormalizer
-} from './settings-panel/capabilityFormatting';
-import { useRuntimeCapabilityLabels } from './settings-panel/hooks/useRuntimeCapabilityLabels';
-import { useSettingsBootstrap } from './settings-panel/hooks/useSettingsBootstrap';
-import { useSettingsDisclosures } from './settings-panel/hooks/useSettingsDisclosures';
-import { useSettingsHomeRows } from './settings-panel/hooks/useSettingsHomeRows';
-import { useSettingsOptionHandlers } from './settings-panel/hooks/useSettingsOptionHandlers';
-import { useSettingsSystemHandlers } from './settings-panel/hooks/useSettingsSystemHandlers';
-import { useSettingsToggleHandlers } from './settings-panel/hooks/useSettingsToggleHandlers';
-import { useSettingsDisplayHandlers } from './settings-panel/hooks/useSettingsDisplayHandlers';
+import {getCapabilityProbeRefreshLabel, getHomeRowLabel, getPlayNextPromptModeLabel} from './settings-panel/labels';
+import {createCapabilityProbeRefreshNormalizer} from './settings-panel/capabilityFormatting';
+import {useRuntimeCapabilityLabels} from './settings-panel/hooks/useRuntimeCapabilityLabels';
+import {useSettingsBootstrap} from './settings-panel/hooks/useSettingsBootstrap';
+import {useSettingsDisclosures} from './settings-panel/hooks/useSettingsDisclosures';
+import {useSettingsHomeRows} from './settings-panel/hooks/useSettingsHomeRows';
+import {useSettingsOptionHandlers} from './settings-panel/hooks/useSettingsOptionHandlers';
+import {useSettingsSystemHandlers} from './settings-panel/hooks/useSettingsSystemHandlers';
+import {useSettingsToggleHandlers} from './settings-panel/hooks/useSettingsToggleHandlers';
+import {useSettingsDisplayHandlers} from './settings-panel/hooks/useSettingsDisplayHandlers';
+import {DEFAULT_SETTINGS_TAB_KEY} from './settings-panel/utils/settingsViewModel';
 
 import css from './SettingsPanel.module.less';
 import {popupShellCss} from '../styles/popupStyles';
@@ -78,6 +69,8 @@ const SettingsPanel = ({
 	const [, bumpCapabilitySnapshotVersion] = useState(0);
 	const runtimeCapabilities = getRuntimePlatformCapabilities();
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+	// Owned here so a tab switch re-renders the Scroller, which re-measures its scroll bounds.
+	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_SETTINGS_TAB_KEY);
 	const [integrationPreferences, setIntegrationPreferences] = useState(() => (
 		readIntegrationPreferences(jellyfinService)
 	));
@@ -107,7 +100,8 @@ const SettingsPanel = ({
 		assSubtitleRendererPopupOpen,
 		bitmapSubtitleRendererPopupOpen,
 		subtitleOverlaySizePopupOpen,
-		subtitleOverlayPositionPopupOpen,
+        subtitleOverlayOffsetYPopupOpen,
+        subtitleOverlayOffsetXPopupOpen,
 		subtitleOverlayBackgroundPopupOpen,
 		subtitleOverlayWeightPopupOpen,
 		subtitleOverlayTextColorPopupOpen,
@@ -139,8 +133,10 @@ const SettingsPanel = ({
 		closeBitmapSubtitleRendererPopup,
 		openSubtitleOverlaySizePopup,
 		closeSubtitleOverlaySizePopup,
-		openSubtitleOverlayPositionPopup,
-		closeSubtitleOverlayPositionPopup,
+        openSubtitleOverlayOffsetYPopup,
+        closeSubtitleOverlayOffsetYPopup,
+        openSubtitleOverlayOffsetXPopup,
+        closeSubtitleOverlayOffsetXPopup,
 		openSubtitleOverlayBackgroundPopup,
 		closeSubtitleOverlayBackgroundPopup,
 		openSubtitleOverlayWeightPopup,
@@ -203,6 +199,7 @@ const SettingsPanel = ({
 	} = useRuntimeCapabilityLabels(runtimeCapabilities);
 	const {
 		captureScrollTo: captureSettingsScrollRestore,
+		handleScroll: handleSettingsScrollMemory,
 		handleScrollStop: handleSettingsScrollMemoryStop
 	} = usePanelScrollState({
 		cachedState,
@@ -276,7 +273,6 @@ const SettingsPanel = ({
 		closeAssSubtitleRendererPopup,
 		closeBitmapSubtitleRendererPopup,
 		closeSubtitleOverlaySizePopup,
-		closeSubtitleOverlayPositionPopup,
 		closeSubtitleOverlayBackgroundPopup,
 		closeSubtitleOverlayWeightPopup,
 		closeSubtitleOverlayTextColorPopup,
@@ -319,7 +315,12 @@ const SettingsPanel = ({
 		handleSubtitleOverlayFontSizeDecrease,
 		handleSubtitleOverlayFontSizeIncrease,
 		handleSubtitleOverlayFontSizeReset,
-		handleSubtitleOverlayPositionSelect,
+        handleSubtitleOverlayOffsetYDecrease,
+        handleSubtitleOverlayOffsetYIncrease,
+        handleSubtitleOverlayOffsetYReset,
+        handleSubtitleOverlayOffsetXDecrease,
+        handleSubtitleOverlayOffsetXIncrease,
+        handleSubtitleOverlayOffsetXReset,
 		handleSubtitleOverlayBackgroundSelect,
 		handleSubtitleOverlayWeightSelect
 	} = optionHandlers;
@@ -327,6 +328,8 @@ const SettingsPanel = ({
 		handleSubtitleOverlayTextColorSelect,
 		handleSubtitleOverlayBorderStyleSelect,
 		handleSubtitleOverlayBorderColorSelect,
+		handleSubtitleOverlayTextColorCustomApply,
+		handleSubtitleOverlayBorderColorCustomApply,
 		handleSubtitleOverlayBorderStrengthSelect
 	} = optionHandlers;
 	const {
@@ -343,7 +346,8 @@ const SettingsPanel = ({
 	} = optionHandlers;
 	const {
 		subtitleOverlayFontSizeLabel,
-		subtitleOverlayPositionLabel,
+        subtitleOverlayOffsetYLabel,
+        subtitleOverlayOffsetXLabel,
 		subtitleOverlayBackgroundLabel,
 		subtitleOverlayWeightLabel,
 		subtitleOverlayTextColorLabel,
@@ -395,9 +399,12 @@ const SettingsPanel = ({
 				<Scroller
 					className={css.settingsContainer}
 					cbScrollTo={captureSettingsScrollRestore}
+					onScroll={handleSettingsScrollMemory}
 					onScrollStop={handleSettingsScrollMemoryStop}
 				>
 					<SettingsSections
+						activeTabKey={activeTabKey}
+						onActiveTabChange={setActiveTabKey}
 						loading={loading}
 						serverInfo={serverInfo}
 						serverUrl={jellyfinService.serverUrl}
@@ -428,7 +435,8 @@ const SettingsPanel = ({
 						bitmapSubtitleRendererLabel={bitmapSubtitleRendererLabel}
 						openBitmapSubtitleRendererPopup={openBitmapSubtitleRendererPopup}
 						subtitleOverlayFontSizeLabel={subtitleOverlayFontSizeLabel}
-						subtitleOverlayPositionLabel={subtitleOverlayPositionLabel}
+                        subtitleOverlayOffsetYLabel={subtitleOverlayOffsetYLabel}
+                        subtitleOverlayOffsetXLabel={subtitleOverlayOffsetXLabel}
 						subtitleOverlayBackgroundLabel={subtitleOverlayBackgroundLabel}
 						subtitleOverlayWeightLabel={subtitleOverlayWeightLabel}
 						subtitleOverlayTextColorLabel={subtitleOverlayTextColorLabel}
@@ -439,7 +447,8 @@ const SettingsPanel = ({
 						subtitleOverlayShadowDistanceLabel={subtitleOverlayShadowDistanceLabel}
 						subtitleOverlayShadowAngleLabel={subtitleOverlayShadowAngleLabel}
 						openSubtitleOverlaySizePopup={openSubtitleOverlaySizePopup}
-						openSubtitleOverlayPositionPopup={openSubtitleOverlayPositionPopup}
+                        openSubtitleOverlayOffsetYPopup={openSubtitleOverlayOffsetYPopup}
+                        openSubtitleOverlayOffsetXPopup={openSubtitleOverlayOffsetXPopup}
 						openSubtitleOverlayBackgroundPopup={openSubtitleOverlayBackgroundPopup}
 						openSubtitleOverlayWeightPopup={openSubtitleOverlayWeightPopup}
 						openSubtitleOverlayTextColorPopup={openSubtitleOverlayTextColorPopup}
@@ -514,10 +523,18 @@ const SettingsPanel = ({
 					handleSubtitleOverlayFontSizeDecrease={handleSubtitleOverlayFontSizeDecrease}
 					handleSubtitleOverlayFontSizeIncrease={handleSubtitleOverlayFontSizeIncrease}
 					handleSubtitleOverlayFontSizeReset={handleSubtitleOverlayFontSizeReset}
-					subtitleOverlayPositionPopupOpen={subtitleOverlayPositionPopupOpen}
-					closeSubtitleOverlayPositionPopup={closeSubtitleOverlayPositionPopup}
-					subtitleOverlayPositionOptions={SUBTITLE_OVERLAY_POSITION_OPTIONS}
-					handleSubtitleOverlayPositionSelect={handleSubtitleOverlayPositionSelect}
+                    subtitleOverlayOffsetYPopupOpen={subtitleOverlayOffsetYPopupOpen}
+                    closeSubtitleOverlayOffsetYPopup={closeSubtitleOverlayOffsetYPopup}
+                    subtitleOverlayOffsetYLabel={subtitleOverlayOffsetYLabel}
+                    handleSubtitleOverlayOffsetYDecrease={handleSubtitleOverlayOffsetYDecrease}
+                    handleSubtitleOverlayOffsetYIncrease={handleSubtitleOverlayOffsetYIncrease}
+                    handleSubtitleOverlayOffsetYReset={handleSubtitleOverlayOffsetYReset}
+                    subtitleOverlayOffsetXPopupOpen={subtitleOverlayOffsetXPopupOpen}
+                    closeSubtitleOverlayOffsetXPopup={closeSubtitleOverlayOffsetXPopup}
+                    subtitleOverlayOffsetXLabel={subtitleOverlayOffsetXLabel}
+                    handleSubtitleOverlayOffsetXDecrease={handleSubtitleOverlayOffsetXDecrease}
+                    handleSubtitleOverlayOffsetXIncrease={handleSubtitleOverlayOffsetXIncrease}
+                    handleSubtitleOverlayOffsetXReset={handleSubtitleOverlayOffsetXReset}
 					subtitleOverlayBackgroundPopupOpen={subtitleOverlayBackgroundPopupOpen}
 					closeSubtitleOverlayBackgroundPopup={closeSubtitleOverlayBackgroundPopup}
 					subtitleOverlayBackgroundOptions={SUBTITLE_OVERLAY_BACKGROUND_OPTIONS}
@@ -538,6 +555,8 @@ const SettingsPanel = ({
 					closeSubtitleOverlayBorderColorPopup={closeSubtitleOverlayBorderColorPopup}
 					subtitleOverlayBorderColorOptions={SUBTITLE_OVERLAY_BORDER_COLOR_OPTIONS}
 					handleSubtitleOverlayBorderColorSelect={handleSubtitleOverlayBorderColorSelect}
+					handleSubtitleOverlayTextColorCustomApply={handleSubtitleOverlayTextColorCustomApply}
+					handleSubtitleOverlayBorderColorCustomApply={handleSubtitleOverlayBorderColorCustomApply}
 					subtitleOverlayBorderStrengthPopupOpen={subtitleOverlayBorderStrengthPopupOpen}
 					closeSubtitleOverlayBorderStrengthPopup={closeSubtitleOverlayBorderStrengthPopup}
 					subtitleOverlayBorderStrengthOptions={SUBTITLE_OVERLAY_BORDER_STRENGTH_OPTIONS}

@@ -33,7 +33,11 @@ const WatchPartyPanel = ({
 	const activeRef = useRef(isActive);
 	const availabilityRequestRef = useRef(0);
 	const playRequestRef = useRef(0);
-	const {captureScrollTo, handleScrollStop} = usePanelScrollState({cachedState, isActive, onCacheState});
+	const {captureScrollTo, handleScroll, handleScrollStop} = usePanelScrollState({
+		cachedState,
+		isActive,
+		onCacheState
+	});
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate, onSwitchUser, onLogout, onExit, registerBackHandler, isActive
 	});
@@ -202,6 +206,7 @@ const WatchPartyPanel = ({
 			backdropItem={backdropItem}
 			loading={availability == null}
 			captureScrollTo={captureScrollTo}
+			onScroll={handleScroll}
 			onScrollStop={handleScrollStop}
 		>
 			<section className={css.section}>

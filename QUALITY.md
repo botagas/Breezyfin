@@ -121,15 +121,30 @@ Production dependency security is a release gate; build-tool advisories remain a
 
 Evidence:
 
-- Axios `^1.18.1` is now an explicit runtime dependency and satisfies the Jellyfin SDK peer dependency. Its required `follow-redirects` and `form-data` chain is also resolved to non-vulnerable versions in the lockfile.
-- `npm audit --omit=dev --audit-level=high` currently passes with no production vulnerabilities.
-- Findings from an unscoped `npm audit`, including current high-severity
-  `brace-expansion`, `fast-uri`, and `js-yaml` reports, are confined to the nested Enact
-  CLI build-tool chain and are not part of the packaged application.
-- Enact CLI's tarball contains undeclared nested `@enact/dev-utils` tooling. The lockfile
-  marks those extraneous entries as development-only so `--omit=dev` reflects their real
-  ancestor; preserve that metadata when refreshing the lockfile. Range-scoped overrides
-  keep normal dependency paths on patched releases without changing Enact generations.
+- Axios `^1.20.0` is an explicit runtime dependency and satisfies the Jellyfin SDK peer
+  dependency. Its transitive dependencies remain subject to the production security gate.
+- Contributors must run `npm audit --omit=dev --audit-level=high` before publishing a PR.
+  `npm run audit` checks repository rules and does not query npm security advisories.
+- Review each unscoped `npm audit` finding against the installed dependency graph.
+  Findings confined to the Enact CLI build-tool chain require a separate tooling review.
+  Contributors must not classify a runtime finding as tooling-only to pass the gate.
+- Enact CLI's tarball contains undeclared nested `@enact/dev-utils` tooling. Stale
+  extraneous entries without development-only metadata can incorrectly enter npm's
+  production audit. Regenerating the lockfile prunes those redundant entries without
+  changing the pinned CLI. `audit:runtime-deps` rejects their return. Correctly classified
+  development-only entries are also valid. See WA-010 in `WORKAROUNDS.md`.
+- The 2026-10-30 advisory
+  [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p) affects
+  `follow-redirects` 1.16.0 and 1.16.1. The lockfile now resolves the runtime dependency
+  to the patched version 1.16.2 through Axios's existing compatible range. The update
+  does not change Axios, the pinned Enact toolchain, or the development-only CLI copy.
+  Contributors must repeat the production audit after a clean install and before release;
+  a prior passing audit does not establish current advisory status.
+- The 2026-10-31 production audit after a clean install reports no vulnerabilities.
+  The unscoped audit reports 76 findings: seven low, 53 moderate, 14 high, and two
+  critical. None of their affected package paths are in the 69-package production
+  graph. Keep those findings visible during the separate build-tool compatibility
+  review; do not run forced toolchain upgrades for this release.
 - Running `npm audit fix` blindly is too risky for this app because Enact/webOS packaging, Sandstone behavior, and production minification have all been regression-sensitive.
 
 Recommended adoption path:

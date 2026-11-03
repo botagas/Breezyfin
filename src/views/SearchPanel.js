@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Panel, Header } from '../components/BreezyPanels';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Header, Panel} from '../components/BreezyPanels';
 import Button from '../components/BreezyButton';
 import MediaBrowseControls from '../components/MediaBrowseControls';
 import MediaBrowseOverlay from '../components/MediaBrowseOverlay';
@@ -14,15 +14,14 @@ import BreezyLoadingOverlay from '../components/BreezyLoadingOverlay';
 import MediaPanelBackdrop from '../components/MediaPanelBackdrop';
 import {getPosterCardImageUrls} from '../utils/mediaItemUtils';
 import {getMediaCardPresentation} from '../utils/mediaCardPresentation';
-import { useDisclosureMap } from '../hooks/useDisclosureMap';
-import { useDisclosureHandlers } from '../hooks/useDisclosureHandlers';
-import { useMapById } from '../hooks/useMapById';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePopupInitialFocus } from '../hooks/usePopupInitialFocus';
+import {useDisclosureMap} from '../hooks/useDisclosureMap';
+import {useDisclosureHandlers} from '../hooks/useDisclosureHandlers';
+import {useMapById} from '../hooks/useMapById';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
+import {usePanelCacheOnUnmount} from '../hooks/usePanelCacheOnUnmount';
+import {usePopupInitialFocus} from '../hooks/usePopupInitialFocus';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
-import {
-	resolveSearchPageProgress
-} from '../utils/searchPagination';
+import {resolveSearchPageProgress} from '../utils/searchPagination';
 
 import css from './SearchPanel.module.less';
 import browseCss from '../components/MediaBrowseControls.module.less';
@@ -72,6 +71,7 @@ const SearchPanel = ({
 	isActive = false,
 	cachedState = null,
 	onCacheState = null,
+						 resetToken = 0,
 	...rest
 }) => {
 	const [searchTerm, setSearchTerm] = useState(() => (
@@ -104,7 +104,7 @@ const SearchPanel = ({
 	const gridScrollToRef = useRef(null);
 	const lastFocusedItemIdRef = useRef(cachedState?.focusedItemId || null);
 	const filterPopupContentRef = useRef(null);
-	const lastCachedStateRef = useRef(cachedState);
+	const lastResetTokenRef = useRef(resetToken);
 	const paginationRef = useRef({
 		nextStartIndex: getCachedNextStartIndex(cachedState?.nextStartIndex) ?? (
 			Array.isArray(cachedState?.results) ? cachedState.results.length : 0
@@ -127,9 +127,8 @@ const SearchPanel = ({
 	}, []);
 
 	useEffect(() => {
-		const hadCachedState = lastCachedStateRef.current !== null;
-		lastCachedStateRef.current = cachedState;
-		if (!hadCachedState || cachedState !== null) return;
+		if (lastResetTokenRef.current === resetToken) return;
+		lastResetTokenRef.current = resetToken;
 		if (searchDebounceRef.current) {
 			clearTimeout(searchDebounceRef.current);
 			searchDebounceRef.current = null;
@@ -153,7 +152,7 @@ const SearchPanel = ({
 		setSelectedFilterIds(ALL_FILTER_IDS);
 		setHasMore(false);
 		resetGridScroll();
-	}, [cachedState, closeDisclosure, resetGridScroll]);
+	}, [closeDisclosure, resetGridScroll, resetToken]);
 
 	const buildFilterTypes = useCallback((filterIds) => {
 		if (!Array.isArray(filterIds) || filterIds.length === 0) return null;
@@ -311,18 +310,16 @@ const SearchPanel = ({
 		}
 	}, [buildFilterTypes, results.length, searchTerm, selectedFilterIds]);
 
-	useEffect(() => {
-		if (typeof onCacheState !== 'function') return;
-		onCacheState({
-			searchTerm,
-			results,
-			hasSearched,
-			selectedFilterIds,
-			hasMore,
-			nextStartIndex: paginationRef.current.nextStartIndex,
-			focusedItemId: lastFocusedItemIdRef.current
-		});
-	}, [hasMore, hasSearched, onCacheState, results, searchTerm, selectedFilterIds]);
+	const getCacheSnapshot = useCallback(() => ({
+		searchTerm,
+		results: resultsRef.current,
+		hasSearched,
+		selectedFilterIds,
+		hasMore,
+		nextStartIndex: paginationRef.current.nextStartIndex,
+		focusedItemId: lastFocusedItemIdRef.current
+	}), [hasMore, hasSearched, searchTerm, selectedFilterIds]);
+	usePanelCacheOnUnmount(onCacheState, getCacheSnapshot);
 
 	const handleSearchChange = useCallback((e) => {
 		const value = e.value;
@@ -404,17 +401,9 @@ const SearchPanel = ({
 		const selectedItem = Number.isInteger(itemIndex) ? resultsRef.current[itemIndex] : null;
 		if (!selectedItem) return;
 		lastFocusedItemIdRef.current = selectedItem.Id || null;
-		onCacheState?.({
-			searchTerm,
-			results: resultsRef.current,
-			hasSearched,
-			selectedFilterIds,
-			hasMore,
-			nextStartIndex: paginationRef.current.nextStartIndex,
-			focusedItemId: lastFocusedItemIdRef.current
-		});
+		onCacheState?.(getCacheSnapshot());
 		handleItemClick(selectedItem);
-	}, [handleItemClick, hasMore, hasSearched, onCacheState, searchTerm, selectedFilterIds]);
+	}, [getCacheSnapshot, handleItemClick, onCacheState]);
 
 	const renderSearchResult = useCallback(({index, items, ...itemProps}) => {
 		const item = items[index];

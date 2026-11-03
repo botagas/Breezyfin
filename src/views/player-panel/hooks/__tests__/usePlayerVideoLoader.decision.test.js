@@ -99,6 +99,28 @@ describe('usePlayerVideoLoader blocking playback decisions', () => {
 		expect(props.setMediaSourceData).not.toHaveBeenCalled();
 	});
 
+	it('returns a stale result when recovery replaces an override during PlaybackInfo', async () => {
+		const {props} = createProps();
+		let resolveInfo;
+		jellyfinService.getPlaybackInfo.mockImplementation(() => new Promise((resolve) => {
+			resolveInfo = resolve;
+		}));
+		const {result} = renderHook(() => usePlayerVideoLoader(props));
+		let load;
+		await act(async () => {
+			load = result.current();
+		});
+		props.playbackOverrideRef.current = {recovery: true};
+		let outcome;
+		await act(async () => {
+			resolveInfo({MediaSources: []});
+			outcome = await load;
+		});
+		expect(outcome).toEqual(expect.objectContaining({status: 'stale'}));
+		expect(props.detachPlaybackSource).not.toHaveBeenCalled();
+		expect(props.attachPlaybackSource).not.toHaveBeenCalled();
+	});
+
 	it('rejects a prepared plan for another item before detaching the active source', async () => {
 		const {props} = createProps();
 		jellyfinService.getPlaybackInfo.mockResolvedValue({MediaSources: [{

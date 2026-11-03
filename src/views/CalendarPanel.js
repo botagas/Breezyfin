@@ -328,6 +328,7 @@ const CalendarPanel = ({
 			backdropUrl={backdropUrl}
 			loading={loading && items.length === 0}
 			captureScrollTo={providerShell.captureScrollTo}
+			onScroll={providerShell.handleScroll}
 			onScrollStop={providerShell.handleScrollStop}
 			errorMessage={items.length === 0 ? (initialError || activationError) : activationError}
 			onRetry={items.length === 0 && initialError ? retryInitial : null}

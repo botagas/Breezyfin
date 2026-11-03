@@ -1,6 +1,7 @@
 import {render, waitFor} from '@testing-library/react';
 import Toolbar from '../Toolbar';
 import jellyfinService from '../../services/jellyfinService';
+import {resetToolbarDataCache} from '../toolbar/toolbarDataCache';
 
 jest.mock('@enact/spotlight/Spottable', () => ({
 	Spottable: (component) => component
@@ -82,6 +83,7 @@ const toolbarProps = {
 describe('Toolbar session probes', () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
+		resetToolbarDataCache();
 		jellyfinService.getLibraryViews.mockResolvedValue([]);
 		jellyfinService.getCurrentUser.mockResolvedValue({Name: 'Viewer', Policy: {}});
 		jellyfinService.getBreezyfinCapabilities.mockResolvedValue({available: false});
@@ -109,5 +111,23 @@ describe('Toolbar session probes', () => {
 			expect(jellyfinService.getBreezyfinCapabilities).toHaveBeenCalledTimes(1);
 			expect(jellyfinService.detectJellyWatchParty).toHaveBeenCalledTimes(1);
 		});
+	});
+
+	it('reuses cached libraries and user data when another panel toolbar mounts', async () => {
+		jellyfinService.getLibraryViews.mockResolvedValue([{Id: 'lib-1', Name: 'Movies'}]);
+		const {unmount} = render(<Toolbar {...toolbarProps} isActive/>);
+		await waitFor(() => {
+			expect(jellyfinService.getLibraryViews).toHaveBeenCalledTimes(1);
+			expect(jellyfinService.getCurrentUser).toHaveBeenCalledTimes(1);
+		});
+		unmount();
+
+		render(<Toolbar {...toolbarProps} isActive/>);
+
+		await waitFor(() => {
+			expect(jellyfinService.getBreezyfinCapabilities).toHaveBeenCalledTimes(2);
+		});
+		expect(jellyfinService.getLibraryViews).toHaveBeenCalledTimes(1);
+		expect(jellyfinService.getCurrentUser).toHaveBeenCalledTimes(1);
 	});
 });

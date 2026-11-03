@@ -1,10 +1,11 @@
 {
     "id": "com.breezyfin.app",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "vendor": "botagas",
     "type": "web",
     "main": "index.html",
     "title": "Breezyfin",
+    "breezyfinLaunchVersion": 1,
     "icon": "icon.png",
     "requiredPermissions": [
         "time.query",

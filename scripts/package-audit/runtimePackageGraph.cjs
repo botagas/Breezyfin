@@ -60,7 +60,24 @@ const getRuntimePackageEntries = (packageLock) => {
 		}));
 };
 
+const getCliBundledMetadataFailures = (packageJson, packageLock) => {
+	const cliPath = 'node_modules/@enact/cli';
+	if (!packageJson.devDependencies?.['@enact/cli'] || packageJson.dependencies?.['@enact/cli']) {
+		return ['Enact CLI must remain a development-only dependency.'];
+	}
+	if (packageLock.packages?.[cliPath]?.dev !== true) {
+		return ['The Enact CLI lockfile entry must be development-only.'];
+	}
+	return Object.entries(packageLock.packages || {})
+		.filter(([packagePath, metadata]) => (
+			packagePath.startsWith(`${cliPath}/node_modules/`) &&
+			metadata.extraneous === true && metadata.dev !== true
+		))
+		.map(([packagePath]) => `${packagePath} is extraneous bundled CLI tooling without development-only metadata; regenerate the lockfile.`);
+};
+
 module.exports = {
 	getPackageNameFromPath,
-	getRuntimePackageEntries
+	getRuntimePackageEntries,
+	getCliBundledMetadataFailures
 };

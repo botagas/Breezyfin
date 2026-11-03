@@ -201,7 +201,7 @@ export const usePlayerVideoLoader = ({
 				playbackInfoError = infoError;
 				console.error('Failed to get playback info:', infoError);
 			}
-			if (isStaleLoad()) return;
+			if (isStaleLoad()) return {status: 'stale', reason: 'load-superseded'};
 
 			if (!playbackPlan && playbackInfo) {
 				playbackPlan = buildPlaybackPlan({
@@ -222,7 +222,7 @@ export const usePlayerVideoLoader = ({
 				}
 				throw new Error('No media source available');
 			}
-			if (beginPlaybackPlanCommit(playbackPlan) === null || isStaleLoad()) return;
+			if (beginPlaybackPlanCommit(playbackPlan) === null || isStaleLoad()) return {status: 'stale', reason: 'plan-commit-superseded'};
 			return await commitPlaybackPlan(playbackPlan, {
 				item,
 				generation,
@@ -253,9 +253,9 @@ export const usePlayerVideoLoader = ({
 				}
 			});
 		} catch (err) {
-			if (isStaleLoad()) return;
+			if (isStaleLoad()) return {status: 'stale', reason: 'load-superseded'};
 			if (err?.code === 'subtitle-burn-in-no-source') {
-				if (beginCommit() === null || isStaleLoad()) return;
+				if (beginCommit() === null || isStaleLoad()) return {status: 'stale', reason: 'recovery-commit-superseded'};
 				const subtitleStreamIndex = Number.isInteger(err?.details?.subtitleStreamIndex)
 					? err.details.subtitleStreamIndex
 					: playbackOverrideRef.current?.subtitleStreamIndex;
@@ -284,7 +284,7 @@ export const usePlayerVideoLoader = ({
 				playbackOverrideRef.current?.confirmedDynamicRangeFallback || ''
 			).toLowerCase();
 			if (confirmedRange === 'hdr10') {
-				if (beginCommit() === null || isStaleLoad()) return;
+				if (beginCommit() === null || isStaleLoad()) return {status: 'stale', reason: 'recovery-commit-superseded'};
 				setLoading(false);
 				setLoadingStatusMessage('Waiting for video quality decision...');
 				if (!loadOptions?.deferDecisions) {

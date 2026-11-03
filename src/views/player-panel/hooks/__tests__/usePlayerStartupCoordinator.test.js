@@ -238,6 +238,41 @@ describe('usePlayerStartupCoordinator state', () => {
 		expect(view.props.onInitialAudioSelectionFallback).toBeUndefined();
 	});
 
+	it.each([false, true])('uses the latest initial-audio fallback while rejecting a replaced source (%s)', async (replaceSource) => {
+		jest.useFakeTimers();
+		const view = createCoordinatorProps();
+		const runtimeContext = createPlaybackRuntimeContext({
+			generation: 1,
+			itemId: 'item-1',
+			mediaSourceData: {Id: 'source-1', MediaStreams: [{Type: 'Audio', Index: 2, Language: 'jpn'}]},
+			playMethod: 'DirectPlay',
+			selectedAudioTrack: 2,
+			requiresInitialNativeAudioSelection: true
+		});
+		view.sourceToken = createNativePlaybackSourceToken({runtimeContext, video: view.video, sourceUrl: 'video.mkv'});
+		view.props.playbackRuntimeContextRef.current = runtimeContext;
+		view.props.nativeSourceTokenRef.current = view.sourceToken;
+		const previousFallback = jest.fn();
+		const currentFallback = jest.fn();
+		const {result, rerender} = renderHook((props) => usePlayerStartupCoordinator(props), {
+			initialProps: {...view.props, onInitialAudioSelectionFallback: previousFallback}
+		});
+		act(() => { result.current.registerPlaybackSource(view.sourceToken); });
+		rerender({...view.props, onInitialAudioSelectionFallback: currentFallback});
+		if (replaceSource) {
+			view.props.nativeSourceTokenRef.current = null;
+		}
+		await act(async () => {
+			jest.advanceTimersByTime(1800);
+			await Promise.resolve();
+		});
+		expect(previousFallback).not.toHaveBeenCalled();
+		const expectedFallback = expect.objectContaining({
+			sourceToken: view.sourceToken, audioStreamIndex: 2, reason: 'native-track-discovery-timeout'
+		});
+		expect(currentFallback.mock.calls).toEqual(replaceSource ? [] : [[expectedFallback]]);
+	});
+
 	it('waits for native audio selection and position restoration before releasing a paused DirectPlay transition', async () => {
 		const view = createCoordinatorProps();
 		let readyState = 0;

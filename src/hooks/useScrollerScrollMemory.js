@@ -293,8 +293,10 @@ export const useScrollerScrollMemory = ({
 			finishRestore(rawTop);
 			return;
 		}
-		commitLatestScrollTop(rawTop);
-	}, [commitLatestScrollTop, diagnosticsEnabled, finishRestore, handleScroll]);
+		// Only track the position here; committing to React state on every scroll stop
+		// re-renders the whole app. Deactivation and unmount persist it instead.
+		targetScrollTopRef.current = latestScrollTopRef.current;
+	}, [diagnosticsEnabled, finishRestore, handleScroll]);
 
 	return {
 		cancelScrollRestore,

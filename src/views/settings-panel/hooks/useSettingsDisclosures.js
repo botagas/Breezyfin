@@ -1,10 +1,6 @@
-import { useDisclosureMap } from '../../../hooks/useDisclosureMap';
-import { useDisclosureHandlers } from '../../../hooks/useDisclosureHandlers';
-import {
-	INITIAL_SETTINGS_DISCLOSURES,
-	SETTINGS_DISCLOSURE_KEYS,
-	SETTINGS_DISCLOSURE_KEY_LIST
-} from '../constants';
+import {useDisclosureMap} from '../../../hooks/useDisclosureMap';
+import {useDisclosureHandlers} from '../../../hooks/useDisclosureHandlers';
+import {INITIAL_SETTINGS_DISCLOSURES, SETTINGS_DISCLOSURE_KEY_LIST, SETTINGS_DISCLOSURE_KEYS} from '../constants';
 
 export const useSettingsDisclosures = () => {
 	const {
@@ -30,7 +26,8 @@ export const useSettingsDisclosures = () => {
 		bitmapSubtitleRendererPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.BITMAP_SUBTITLE_RENDERER] === true,
 		subtitleBurnInTextCodecsPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS] === true,
 		subtitleOverlaySizePopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE] === true,
-		subtitleOverlayPositionPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION] === true,
+		subtitleOverlayOffsetYPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_Y] === true,
+		subtitleOverlayOffsetXPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_X] === true,
 		subtitleOverlayBackgroundPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND] === true,
 		subtitleOverlayWeightPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT] === true,
 		subtitleOverlayTextColorPopupOpen: disclosures[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_TEXT_COLOR] === true,
@@ -62,8 +59,10 @@ export const useSettingsDisclosures = () => {
 		closeSubtitleBurnInTextCodecsPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_BURN_IN_TEXT_CODECS].close,
 		openSubtitleOverlaySizePopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE].open,
 		closeSubtitleOverlaySizePopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_SIZE].close,
-		openSubtitleOverlayPositionPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION].open,
-		closeSubtitleOverlayPositionPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_POSITION].close,
+		openSubtitleOverlayOffsetYPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_Y].open,
+		closeSubtitleOverlayOffsetYPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_Y].close,
+		openSubtitleOverlayOffsetXPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_X].open,
+		closeSubtitleOverlayOffsetXPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_OFFSET_X].close,
 		openSubtitleOverlayBackgroundPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND].open,
 		closeSubtitleOverlayBackgroundPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_BACKGROUND].close,
 		openSubtitleOverlayWeightPopup: disclosureHandlers[SETTINGS_DISCLOSURE_KEYS.SUBTITLE_OVERLAY_WEIGHT].open,

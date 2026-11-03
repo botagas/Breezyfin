@@ -4,6 +4,43 @@ All notable changes to Breezyfin are documented in this file.
 
 ## Unreleased
 
+## 0.2.2
+
+### Added
+
+- Added account-bound playback launches from Breezyfin Home, with server and user
+  validation, fresh progress lookup, and the existing playback preference and consent flow.
+- Added custom subtitle colors and horizontal and vertical offsets, with an option
+  to move the entire styled subtitle layer.
+
+### Changed
+
+- Reworked Media Details into focused page, section, data, and navigation modules.
+- Improved Home row loading and artwork delivery. Rows load when they enter the viewport
+  independently of artwork activation, and artwork retains native lazy loading.
+- Retained audio and subtitle choices per series or movie, with global preferences
+  and file defaults as fallback choices.
+
+### Fixed
+
+- Restored pointer reveal for clipped cards in Home, Watchlist, Calendar, and sideways
+  episode rows without changing focus, selection, or vertical scroll.
+- Preserved specific Home-launch validation notices and rejected stale launch completions
+  after cancellation, session replacement, hiding, or a newer request.
+- Prevented retained Home launch parameters from replaying after reload or cache clearing.
+- Released failed session-restoration and crash-recovery attempts so new Home launches
+  can proceed after sign-in.
+- Preserved current Media Details selections and user flags during delayed requests and
+  invalidated parent lists after episode changes.
+- Bound Home content freshness and retries to the authenticated session.
+- Corrected styled subtitle offsets and fitted the first dialogue cue after subtitle gaps.
+- Prevented Settings tab changes from retaining the previous tab's scroll height.
+
+### Security
+
+- Updated the runtime `follow-redirects` dependency to 1.16.2 to address
+  [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p).
+
 ## 0.2.1
 
 ### Changed

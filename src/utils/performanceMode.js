@@ -6,7 +6,8 @@ export const PERFORMANCE_MODES = Object.freeze({
 
 export const getPerformanceMode = (settings = {}) => {
 	if (settings.disableAllAnimations === true) return PERFORMANCE_MODES.PERFORMANCE_PLUS;
-	if (settings.disableAnimations === true) return PERFORMANCE_MODES.PERFORMANCE;
+	// Animations are off unless explicitly enabled, matching the app's data-bf-animations attribute.
+	if (settings.disableAnimations !== false) return PERFORMANCE_MODES.PERFORMANCE;
 	return PERFORMANCE_MODES.NORMAL;
 };
 

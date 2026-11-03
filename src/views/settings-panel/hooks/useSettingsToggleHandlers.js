@@ -12,6 +12,7 @@ const TOGGLE_SETTING_KEYS = [
 	'smartSubtitleTranscoding',
 	'enableSubtitleBurnIn',
 	'forceTranscodingWithSubtitles',
+	'subtitleOverlayOffsetStyled',
 	'relaxedPlaybackProfile',
 	'showBackdrops',
 	'showSeasonImages',

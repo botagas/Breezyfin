@@ -1,6 +1,6 @@
-import {useCallback} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import BodyText from '@enact/sandstone/BodyText';
-import {Panel, Header} from './BreezyPanels';
+import {Header, Panel} from './BreezyPanels';
 import AppScroller from './AppScroller';
 import Toolbar from './Toolbar';
 import BreezyLoadingOverlay from './BreezyLoadingOverlay';
@@ -26,13 +26,18 @@ const IntegrationPanelLayout = ({
 	retrySpotlightId = '',
 	scrollable = true,
 	captureScrollTo,
+									onScroll,
 	onScrollStop,
 	children,
 	...rest
 }) => {
 	const errorRetryId = retrySpotlightId || `${activeSection || 'integration'}-panel-retry`;
 	const entryFocusId = errorMessage && typeof onRetry === 'function' ? errorRetryId : firstFocusId;
-	const handleNavigateDown = useCallback(() => focusSpotlightTarget(entryFocusId), [entryFocusId]);
+	const entryFocusIdRef = useRef(entryFocusId);
+	useEffect(() => {
+		entryFocusIdRef.current = entryFocusId;
+	}, [entryFocusId]);
+	const handleNavigateDown = useCallback(() => focusSpotlightTarget(entryFocusIdRef.current), []);
 	const content = (
 		<div
 			className={`${css.content} ${scrollable ? '' : css.staticContent}`}
@@ -72,6 +77,7 @@ const IntegrationPanelLayout = ({
 				<AppScroller
 					className={css.scroller}
 					cbScrollTo={captureScrollTo}
+					onScroll={onScroll}
 					onScrollStop={onScrollStop}
 				>
 					{content}

@@ -13,7 +13,7 @@ export const TAB_SECTION_KEYS = {
 	home: ['homeRows'],
 	playback: ['playback', 'transcoding'],
 	subtitles: ['subtitles', 'subtitleAppearance'],
-	display: ['display', 'languages'],
+	display: ['display'],
 	about: ['about'],
 	diagnostics: ['diagnostics', 'capabilities']
 };

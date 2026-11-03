@@ -6,18 +6,15 @@ import PanelTabNavigation from '../../../components/PanelTabNavigation';
 import {HOME_ROW_ORDER} from '../../../constants/homeRows';
 import {
 	DEFAULT_SETTINGS_TAB_KEY,
-	SETTINGS_TABS,
 	getAssSubtitleRendererControlState,
 	getBitmapSubtitleRendererControlState,
 	getSettingsSectionKeys,
 	getSubtitleBurnInFormatsControlState,
 	isSettingsTabKey,
-	isSmartSubtitleHandlingEnabled
+	isSmartSubtitleHandlingEnabled,
+	SETTINGS_TABS
 } from '../utils/settingsViewModel';
-import {
-	SettingsItem as Item,
-	SettingsSwitchItem as SwitchItem
-} from './SettingsStaticItems';
+import {SettingsItem as Item, SettingsSwitchItem as SwitchItem} from './SettingsStaticItems';
 import css from '../../SettingsPanel.module.less';
 
 const SETTINGS_PANEL_TABS = SETTINGS_TABS.map((tab) => ({id: tab.key, label: tab.label}));
@@ -53,7 +50,8 @@ const SettingsSections = ({
 	bitmapSubtitleRendererLabel,
 	openBitmapSubtitleRendererPopup,
 	subtitleOverlayFontSizeLabel,
-	subtitleOverlayPositionLabel,
+							  subtitleOverlayOffsetYLabel,
+							  subtitleOverlayOffsetXLabel,
 	subtitleOverlayBackgroundLabel,
 	subtitleOverlayWeightLabel,
 	subtitleOverlayTextColorLabel,
@@ -64,7 +62,8 @@ const SettingsSections = ({
 	subtitleOverlayShadowDistanceLabel,
 	subtitleOverlayShadowAngleLabel,
 	openSubtitleOverlaySizePopup,
-	openSubtitleOverlayPositionPopup,
+							  openSubtitleOverlayOffsetYPopup,
+							  openSubtitleOverlayOffsetXPopup,
 	openSubtitleOverlayBackgroundPopup,
 	openSubtitleOverlayWeightPopup,
 	openSubtitleOverlayTextColorPopup,
@@ -100,9 +99,10 @@ const SettingsSections = ({
 	openLogsPopup,
 	openWipeCacheConfirm,
 	openWipeCacheKeepLoginConfirm,
-	isNonStableBuild = false
+                              isNonStableBuild = false,
+                              activeTabKey = DEFAULT_SETTINGS_TAB_KEY,
+                              onActiveTabChange
 }) => {
-	const [activeTabKey, setActiveTabKey] = useState(DEFAULT_SETTINGS_TAB_KEY);
 	const [expandedCapabilityRows, setExpandedCapabilityRows] = useState({
 		videoCodecs: false,
 		audioCodecs: false
@@ -116,8 +116,8 @@ const SettingsSections = ({
 
 	const handleTabClick = useCallback((tabKey) => {
 		if (!tabKey || !isSettingsTabKey(tabKey)) return;
-		setActiveTabKey(tabKey);
-	}, []);
+        onActiveTabChange(tabKey);
+    }, [onActiveTabChange]);
 
 	const shouldRenderSection = useCallback(
 		(sectionKey) => activeSectionKeys.includes(sectionKey),
@@ -317,6 +317,12 @@ const SettingsSections = ({
 			{shouldRenderSection('playback') ? (
 				<section className={css.section}>
 					<BodyText className={css.sectionTitle}>Playback</BodyText>
+					<Item
+						className={css.settingItem}
+						label="Preferred Audio Language"
+						slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
+						onClick={openAudioLangPopup}
+					/>
 					<SwitchItem
 						className={css.switchItem}
 						onToggle={settingToggleHandlers.autoPlayNext}
@@ -453,10 +459,23 @@ const SettingsSections = ({
 					/>
 					<Item
 						className={css.settingItem}
-						label="Breezyfin Subtitle Position"
-						slotAfter={subtitleOverlayPositionLabel}
-						onClick={openSubtitleOverlayPositionPopup}
+						label="Breezyfin Subtitle Vertical Offset"
+						slotAfter={subtitleOverlayOffsetYLabel}
+						onClick={openSubtitleOverlayOffsetYPopup}
 					/>
+					<Item
+						className={css.settingItem}
+						label="Breezyfin Subtitle Horizontal Offset"
+						slotAfter={subtitleOverlayOffsetXLabel}
+						onClick={openSubtitleOverlayOffsetXPopup}
+					/>
+					<SwitchItem
+						className={css.switchItem}
+						onToggle={settingToggleHandlers.subtitleOverlayOffsetStyled}
+						selected={settings.subtitleOverlayOffsetStyled === true}
+					>
+						Apply Offsets to Entire Styled Layer
+					</SwitchItem>
 					<Item
 						className={css.settingItem}
 						label="Breezyfin Subtitle Background"
@@ -571,18 +590,6 @@ const SettingsSections = ({
 					>
 						Show Media Bar on Home
 					</SwitchItem>
-				</section>
-			) : null}
-
-			{shouldRenderSection('languages') ? (
-				<section className={css.section}>
-					<BodyText className={css.sectionTitle}>Audio Language Preferences</BodyText>
-					<Item
-						className={css.settingItem}
-						label="Preferred Audio Language"
-						slotAfter={getLanguageLabel(settings.preferredAudioLanguage)}
-						onClick={openAudioLangPopup}
-					/>
 				</section>
 			) : null}
 

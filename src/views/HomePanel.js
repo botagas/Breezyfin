@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Panel } from '../components/BreezyPanels';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Panel} from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Scroller from '../components/AppScroller';
 import Spotlight from '@enact/spotlight';
@@ -14,36 +14,36 @@ import {HOME_ROW_ORDER} from '../constants/homeRows';
 import {getHomeSectionDescriptor} from '../constants/homeSections';
 import {BREEZYFIN_USER_DATA_INVALIDATED_EVENT} from '../constants/integrationEvents';
 import {KeyCodes} from '../utils/keyCodes';
-import {
-	getLandscapeCardImageUrls,
-	mergeMediaItemImageCandidates
-} from '../utils/mediaItemUtils';
-import { useBreezyfinSettingsSync } from '../hooks/useBreezyfinSettingsSync';
-import { usePanelToolbarActions } from '../hooks/usePanelToolbarActions';
-import { usePanelScrollState } from '../hooks/usePanelScrollState';
+import {getLandscapeCardImageUrls, mergeMediaItemImageCandidates} from '../utils/mediaItemUtils';
+import {useBreezyfinSettingsSync} from '../hooks/useBreezyfinSettingsSync';
+import {usePanelToolbarActions} from '../hooks/usePanelToolbarActions';
+import {usePanelScrollState} from '../hooks/usePanelScrollState';
 import {useRuntimeDiagnosticsEnabled} from '../hooks/useRuntimeDiagnostics';
 import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
 import {focusToolbarSpotlightTargets} from '../utils/toolbarFocus';
+import {findVerticalScrollableAncestor, getVerticalVisibilityDelta} from '../utils/verticalFocusScroll';
+import {INTEGRATION_PREFERENCES_CHANGED_EVENT, readIntegrationPreferences} from '../utils/integrationPreferences';
+import {readBreezyfinSettings} from '../utils/settingsStorage';
 import {
-	findVerticalScrollableAncestor,
-	getVerticalVisibilityDelta
-} from '../utils/verticalFocusScroll';
-import {
-	INTEGRATION_PREFERENCES_CHANGED_EVENT,
-	readIntegrationPreferences
-} from '../utils/integrationPreferences';
-import {
-	getServerHomeRowStatus,
 	getServerHomeRowsStatus,
+	getServerHomeRowStatus,
 	isServerHomeSectionEnabled,
 	loadServerHomeRowsProgressively,
-	SERVER_HOME_ROW_STATUS,
 	selectDisplayableServerHomeRows,
 	selectHomeRowsForSource,
 	selectServerHomeRowsToLoad,
+	SERVER_HOME_ROW_STATUS,
 	shouldReloadHomeContent
 } from '../utils/serverHomeRows';
 import {normalizeDiscoveryMediaItem} from '../utils/discoveryMediaItems';
+import {
+	clearHomeContentCache,
+	getHomeContentSessionKey,
+	readHomeContentCache,
+	rememberHomeFocus,
+	writeHomeContentCache,
+	markHomeContentCacheStale
+} from '../utils/homeContentCache';
 
 import css from './HomePanel.module.less';
 
@@ -53,8 +53,6 @@ const HOME_ROW_PREVIEW_LIMIT = 10;
 const SERVER_HOME_INITIAL_RENDER_COUNT = 8;
 const SERVER_HOME_RENDER_AHEAD = 6;
 const HOME_CONTENT_REVALIDATE_MS = 2 * 60 * 1000;
-const HOME_IMAGE_ROWS_BEHIND = 2;
-const HOME_IMAGE_ROWS_AHEAD = 3;
 const HOME_DESIGN_CURRENT = 'current';
 const HOME_DESIGN_CINEMATIC = 'cinematic';
 const HOME_DESIGN_VARIANT = process.env.REACT_APP_HOME_DESIGN_VARIANT === HOME_DESIGN_CURRENT
@@ -76,6 +74,38 @@ const pruneSeriesUnplayedCache = (cache, now = Date.now()) => {
 		.forEach(([seriesId]) => cache.delete(seriesId));
 };
 
+const DEFAULT_HOME_ROW_SETTINGS = Object.freeze({
+	recentlyAdded: true,
+	continueWatching: true,
+	nextUp: true,
+	latestMovies: true,
+	latestShows: true,
+	myRequests: true
+});
+
+const resolveHomeRowSettings = (settings, current = DEFAULT_HOME_ROW_SETTINGS) => {
+	if (!settings.homeRows) return current;
+	const next = Object.fromEntries(
+		Object.keys(DEFAULT_HOME_ROW_SETTINGS).map((key) => [key, settings.homeRows[key] !== false])
+	);
+	return Object.keys(next).every((key) => next[key] === current[key]) ? current : next;
+};
+
+const resolveHomeRowOrder = (settings, current = HOME_ROW_ORDER) => {
+	if (!Array.isArray(settings.homeRowOrder)) return current;
+	const normalized = settings.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
+	const next = [...normalized, ...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))];
+	return next.join('|') === current.join('|') ? current : next;
+};
+
+const resetUnsettledServerHomeRows = (rows) => (
+	(Array.isArray(rows) ? rows : []).map((row) => (
+		row.status === SERVER_HOME_ROW_STATUS.LOADING
+			? {...row, items: null, loading: false, status: SERVER_HOME_ROW_STATUS.PENDING, error: null}
+			: row
+	))
+);
+
 const HomePanel = ({
 	onItemSelect,
 	onNavigate,
@@ -87,37 +117,33 @@ const HomePanel = ({
 	screensaverActive = false,
 	cachedState = null,
 	onCacheState = null,
+					   resetToken = 0,
 	...rest
 }) => {
-	const [loading, setLoading] = useState(true);
-	const [heroItems, setHeroItems] = useState([]);
-	const [recentlyAdded, setRecentlyAdded] = useState([]);
-	const [continueWatching, setContinueWatching] = useState([]);
-	const [nextUp, setNextUp] = useState([]);
-	const [latestMovies, setLatestMovies] = useState([]);
-	const [latestShows, setLatestShows] = useState([]);
-	const [myRequests, setMyRequests] = useState([]);
-	const [watchlist, setWatchlist] = useState([]);
-	const [serverHomeRows, setServerHomeRows] = useState([]);
-	const [serverHomeActive, setServerHomeActive] = useState(false);
+	const contentSessionKey = getHomeContentSessionKey(jellyfinService);
+	const [cachedEntry] = useState(() => readHomeContentCache(contentSessionKey, resetToken));
+	const cachedContent = cachedEntry?.content;
+	const [loading, setLoading] = useState(() => !cachedContent);
+	const [heroItems, setHeroItems] = useState(() => cachedContent?.heroItems || []);
+	const [recentlyAdded, setRecentlyAdded] = useState(() => cachedContent?.recentlyAdded || []);
+	const [continueWatching, setContinueWatching] = useState(() => cachedContent?.continueWatching || []);
+	const [nextUp, setNextUp] = useState(() => cachedContent?.nextUp || []);
+	const [latestMovies, setLatestMovies] = useState(() => cachedContent?.latestMovies || []);
+	const [latestShows, setLatestShows] = useState(() => cachedContent?.latestShows || []);
+	const [myRequests, setMyRequests] = useState(() => cachedContent?.myRequests || []);
+	const [watchlist, setWatchlist] = useState(() => cachedContent?.watchlist || []);
+	const [serverHomeRows, setServerHomeRows] = useState(() => resetUnsettledServerHomeRows(cachedContent?.serverHomeRows));
+	const [serverHomeActive, setServerHomeActive] = useState(() => cachedContent?.serverHomeActive === true);
 	const [integrationPreferences, setIntegrationPreferences] = useState(() => (
 		readIntegrationPreferences(jellyfinService)
 	));
 	const diagnosticsEnabled = useRuntimeDiagnosticsEnabled();
 	const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
 	diagnosticsEnabledRef.current = diagnosticsEnabled;
-	const [homeRowSettings, setHomeRowSettings] = useState({
-		recentlyAdded: true,
-		continueWatching: true,
-		nextUp: true,
-		latestMovies: true,
-		latestShows: true,
-		myRequests: true
-	});
-	const [homeRowOrder, setHomeRowOrder] = useState(HOME_ROW_ORDER);
-	const [showMediaBar, setShowMediaBar] = useState(true);
+	const [homeRowSettings, setHomeRowSettings] = useState(() => resolveHomeRowSettings(readBreezyfinSettings()));
+	const [homeRowOrder, setHomeRowOrder] = useState(() => resolveHomeRowOrder(readBreezyfinSettings()));
+	const [showMediaBar, setShowMediaBar] = useState(() => readBreezyfinSettings().showMediaBar !== false);
 	const [activatedRowCount, setActivatedRowCount] = useState(2);
-	const [activeRowIndex, setActiveRowIndex] = useState(0);
 	const [serverHomeRenderCount, setServerHomeRenderCount] = useState(SERVER_HOME_INITIAL_RENDER_COUNT);
 	const {
 		activateItem: activateDiscoveryItem,
@@ -134,8 +160,12 @@ const HomePanel = ({
 	const rowVisibilityFrameRef = useRef(0);
 	const seriesUnplayedCacheRef = useRef(new Map());
 	const contentLoadRequestIdRef = useRef(0);
-	const contentLoadedRef = useRef(false);
-	const contentLoadedAtRef = useRef(0);
+	const contentLoadedRef = useRef(Boolean(cachedContent));
+	// Back restores content immediately, but preserves its age for background revalidation.
+	const cachedContentIsFresh = Boolean(cachedEntry && !cachedEntry.stale);
+	const contentLoadedAtRef = useRef(cachedContentIsFresh ? cachedEntry.loadedAt : 0);
+	const contentLoadSucceededRef = useRef(cachedContentIsFresh);
+	const lastResetTokenRef = useRef(resetToken);
 	const contentLoadedVersionRef = useRef(0);
 	const contentInvalidationVersionRef = useRef(0);
 	const serverHomeFallbackRef = useRef(false);
@@ -149,6 +179,11 @@ const HomePanel = ({
 			onNavigate(section, data);
 		}
 	}, [onNavigate]);
+	const handlePanelBack = useCallback(() => {
+		if (!externalItemOpen) return false;
+		closeExternalItem();
+		return true;
+	}, [closeExternalItem, externalItemOpen]);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate: handleNavigation,
 		onSwitchUser,
@@ -156,14 +191,19 @@ const HomePanel = ({
 		onExit,
 		registerBackHandler,
 		isActive,
-		onPanelBack: () => {
-			if (!externalItemOpen) return false;
-			closeExternalItem();
-			return true;
-		}
+		onPanelBack: handlePanelBack
 	});
+	// After Back, the Panel focuses the card (or hero Play button) that was opened.
+	// The focus is used once, so a later Back from another panel keeps the Panel's default.
+	const [autoFocusSelector] = useState(() => (
+		cachedEntry?.focus ? `[data-spotlight-id="${window.CSS.escape(cachedEntry.focus)}"]` : undefined
+	));
+	useEffect(() => {
+		rememberHomeFocus(null);
+	}, []);
 	const {
 		captureScrollTo: captureHomeScrollRestore,
+		handleScroll: handleHomeScrollMemory,
 		handleScrollStop: handleHomeScrollMemoryStop
 	} = usePanelScrollState({
 		cachedState,
@@ -191,19 +231,19 @@ const HomePanel = ({
 			return !(cached && now - cached.timestamp < SERIES_UNPLAYED_CACHE_TTL_MS);
 		});
 
-		await Promise.all(missingSeriesIds.map(async (seriesId) => {
-			try {
-				const series = await jellyfinService.getItem(seriesId);
+		if (missingSeriesIds.length > 0) {
+			const seriesItems = await jellyfinService.getItemsUserData(missingSeriesIds);
+			const fetchedAt = Date.now();
+			seriesItems.forEach((series) => {
+				if (!series?.Id) return;
 				const count = Number(series?.UserData?.UnplayedItemCount);
-				cache.set(seriesId, {
+				cache.set(series.Id, {
 					count: Number.isFinite(count) ? count : 0,
-					timestamp: Date.now()
+					timestamp: fetchedAt
 				});
-				pruneSeriesUnplayedCache(cache);
-			} catch (error) {
-				console.error('Failed to fetch series data:', error);
-			}
-		}));
+			});
+			pruneSeriesUnplayedCache(cache);
+		}
 
 		return normalizedGroups.map((episodes) => episodes.map((episode) => {
 			if (episode?.Type !== 'Episode' || !episode?.SeriesId) return episode;
@@ -220,12 +260,12 @@ const HomePanel = ({
 		contentLoadRequestIdRef.current += 1;
 		const loadRequestId = contentLoadRequestIdRef.current;
 		const loadInvalidationVersion = contentInvalidationVersionRef.current;
+		contentLoadSucceededRef.current = false;
 		const isInitialLoad = !contentLoadedRef.current;
 		serverHomeLoadBatchIdRef.current += 1;
 		if (isInitialLoad) {
 			setLoading(true);
 			setActivatedRowCount(2);
-			setActiveRowIndex(0);
 			setServerHomeRenderCount(SERVER_HOME_INITIAL_RENDER_COUNT);
 		}
 		try {
@@ -293,52 +333,69 @@ const HomePanel = ({
 					serverHomeFallbackRef.current = true;
 				}
 			}
-			recently = await jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT);
+			const userName = useServerHome ? '' : (jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '');
+			const requestOptions = {throwOnError: true};
+			let rowLoadFailed = false;
+			const loadRow = (request) => request.catch((error) => {
+				rowLoadFailed = true;
+				console.error('Failed to load Home row:', error);
+				return null;
+			});
+			const recentlyPromise = loadRow(jellyfinService.getRecentlyAdded(HOME_ROW_PREVIEW_LIMIT, 0, requestOptions));
 
-			if (!useServerHome) {
-				const userName = jellyfinService.username || (await jellyfinService.getCurrentUser())?.Name || '';
-				[resume, next, movies, shows, myRequestsResult, watchlistResult] = await Promise.all([
-					jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT),
-					jellyfinService.getMyRequests(
+			if (useServerHome) {
+				recently = await recentlyPromise;
+			} else {
+				[recently, resume, next, movies, shows, myRequestsResult, watchlistResult] = await Promise.all([
+					recentlyPromise,
+					loadRow(jellyfinService.getResumeItems(HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getNextUp(HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getLatestMedia(['Movie'], HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getLatestMedia(['Series'], HOME_ROW_PREVIEW_LIMIT, 0, requestOptions)),
+					loadRow(jellyfinService.getMyRequests(
 						null,
 						['Movie', 'Series'],
 						HOME_ROW_PREVIEW_LIMIT,
 						0,
-						userName
-					).catch(() => ({items: []})),
+						userName,
+						requestOptions
+					)),
 					preferences.watchlistEnabled
-						? jellyfinService.getLikesWatchlist(HOME_ROW_PREVIEW_LIMIT).catch(() => ({items: []}))
+						? loadRow(jellyfinService.getLikesWatchlist(HOME_ROW_PREVIEW_LIMIT))
 						: Promise.resolve({items: []})
 				]);
 			}
 
-			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume, next]);
+			const [enhancedResume, enhancedNext] = await hydrateEpisodeSeriesProgress([resume || [], next || []]);
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
-			const heroContent = recently.filter(item =>
+			const heroContent = (recently || []).filter(item =>
 				(item.Type === 'Movie' || item.Type === 'Series') &&
 				item.BackdropImageTags && item.BackdropImageTags.length > 0
 			).slice(0, 5);
 
-			setHeroItems(heroContent);
-			setRecentlyAdded(recently || []);
-			setContinueWatching(enhancedResume || []);
-			setNextUp(enhancedNext || []);
-			setLatestMovies(movies || []);
-			setLatestShows(shows || []);
-			setMyRequests((myRequestsResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
-			setWatchlist((watchlistResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			if (recently !== null) {
+				setHeroItems(heroContent);
+				setRecentlyAdded(recently || []);
+			}
+			if (resume !== null) setContinueWatching(enhancedResume || []);
+			if (next !== null) setNextUp(enhancedNext || []);
+			if (movies !== null) setLatestMovies(movies || []);
+			if (shows !== null) setLatestShows(shows || []);
+			if (myRequestsResult !== null) setMyRequests((myRequestsResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
+			if (watchlistResult !== null) setWatchlist((watchlistResult?.items || []).slice(0, HOME_ROW_PREVIEW_LIMIT));
 			if (!useServerHome) setServerHomeRows(resolvedServerRows);
 			setServerHomeActive(useServerHome);
+			contentLoadSucceededRef.current = !rowLoadFailed;
+			if (rowLoadFailed) markHomeContentCacheStale();
 		} catch (error) {
 			if (loadRequestId !== contentLoadRequestIdRef.current) return;
+			contentLoadSucceededRef.current = false;
+			markHomeContentCacheStale();
 			console.error('Failed to load content:', error);
 		} finally {
 			if (loadRequestId === contentLoadRequestIdRef.current) {
 				contentLoadedRef.current = true;
-				contentLoadedAtRef.current = Date.now();
+				contentLoadedAtRef.current = contentLoadSucceededRef.current ? Date.now() : 0;
 				contentLoadedVersionRef.current = loadInvalidationVersion;
 				setLoading(false);
 			}
@@ -347,24 +404,8 @@ const HomePanel = ({
 
 	const applyHomeSettings = useCallback((settingsPayload) => {
 		const settings = settingsPayload || {};
-		if (settings.homeRows) {
-			setHomeRowSettings({
-				recentlyAdded: settings.homeRows.recentlyAdded !== false,
-				continueWatching: settings.homeRows.continueWatching !== false,
-				nextUp: settings.homeRows.nextUp !== false,
-				latestMovies: settings.homeRows.latestMovies !== false,
-				latestShows: settings.homeRows.latestShows !== false,
-				myRequests: settings.homeRows.myRequests !== false
-			});
-		}
-		if (Array.isArray(settings.homeRowOrder)) {
-			const normalized = settings.homeRowOrder.filter((key) => HOME_ROW_ORDER.includes(key));
-			const resolved = [
-				...normalized,
-				...HOME_ROW_ORDER.filter((key) => !normalized.includes(key))
-			];
-			setHomeRowOrder(resolved);
-		}
+		setHomeRowSettings((current) => resolveHomeRowSettings(settings, current));
+		setHomeRowOrder((current) => resolveHomeRowOrder(settings, current));
 		setShowMediaBar(settings.showMediaBar !== false);
 	}, []);
 
@@ -492,6 +533,50 @@ const HomePanel = ({
 	}, [activatedRowCount, isActive, reportHomeSectionsDiagnostic, serverHomeActive, serverHomeRows]);
 
 	useEffect(() => {
+		if (loading || !contentLoadSucceededRef.current) return;
+		writeHomeContentCache(contentSessionKey, resetToken, {
+			heroItems,
+			recentlyAdded,
+			continueWatching,
+			nextUp,
+			latestMovies,
+			latestShows,
+			myRequests,
+			watchlist,
+			serverHomeRows,
+			serverHomeActive
+		}, {
+			loadedAt: contentLoadedAtRef.current,
+			stale: contentLoadedVersionRef.current < contentInvalidationVersionRef.current
+		});
+	}, [
+		contentSessionKey,
+		continueWatching,
+		heroItems,
+		latestMovies,
+		latestShows,
+		loading,
+		myRequests,
+		nextUp,
+		recentlyAdded,
+		resetToken,
+		serverHomeActive,
+		serverHomeRows,
+		watchlist
+	]);
+
+	// Clicking the Home tab while Home is open forces a full reload.
+	useEffect(() => {
+		if (lastResetTokenRef.current === resetToken) return;
+		lastResetTokenRef.current = resetToken;
+		clearHomeContentCache();
+		contentLoadedRef.current = false;
+		contentLoadSucceededRef.current = false;
+		contentInvalidationVersionRef.current += 1;
+		setContentRefreshVersion((version) => version + 1);
+	}, [resetToken]);
+
+	useEffect(() => {
 		if (!isActive) return undefined;
 		if (!shouldReloadHomeContent({
 			hasLoaded: contentLoadedRef.current,
@@ -507,13 +592,36 @@ const HomePanel = ({
 		};
 	}, [contentRefreshVersion, isActive, loadContent]);
 
+	// Pointer clicks can open a card that is only partly visible. Saving the position at which the
+	// card would be vertically centered below the toolbar (without scrolling) shows it fully after Back,
+	// so restoring its focus does not scroll the page again.
+	const rememberCenteredScrollTop = useCallback((card, row) => {
+		// Searching from the row skips the row's horizontal card scroller.
+		const scroller = findVerticalScrollableAncestor(row);
+		if (!scroller) return;
+		const scrollerRect = scroller.getBoundingClientRect();
+		const toolbarBottom = document.querySelector('[data-bf-navbar="true"]')?.getBoundingClientRect().bottom || 0;
+		const visibleCenter = (Math.max(scrollerRect.top, toolbarBottom) + scrollerRect.bottom) / 2;
+		const cardRect = card.getBoundingClientRect();
+		const cardCenter = (cardRect.top + cardRect.bottom) / 2;
+		const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+		const centeredTop = Math.min(maxTop, Math.max(0, scroller.scrollTop + cardCenter - visibleCenter));
+		handleHomeScrollMemory({scrollTop: centeredTop});
+	}, [handleHomeScrollMemory]);
+
 	const handleItemClick = useCallback((item) => {
+		// Rows are remembered instead of cards: the Panel can't look inside row containers, but the
+		// row restores its own last focused card.
+		const activeElement = document.activeElement;
+		const row = activeElement?.closest?.('[data-spotlight-id^="home-row-"]');
+		rememberHomeFocus(row ? row.dataset.spotlightId : activeElement?.dataset?.spotlightId);
+		if (row && Spotlight.getPointerMode()) rememberCenteredScrollTop(activeElement, row);
 		if (item?.IsDiscoveryItem) {
 			activateDiscoveryItem(item);
 			return;
 		}
 		onItemSelect(item);
-	}, [activateDiscoveryItem, onItemSelect]);
+	}, [activateDiscoveryItem, onItemSelect, rememberCenteredScrollTop]);
 
 	const handleViewMoreSection = useCallback((sectionKey) => {
 		const descriptor = serverHomeRows.find((row) => row.key === sectionKey)?.descriptor ||
@@ -535,7 +643,6 @@ const HomePanel = ({
 
 	const handleRowVisible = useCallback((rowIndex) => {
 		setActivatedRowCount((currentCount) => Math.max(currentCount, rowIndex + 2));
-		setActiveRowIndex(rowIndex);
 		if (serverHomeActive) {
 			setServerHomeRenderCount((currentCount) => Math.min(
 				serverHomeRows.length,
@@ -560,6 +667,9 @@ const HomePanel = ({
 	}, [serverHomeRows]);
 
 	const handleRowFocus = useCallback((rowIndex, rowNode) => {
+		// Pointer focus follows cards moving under the Magic Remote cursor while wheel scrolling;
+		// correcting the scroll position there fights the wheel.
+		if (Spotlight.getPointerMode()) return;
 		if (!rowNode || lastFocusedRowRef.current === rowIndex) return;
 		lastFocusedRowRef.current = rowIndex;
 		window.cancelAnimationFrame(rowVisibilityFrameRef.current);
@@ -627,8 +737,13 @@ const HomePanel = ({
 	const visibleRows = useMemo(() => {
 		const rowConfig = {
 			recentlyAdded: {title: 'Recently Added', items: recentlyAdded, showEpisodeProgress: false},
-			continueWatching: {title: 'Continue Watching', items: continueWatching, showEpisodeProgress: false},
-			nextUp: {title: 'Next Up', items: nextUp, showEpisodeProgress: false},
+			continueWatching: {
+				title: 'Continue Watching',
+				items: continueWatching,
+				showEpisodeProgress: false,
+				reserveSubtitleLine: true
+			},
+			nextUp: {title: 'Next Up', items: nextUp, showEpisodeProgress: false, reserveSubtitleLine: true},
 			latestMovies: {title: 'Latest Movies', items: latestMovies, showEpisodeProgress: false},
 			latestShows: {title: 'Latest TV Shows', items: latestShows, showEpisodeProgress: false},
 			myRequests: {title: 'My Requests', items: myRequests, showEpisodeProgress: true},
@@ -671,11 +786,15 @@ const HomePanel = ({
 		watchlist
 	]);
 	const panelBackdropItem = heroItems[0] || visibleRows.find(({row}) => row.items?.length > 0)?.row.items[0] || null;
+	const hasHeroActionRef = useRef(false);
+	useEffect(() => {
+		hasHeroActionRef.current = showMediaBar && heroItems.length > 0;
+	}, [heroItems.length, showMediaBar]);
 	const handleToolbarNavigateDown = useCallback(() => {
-		if (!showMediaBar || heroItems.length === 0) return false;
+		if (!hasHeroActionRef.current) return false;
 		focusHeroPrimaryAction();
 		return true;
-	}, [focusHeroPrimaryAction, heroItems.length, showMediaBar]);
+	}, [focusHeroPrimaryAction]);
 	const handleHomePanelKeyDownCapture = useCallback((event) => {
 		const code = event.keyCode || event.which;
 		if (code !== KeyCodes.DOWN) return;
@@ -717,7 +836,11 @@ const HomePanel = ({
 	}
 
 	return (
-		<Panel {...rest} onKeyDownCapture={handleHomePanelKeyDownCapture}>
+		<Panel
+			{...rest}
+			autoFocus={autoFocusSelector ?? rest.autoFocus}
+			onKeyDownCapture={handleHomePanelKeyDownCapture}
+		>
 			{topToolbar}
 			{showEmptyState && (
 				<div className={css.emptyStateCenter}>
@@ -734,6 +857,7 @@ const HomePanel = ({
 			<Scroller
 				className={`${css.scroller} ${useCinematicHome ? css.scrollerCinematic : ''}`}
 				cbScrollTo={captureHomeScrollTo}
+				onScroll={handleHomeScrollMemory}
 				onScrollStop={handleHomeScrollMemoryStop}
 				verticalScrollbar={useCinematicHome ? 'hidden' : 'auto'}
 			>
@@ -761,13 +885,10 @@ const HomePanel = ({
 								: undefined}
 							onItemClick={handleItemClick}
 							getImageCandidates={getMediaRowImageCandidates}
-							imagesActive={
-								rowIndex >= Math.max(0, activeRowIndex - HOME_IMAGE_ROWS_BEHIND) &&
-								rowIndex <= activeRowIndex + HOME_IMAGE_ROWS_AHEAD
-							}
 							onRowVisible={handleRowVisible}
 							onRowFocus={handleRowFocus}
 							showEpisodeProgress={row.showEpisodeProgress}
+							reserveSubtitleLine={row.reserveSubtitleLine === true}
 							rowIndex={rowIndex}
 							onCardKeyDown={handleHomeCardKeyDown}
 							onMoreClick={handleViewMoreSection}

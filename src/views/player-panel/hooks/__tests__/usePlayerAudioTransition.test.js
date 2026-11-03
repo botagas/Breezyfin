@@ -383,6 +383,66 @@ describe('usePlayerAudioTransition', () => {
 		}));
 	});
 
+	it.each(['resolve', 'reject'])('does not publish a terminal failure when rollback is cancelled before restore can %s', async (settlement) => {
+		const props = createProps();
+		const restoration = createDeferred();
+		props.restorePlaybackSnapshot.mockReturnValue(restoration.promise);
+		const {result} = renderHook(() => usePlayerAudioTransition(props));
+		let transition;
+		await act(async () => {
+			transition = result.current.requestAudioTransition(2);
+		});
+		const sourceToken = props.nativeSourceTokenRef.current;
+		await act(async () => {
+			result.current.handleAudioTransitionFailed(sourceToken, 'replacement-failed');
+		});
+		expect(props.restorePlaybackSnapshot).toHaveBeenCalledTimes(1);
+		await act(async () => {
+			result.current.cancelAudioTransition();
+			if (settlement === 'resolve') restoration.resolve(true);
+			else restoration.reject(new Error('restore cancelled'));
+			await transition;
+		});
+		expect(props.onTerminalFailure).not.toHaveBeenCalled();
+		expect(result.current.active).toBe(false);
+	});
+
+	it('does not restore the old source when a recovery supersedes the replacement load', async () => {
+		const props = createProps();
+		props.loadVideo.mockImplementation(() => {
+			props.playbackOverrideRef.current = {recovery: true};
+			props.nativeSourceTokenRef.current = {itemId: 'item-1', generation: 5};
+			props.playbackSessionRef.current = {playSessionId: 'recovery-session'};
+			return Promise.resolve({status: 'stale', reason: 'superseded'});
+		});
+		props.restorePlaybackSnapshot.mockResolvedValue(false);
+		const {result} = renderHook(() => usePlayerAudioTransition(props));
+		await act(async () => {
+			await result.current.requestAudioTransition(2);
+		});
+		expect(props.restorePlaybackSnapshot).not.toHaveBeenCalled();
+		expect(props.onTerminalFailure).not.toHaveBeenCalled();
+		expect(props.reportPlaybackSessionStopped).toHaveBeenCalledWith(expect.objectContaining({
+			session: {playSessionId: 'session-2'}
+		}));
+		expect(result.current.active).toBe(false);
+	});
+
+	it('still reports a genuine rollback restoration failure', async () => {
+		const props = createProps();
+		props.restorePlaybackSnapshot.mockResolvedValue(false);
+		const {result} = renderHook(() => usePlayerAudioTransition(props));
+		let transition;
+		await act(async () => {
+			transition = result.current.requestAudioTransition(2);
+		});
+		await act(async () => {
+			result.current.handleAudioTransitionFailed(props.nativeSourceTokenRef.current, 'replacement-failed');
+			await transition;
+		});
+		expect(props.onTerminalFailure).toHaveBeenCalledTimes(1);
+	});
+
 	it('does not stop an ambiguous session reused by the replacement', async () => {
 		const props = createProps();
 		props.preparePlaybackPlan.mockResolvedValue({

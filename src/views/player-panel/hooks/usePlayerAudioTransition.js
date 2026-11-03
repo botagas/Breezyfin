@@ -159,9 +159,19 @@ export const usePlayerAudioTransition = ({
 		try {
 			operation.completion = createCompletion();
 			const restored = await restorePlaybackSnapshot?.(operation.snapshot, operation.id);
-			if (!restored || !isOperationCurrent(operation)) throw new Error('Previous source could not be restored');
+			if (!isOperationOwned(operation)) return false;
+			if (!restored) throw new Error('Previous source could not be restored');
+			if (!isOperationCurrent(operation)) {
+				finishOperation(operation);
+				return false;
+			}
 			const restoredOutcome = await operation.completion.promise;
-			if (!restoredOutcome?.success || !isOperationCurrent(operation)) {
+			if (!isOperationOwned(operation)) return false;
+			if (!isOperationCurrent(operation)) {
+				finishOperation(operation);
+				return false;
+			}
+			if (!restoredOutcome?.success) {
 				throw new Error(restoredOutcome?.reason || 'Previous source did not become ready');
 			}
 			setPhase('failed');
@@ -172,6 +182,7 @@ export const usePlayerAudioTransition = ({
 			});
 			return true;
 		} catch (error) {
+			if (!isOperationOwned(operation)) return false;
 			finishOperation(operation);
 			onTerminalFailure?.(
 				'Audio track switching failed and the previous playback source could not be restored.'
@@ -311,6 +322,12 @@ export const usePlayerAudioTransition = ({
 				deferTrackState: true,
 				suppressErrors: true
 			});
+			if (!isOperationOwned(operation)) return false;
+			if (loadResult?.status === 'stale') {
+				stopTransitionSession(operation, operation.replacementSession, operation.snapshot.playbackSession, {skipIfActive: true});
+				finishOperation(operation);
+				return false;
+			}
 			if (loadResult?.status !== 'attached') {
 				return rollback(operation, loadResult?.reason || loadResult?.error?.message || 'replacement-not-attached');
 			}

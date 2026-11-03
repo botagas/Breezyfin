@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Panel, Header} from '../components/BreezyPanels';
+import {Header, Panel} from '../components/BreezyPanels';
 import BodyText from '@enact/sandstone/BodyText';
 import Toolbar from '../components/Toolbar';
 import MediaFilterControls from '../components/MediaFilterControls';
@@ -15,17 +15,11 @@ import {useMediaFilterState} from '../hooks/useMediaFilterState';
 import {getHomeSectionDescriptor, isMyRequestsHomeSection} from '../constants/homeSections';
 import {MEDIA_GRID_PAGE_SIZE} from '../constants/pagination';
 import {getJellyfinUsername} from '../utils/jellyfinUser';
-import {
-	MEDIA_FILTER_OPTIONS,
-	mediaItemMatchesFilters
-} from '../utils/mediaFilters';
+import {MEDIA_FILTER_OPTIONS, mediaItemMatchesFilters} from '../utils/mediaFilters';
 import {buildGridQuerySignature} from '../utils/gridScrollRestore';
 import {focusSpotlightTarget} from '../utils/gridFocus';
 import {usePluginMediaItemPopup} from '../hooks/usePluginMediaItemPopup';
-import {
-	collectFilteredHomeSectionPage,
-	normalizeHomeSectionPage
-} from './home-section-panel/utils/homeSectionPaging';
+import {collectFilteredHomeSectionPage, normalizeHomeSectionPage} from './home-section-panel/utils/homeSectionPaging';
 import {fetchHomeSectionPage} from './home-section-panel/utils/homeSectionSource';
 
 import css from './LibraryPanel.module.less';
@@ -109,6 +103,17 @@ const HomeSectionPanel = ({
 		nextStartIndexRef.current = cachedItems.length;
 		lastFocusedCardIdRef.current = null;
 	}
+	const handlePanelBack = useCallback(() => {
+		if (externalItemOpen) {
+			closeExternalItem();
+			return true;
+		}
+		if (filterPopupOpen) {
+			closeFilterPopup();
+			return true;
+		}
+		return false;
+	}, [closeExternalItem, closeFilterPopup, externalItemOpen, filterPopupOpen]);
 	const toolbarActions = usePanelToolbarActions({
 		onNavigate,
 		onSwitchUser,
@@ -116,17 +121,7 @@ const HomeSectionPanel = ({
 		onExit,
 		registerBackHandler,
 		isActive,
-		onPanelBack: () => {
-			if (externalItemOpen) {
-				closeExternalItem();
-				return true;
-			}
-			if (filterPopupOpen) {
-				closeFilterPopup();
-				return true;
-			}
-			return false;
-		}
+		onPanelBack: handlePanelBack
 	});
 	const itemsById = useMapById(items);
 	const hasActiveFilters = activeFilterCount > 0;
