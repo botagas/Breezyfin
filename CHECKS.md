@@ -76,6 +76,11 @@ Run these before packaging a release candidate:
 
 ### Playback/path validation
 
+- Start native HLS from a slow or cold server that takes more than 3.5 seconds to
+  produce startup evidence. Verify playback can start before the 10-second fallback
+  without switching engines. Force a native error and verify immediate fallback.
+  Press Back before the timeout and verify no later engine switch or playback starts.
+
 - Start DirectPlay with an explicit non-default audio track that the runtime does
   not expose. Confirm the delayed fallback uses the current media source and position.
   Replace playback before discovery times out and confirm the old source cannot restart.

@@ -11,7 +11,7 @@ import {selectHlsEnginePreference} from '../utils/playerVideoLoaderHelpers';
 import {PLAYER_HLS_ENGINE_STARTUP_TIMEOUT_MS} from '../utils/playerStartupState';
 import {createHlsStartupMeasurements} from '../utils/hlsStartupMeasurements';
 
-const NATIVE_HLS_FALLBACK_TIMEOUT_MS = 3500;
+const NATIVE_HLS_FALLBACK_TIMEOUT_MS = 10000;
 
 const safelyResetVideo = (video) => {
 	if (!video) return;

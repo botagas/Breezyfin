@@ -232,6 +232,11 @@ describe('usePlayerSourcePipeline', () => {
 		act(() => {
 			jest.advanceTimersByTime(3500);
 		});
+		expect(Hls).not.toHaveBeenCalled();
+
+		act(() => {
+			jest.advanceTimersByTime(6500);
+		});
 		const hlsToken = view.props.nativeSourceTokenRef.current;
 		expect(Hls).toHaveBeenCalledTimes(1);
 		expect(hlsToken.engine).toBe('hls.js');
@@ -243,6 +248,56 @@ describe('usePlayerSourcePipeline', () => {
 		);
 	});
 
+	it('keeps native HLS when playback starts after seven seconds', () => {
+		const view = createPipeline({nativeHls: true});
+		const {result} = renderHook(() => usePlayerSourcePipeline(view.props));
+		let nativeToken;
+		act(() => {
+			nativeToken = result.current.attachSource(view.descriptor);
+			jest.advanceTimersByTime(7100);
+		});
+		expect(Hls).not.toHaveBeenCalled();
+
+		act(() => {
+			view.video.emit('playing');
+			jest.advanceTimersByTime(10000);
+		});
+		expect(Hls).not.toHaveBeenCalled();
+		expect(view.props.nativeSourceTokenRef.current).toBe(nativeToken);
+		expect(view.props.onPlaybackSourceInvalidated).not.toHaveBeenCalled();
+	});
+
+	it('falls back immediately on a native HLS error without waiting for the timeout', () => {
+		const view = createPipeline({nativeHls: true});
+		const {result} = renderHook(() => usePlayerSourcePipeline(view.props));
+		act(() => {
+			result.current.attachSource(view.descriptor);
+			jest.advanceTimersByTime(100);
+			view.video.emit('error');
+		});
+		expect(Hls).toHaveBeenCalledTimes(1);
+		expect(view.props.nativeSourceTokenRef.current.engine).toBe('hls.js');
+
+		act(() => {
+			jest.advanceTimersByTime(10000);
+		});
+		expect(Hls).toHaveBeenCalledTimes(1);
+	});
+
+	it('cancels pending native HLS fallback when the source is detached', () => {
+		const view = createPipeline({nativeHls: true});
+		const {result} = renderHook(() => usePlayerSourcePipeline(view.props));
+		act(() => {
+			result.current.attachSource(view.descriptor);
+			jest.advanceTimersByTime(5000);
+			result.current.detachSource();
+			jest.advanceTimersByTime(15000);
+		});
+		expect(Hls).not.toHaveBeenCalled();
+		expect(view.props.nativeSourceTokenRef.current).toBeNull();
+		expect(view.props.nativeHlsFallbackCleanupRef.current).toBeNull();
+	});
+
 	it('does not treat loadeddata readiness as native HLS playback evidence', () => {
 		const view = createPipeline({nativeHls: true});
 		const {result} = renderHook(() => usePlayerSourcePipeline(view.props));
@@ -252,7 +307,7 @@ describe('usePlayerSourcePipeline', () => {
 		});
 		view.video.readyState = 2;
 		act(() => {
-			jest.advanceTimersByTime(3500);
+			jest.advanceTimersByTime(10000);
 		});
 
 		expect(Hls).toHaveBeenCalledTimes(1);
@@ -280,7 +335,7 @@ describe('usePlayerSourcePipeline', () => {
 		expect(Hls).not.toHaveBeenCalled();
 
 		act(() => {
-			jest.advanceTimersByTime(3500);
+			jest.advanceTimersByTime(10000);
 		});
 		expect(Hls).toHaveBeenCalledTimes(1);
 		expect(view.props.nativeSourceTokenRef.current.engine).toBe('hls.js');
